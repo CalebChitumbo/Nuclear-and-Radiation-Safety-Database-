@@ -29,6 +29,13 @@ yarn-error.log*
 .env*.local
 .env
 
+# service account keys — NEVER commit these
+service-account.json
+service-account*.json
+*-firebase-adminsdk-*.json
+gcp-key.json
+*.serviceaccount.json
+
 # typescript
 *.tsbuildinfo
 
