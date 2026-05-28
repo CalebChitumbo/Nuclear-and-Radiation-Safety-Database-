@@ -1,0 +1,12 @@
+{
+  "name": "RPA Regulatory System",
+  "short_name": "RPA",
+  "description": "Radiation Protection Authority of Zambia — Nuclear & Radiation Safety regulatory information system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4EC",
+  "theme_color": "#00A050",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

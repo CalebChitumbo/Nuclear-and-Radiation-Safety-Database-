@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function role()     { return request.auth.token.role; }
+    function section()  { return request.auth.token.section; }
+    function isAdmin()  { return signedIn() && role() == 'admin'; }
+    function isAS()     {
+      return signedIn() && (
+        section() == 'Authorisation & Standards' ||
+        section() == 'All' || isAdmin()
+      );
+    }
+    function isInsp() {
+      return signedIn() && (
+        section() == 'Inspectorate' ||
+        section() == 'All' || isAdmin()
+      );
+    }
+
+    function validFacility(d) {
+      return d.name is string && d.name.size() > 0
+        && d.province is string
+        && d.sector in ['Public','Private']
+        && d.licensed is bool
+        && d.stage is string;
+    }
+
+    function validEvent(d) {
+      return d.date is string && d.date.matches('\\d{4}-\\d{2}-\\d{2}')
+        && d.week is string && d.week.size() > 0
+        && d.type is string
+        && d.facilityName is string;
+    }
+
+    function validInspection(d) {
+      return d.date is string && d.date.matches('\\d{4}-\\d{2}-\\d{2}')
+        && d.week is string && d.week.size() > 0
+        && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
+        && d.outcome in ['Compliant','Minor findings','Major findings','Non-compliant','N/A'];
+    }
+
+    match /facilities/{id} {
+      allow read:   if signedIn();
+      allow create: if isAS() && validFacility(request.resource.data);
+      allow update: if isAS() && validFacility(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /licenceEvents/{id} {
+      allow read:   if signedIn();
+      allow create: if isAS() && validEvent(request.resource.data);
+      allow update: if isAS() && validEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /inspections/{id} {
+      allow read:   if signedIn();
+      allow create: if isInsp() && validInspection(request.resource.data);
+      allow update: if isInsp() && validInspection(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /weekMetrics/{week} {
+      allow read:  if signedIn();
+      allow write: if signedIn();
+    }
+
+    match /activities/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.resource.data.updatedBy == request.auth.uid;
+      allow update, delete:
+        if isAdmin() || resource.data.updatedBy == request.auth.uid;
+    }
+
+    match /aggregates/{doc} {
+      allow read:  if signedIn();
+      allow write: if false;
+    }
+
+    match /config/{doc} {
+      allow read:  if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read:  if isAdmin() || request.auth.uid == uid;
+      allow write: if isAdmin();
+    }
+  }
+}

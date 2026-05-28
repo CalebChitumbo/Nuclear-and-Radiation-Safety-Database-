@@ -1,0 +1,44 @@
+{
+  "name": "rpa-system",
+  "version": "1.0.0",
+  "description": "RPA Integrated Regulatory Information System — Radiation Protection Authority of Zambia",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "tsx scripts/seed.ts",
+    "seed:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts",
+    "emulator": "firebase emulators:start --import=./.emulator-data --export-on-exit",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:functions": "cd functions && npm run build && cd .. && firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting"
+  },
+  "dependencies": {
+    "next": "14.2.13",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "firebase": "10.13.2",
+    "firebase-admin": "12.5.0",
+    "clsx": "2.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.5",
+    "@types/react": "18.3.7",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.1",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.47",
+    "tailwindcss": "3.4.12",
+    "tsx": "4.19.1",
+    "typescript": "5.6.2",
+    "vitest": "2.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
