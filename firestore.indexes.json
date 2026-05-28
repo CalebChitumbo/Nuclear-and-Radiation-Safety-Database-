@@ -4,13 +4,6 @@
       "collectionGroup": "licenceEvents",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "week", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "licenceEvents",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "week", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
       ]
@@ -21,13 +14,6 @@
       "fields": [
         { "fieldPath": "facilityId", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "inspections",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "week", "order": "ASCENDING" }
       ]
     },
     {
@@ -60,13 +46,6 @@
       "fields": [
         { "fieldPath": "sector", "order": "ASCENDING" },
         { "fieldPath": "licensed", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "facilities",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "nameLower", "order": "ASCENDING" }
       ]
     }
   ],
