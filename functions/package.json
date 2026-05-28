@@ -7,7 +7,7 @@
     "deploy": "firebase deploy --only functions",
     "serve": "npm run build && firebase emulators:start --only functions"
   },
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "dependencies": {
     "firebase-admin": "12.5.0",
     "firebase-functions": "5.0.1"
