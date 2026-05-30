@@ -15,7 +15,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
-import { getDb } from "../firebase";
+import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import { recordLicence } from "../rules/recordLicence";
@@ -276,10 +276,37 @@ class FirebaseStore implements DataStore {
     return facility;
   }
 
-  async addUser(u: Omit<UserDoc, "uid">): Promise<UserDoc> {
-    const db = requireDb();
-    const ref = await addDoc(collection(db, "users"), u);
-    return { ...u, uid: ref.id };
+  async provisionUser(input: {
+    email: string;
+    displayName: string;
+    role: UserDoc["role"];
+    section: UserDoc["section"];
+    password: string;
+  }): Promise<{ uid: string }> {
+    // Provisioning a real account needs Admin-SDK privileges (create the Auth
+    // user + set custom claims), so it runs in the setUserClaims Cloud Function.
+    // The function self-guards: it rejects callers whose token role != "admin".
+    const functions = getFbFunctions();
+    if (!functions) throw new Error("Firebase Functions are not configured.");
+    const { httpsCallable } = await import("firebase/functions");
+    const callable = httpsCallable<
+      {
+        email: string;
+        password: string;
+        displayName: string;
+        role: string;
+        section: string;
+      },
+      { uid: string }
+    >(functions, "setUserClaims");
+    const res = await callable({
+      email: input.email,
+      password: input.password,
+      displayName: input.displayName,
+      role: input.role,
+      section: input.section,
+    });
+    return res.data;
   }
 
   async setUserDisabled(uid: string, disabled: boolean): Promise<void> {

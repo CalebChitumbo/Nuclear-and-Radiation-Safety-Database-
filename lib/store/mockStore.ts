@@ -351,6 +351,25 @@ class MockStore implements DataStore {
     return user;
   }
 
+  async provisionUser(input: {
+    email: string;
+    displayName: string;
+    role: UserDoc["role"];
+    section: UserDoc["section"];
+    password: string;
+  }): Promise<{ uid: string }> {
+    // Demo mode has no real Auth backend — store the account locally and ignore
+    // the password. Mirrors what the setUserClaims Cloud Function does in
+    // Firebase mode (create the user + persist role/section).
+    const user = await this.addUser({
+      email: input.email,
+      displayName: input.displayName,
+      role: input.role,
+      section: input.section,
+    });
+    return { uid: user.uid };
+  }
+
   async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
     const s = ensure();
     s.users = s.users.map((u) => (u.uid === uid ? { ...u, disabled } : u));
