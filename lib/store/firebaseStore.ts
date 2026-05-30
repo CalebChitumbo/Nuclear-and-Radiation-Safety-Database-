@@ -223,10 +223,12 @@ class FirebaseStore implements DataStore {
       }
     }
 
-    // Recompute aggregate in the same batch.
-    const agg = computeAggregate(Array.from(facMap.values()));
-    batch.set(doc(db, "aggregates", "dashboard"), agg);
-
+    // NOTE: aggregates/dashboard is maintained by the onFacilityWrite Cloud
+    // Function (Admin SDK). firestore.rules blocks client writes to it
+    // ("allow write: if false"), and a Firestore batch is atomic — including
+    // an aggregate write here would make the whole bulk-approval commit fail
+    // with a permission error. So we deliberately omit it; the Cloud Function
+    // recomputes the rollup once these facility writes land.
     await batch.commit();
     return {
       eventIds,
