@@ -3,6 +3,7 @@ import type { Facility } from "./types";
 export function norm(s: string): string {
   return (s || "")
     .toLowerCase()
+    .replace(/&/g, " and ")
     .replace(/[^a-z0-9 ]/g, " ")
     .replace(/\b(ltd|limited|plc|inc|co|company)\b/g, " ")
     .replace(/\s+/g, " ")
@@ -18,6 +19,69 @@ export function jaccard(a: string, b: string): number {
     if (B.has(t)) intersect++;
   });
   return intersect / (A.size + B.size - intersect);
+}
+
+/**
+ * Generic words that appear in a great many facility names and so carry little
+ * identifying signal. They are down-weighted (not dropped) so that two names
+ * which differ only by, say, "Hospital" vs "Clinic" still score on the strength
+ * of their distinctive words instead of being dragged down to a coin-flip.
+ */
+const GENERIC_TOKENS = new Set([
+  "hospital", "hospitals", "hosp", "clinic", "clinics", "medical", "medicare",
+  "centre", "center", "health", "healthcare", "general", "district", "care",
+  "services", "service", "mission", "university", "college", "school",
+  "council", "board", "institute", "institution", "laboratory", "lab", "labs",
+  "diagnostic", "diagnostics", "pharmacy", "dental", "trust", "group",
+  "holdings", "enterprises", "enterprise", "national", "rural", "urban",
+  "provincial", "public", "private", "the", "of", "and",
+]);
+
+function tokenWeight(t: string): number {
+  return GENERIC_TOKENS.has(t) ? 0.3 : 1;
+}
+
+/**
+ * Weighted Jaccard over name tokens: shared-token weight ÷ union-token weight,
+ * with generic words counting for less. More forgiving than plain Jaccard when
+ * names differ only by a common word, without rewarding matches on common words
+ * alone.
+ */
+export function weightedTokenSim(a: string, b: string): number {
+  const A = new Set(norm(a).split(" ").filter(Boolean));
+  const B = new Set(norm(b).split(" ").filter(Boolean));
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  let union = 0;
+  new Set([...A, ...B]).forEach((t) => {
+    const w = tokenWeight(t);
+    union += w;
+    if (A.has(t) && B.has(t)) inter += w;
+  });
+  return union ? inter / union : 0;
+}
+
+function trigrams(s: string): Set<string> {
+  const t = norm(s).replace(/ /g, "");
+  const g = new Set<string>();
+  for (let i = 0; i <= t.length - 3; i++) g.add(t.slice(i, i + 3));
+  return g;
+}
+
+/**
+ * Character-trigram Dice coefficient — a fuzzy, spelling-tolerant similarity
+ * used as a fallback to rescue typos and minor spelling variants (e.g.
+ * "Mediheal" vs "Medihealth") that token matching would miss.
+ */
+export function trigramSim(a: string, b: string): number {
+  const A = trigrams(a);
+  const B = trigrams(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  A.forEach((g) => {
+    if (B.has(g)) inter++;
+  });
+  return (2 * inter) / (A.size + B.size);
 }
 
 export function scoreMatch(
@@ -43,7 +107,12 @@ export function scoreMatch(
   ) {
     return 0.9;
   }
-  return jaccard(query, fac.name);
+  const wj = weightedTokenSim(query, fac.name);
+  // Trigram similarity is a softer fallback: only let it contribute when it is
+  // genuinely high, and scaled down, so spelling variants are rescued without
+  // lifting unrelated names over the match threshold.
+  const tg = trigramSim(query, fac.name);
+  return Math.max(wj, tg >= 0.6 ? tg * 0.8 : 0);
 }
 
 export interface MatchResult {
