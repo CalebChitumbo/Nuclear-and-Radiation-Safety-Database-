@@ -21,12 +21,24 @@ describe("week.ts", () => {
     );
   });
 
-  it("weekend dates between weeks return null", () => {
-    expect(weekForDate("2026-05-30", weeks)).toBeNull();
+  it("snaps weekend/gap dates to the most recent reporting week", () => {
+    // Sat/Sun after W22's Friday end must still belong to a week (not null),
+    // otherwise the event carries an empty `week` the security rules reject.
+    expect(weekForDate("2026-05-30", weeks)?.label).toBe(
+      "W22 — wk of 25 May 2026",
+    );
+    expect(weekForDate("2026-05-31", weeks)?.label).toBe(
+      "W22 — wk of 25 May 2026",
+    );
   });
 
-  it("weekLabelForDate uses fallback when no match", () => {
-    expect(weekLabelForDate("2026-12-31", weeks, "unknown")).toBe("unknown");
+  it("weekLabelForDate always yields a real week for in-calendar dates", () => {
+    // A date past the last known week snaps to the last week (never empty).
+    expect(weekLabelForDate("2026-12-31", weeks, "unknown")).toBe(
+      "W23 — wk of 01 Jun 2026",
+    );
+    // The fallback is only used when there are no weeks at all.
+    expect(weekLabelForDate("2026-05-27", [], "unknown")).toBe("unknown");
   });
 
   it("currentWeek returns the week containing today", () => {
