@@ -15,7 +15,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
-import { getDb } from "../firebase";
+import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import { recordLicence } from "../rules/recordLicence";
@@ -223,10 +223,12 @@ class FirebaseStore implements DataStore {
       }
     }
 
-    // Recompute aggregate in the same batch.
-    const agg = computeAggregate(Array.from(facMap.values()));
-    batch.set(doc(db, "aggregates", "dashboard"), agg);
-
+    // NOTE: aggregates/dashboard is maintained by the onFacilityWrite Cloud
+    // Function (Admin SDK). firestore.rules blocks client writes to it
+    // ("allow write: if false"), and a Firestore batch is atomic — including
+    // an aggregate write here would make the whole bulk-approval commit fail
+    // with a permission error. So we deliberately omit it; the Cloud Function
+    // recomputes the rollup once these facility writes land.
     await batch.commit();
     return {
       eventIds,
@@ -274,10 +276,37 @@ class FirebaseStore implements DataStore {
     return facility;
   }
 
-  async addUser(u: Omit<UserDoc, "uid">): Promise<UserDoc> {
-    const db = requireDb();
-    const ref = await addDoc(collection(db, "users"), u);
-    return { ...u, uid: ref.id };
+  async provisionUser(input: {
+    email: string;
+    displayName: string;
+    role: UserDoc["role"];
+    section: UserDoc["section"];
+    password: string;
+  }): Promise<{ uid: string }> {
+    // Provisioning a real account needs Admin-SDK privileges (create the Auth
+    // user + set custom claims), so it runs in the setUserClaims Cloud Function.
+    // The function self-guards: it rejects callers whose token role != "admin".
+    const functions = getFbFunctions();
+    if (!functions) throw new Error("Firebase Functions are not configured.");
+    const { httpsCallable } = await import("firebase/functions");
+    const callable = httpsCallable<
+      {
+        email: string;
+        password: string;
+        displayName: string;
+        role: string;
+        section: string;
+      },
+      { uid: string }
+    >(functions, "setUserClaims");
+    const res = await callable({
+      email: input.email,
+      password: input.password,
+      displayName: input.displayName,
+      role: input.role,
+      section: input.section,
+    });
+    return res.data;
   }
 
   async setUserDisabled(uid: string, disabled: boolean): Promise<void> {

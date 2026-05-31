@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { useToast } from "@/components/Toast";
+import { isMockMode } from "@/lib/firebase";
 import {
   ROLES,
   SECTIONS,
@@ -24,6 +25,7 @@ export default function AdminUsersPage() {
   const [section, setSection] = useState<Section | "All">(
     "Authorisation & Standards",
   );
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   if (!isAdmin) {
@@ -36,19 +38,33 @@ export default function AdminUsersPage() {
 
   const add = async () => {
     if (!email.trim() || !displayName.trim()) return;
+    if (!isMockMode && password.length < 6) {
+      toast.push("Set a temporary password of at least 6 characters.", "error");
+      return;
+    }
     setBusy(true);
     try {
       const s = await store();
-      await s.addUser({
+      const { uid } = await s.provisionUser({
         email: email.trim(),
         displayName: displayName.trim(),
         role,
         section,
+        password,
       });
-      toast.push(`User ${email} provisioned.`, "success");
+      toast.push(
+        `User ${email} provisioned (uid ${uid.slice(0, 6)}…).`,
+        "success",
+      );
       setEmail("");
       setDisplayName("");
+      setPassword("");
       reload();
+    } catch (err) {
+      toast.push(
+        err instanceof Error ? err.message : "Failed to provision user.",
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -108,18 +124,41 @@ export default function AdminUsersPage() {
               ))}
             </select>
           </div>
+          <div className="md:col-span-2">
+            <label className="caps text-[10px] text-gunmetal/60">
+              {isMockMode
+                ? "Temporary password (ignored in demo mode)"
+                : "Temporary password"}
+            </label>
+            <input
+              className="input mt-1"
+              type="password"
+              value={password}
+              autoComplete="new-password"
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={
+                isMockMode ? "(not required in demo mode)" : "min. 6 characters"
+              }
+            />
+          </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
           <button
-            disabled={busy || !email.trim() || !displayName.trim()}
+            disabled={
+              busy ||
+              !email.trim() ||
+              !displayName.trim() ||
+              (!isMockMode && password.length < 6)
+            }
             className="btn btn-primary"
             onClick={add}
           >
             {busy ? "Adding…" : "Provision account"}
           </button>
           <div className="text-xs text-gunmetal/55">
-            In production, a Cloud Function creates the Firebase Auth user and
-            sets <code>role</code> + <code>section</code> custom claims.
+            {isMockMode
+              ? "Demo mode: the account is stored locally — no real sign-in is created."
+              : "Creates the Firebase Auth account and sets the role + section custom claims via the setUserClaims Cloud Function. Share the temporary password securely; the user can change it after first sign-in."}
           </div>
         </div>
       </div>

@@ -11,6 +11,11 @@ import {
   type Firestore,
   connectFirestoreEmulator,
 } from "firebase/firestore";
+import {
+  getFunctions,
+  type Functions,
+  connectFunctionsEmulator,
+} from "firebase/functions";
 
 export const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK === "1";
 export const useEmulators = process.env.NEXT_PUBLIC_USE_EMULATORS === "1";
@@ -27,6 +32,7 @@ const firebaseConfig = {
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
+let _functions: Functions | null = null;
 
 export function getFirebaseApp(): FirebaseApp | null {
   if (isMockMode) return null;
@@ -68,4 +74,21 @@ export function getDb(): Firestore | null {
     }
   }
   return _db;
+}
+
+export function getFbFunctions(): Functions | null {
+  if (isMockMode) return null;
+  if (_functions) return _functions;
+  const app = getFirebaseApp();
+  if (!app) return null;
+  // setUserClaims (and the other functions) are deployed to us-central1.
+  _functions = getFunctions(app, "us-central1");
+  if (useEmulators) {
+    try {
+      connectFunctionsEmulator(_functions, "localhost", 5001);
+    } catch {
+      /* already connected */
+    }
+  }
+  return _functions;
 }

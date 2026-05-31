@@ -14,8 +14,8 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("admin@rpa.gov.zm");
-  const [password, setPassword] = useState("demo");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -45,7 +45,13 @@ export interface DataStore {
   addInspection(i: Omit<Inspection, "id">): Promise<Inspection>;
   updateFacility(id: string, patch: Partial<Facility>, uid: string): Promise<void>;
   addFacility(f: Omit<Facility, "id">, uid: string): Promise<Facility>;
-  addUser(u: Omit<UserDoc, "uid">): Promise<UserDoc>;
+  provisionUser(input: {
+    email: string;
+    displayName: string;
+    role: UserDoc["role"];
+    section: UserDoc["section"];
+    password: string;
+  }): Promise<{ uid: string }>;
   setUserDisabled(uid: string, disabled: boolean): Promise<void>;
   exportAll(): Promise<{
     facilities: Facility[];

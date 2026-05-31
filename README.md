@@ -35,7 +35,7 @@ and is exercised by `tests/recordLicence.test.ts`. Do not bypass them.
 | Backend data | Cloud Firestore (Native) |
 | Auth | Firebase Authentication (email/password) + custom claims `{role, section}` |
 | Server logic | Cloud Functions (2nd gen, TypeScript) |
-| Hosting | Firebase App Hosting (or Hosting + Functions SSR) |
+| Hosting | **Vercel** (Next.js frontend) · Firebase backend (Firestore, Auth, Cloud Functions) |
 | Tests | Vitest |
 
 The Firestore SDK is loaded only when running in **Firebase mode**. The app
@@ -49,7 +49,7 @@ credentials.
 
 ```bash
 cp .env.local.example .env.local
-# .env.local already defaults to NEXT_PUBLIC_USE_MOCK=1
+# set NEXT_PUBLIC_USE_MOCK=1 in .env.local to run the no-Firebase demo
 npm install
 npm run dev
 # open http://localhost:3000
@@ -98,6 +98,66 @@ firebase emulators:start
 NEXT_PUBLIC_USE_EMULATORS=1 NEXT_PUBLIC_USE_MOCK= npm run dev
 FIRESTORE_EMULATOR_HOST=localhost:8080 npm run seed:emulator
 ```
+
+---
+
+## Deploy to Vercel
+
+The Next.js **frontend** is hosted on Vercel; the **backend stays on Firebase**
+(Firestore, Authentication, Cloud Functions, security rules and the seeded
+register — all unchanged). The browser talks to Firestore/Auth directly, so no
+Firebase **secrets** ever touch a Vercel server — only the public
+`NEXT_PUBLIC_FIREBASE_*` web config, which is designed to ship to the client.
+
+### 1. Import the repository
+
+In the Vercel dashboard: **Add New… → Project → Import** this Git repository.
+Vercel auto-detects Next.js — leave the build & output settings at their
+defaults (`vercel.json` pins the framework).
+
+### 2. Add environment variables
+
+Add these under **Project → Settings → Environment Variables** (Production **and**
+Preview). Copy the values from Firebase Console → _Project settings → Your apps →
+SDK setup and configuration_.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | ✅ | Web API key |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | ✅ | `your-project.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ✅ | |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | ✅ | |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | ✅ | |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | ✅ | |
+| `NEXT_PUBLIC_USE_MOCK` | — | **Leave empty / unset.** `1` would force the localStorage demo. |
+| `NEXT_PUBLIC_USE_EMULATORS` | — | **Leave empty / unset.** |
+
+> ⚠️ `NEXT_PUBLIC_*` values are inlined at **build time**. If you add or change
+> them, trigger a **redeploy** so the new values take effect.
+
+### 3. Deploy
+
+Click **Deploy**. After that, every push to the connected branch redeploys
+automatically (Production for the production branch, Preview for others).
+
+### 4. One-time Firebase settings for the new domain
+
+- **Authorized domains** — Firebase Console → Authentication → Settings →
+  Authorized domains: add your `*.vercel.app` domain and any custom domain.
+  (Required for Google/OAuth or email-link sign-in; harmless for email/password.)
+- **API key restrictions** — Google Cloud Console → APIs & Services → Credentials:
+  if you restricted the Web API key by **HTTP referrer**, add
+  `https://your-app.vercel.app/*` (and your custom domain), otherwise Firebase
+  calls will be blocked from the new origin.
+
+### Notes
+
+- The dashboard rollup (`aggregates/dashboard`) is maintained by the deployed
+  `onFacilityWrite` Cloud Function. **Keep Functions deployed on Firebase** — the
+  Vercel frontend never writes that document (the rules forbid it), it only reads
+  it.
+- `firebase.json`, `firestore.rules`, `firestore.indexes.json` and `functions/`
+  stay in the repo for your Firebase backend; Vercel ignores them.
 
 ---
 
