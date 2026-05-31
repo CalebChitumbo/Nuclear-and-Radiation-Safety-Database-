@@ -25,6 +25,15 @@ export const STAGES = [
   "Under Internal Review (Further Information Required)",
   "CEO Licence Approval Required",
   "Import Licence Only (Not yet Use/Possession)",
+  // Added for the Licensing Status (RAIS workflow) tracker. These let the
+  // facility register / Overview reflect the full pipeline an application moves
+  // through once notifications are imported on the Licensing Status tab.
+  "Application Submitted",
+  "Under Review and Assessment",
+  "Authorization Terms Issued",
+  "Board Licence Approval Required",
+  "Licence / Certificate Issued",
+  "Inspection in Progress",
 ] as const;
 export type Stage = (typeof STAGES)[number];
 
@@ -123,6 +132,72 @@ export interface Inspection {
   sector: Sector | "";
   notes: string;
   createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * Kanban columns for the Licensing Status board, in pipeline order. Each parsed
+ * RAIS notification is mapped to exactly one phase (see parseNotifications.ts).
+ */
+export const WORKFLOW_PHASES = [
+  "Application",
+  "Payment",
+  "Accounts Clearance",
+  "RPA Receipt",
+  "Review & Assessment",
+  "Authorization / Conditions",
+  "Approval (CEO/Board)",
+  "Licence Issued",
+  "Inspection",
+  "Other",
+] as const;
+export type WorkflowPhase = (typeof WORKFLOW_PHASES)[number];
+
+/** Urgency buckets, mirroring the officer's RAIS triage prompt. */
+export const WORKFLOW_PRIORITIES = [
+  "CRITICAL",
+  "HIGH",
+  "NORMAL",
+  "APPLICANT",
+] as const;
+export type WorkflowPriority = (typeof WORKFLOW_PRIORITIES)[number];
+
+/**
+ * One licensing application tracked through the RAIS pipeline, keyed by its
+ * workflow RAN (e.g. AUTH/USE.REN/1097). Produced by the Licensing Status tab's
+ * parser from pasted dashboard notifications and persisted so the register stays
+ * current across reloads. A facility can own several of these at once (different
+ * RANs), which is why the unit is the RAN, not the facility.
+ */
+export interface LicenceWorkflow {
+  id: string;
+  ran: string;
+  ranType: string;
+  facilityId: string | null;
+  facilityName: string;
+  facCode: string;
+  /** Fuzzy-match confidence (0–1) against the register; 1 = exact FAC code. */
+  matchScore?: number;
+  /** The furthest-reached notification title (what the card headline shows). */
+  notificationTitle: string;
+  /** Short sub-stage label shown on the card, e.g. "CEO Approval". */
+  stage: string;
+  phase: WorkflowPhase;
+  responsibleParty: string;
+  priority: WorkflowPriority;
+  outstandingPayment: boolean;
+  bottleneck: boolean;
+  /** Payment workflow RAN (AUTH/PAY/####) when one was seen. */
+  paymentRan?: string;
+  /** Human-readable dependency / bottleneck alerts for this application. */
+  alerts: string[];
+  /** Every notification title seen for this RAN, in input order. */
+  notifications: string[];
+  /** The Stage value rolled up onto the matched facility on commit. */
+  facilityStage: Stage;
+  /** Most recent date seen in the notifications (DD/MM/YYYY as pasted). */
+  lastSeen: string;
   updatedAt?: string;
   updatedBy?: string;
 }

@@ -8,6 +8,7 @@ import {
   type Inspection,
   type LicenceEvent,
   type LicenceType,
+  type LicenceWorkflow,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -26,6 +27,7 @@ interface State {
   licenceEvents: LicenceEvent[];
   inspections: Inspection[];
   activities: Activity[];
+  licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
   users: UserDoc[];
 }
@@ -36,6 +38,7 @@ function freshState(): State {
     licenceEvents: [],
     inspections: [],
     activities: [],
+    licenceWorkflows: [],
     weekMetrics: {},
     users: [
       {
@@ -72,7 +75,10 @@ function load(): State {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
       return s;
     }
-    return JSON.parse(raw) as State;
+    const parsed = JSON.parse(raw) as State;
+    // Back-compat: stores saved before the Licensing Status tab lack this array.
+    if (!parsed.licenceWorkflows) parsed.licenceWorkflows = [];
+    return parsed;
   } catch {
     return freshState();
   }
@@ -135,6 +141,10 @@ class MockStore implements DataStore {
 
   async listActivities(): Promise<Activity[]> {
     return [...ensure().activities];
+  }
+
+  async listLicenceWorkflows(): Promise<LicenceWorkflow[]> {
+    return [...ensure().licenceWorkflows];
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -306,6 +316,46 @@ class MockStore implements DataStore {
     return ins;
   }
 
+  async saveLicenceWorkflows(
+    items: LicenceWorkflow[],
+    uid: string,
+  ): Promise<{ saved: number; facilitiesUpdated: number }> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    const byRan = new Map(
+      s.licenceWorkflows.map((w) => [w.ran || w.id, w]),
+    );
+    for (const item of items) {
+      byRan.set(item.ran || item.id, { ...item, updatedAt: now, updatedBy: uid });
+    }
+    s.licenceWorkflows = [...byRan.values()];
+
+    // Roll each matched application's stage up onto its facility so the register
+    // and the Overview pipeline reflect the imported RAIS status.
+    const stageByFacility = new Map<string, Facility["stage"]>();
+    for (const item of items) {
+      if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
+        stageByFacility.set(item.facilityId, item.facilityStage);
+      }
+    }
+    let facilitiesUpdated = 0;
+    if (stageByFacility.size) {
+      s.facilities = s.facilities.map((f) => {
+        const stage = stageByFacility.get(f.id);
+        // Never override an already-Licensed facility from a workflow import.
+        if (stage && !f.licensed && f.stage !== stage) {
+          facilitiesUpdated++;
+          return { ...f, stage, updatedAt: now, updatedBy: uid };
+        }
+        return f;
+      });
+    }
+
+    save(s);
+    dispatchChange();
+    return { saved: items.length, facilitiesUpdated };
+  }
+
   async updateFacility(
     id: string,
     patch: Partial<Facility>,
@@ -384,6 +434,7 @@ class MockStore implements DataStore {
       licenceEvents: s.licenceEvents,
       inspections: s.inspections,
       activities: s.activities,
+      licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
     };
   }

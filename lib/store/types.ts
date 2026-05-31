@@ -4,6 +4,7 @@ import type {
   Facility,
   Inspection,
   LicenceEvent,
+  LicenceWorkflow,
   UserDoc,
   WeekDef,
   WeekMetrics,
@@ -15,6 +16,7 @@ export interface DataStore {
   listLicenceEvents(): Promise<LicenceEvent[]>;
   listInspections(): Promise<Inspection[]>;
   listActivities(): Promise<Activity[]>;
+  listLicenceWorkflows(): Promise<LicenceWorkflow[]>;
   listUsers(): Promise<UserDoc[]>;
   getAggregate(): Promise<DashboardAggregate>;
   getWeeks(): Promise<WeekDef[]>;
@@ -43,6 +45,15 @@ export interface DataStore {
     };
   }>;
   addInspection(i: Omit<Inspection, "id">): Promise<Inspection>;
+  /**
+   * Upsert parsed RAIS workflow records (keyed by RAN) and roll each matched
+   * facility's stage up onto its facility doc. Returns how many facility stages
+   * were updated. Used by the Licensing Status tab.
+   */
+  saveLicenceWorkflows(
+    items: LicenceWorkflow[],
+    uid: string,
+  ): Promise<{ saved: number; facilitiesUpdated: number }>;
   updateFacility(id: string, patch: Partial<Facility>, uid: string): Promise<void>;
   addFacility(f: Omit<Facility, "id">, uid: string): Promise<Facility>;
   provisionUser(input: {
@@ -58,6 +69,7 @@ export interface DataStore {
     licenceEvents: LicenceEvent[];
     inspections: Inspection[];
     activities: Activity[];
+    licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;
   }>;
 }
