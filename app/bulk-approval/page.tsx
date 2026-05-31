@@ -8,7 +8,7 @@ import { useStoreData } from "@/lib/storeHooks";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { detectType } from "@/lib/rules/detectType";
-import { matchOne, parseBulkLine } from "@/lib/rules/matching";
+import { classifyMatch, matchOne, parseBulkLine } from "@/lib/rules/matching";
 import { weekLabelForDate } from "@/lib/rules/week";
 import {
   isUseP,
@@ -339,6 +339,17 @@ function ReviewRowEditor({
     : null;
   const eff = effectFor(row.type, fac, row.decision === "create");
   const confidencePct = (row.score * 100).toFixed(0);
+  const confidenceLabel =
+    classifyMatch(row.score) === "auto" ? "Auto" : "Likely";
+
+  // The dropdown caps rendered options for performance, but the matched
+  // facility may sit beyond that cap — without its <option> the <select> would
+  // wrongly display "— no match —". Always include the matched facility so the
+  // selection it found is actually shown.
+  const facOptions =
+    fac && !facilities.slice(0, 250).some((f) => f.id === fac.id)
+      ? [fac, ...facilities.slice(0, 250)]
+      : facilities.slice(0, 250);
 
   return (
     <tr className="border-t border-gunmetal/8 align-top">
@@ -416,7 +427,7 @@ function ReviewRowEditor({
               }}
             >
               <option value="">— no match —</option>
-              {facilities.slice(0, 250).map((f) => (
+              {facOptions.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
@@ -425,7 +436,8 @@ function ReviewRowEditor({
             <div className="text-xs text-gunmetal/60 mt-1">
               {row.matchName ? (
                 <>
-                  Auto · <span className="tabular">{confidencePct}%</span>
+                  {confidenceLabel} ·{" "}
+                  <span className="tabular">{confidencePct}%</span>
                   {fac?.licensed ? " · already licensed" : ""}
                 </>
               ) : (

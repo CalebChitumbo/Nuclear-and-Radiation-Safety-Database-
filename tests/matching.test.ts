@@ -55,6 +55,25 @@ describe("scoreMatch", () => {
       scoreMatch("Friends Care Medical", mk("Friends Care Medical Centre")),
     ).toBe(0.9);
   });
+
+  it("down-weights generic words so distinctive names still match", () => {
+    // Differs only by the generic word "General". Plain Jaccard gives 0.67;
+    // down-weighting the generic tokens lifts it into auto range.
+    const s = scoreMatch("Maamba General Hospital", mk("Maamba Hospital"));
+    expect(s).toBeGreaterThan(jaccard("Maamba General Hospital", "Maamba Hospital"));
+    expect(classifyMatch(s)).toBe("auto");
+  });
+
+  it("does not reward matches on generic words alone", () => {
+    expect(
+      scoreMatch("Lusaka General Hospital", mk("Ndola District Clinic")),
+    ).toBeLessThan(0.45);
+  });
+
+  it("tolerates spelling variants via trigram fallback", () => {
+    const s = scoreMatch("Medihealth Diagnostic", mk("Mediheal Diagnostics"));
+    expect(classifyMatch(s)).not.toBe("none");
+  });
 });
 
 describe("matchOne / classify", () => {
