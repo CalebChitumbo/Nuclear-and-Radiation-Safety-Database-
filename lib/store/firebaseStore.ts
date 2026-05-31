@@ -26,6 +26,7 @@ import {
   type Inspection,
   type LicenceEvent,
   type LicenceType,
+  type LicenceWorkflow,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -76,6 +77,14 @@ class FirebaseStore implements DataStore {
     const db = requireDb();
     const snap = await getDocs(collection(db, "activities"));
     return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Activity, "id">) }));
+  }
+
+  async listLicenceWorkflows(): Promise<LicenceWorkflow[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "licenceWorkflows"));
+    return snap.docs.map(
+      (d) => ({ id: d.id, ...(d.data() as Omit<LicenceWorkflow, "id">) }),
+    );
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -244,6 +253,50 @@ class FirebaseStore implements DataStore {
     return { ...i, week, id: ref.id };
   }
 
+  async saveLicenceWorkflows(
+    items: LicenceWorkflow[],
+    uid: string,
+  ): Promise<{ saved: number; facilitiesUpdated: number }> {
+    const db = requireDb();
+    const batch = writeBatch(db);
+    const now = new Date().toISOString();
+
+    // Deterministic doc id from the RAN so re-importing a dashboard upserts the
+    // same application rather than duplicating it.
+    const docId = (w: LicenceWorkflow) =>
+      (w.ran || w.id).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+
+    const stageByFacility = new Map<string, Facility["stage"]>();
+    for (const item of items) {
+      const ref = doc(db, "licenceWorkflows", docId(item));
+      batch.set(ref, { ...item, updatedAt: now, updatedBy: uid }, { merge: true });
+      if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
+        stageByFacility.set(item.facilityId, item.facilityStage);
+      }
+    }
+
+    // Roll the stage up onto each matched facility (skip already-licensed ones).
+    let facilitiesUpdated = 0;
+    if (stageByFacility.size) {
+      const facilities = await this.listFacilities();
+      const facMap = new Map(facilities.map((f) => [f.id, f]));
+      for (const [facilityId, stage] of stageByFacility) {
+        const fac = facMap.get(facilityId);
+        if (fac && !fac.licensed && fac.stage !== stage) {
+          batch.set(
+            doc(db, "facilities", facilityId),
+            { ...fac, stage, updatedAt: now, updatedBy: uid },
+            { merge: true },
+          );
+          facilitiesUpdated++;
+        }
+      }
+    }
+
+    await batch.commit();
+    return { saved: items.length, facilitiesUpdated };
+  }
+
   async updateFacility(
     id: string,
     patch: Partial<Facility>,
@@ -315,12 +368,13 @@ class FirebaseStore implements DataStore {
   }
 
   async exportAll() {
-    const [facilities, licenceEvents, inspections, activities] =
+    const [facilities, licenceEvents, inspections, activities, licenceWorkflows] =
       await Promise.all([
         this.listFacilities(),
         this.listLicenceEvents(),
         this.listInspections(),
         this.listActivities(),
+        this.listLicenceWorkflows(),
       ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -328,7 +382,14 @@ class FirebaseStore implements DataStore {
     snap.docs.forEach((d) => {
       weekMetrics[d.id] = d.data() as WeekMetrics;
     });
-    return { facilities, licenceEvents, inspections, activities, weekMetrics };
+    return {
+      facilities,
+      licenceEvents,
+      inspections,
+      activities,
+      licenceWorkflows,
+      weekMetrics,
+    };
   }
 }
 

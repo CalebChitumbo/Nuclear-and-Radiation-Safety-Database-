@@ -62,6 +62,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // RAIS licensing-status tracker: imported on the Licensing Status tab by
+    // Authorisation & Standards officers; readable by any signed-in user.
+    match /licenceWorkflows/{id} {
+      allow read:   if signedIn();
+      allow create: if isAS() && request.resource.data.ran is string;
+      allow update: if isAS() && request.resource.data.ran is string;
+      allow delete: if isAdmin();
+    }
+
     match /weekMetrics/{week} {
       allow read:  if signedIn();
       allow write: if signedIn();
