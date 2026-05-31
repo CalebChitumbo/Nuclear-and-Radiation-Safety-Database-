@@ -83,17 +83,31 @@ export function matchOne(
 }
 
 /**
- * Parse a bulk-approval line.
- *   "Acme Hospital | AUTH/USE.REN/0701"
- *   "Acme Hospital, AUTH/USE.REN/0701"
- *   "Acme, Inc | AUTH/IMP/0102"
- * A pipe always splits the number.
- * A comma only splits when the tail looks like an AUTH code/FAC code.
+ * Does this token look like an AUTH/licence code rather than a facility name?
+ * Codes have no spaces, e.g. "RPA/LIC/0133", "AUTH/USE.REN/0781", "FAC/0344".
+ */
+export function looksLikeCode(s: string): boolean {
+  const t = (s || "").trim();
+  if (!t || /\s/.test(t)) return false; // a code has no spaces
+  return (/\d/.test(t) && /[\/.-]/.test(t)) || /^(rpa|auth|fac)/i.test(t);
+}
+
+/**
+ * Parse a bulk-approval line into { name, number }. Handles, in order:
+ *   1. Strip a trailing reference URL (e.g. a RAIS workflow link pasted right
+ *      after the name: "… CENTREhttps://rais.rpa.gov.zm/…").
+ *   2. Pipe always separates the number:  "Acme Hospital | AUTH/USE.REN/0701"
+ *   3. RAIS export — code first, em/en-dash, then the name (with or without a
+ *      link):  "RPA/LIC/0133 — DR. DILOBARS MEDICAL CENTRE"
+ *   4. Trailing comma, only when the tail looks like a code.
+ *   5. Otherwise the whole line is the name.
  */
 export function parseBulkLine(line: string): { name: string; number: string } {
-  const raw = line.trim();
+  // 1. Drop any reference URL (it has no whitespace, so only the link goes).
+  const raw = (line || "").replace(/\s*https?:\/\/\S+/gi, "").trim();
   if (!raw) return { name: "", number: "" };
 
+  // 2. Explicit pipe — name first.
   if (raw.includes("|")) {
     const idx = raw.indexOf("|");
     return {
@@ -102,6 +116,14 @@ export function parseBulkLine(line: string): { name: string; number: string } {
     };
   }
 
+  // 3. RAIS "CODE — Name" — number first, separated by an em/en-dash (or a
+  //    spaced hyphen). Only fires when the left side is a bare code.
+  const dash = raw.match(/^(.+?)\s+[—–-]\s+(.+)$/);
+  if (dash && looksLikeCode(dash[1])) {
+    return { name: dash[2].trim(), number: dash[1].trim() };
+  }
+
+  // 4. Trailing comma, only on an AUTH-looking tail (commas in names are safe).
   const lastComma = raw.lastIndexOf(",");
   if (lastComma !== -1) {
     const tail = raw.slice(lastComma + 1).trim();

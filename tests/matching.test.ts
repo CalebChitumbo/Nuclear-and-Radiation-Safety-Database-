@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyMatch,
   jaccard,
+  looksLikeCode,
   matchOne,
   norm,
   parseBulkLine,
@@ -106,6 +107,34 @@ describe("parseBulkLine", () => {
 
   it("comma in facility name is preserved", () => {
     expect(parseBulkLine("Acme, Inc")).toEqual({ name: "Acme, Inc", number: "" });
+  });
+
+  it("RAIS format: code first, em-dash, then name", () => {
+    expect(parseBulkLine("RPA/LIC/0133 — DR. DILOBARS MEDICAL CENTRE")).toEqual({
+      name: "DR. DILOBARS MEDICAL CENTRE",
+      number: "RPA/LIC/0133",
+    });
+  });
+
+  it("RAIS format: strips the trailing reference URL", () => {
+    expect(
+      parseBulkLine(
+        "RPA/LIC/0494 — NORTH WAY DENTAL CLINIChttps://rais.rpa.gov.zm/Workflow/WFUseAuthorization/Form/0f4c19b6-8b47-43ec-8097-ab8cf98b6553",
+      ),
+    ).toEqual({ name: "NORTH WAY DENTAL CLINIC", number: "RPA/LIC/0494" });
+  });
+
+  it("does not split a spaced dash inside a plain facility name", () => {
+    expect(parseBulkLine("Mary - Jane Clinic")).toEqual({
+      name: "Mary - Jane Clinic",
+      number: "",
+    });
+  });
+
+  it("looksLikeCode distinguishes codes from names", () => {
+    expect(looksLikeCode("RPA/LIC/0133")).toBe(true);
+    expect(looksLikeCode("AUTH/USE.REN/0781")).toBe(true);
+    expect(looksLikeCode("DR. DILOBARS MEDICAL CENTRE")).toBe(false);
   });
 
   it("empty line", () => {

@@ -13,11 +13,23 @@ export function toISO(d: Date): string {
 }
 
 export function weekForDate(date: string, weeks: WeekDef[]): WeekDef | null {
-  if (!date) return null;
+  if (!date || weeks.length === 0) return null;
+  // Exact containment first — a weekday inside its Mon–Fri window.
   for (const w of weeks) {
     if (date >= w.start && date <= w.end) return w;
   }
-  return null;
+  // Otherwise SNAP to a reporting week so a date is never left unassigned.
+  // An empty `week` is rejected by the Firestore rules (week.size() > 0), so a
+  // weekend/gap licence must still belong to a week: it rolls into the most
+  // recent week that has started; a date before the calendar maps to the
+  // earliest week.
+  let preceding: WeekDef | null = null;
+  for (const w of weeks) {
+    if (w.start <= date && (!preceding || w.start > preceding.start)) {
+      preceding = w;
+    }
+  }
+  return preceding ?? weeks.reduce((a, b) => (a.start <= b.start ? a : b));
 }
 
 export function weekLabelForDate(
