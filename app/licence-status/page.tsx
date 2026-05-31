@@ -386,15 +386,52 @@ function ReviewTable({
   onChange: (id: string, patch: Partial<LicenceWorkflow>) => void;
 }) {
   const facOptions = facilities.slice(0, 300);
+
+  // The register-match control is shared between the desktop table and the
+  // mobile card list so editing behaves identically on every screen size.
+  const renderMatch = (r: LicenceWorkflow) =>
+    editable ? (
+      <select
+        className="input"
+        value={r.facilityId || ""}
+        onChange={(e) => {
+          const id = e.target.value;
+          const f = facilities.find((x) => x.id === id);
+          onChange(r.id, {
+            facilityId: id || null,
+            facilityName: f ? f.name : r.facilityName,
+            facCode: f ? f.facCode : r.facCode,
+          });
+        }}
+      >
+        <option value="">— no match —</option>
+        {/* keep the matched facility visible even past the cap */}
+        {r.facilityId && !facOptions.some((f) => f.id === r.facilityId) ? (
+          <option value={r.facilityId}>{r.facilityName}</option>
+        ) : null}
+        {facOptions.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.name}
+          </option>
+        ))}
+      </select>
+    ) : r.facilityId ? (
+      <span className="chip green">matched</span>
+    ) : (
+      <span className="chip">unmatched</span>
+    );
+
   return (
     <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
+      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 font-black">
         {editable ? "Review & correct" : "Tracked applications"}
         <span className="text-xs text-gunmetal/55 font-normal ml-2">
           {records.length} applications
         </span>
       </div>
-      <div className="overflow-x-auto">
+
+      {/* Tablet & desktop: full table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm tbl-sticky">
           <thead>
             <tr className="text-left text-xs caps text-gunmetal/55">
@@ -433,43 +470,66 @@ function ReviewTable({
                     {r.priority}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  {editable ? (
-                    <select
-                      className="input"
-                      value={r.facilityId || ""}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        const f = facilities.find((x) => x.id === id);
-                        onChange(r.id, {
-                          facilityId: id || null,
-                          facilityName: f ? f.name : r.facilityName,
-                          facCode: f ? f.facCode : r.facCode,
-                        });
-                      }}
-                    >
-                      <option value="">— no match —</option>
-                      {/* keep the matched facility visible even past the cap */}
-                      {r.facilityId &&
-                      !facOptions.some((f) => f.id === r.facilityId) ? (
-                        <option value={r.facilityId}>{r.facilityName}</option>
-                      ) : null}
-                      {facOptions.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : r.facilityId ? (
-                    <span className="chip green">matched</span>
-                  ) : (
-                    <span className="chip">unmatched</span>
-                  )}
-                </td>
+                <td className="px-4 py-3">{renderMatch(r)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: stacked cards (a 6-column table is unreadable on a phone) */}
+      <div className="md:hidden divide-y divide-gunmetal/8">
+        {records.map((r) => (
+          <div key={r.id} className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-bold leading-tight">
+                  {r.facilityName || <em>(unmatched)</em>}
+                </div>
+                <div className="text-[11px] text-gunmetal/55">{r.ranType}</div>
+              </div>
+              <span
+                className={`chip ${PRIORITY_META[r.priority].chip} shrink-0`}
+              >
+                {r.priority}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+              <div>
+                <div className="caps text-[10px] text-gunmetal/50">RAN</div>
+                <div className="text-sm tabular">{r.ran || "—"}</div>
+              </div>
+              <div>
+                <div className="caps text-[10px] text-gunmetal/50">
+                  Responsible
+                </div>
+                <div className="text-sm">{r.responsibleParty}</div>
+              </div>
+              <div className="col-span-2">
+                <div className="caps text-[10px] text-gunmetal/50">Stage</div>
+                <div className="text-sm">{r.stage}</div>
+                {r.outstandingPayment || r.bottleneck ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {r.outstandingPayment ? (
+                      <span className="chip amber">payment</span>
+                    ) : null}
+                    {r.bottleneck ? (
+                      <span className="chip red">bottleneck</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="caps text-[10px] text-gunmetal/50 mb-1">
+                Register match
+              </div>
+              {renderMatch(r)}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
