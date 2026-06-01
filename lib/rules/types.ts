@@ -198,6 +198,21 @@ export interface LicenceWorkflow {
   facilityStage: Stage;
   /** Most recent date seen in the notifications (DD/MM/YYYY as pasted). */
   lastSeen: string;
+  /**
+   * How this record entered the system: an officer paste on the Licensing
+   * Status tab, or the automatic RAIS email connector (ingestRaisEmail).
+   */
+  source?: "paste" | "email";
+  /**
+   * Set on email-ingested records. "applied" means a confident facility match
+   * was auto-rolled onto the register; "needs-review" means it is waiting for an
+   * officer to confirm the facility match on the Licensing Status tab.
+   */
+  reviewStatus?: "applied" | "needs-review";
+  /** ISO timestamp the connector received the source email. */
+  receivedAt?: string;
+  /** Subject line of the source email (for the review queue). */
+  emailSubject?: string;
   updatedAt?: string;
   updatedBy?: string;
 }

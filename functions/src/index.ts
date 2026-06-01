@@ -5,6 +5,8 @@
  * 2. setUserClaims — callable, admin-only: create Auth user + users/{uid} +
  *    custom claims {role, section}.
  * 3. onUserDocWrite — keep custom claims in sync if an admin edits a user.
+ * 4. ingestRaisEmail — inbound-email connector that auto-updates the licensing
+ *    status from forwarded RAIS notification emails (see ./rais/ingest).
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -14,6 +16,8 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 initializeApp();
+
+export { ingestRaisEmail } from "./rais/ingest";
 
 const PROVINCES = [
   "Lusaka",

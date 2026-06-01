@@ -1,4 +1,4 @@
-import { matchOne } from "./matching";
+import { classifyMatch, matchOne } from "./matching";
 import {
   type Facility,
   type LicenceWorkflow,
@@ -554,6 +554,20 @@ export function linkFacilities(
     }
     return { ...r, matchScore: m.score };
   });
+}
+
+/**
+ * Decide whether a linked record is safe to apply to the register automatically
+ * or should wait in the review queue. Used by the email connector
+ * (ingestRaisEmail): only a confident facility match — the same "auto" tier the
+ * Bulk Approval matcher uses (score ≥ 0.72) — is auto-applied. Everything else
+ * (weak/no match, or a notification we could not classify) is queued so an
+ * officer confirms the facility before the register moves.
+ */
+export function ingestDecision(r: LicenceWorkflow): "auto" | "review" {
+  if (!r.facilityId) return "review";
+  if (r.stage === "Unrecognized") return "review";
+  return classifyMatch(r.matchScore ?? 0) === "auto" ? "auto" : "review";
 }
 
 // ---------------------------------------------------------------------------

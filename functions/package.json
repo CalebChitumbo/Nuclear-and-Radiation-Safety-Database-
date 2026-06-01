@@ -3,7 +3,8 @@
   "private": true,
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc",
+    "sync-rules": "node scripts/sync-rules.js",
+    "build": "npm run sync-rules && tsc",
     "deploy": "firebase deploy --only functions",
     "serve": "npm run build && firebase emulators:start --only functions"
   },
