@@ -190,7 +190,10 @@ export const ingestRaisEmail = onRequest(
       res.status(200).json({ ok: true, ...summary });
     } catch (err) {
       logger.error("ingestRaisEmail failed", err);
-      res.status(500).json({ error: "ingest failed" });
+      res.status(500).json({
+        error: "ingest failed",
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   },
 );

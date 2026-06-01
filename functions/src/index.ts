@@ -16,6 +16,10 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 initializeApp();
+// The RAIS parser leaves some optional fields (e.g. paymentRan, matchScore)
+// undefined when absent. The Admin SDK rejects undefined values unless told to
+// ignore them, so configure that once here before any Firestore access.
+getFirestore().settings({ ignoreUndefinedProperties: true });
 
 export { ingestRaisEmail } from "./rais/ingest";
 
