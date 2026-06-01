@@ -99,3 +99,66 @@ RAN of Authorization: RPA/LIC/0543`;
     expect(ingestDecision(ks!)).toBe("review");
   });
 });
+
+// Real RAIS automated emails (sender eLicensing@rpa.gov.zm). The connector
+// prepends the SUBJECT to the body before parsing, because the email's first
+// line is "Hello," and the notification type lives in the subject.
+describe("real RAIS email shapes", () => {
+  const konkola = [fac({ id: "kcm", name: "KONKOLA COPPER MINE PLC" })];
+  const feed = (subject: string, body: string) => `${subject}\n${body}`;
+
+  it("auto-applies an 'Application Approved' email as Licence Issued", () => {
+    const f = feed(
+      "Renewal Ionising Radiation Licence Application Approved",
+      [
+        "Hello,",
+        "Your Application for a renewal Ionising Radiation Licence has been Approved.",
+        "Facility Name - KONKOLA COPPER MINE PLC",
+        "Workflow RAN - AUTH/USE.REN/0935",
+        "How to Access Your Certificate:",
+        "Open your web browser and go to: https://rais.rpa.gov.zm/idp",
+      ].join("\n"),
+    );
+    const [r] = linkFacilities(parseNotifications(f), konkola);
+    expect(r.facilityName).toBe("KONKOLA COPPER MINE PLC");
+    expect(r.ran).toBe("AUTH/USE.REN/0935");
+    expect(r.phase).toBe("Licence Issued");
+    expect(r.facilityStage).toBe("Licence / Certificate Issued");
+    expect(r.facilityId).toBe("kcm");
+    expect(ingestDecision(r)).toBe("auto");
+  });
+
+  it("auto-applies a 'Request Submitted successfully' email as Application Submitted", () => {
+    const f = feed(
+      "Renewal Ionising Radiation Licence Request Submitted successfully",
+      [
+        "Hello,",
+        "Your application request for Renewal has been submitted successfully. Please wait for response from Authority.",
+        "Facility Name - KONKOLA COPPER MINE PLC",
+        "Workflow RAN - AUTH/USE.REN/0556",
+        "Thank you,",
+      ].join("\n"),
+    );
+    const [r] = linkFacilities(parseNotifications(f), konkola);
+    expect(r.phase).toBe("Application");
+    expect(r.facilityStage).toBe("Application Submitted");
+    expect(ingestDecision(r)).toBe("auto");
+  });
+
+  it("queues a 'Payment Pending' email (no facility name in the body)", () => {
+    const f = feed(
+      "Payment Pending",
+      [
+        "Hello,",
+        "Your payment for Ionising Radiation Licence application having RAN AUTH/USE.REN/0926 is pending.",
+        "How to Access Your Invoice:",
+      ].join("\n"),
+    );
+    const [r] = linkFacilities(parseNotifications(f), konkola);
+    expect(r.ran).toBe("AUTH/USE.REN/0926");
+    expect(r.phase).toBe("Payment");
+    expect(r.outstandingPayment).toBe(true);
+    expect(r.facilityId).toBeNull();
+    expect(ingestDecision(r)).toBe("review");
+  });
+});

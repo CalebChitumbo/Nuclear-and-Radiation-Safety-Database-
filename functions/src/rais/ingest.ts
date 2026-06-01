@@ -54,8 +54,13 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
     (d) => ({ id: d.id, ...d.data() }) as Facility,
   );
 
+  // Real RAIS emails put the notification type in the SUBJECT and open the body
+  // with "Hello,". The parser classifies on the first line, so prepend the
+  // subject — that mirrors how the pasted dashboard leads with the title.
+  const feed = subject ? `${subject}\n${text}` : text;
+
   // Drop pure footer/noise blocks; keep unclassified-but-real ones for review.
-  const records = linkFacilities(parseNotifications(text), facilities).filter(
+  const records = linkFacilities(parseNotifications(feed), facilities).filter(
     (r) => !(r.stage === "Unrecognized" && !r.ran && !r.facilityName),
   );
   const empty: IngestSummary = {

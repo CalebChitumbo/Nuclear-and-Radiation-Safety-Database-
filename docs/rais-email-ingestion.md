@@ -94,9 +94,26 @@ Writes use the Admin SDK and bypass Firestore security rules, so the endpoint
 
 ### 4. Forward the RAIS emails in
 
-In the mailbox that receives RAIS notifications (e.g. the RPA Gmail/Workspace
-account), add a filter: **From** the RAIS sender (or **Subject** matches the
-notification pattern) → **Forward to** the provider address from step 3.
+RAIS sends its automated status emails from **`eLicensing@rpa.gov.zm`**. In the
+Gmail/Workspace mailbox that receives them:
+
+1. **Add the forwarding address.** Settings → *See all settings* → *Forwarding
+   and POP/IMAP* → **Add a forwarding address** → paste the provider address
+   from step 3. Gmail emails a confirmation code to it.
+2. **Confirm it.** That code lands at the provider, not a normal inbox — read it
+   from the provider's message log (CloudMailin *Message history* / Mailgun
+   *Logs*) and enter it, or click the link there. (You can also temporarily log
+   the request body in the function to read the code from the Cloud Functions
+   logs.)
+3. **Create the filter.** Search `from:(eLicensing@rpa.gov.zm)` → *Create
+   filter* → tick **Forward it to** the address from step 1 → *Create filter*.
+   Optionally tick "also apply to matching conversations" to back-fill.
+
+From then on, every new RAIS email is forwarded to the function automatically.
+
+> If the forwarding-confirmation step proves fiddly, the alternative "Gmail-native
+> push" design (Gmail API `watch` → Pub/Sub → function) avoids forwarding
+> entirely — ask and it can be wired up instead.
 
 ## Test it
 
@@ -120,15 +137,26 @@ Expected response:
 and not already licensed.) An unauthorized request returns `401`; an email with
 no readable body returns `200` with `"ignored"`.
 
-## Validate against a real email
+## Coverage (confirmed against real `eLicensing@rpa.gov.zm` emails)
 
-The parser was built for the pasted RAIS dashboard feed; real emails carry the
-same notification text but with email chrome (greeting, signature, footer). It
-reads the notification title from the first meaningful line and pulls the RAN /
-facility from the body, and anything it cannot classify is queued rather than
-lost — but it is worth confirming against one or two real RAIS emails and adding
-their phrasings to the `RULES` / `extractFacility` patterns in
-`lib/rules/parseNotifications.ts` if needed.
+Real emails open the body with "Hello," and carry the notification type in the
+**subject**, so the connector prepends the subject before parsing. Behaviour by
+email type:
+
+| Subject | Tracked as | Auto-applies? |
+|---|---|---|
+| …Application **Approved** | Licence / Certificate Issued | ✅ when the named facility matches the register |
+| …Request **Submitted successfully** | Application Submitted | ✅ when the named facility matches |
+| **Payment Pending** | Awaiting Proof of Payment | ⏳ queued — the email body carries no facility name |
+| **Additional Information Required** | Application (applicant to act) | ⏳ queued unless a facility/RAN is present |
+| **Invoice Request Generator** | — (generic blast, no RAN) | ignored |
+| **…Withdrawal** | not classified | ⏳ queued for an officer to decide |
+
+"Approved" moves the facility's **stage** to *Licence / Certificate Issued*; it
+does **not** flip the facility to officially `licensed` — that stays a deliberate
+action through the R1–R6 rules. New subject phrasings can be added to the `RULES`
+/ `extractFacility` patterns in `lib/rules/parseNotifications.ts`
+(`tests/raisIngest.test.ts` covers the shapes above).
 
 ## Local testing with the emulator
 

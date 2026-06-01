@@ -143,6 +143,12 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
   },
   // --- Applicant-side intake ------------------------------------------------
   {
+    // RAIS email: "… Licence Request Submitted successfully" — applicant has
+    // filed; the application now sits with the Authority.
+    test: /submitted successfully|request submitted|submission successful/i,
+    map: { phase: "Application", stage: "Application Submitted", responsibleParty: "NRSO", priority: "NORMAL" },
+  },
+  {
     test: /licence expiry|about to expire|granted to facility/i,
     map: { phase: "Application", stage: "Expiry / Renewal Reminder", responsibleParty: "Applicant", priority: "APPLICANT" },
   },
