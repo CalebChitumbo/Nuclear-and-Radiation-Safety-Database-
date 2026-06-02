@@ -77,6 +77,15 @@ Writes use the Admin SDK and bypass Firestore security rules, so the endpoint
 
 ## 3. Point an inbound-email provider at it
 
+> **Simplest for Gmail/Workspace:** skip inbound providers entirely and use the
+> Google Apps Script in [`gmail-apps-script.gs`](gmail-apps-script.gs). It runs
+> in your own Google account on a timer, finds new RAIS emails, and posts each
+> to this function — no forwarding-address confirmation, no third party. Paste
+> it in at <https://script.google.com>, set `ENDPOINT` + `SECRET`, run it once to
+> authorize, then add a 15-minute time trigger.
+
+If you prefer a true inbound webhook instead, point a provider at the endpoint:
+
 ### Option A — CloudMailin (simplest; posts clean JSON)
 
 1. Create an address; set the **target** to the function URL with the secret in
