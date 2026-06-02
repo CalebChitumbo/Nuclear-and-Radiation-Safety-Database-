@@ -161,4 +161,26 @@ describe("real RAIS email shapes", () => {
     expect(r.facilityId).toBeNull();
     expect(ingestDecision(r)).toBe("review");
   });
+
+  it("maps 'Invoice Request Generator' to Invoice Generation Pending", () => {
+    const f = feed(
+      "INVOICE REQUEST GENERATOR",
+      "Facility Name - KONKOLA COPPER MINE PLC\nWorkflow RAN - AUTH/USE.REN/0700",
+    );
+    const [r] = parseNotifications(f);
+    expect(r.phase).toBe("Payment");
+    expect(r.facilityStage).toBe("Invoice Generation Pending");
+  });
+
+  it("maps 'Additional Information Required' to Further Information Required", () => {
+    const f = feed(
+      "Additional Information Required",
+      "Facility Name - KONKOLA COPPER MINE PLC\nWorkflow RAN - AUTH/USE.REN/0701",
+    );
+    const [r] = parseNotifications(f);
+    expect(r.phase).toBe("Review & Assessment");
+    expect(r.facilityStage).toBe(
+      "Under Internal Review (Further Information Required)",
+    );
+  });
 });

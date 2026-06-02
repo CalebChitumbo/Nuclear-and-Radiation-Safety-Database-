@@ -47,6 +47,12 @@ interface Mapping {
 const RULES: Array<{ test: RegExp; map: Mapping }> = [
   // --- Payment workflow -----------------------------------------------------
   {
+    // RAIS "Invoice Request Generator": the applicant must first generate an
+    // invoice request — the invoice itself does not exist yet.
+    test: /invoice request generator|invoice request is required|invoice generation|generate (your )?invoice/i,
+    map: { phase: "Payment", stage: "Invoice Generation Pending", responsibleParty: "Applicant", priority: "APPLICANT" },
+  },
+  {
     test: /payment pending/i,
     map: { phase: "Payment", stage: "Awaiting Proof of Payment", responsibleParty: "Applicant", priority: "APPLICANT", outstandingPayment: true },
   },
@@ -96,6 +102,12 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
   {
     test: /improvement actions/i,
     map: { phase: "Review & Assessment", stage: "Improvement Actions Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
+  },
+  {
+    // RAIS "Additional Information Required": more info needed to continue the
+    // review & assessment.
+    test: /additional information|further information required|request(ed)? for (additional|further) information/i,
+    map: { phase: "Review & Assessment", stage: "Further Information Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
     test: /external review|internal review|review and evaluation|review and assessment/i,
@@ -153,7 +165,7 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Application", stage: "Expiry / Renewal Reminder", responsibleParty: "Applicant", priority: "APPLICANT" },
   },
   {
-    test: /application submission form|new form i|new ionising radiation licence renewal request|new variation of terms|additional information|regulatory requirements|new licence|new ionising radiation licence request|notice of intention to decomiss/i,
+    test: /application submission form|new form i|new ionising radiation licence renewal request|new variation of terms|regulatory requirements|new licence|new ionising radiation licence request|notice of intention to decomiss/i,
     map: { phase: "Application", stage: "Application Submission", responsibleParty: "Applicant", priority: "APPLICANT" },
   },
 ];
@@ -314,13 +326,17 @@ function facilityStageFor(phase: WorkflowPhase, stage: string): Stage {
     case "Application":
       return "Application Submitted";
     case "Payment":
-      return "Waiting for Payment";
+      return stage === "Invoice Generation Pending"
+        ? "Invoice Generation Pending"
+        : "Waiting for Payment";
     case "Accounts Clearance":
       return "Accounts Clearance Pending";
     case "RPA Receipt":
       return "Waiting for Review and Assessment";
     case "Review & Assessment":
-      return "Under Review and Assessment";
+      return stage === "Further Information Required"
+        ? "Under Internal Review (Further Information Required)"
+        : "Under Review and Assessment";
     case "Authorization / Conditions":
       return "Authorization Terms Issued";
     case "Approval (CEO/Board)":
