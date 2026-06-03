@@ -1,0 +1,36 @@
+name: Deploy Functions
+
+# Auto-deploy the Cloud Functions to Firebase whenever the production branch
+# changes anything the functions depend on. Runs `firebase deploy --only
+# functions`, whose predeploy hook installs deps and builds (including the
+# sync-rules step that shares lib/rules/ into the functions runtime).
+#
+# One-time setup: add a repo secret FIREBASE_TOKEN
+#   firebase login:ci   →  copy the token  →  GitHub repo
+#   Settings → Secrets and variables → Actions → New repository secret.
+
+on:
+  push:
+    branches: ["claude/stoic-rubin-pqGb4"]
+    paths:
+      - "functions/**"
+      - "lib/rules/**"
+      - "firebase.json"
+      - ".firebaserc"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Deploy to Firebase
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15
+      - name: Deploy functions
+        run: firebase deploy --only functions --project nrsd-imformation-management --non-interactive
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
