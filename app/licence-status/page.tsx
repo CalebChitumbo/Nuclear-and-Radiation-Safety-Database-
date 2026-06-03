@@ -14,8 +14,10 @@ import {
   type WorkflowReport,
 } from "@/lib/rules/parseNotifications";
 import {
+  LICENCE_TYPES,
   WORKFLOW_PHASES,
   type Facility,
+  type LicenceType,
   type LicenceWorkflow,
   type WorkflowPhase,
   type WorkflowPriority,
@@ -68,13 +70,103 @@ export default function LicenceStatusPage() {
   const [rows, setRows] = useState<LicenceWorkflow[] | null>(null);
   const [committing, setCommitting] = useState(false);
 
+  // Items the email connector queued for a human to confirm the facility match.
+  const needsReview = useMemo(
+    () => (saved ?? []).filter((r) => r.reviewStatus === "needs-review"),
+    [saved],
+  );
+
+  const facById = useMemo(
+    () => new Map((facilities || []).map((f) => [f.id, f])),
+    [facilities],
+  );
+
+  // Applications whose certificate has been issued but whose facility is not yet
+  // officially Licensed — these await the one-click approval below.
+  const readyToLicense = useMemo(
+    () =>
+      (saved ?? []).filter((r) => {
+        if (r.reviewStatus === "needs-review") return false;
+        if (r.facilityStage !== "Licence / Certificate Issued") return false;
+        if (!r.facilityId) return false;
+        const f = facById.get(r.facilityId);
+        return !!f && !f.licensed;
+      }),
+    [saved, facById],
+  );
+
   // Parsed-then-linked records once Analyze is clicked; otherwise the persisted
-  // set so the board/table survive reloads.
-  const records = rows ?? saved ?? [];
+  // set so the board/table survive reloads. Queued (needs-review) items live in
+  // their own panel, not the board, until an officer applies them.
+  const records =
+    rows ?? (saved ?? []).filter((r) => r.reviewStatus !== "needs-review");
   const report: WorkflowReport | null = useMemo(
     () => (records.length ? buildReport(records) : null),
     [records],
   );
+
+  const applyReviewed = async (
+    row: LicenceWorkflow,
+    facilityId: string | null,
+  ) => {
+    if (!user) return;
+    const f = facilityId
+      ? (facilities || []).find((x) => x.id === facilityId)
+      : undefined;
+    const rec: LicenceWorkflow = {
+      ...row,
+      facilityId: facilityId || null,
+      facilityName: f ? f.name : row.facilityName,
+      facCode: f ? f.facCode : row.facCode,
+      reviewStatus: "applied",
+      source: row.source ?? "email",
+    };
+    try {
+      const s = await store();
+      const res = await s.saveLicenceWorkflows([rec], user.uid);
+      toast.push(
+        facilityId
+          ? `Applied — ${res.facilitiesUpdated} facility stage updated.`
+          : "Dismissed from the review queue.",
+        "success",
+      );
+      reload();
+    } catch (err) {
+      toast.push(
+        `Could not apply: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
+
+  // Officer confirmation that an issued certificate is now an official licence:
+  // records it through the R1–R6 rules (flips licensed for use/possession types).
+  const approveLicence = async (
+    row: LicenceWorkflow,
+    type: LicenceType,
+    date: string,
+  ) => {
+    if (!user || !row.facilityId) return;
+    try {
+      const s = await store();
+      const res = await s.recordLicences(
+        [{ facilityId: row.facilityId, number: row.ran, type, date }],
+        user.uid,
+      );
+      toast.push(
+        res.summary.newLicensed > 0
+          ? `${row.facilityName} is now Licensed.`
+          : `Recorded ${type} for ${row.facilityName}.`,
+        "success",
+      );
+      reload();
+    } catch (err) {
+      toast.push(
+        `Could not record licence: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
 
   const analyze = () => {
     const parsed = parseNotifications(text);
@@ -141,6 +233,18 @@ export default function LicenceStatusPage() {
 
   return (
     <div className="space-y-4 staggered">
+      {needsReview.length ? (
+        <ReviewQueue
+          items={needsReview}
+          facilities={facilities || []}
+          onApply={applyReviewed}
+        />
+      ) : null}
+
+      {readyToLicense.length ? (
+        <ReadyToLicense items={readyToLicense} onApprove={approveLicence} />
+      ) : null}
+
       {/* Paste + analyze */}
       <div className="card p-5">
         <label className="caps text-[10px] text-gunmetal/60">
@@ -530,6 +634,208 @@ function ReviewTable({
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Email connector review queue
+// ---------------------------------------------------------------------------
+
+/**
+ * Applications the automatic email connector (ingestRaisEmail) parsed but could
+ * not confidently match to the register. An officer confirms the facility and
+ * applies it (which rolls the stage onto that facility), or dismisses it.
+ */
+function ReviewQueue({
+  items,
+  facilities,
+  onApply,
+}: {
+  items: LicenceWorkflow[];
+  facilities: Facility[];
+  onApply: (row: LicenceWorkflow, facilityId: string | null) => void;
+}) {
+  const facOptions = facilities.slice(0, 300);
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const choiceFor = (r: LicenceWorkflow) => picked[r.id] ?? (r.facilityId || "");
+
+  return (
+    <div
+      className="card overflow-hidden"
+      style={{ borderLeft: "3px solid var(--status-stalled)" }}
+    >
+      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2">
+        <div className="font-black">
+          Needs review
+          <span className="text-xs text-gunmetal/55 font-normal ml-2">
+            {items.length} from email — confirm the facility, then apply
+          </span>
+        </div>
+        <span className="chip amber shrink-0">✉ auto-imported</span>
+      </div>
+
+      <div className="divide-y divide-gunmetal/8">
+        {items.map((r) => {
+          const choice = choiceFor(r);
+          return (
+            <div key={r.id} className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold leading-tight">
+                    {r.facilityName || <em>(no facility name in email)</em>}
+                  </div>
+                  <div className="text-[11px] text-gunmetal/55">
+                    {r.ran || "no RAN"} · {r.ranType}
+                  </div>
+                </div>
+                <span className="chip shrink-0">{r.stage}</span>
+              </div>
+
+              {r.emailSubject ? (
+                <div className="text-[11px] text-gunmetal/50 mt-1 truncate">
+                  ✉ {r.emailSubject}
+                </div>
+              ) : null}
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div>
+                  <div className="caps text-[10px] text-gunmetal/50 mb-1">
+                    Match to register
+                  </div>
+                  <select
+                    className="input"
+                    value={choice}
+                    onChange={(e) =>
+                      setPicked((p) => ({ ...p, [r.id]: e.target.value }))
+                    }
+                  >
+                    <option value="">— no match (dismiss) —</option>
+                    {choice && !facOptions.some((f) => f.id === choice) ? (
+                      <option value={choice}>{r.facilityName}</option>
+                    ) : null}
+                    {facOptions.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onApply(r, choice || null)}
+                >
+                  {choice ? "Apply" : "Dismiss"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ready-to-license approval
+// ---------------------------------------------------------------------------
+
+/** Best-guess licence type for the approval dropdown, from the RAN type label. */
+function defaultLicenceType(ranType: string): LicenceType {
+  return /renewal/i.test(ranType)
+    ? "Renewal of Use/Possession Licence"
+    : "New Use/Possession Licence";
+}
+
+/**
+ * Applications whose certificate has been issued (stage "Licence / Certificate
+ * Issued") but which are not yet officially Licensed. Approving one records the
+ * licence through the R1–R6 rules — the deliberate human step that flips the
+ * register, feeds the weekly report, and is never done automatically by email.
+ */
+function ReadyToLicense({
+  items,
+  onApprove,
+}: {
+  items: LicenceWorkflow[];
+  onApprove: (row: LicenceWorkflow, type: LicenceType, date: string) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [picks, setPicks] = useState<
+    Record<string, { type: LicenceType; date: string }>
+  >({});
+  const pickFor = (r: LicenceWorkflow) =>
+    picks[r.id] || { type: defaultLicenceType(r.ranType), date: today };
+
+  return (
+    <div
+      className="card overflow-hidden"
+      style={{ borderLeft: "3px solid var(--status-ok, #00A050)" }}
+    >
+      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2">
+        <div className="font-black">
+          Ready to license
+          <span className="text-xs text-gunmetal/55 font-normal ml-2">
+            {items.length} issued certificate(s) — approve to record the licence
+          </span>
+        </div>
+        <span className="chip green shrink-0">✓ approve</span>
+      </div>
+
+      <div className="divide-y divide-gunmetal/8">
+        {items.map((r) => {
+          const pick = pickFor(r);
+          const set = (patch: Partial<{ type: LicenceType; date: string }>) =>
+            setPicks((p) => ({ ...p, [r.id]: { ...pick, ...patch } }));
+          return (
+            <div key={r.id} className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold leading-tight">{r.facilityName}</div>
+                  <div className="text-[11px] text-gunmetal/55">
+                    {r.ran} · {r.ranType}
+                  </div>
+                </div>
+                <span className="chip shrink-0">Licence / Certificate Issued</span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+                <div>
+                  <div className="caps text-[10px] text-gunmetal/50 mb-1">
+                    Licence type
+                  </div>
+                  <select
+                    className="input"
+                    value={pick.type}
+                    onChange={(e) => set({ type: e.target.value as LicenceType })}
+                  >
+                    {LICENCE_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <div className="caps text-[10px] text-gunmetal/50 mb-1">Date</div>
+                  <input
+                    type="date"
+                    className="input"
+                    value={pick.date}
+                    onChange={(e) => set({ date: e.target.value })}
+                  />
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onApprove(r, pick.type, pick.date)}
+                >
+                  Mark Licensed
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

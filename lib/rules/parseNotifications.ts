@@ -1,4 +1,4 @@
-import { matchOne } from "./matching";
+import { classifyMatch, matchOne } from "./matching";
 import {
   type Facility,
   type LicenceWorkflow,
@@ -46,6 +46,12 @@ interface Mapping {
  */
 const RULES: Array<{ test: RegExp; map: Mapping }> = [
   // --- Payment workflow -----------------------------------------------------
+  {
+    // RAIS "Invoice Request Generator": the applicant must first generate an
+    // invoice request — the invoice itself does not exist yet.
+    test: /invoice request generator|invoice request is required|invoice generation|generate (your )?invoice/i,
+    map: { phase: "Payment", stage: "Invoice Generation Pending", responsibleParty: "Applicant", priority: "APPLICANT" },
+  },
   {
     test: /payment pending/i,
     map: { phase: "Payment", stage: "Awaiting Proof of Payment", responsibleParty: "Applicant", priority: "APPLICANT", outstandingPayment: true },
@@ -98,6 +104,12 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Review & Assessment", stage: "Improvement Actions Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
+    // RAIS "Additional Information Required": more info needed to continue the
+    // review & assessment.
+    test: /additional information|further information required|request(ed)? for (additional|further) information/i,
+    map: { phase: "Review & Assessment", stage: "Further Information Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
+  },
+  {
     test: /external review|internal review|review and evaluation|review and assessment/i,
     map: { phase: "Review & Assessment", stage: "Review & Assessment", responsibleParty: "NRSO", priority: "HIGH" },
   },
@@ -143,11 +155,17 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
   },
   // --- Applicant-side intake ------------------------------------------------
   {
+    // RAIS email: "… Licence Request Submitted successfully" — applicant has
+    // filed; the application now sits with the Authority.
+    test: /submitted successfully|request submitted|submission successful/i,
+    map: { phase: "Application", stage: "Application Submitted", responsibleParty: "NRSO", priority: "NORMAL" },
+  },
+  {
     test: /licence expiry|about to expire|granted to facility/i,
     map: { phase: "Application", stage: "Expiry / Renewal Reminder", responsibleParty: "Applicant", priority: "APPLICANT" },
   },
   {
-    test: /application submission form|new form i|new ionising radiation licence renewal request|new variation of terms|additional information|regulatory requirements|new licence|new ionising radiation licence request|notice of intention to decomiss/i,
+    test: /application submission form|new form i|new ionising radiation licence renewal request|new variation of terms|regulatory requirements|new licence|new ionising radiation licence request|notice of intention to decomiss/i,
     map: { phase: "Application", stage: "Application Submission", responsibleParty: "Applicant", priority: "APPLICANT" },
   },
 ];
@@ -308,13 +326,17 @@ function facilityStageFor(phase: WorkflowPhase, stage: string): Stage {
     case "Application":
       return "Application Submitted";
     case "Payment":
-      return "Waiting for Payment";
+      return stage === "Invoice Generation Pending"
+        ? "Invoice Generation Pending"
+        : "Waiting for Payment";
     case "Accounts Clearance":
       return "Accounts Clearance Pending";
     case "RPA Receipt":
       return "Waiting for Review and Assessment";
     case "Review & Assessment":
-      return "Under Review and Assessment";
+      return stage === "Further Information Required"
+        ? "Under Internal Review (Further Information Required)"
+        : "Under Review and Assessment";
     case "Authorization / Conditions":
       return "Authorization Terms Issued";
     case "Approval (CEO/Board)":
@@ -554,6 +576,20 @@ export function linkFacilities(
     }
     return { ...r, matchScore: m.score };
   });
+}
+
+/**
+ * Decide whether a linked record is safe to apply to the register automatically
+ * or should wait in the review queue. Used by the email connector
+ * (ingestRaisEmail): only a confident facility match — the same "auto" tier the
+ * Bulk Approval matcher uses (score ≥ 0.72) — is auto-applied. Everything else
+ * (weak/no match, or a notification we could not classify) is queued so an
+ * officer confirms the facility before the register moves.
+ */
+export function ingestDecision(r: LicenceWorkflow): "auto" | "review" {
+  if (!r.facilityId) return "review";
+  if (r.stage === "Unrecognized") return "review";
+  return classifyMatch(r.matchScore ?? 0) === "auto" ? "auto" : "review";
 }
 
 // ---------------------------------------------------------------------------

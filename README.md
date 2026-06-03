@@ -170,6 +170,7 @@ automatically (Production for the production branch, Preview for others).
 | `inspections/{id}` | The dated inspection log |
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
+| `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
 | `config/referenceLists` | Editable lists (provinces, stages, licence types) |
 | `users/{uid}` | Staff accounts; role + section mirrored into Auth custom claims |
@@ -192,6 +193,20 @@ UI.
 
 Bulk approval commits everything in a single `writeBatch()` so a 30-line
 paste is atomic — if any write fails, none apply.
+
+---
+
+## Automatic RAIS email ingestion
+
+The Licensing Status tab can update itself. Forward the RAIS status-change
+emails to the `ingestRaisEmail` Cloud Function (via an inbound-email provider
+such as CloudMailin or Mailgun) and it runs the same parser the tab uses on a
+manual paste: confident facility matches are applied to the register
+automatically, and anything weak/ambiguous waits in the **Needs review** panel
+for an officer to confirm. It tracks *pipeline stage* only — flipping a facility
+to officially licensed still goes through the R1–R6 rules.
+
+Setup, security and provider steps: **[`docs/rais-email-ingestion.md`](docs/rais-email-ingestion.md)**.
 
 ---
 
