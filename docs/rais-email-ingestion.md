@@ -106,7 +106,11 @@ Writes use the Admin SDK and bypass Firestore security rules, so the endpoint
 > in your own Google account on a timer, finds new RAIS emails, and posts each
 > to this function — no forwarding-address confirmation, no third party. Paste
 > it in at <https://script.google.com>, set `ENDPOINT` + `SECRET`, run it once to
-> authorize, then add a 15-minute time trigger.
+> authorize, then add a 15-minute time trigger. It matches the whole
+> `rpa.gov.zm` domain (so internal "… data form assigned" notifications, which
+> can come from a different address than `eLicensing@rpa.gov.zm`, are caught) and
+> de-duplicates per **message** — so a new notification that lands in a thread it
+> already touched is still forwarded.
 
 If you prefer a true inbound webhook instead, point a provider at the endpoint:
 
