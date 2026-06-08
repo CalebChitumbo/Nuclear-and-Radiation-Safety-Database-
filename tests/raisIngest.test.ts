@@ -5,7 +5,8 @@ import {
   linkFacilities,
   parseNotifications,
 } from "../lib/rules/parseNotifications";
-import type { Facility, LicenceWorkflow } from "../lib/rules/types";
+import { recordLicence } from "../lib/rules/recordLicence";
+import type { Facility, LicenceWorkflow, WeekDef } from "../lib/rules/types";
 
 function fac(p: Partial<Facility> & { id: string; name: string }): Facility {
   return {
@@ -128,7 +129,11 @@ describe("real RAIS email shapes", () => {
     expect(ingestDecision(r)).toBe("auto");
   });
 
-  it("auto-applies a 'Request Submitted successfully' email as Application Submitted", () => {
+  it("auto-applies a 'Request Submitted successfully' email as Invoice Request Generation Pending", () => {
+    // Per the RPA template mapping (row 119) a successfully submitted request
+    // means the applicant must next generate the invoice request — the canonical
+    // status is "Invoice Request Generation Pending", not the old coarse
+    // "Application Submitted".
     const f = feed(
       "Renewal Ionising Radiation Licence Request Submitted successfully",
       [
@@ -140,8 +145,9 @@ describe("real RAIS email shapes", () => {
       ].join("\n"),
     );
     const [r] = linkFacilities(parseNotifications(f), konkola);
-    expect(r.phase).toBe("Application");
-    expect(r.facilityStage).toBe("Application Submitted");
+    expect(r.phase).toBe("Payment");
+    expect(r.facilityStage).toBe("Invoice Generation Pending");
+    expect(r.currentStatus).toBe("Invoice Request Generation Pending");
     expect(ingestDecision(r)).toBe("auto");
   });
 
@@ -182,5 +188,107 @@ describe("real RAIS email shapes", () => {
     expect(r.facilityStage).toBe(
       "Under Internal Review (Further Information Required)",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The two licence-issuing special cases (spec §4) — parsed flag → recordLicence.
+// The connector never flips `licensed`; that happens through R1–R6 when the
+// officer approves in the Ready-to-license panel.
+// ---------------------------------------------------------------------------
+
+const weeks: WeekDef[] = [
+  { label: "W23 — wk of 1 Jun 2026", start: "2026-06-01", end: "2026-06-05" },
+];
+const konkola = [fac({ id: "kcm", name: "KONKOLA COPPER MINE PLC" })];
+const feed = (subject: string, body: string) => `${subject}\n${body}`;
+
+describe("Renewal Approved → Licensed via recordLicence (§4a)", () => {
+  it("flags the record renewal-auto and records as a Use/Possession renewal", () => {
+    const f = feed(
+      "Renewal Ionising Radiation Licence Application Approved",
+      "Your Application for a renewal Ionising Radiation Licence has been Approved.\nFacility Name - KONKOLA COPPER MINE PLC\nWorkflow RAN - AUTH/USE.REN/0935",
+    );
+    const [r] = linkFacilities(parseNotifications(f), konkola);
+    expect(r.special).toBe("renewal-auto");
+    expect(r.currentStatus).toBe("Renewal Licence Approved - Licences can be downloaded");
+    expect(r.facilityStage).toBe("Licence / Certificate Issued");
+    expect(ingestDecision(r)).toBe("auto");
+
+    const m = recordLicence({
+      facility: fac({ id: "kcm", name: "KONKOLA COPPER MINE PLC" }),
+      number: r.ran,
+      type: "Renewal of Use/Possession Licence",
+      date: "2026-06-03",
+      weeks,
+      uid: "u",
+      newEventId: "e1",
+    });
+    expect(m.effect).toBe("becomes-licensed");
+    expect(m.facilityWrite.licensed).toBe(true);
+    expect(m.facilityWrite.stage).toBe("Licensed");
+    expect(m.event.type).toBe("Renewal of Use/Possession Licence");
+  });
+});
+
+describe("Form I Approved → officer confirms the type (§4b)", () => {
+  const parsed = () => {
+    const f = feed(
+      "Ionising Radiation Licence Application Approved",
+      "Your Application for an Ionising Radiation Licence has been Approved.\nFacility Name - KONKOLA COPPER MINE PLC\nWorkflow RAN - AUTH/USE.NEW/0101",
+    );
+    return linkFacilities(parseNotifications(f), konkola)[0];
+  };
+
+  it("flags the record form-i-prompt", () => {
+    const r = parsed();
+    expect(r.special).toBe("form-i-prompt");
+    expect(r.currentStatus).toBe("Licence Approved (Use) - Licence available");
+    expect(r.facilityStage).toBe("Licence / Certificate Issued");
+  });
+
+  it("Yes → New Use/Possession → Licensed", () => {
+    const r = parsed();
+    const m = recordLicence({
+      facility: fac({ id: "kcm", name: "KONKOLA COPPER MINE PLC" }),
+      number: r.ran,
+      type: "New Use/Possession Licence",
+      date: "2026-06-03",
+      weeks,
+      uid: "u",
+      newEventId: "e2",
+    });
+    expect(m.effect).toBe("becomes-licensed");
+    expect(m.facilityWrite.licensed).toBe(true);
+  });
+
+  it("No → Import → authorisation recorded, NOT licensed", () => {
+    const r = parsed();
+    const m = recordLicence({
+      facility: fac({ id: "kcm", name: "KONKOLA COPPER MINE PLC" }),
+      number: r.ran,
+      type: "Importation Licence",
+      date: "2026-06-03",
+      weeks,
+      uid: "u",
+      newEventId: "e3",
+    });
+    expect(m.facilityWrite.licensed).toBe(false);
+    expect(m.facilityWrite.auths.some((a) => a.type === "Importation Licence")).toBe(true);
+  });
+});
+
+describe("resets and weak matches", () => {
+  it("classifies a rejection as a reset and queues it when no facility matches", () => {
+    const f = feed(
+      "Use Authorization Application Rejected",
+      "Your Application for Use Authorization has been rejected.\nWorkflow RAN - AUTH/USE.NEW/0202",
+    );
+    const [r] = linkFacilities(parseNotifications(f), konkola);
+    expect(r.special).toBe("reset");
+    expect(r.currentStatus).toBe("Application Rejected (Use)");
+    expect(r.facilityStage).toBe("Application Returned / Rejected");
+    expect(r.facilityId).toBeNull();
+    expect(ingestDecision(r)).toBe("review");
   });
 });

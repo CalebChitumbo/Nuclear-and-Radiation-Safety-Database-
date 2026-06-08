@@ -227,7 +227,12 @@ function FacilityRow({ f, onOpen }: { f: Facility; onOpen: () => void }) {
           </div>
         ) : (
           <div>
-            <div className="text-sm">{f.stage}</div>
+            {/* The precise RAIS status when the email engine has set one, else
+                the coarse pipeline stage. */}
+            <div className="text-sm">{f.currentStatus || f.stage}</div>
+            {f.currentStatus ? (
+              <div className="text-[11px] text-gunmetal/45">{f.stage}</div>
+            ) : null}
             {otherAuths.length > 0 ? (
               <AuthBadge
                 count={otherAuths.length}

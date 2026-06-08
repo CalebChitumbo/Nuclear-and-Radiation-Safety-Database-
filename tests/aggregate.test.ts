@@ -95,3 +95,29 @@ describe("computeAggregate", () => {
     expect(agg.byStage["No Application Submitted"]).toBe(1);
   });
 });
+
+describe("byStage with the new RAIS status buckets", () => {
+  it("counts facilities sitting on a newly-added Stage (e.g. a returned application)", () => {
+    const withNewStages: Facility[] = [
+      ...facs,
+      {
+        id: "4",
+        no: 4,
+        name: "D",
+        nameLower: "d",
+        district: "",
+        province: "Lusaka",
+        practice: "",
+        sector: "Private",
+        licensed: false,
+        stage: "Application Returned / Rejected",
+        currentStatus: "Transfer Application Rejected",
+        facCode: "",
+        auths: [],
+      },
+    ];
+    const agg = computeAggregate(withNewStages);
+    expect(agg.total).toBe(4);
+    expect(agg.byStage["Application Returned / Rejected"]).toBe(1);
+  });
+});

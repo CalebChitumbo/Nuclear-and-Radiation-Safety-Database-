@@ -27,23 +27,39 @@ triggers the existing `onFacilityWrite` function, which recomputes
 
 ## What it does and does not do
 
-- **Does:** keep each application's *pipeline stage* current (Payment Pending →
-  Accounts Clearance → Under Review → CEO Approval → Licence Issued …), and roll
-  that stage onto a confidently-matched facility in the register.
+- **Classifies by the email subject** against the authoritative RPA template
+  mapping (`lib/rules/raisTemplates.ts`, generated from
+  `rais-email-status-mapping.csv` — 64 templates). Each email yields a canonical
+  `currentStatus` (the spreadsheet's `NewApplicationStatus`) and a coarse `Stage`
+  it rolls up to. Dashboard-paste titles that aren't email subjects still fall
+  back to the legacy regex rules. The classifier is pure/deterministic (no LLM).
+- **Keeps one current status per facility, that supersedes the previous.** A
+  facility shows the status of the **most recent applicable** email for its
+  active application (`currentStatus` + the coarse `stage`). Forward progression
+  replaces the shown status; a **stale or duplicate** older email never regresses
+  it; a genuine **reset** (rejection / returned / declination / withdrawal /
+  additional-info) moves it backward when it is the newest event. The ordering
+  rule lives in `lib/rules/supersede.ts` (`shouldSupersede` / `resolveFacilityStatus`).
 - **Confident vs. queued:** it auto-applies only a strong facility match (the
   same `score ≥ 0.72` "auto" tier the Bulk Approval matcher uses). Weak/no
   matches, and notifications it cannot classify, are saved with
   `reviewStatus: "needs-review"` and wait in the **Needs review** panel on the
-  Licensing Status tab for an officer to confirm the facility, then apply.
+  Licensing Status tab for an officer to confirm the facility, then apply. An
+  officer-confirmed facility match is preserved when later emails for the same
+  RAN arrive without a facility of their own (e.g. a body-less *Payment Pending*).
 - **Does not:** flip a facility to officially **licensed** or write the dated
   `licenceEvent` that feeds the register's licensed count and the weekly report.
   That remains a deliberate action through the R1–R6 rules
   (`lib/rules/recordLicence.ts`) — the connector never bypasses them. An
-  already-licensed facility is never downgraded by an incoming email.
+  already-licensed facility is never downgraded by an incoming email. The two
+  licence-issuing emails — **Renewal Approved** and **Form I Approved** — surface
+  in the **Ready to license** panel: a renewal is one click; Form I first asks the
+  officer "Is this a Use/Possession licence?" (Yes → Licensed; No → record the
+  actual authorisation type, e.g. Import, without licensing).
 - **Idempotent:** records are keyed by their workflow RAN, so the same email
-  arriving twice updates the same row instead of duplicating it. A re-sent email
-  will **not** knock an already-applied (or officer-resolved) item back into the
-  queue.
+  arriving twice updates the same row instead of duplicating it. A re-sent or
+  stale email will **not** knock an already-applied (or officer-resolved) item
+  back into the queue, nor regress its status.
 
 ## 1. Deploy the function
 

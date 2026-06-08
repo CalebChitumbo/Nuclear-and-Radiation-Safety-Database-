@@ -16,7 +16,13 @@ const path = require("path");
 
 // Pure, dependency-free modules the connector imports. Keep this list minimal —
 // adding an entry pulls another file (and its imports) into the function bundle.
-const FILES = ["types.ts", "matching.ts", "parseNotifications.ts"];
+const FILES = [
+  "types.ts",
+  "matching.ts",
+  "raisTemplates.ts",
+  "parseNotifications.ts",
+  "supersede.ts",
+];
 
 const SRC_DIR = path.resolve(__dirname, "..", "..", "lib", "rules");
 const DEST_DIR = path.resolve(__dirname, "..", "src", "rais", "rules");

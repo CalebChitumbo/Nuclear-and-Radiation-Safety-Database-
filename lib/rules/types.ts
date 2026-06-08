@@ -1,3 +1,11 @@
+import type { NewApplicationStatus } from "./raisTemplates";
+
+// The canonical RAIS status taxonomy lives in raisTemplates.ts (co-located with
+// the email-template table it is derived from). Re-exported here so callers can
+// keep importing status types from the central types module. This is a
+// type-only import/re-export, so there is no runtime import cycle.
+export type { NewApplicationStatus };
+
 export const PROVINCES = [
   "Lusaka",
   "Copperbelt",
@@ -34,6 +42,12 @@ export const STAGES = [
   "Board Licence Approval Required",
   "Licence / Certificate Issued",
   "Inspection in Progress",
+  // Added for the RAIS email→status engine (driven by the RPA email-template
+  // mapping). The granular per-email status lives on `currentStatus`; these are
+  // the coarse buckets those statuses roll up to for `byStage` aggregates.
+  "Draft Application",
+  "Application Returned / Rejected",
+  "Licence Expiring (Renewal Due)",
 ] as const;
 export type Stage = (typeof STAGES)[number];
 
@@ -98,6 +112,13 @@ export interface Facility {
   sector: Sector;
   licensed: boolean;
   stage: Stage;
+  /**
+   * The granular RAIS status this facility currently shows, taken from the most
+   * recent applicable email for its active application (the spreadsheet's
+   * `NewApplicationStatus`). `stage` is the coarse bucket it rolls up to; this is
+   * the precise wording surfaced on the dashboard. Absent on older docs.
+   */
+  currentStatus?: NewApplicationStatus;
   facCode: string;
   auths: Authorisation[];
   updatedAt?: string;
@@ -196,6 +217,20 @@ export interface LicenceWorkflow {
   notifications: string[];
   /** The Stage value rolled up onto the matched facility on commit. */
   facilityStage: Stage;
+  /**
+   * The canonical RAIS status this email maps to (the spreadsheet's
+   * `NewApplicationStatus`). This is what supersedes the facility's displayed
+   * status; `facilityStage` is the coarse bucket it rolls up to. Undefined for
+   * records classified only by the legacy regex rules (dashboard-paste titles).
+   */
+  currentStatus?: NewApplicationStatus;
+  /**
+   * Set for the two licence-issuing emails and the resets. "renewal-auto" and
+   * "form-i-prompt" surface in the Ready-to-license panel for the officer's R1–R6
+   * action; "reset" marks rejection/returned/declination/withdrawal/additional-info
+   * so a genuinely newer one may move the status backward (see supersede.ts).
+   */
+  special?: "renewal-auto" | "form-i-prompt" | "reset";
   /** Most recent date seen in the notifications (DD/MM/YYYY as pasted). */
   lastSeen: string;
   /**

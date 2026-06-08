@@ -13,9 +13,11 @@ import {
   parseNotifications,
   type WorkflowReport,
 } from "@/lib/rules/parseNotifications";
+import { detectType } from "@/lib/rules/detectType";
 import {
   LICENCE_TYPES,
   WORKFLOW_PHASES,
+  isUseP,
   type Facility,
   type LicenceType,
   type LicenceWorkflow,
@@ -741,11 +743,12 @@ function ReviewQueue({
 // Ready-to-license approval
 // ---------------------------------------------------------------------------
 
-/** Best-guess licence type for the approval dropdown, from the RAN type label. */
-function defaultLicenceType(ranType: string): LicenceType {
-  return /renewal/i.test(ranType)
+/** Best-guess licence type for the approval dropdown, inferred from the RAN. */
+function defaultLicenceType(r: LicenceWorkflow): LicenceType {
+  const fallback: LicenceType = /renewal/i.test(r.ranType)
     ? "Renewal of Use/Possession Licence"
     : "New Use/Possession Licence";
+  return detectType(r.ran, fallback);
 }
 
 /**
@@ -753,6 +756,13 @@ function defaultLicenceType(ranType: string): LicenceType {
  * Issued") but which are not yet officially Licensed. Approving one records the
  * licence through the R1–R6 rules — the deliberate human step that flips the
  * register, feeds the weekly report, and is never done automatically by email.
+ *
+ * Two RAIS emails land here as explicit cases (spec §4):
+ *  - "renewal-auto" (Renewal Approved): pre-filled as a Use/Possession renewal —
+ *    one click sets the facility Licensed.
+ *  - "form-i-prompt" (Form I Approved): the type is ambiguous, so the officer is
+ *    first asked "Is this a Use/Possession licence?". Yes → Licensed; No → pick
+ *    the actual type (Import/Transfer/…), recorded as an authorisation only.
  */
 function ReadyToLicense({
   items,
@@ -763,10 +773,15 @@ function ReadyToLicense({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [picks, setPicks] = useState<
-    Record<string, { type: LicenceType; date: string }>
+    Record<string, { type: LicenceType; date: string; useP?: boolean }>
   >({});
   const pickFor = (r: LicenceWorkflow) =>
-    picks[r.id] || { type: defaultLicenceType(r.ranType), date: today };
+    picks[r.id] || {
+      type: defaultLicenceType(r),
+      date: today,
+      // Form I starts at the common answer (Yes) but the officer must confirm.
+      useP: r.special === "form-i-prompt" ? true : undefined,
+    };
 
   return (
     <div
@@ -786,8 +801,15 @@ function ReadyToLicense({
       <div className="divide-y divide-gunmetal/8">
         {items.map((r) => {
           const pick = pickFor(r);
-          const set = (patch: Partial<{ type: LicenceType; date: string }>) =>
-            setPicks((p) => ({ ...p, [r.id]: { ...pick, ...patch } }));
+          const set = (
+            patch: Partial<{ type: LicenceType; date: string; useP?: boolean }>,
+          ) => setPicks((p) => ({ ...p, [r.id]: { ...pick, ...patch } }));
+          const isFormI = r.special === "form-i-prompt";
+          // Form I "Yes" forces a new Use/Possession licence; otherwise the
+          // officer's chosen type wins.
+          const effectiveType: LicenceType =
+            isFormI && pick.useP ? "New Use/Possession Licence" : pick.type;
+          const showTypePicker = !isFormI || pick.useP === false;
           return (
             <div key={r.id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -797,25 +819,57 @@ function ReadyToLicense({
                     {r.ran} · {r.ranType}
                   </div>
                 </div>
-                <span className="chip shrink-0">Licence / Certificate Issued</span>
+                <span className="chip shrink-0">
+                  {r.currentStatus || "Licence / Certificate Issued"}
+                </span>
               </div>
+
+              {isFormI ? (
+                <div className="mt-3">
+                  <div className="caps text-[10px] text-gunmetal/50 mb-1">
+                    Is this a Use/Possession licence?
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className={`btn ${pick.useP ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => set({ useP: true })}
+                    >
+                      Yes — Use/Possession
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${pick.useP === false ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => set({ useP: false })}
+                    >
+                      No — another type
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end">
                 <div>
                   <div className="caps text-[10px] text-gunmetal/50 mb-1">
                     Licence type
                   </div>
-                  <select
-                    className="input"
-                    value={pick.type}
-                    onChange={(e) => set({ type: e.target.value as LicenceType })}
-                  >
-                    {LICENCE_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
+                  {showTypePicker ? (
+                    <select
+                      className="input"
+                      value={pick.type}
+                      onChange={(e) => set({ type: e.target.value as LicenceType })}
+                    >
+                      {LICENCE_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="input bg-gunmetal/5 text-gunmetal/70">
+                      {effectiveType}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="caps text-[10px] text-gunmetal/50 mb-1">Date</div>
@@ -828,9 +882,9 @@ function ReadyToLicense({
                 </div>
                 <button
                   className="btn btn-primary"
-                  onClick={() => onApprove(r, pick.type, pick.date)}
+                  onClick={() => onApprove(r, effectiveType, pick.date)}
                 >
-                  Mark Licensed
+                  {isUseP(effectiveType) ? "Mark Licensed" : "Record authorisation"}
                 </button>
               </div>
             </div>
