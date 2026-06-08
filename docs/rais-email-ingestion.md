@@ -13,17 +13,20 @@ RAIS notification email
         ▼
 Inbound-email provider  ──HTTP POST──►  ingestRaisEmail  (Cloud Function)
  (CloudMailin / Mailgun)                       │
-                                               ├─ parse + match to the register
-                                               ├─ confident match  → apply: update
-                                               │                     licenceWorkflows + roll
-                                               │                     the facility's stage forward
-                                               └─ weak / no match   → queue: "Needs review"
-                                                                      on the Licensing Status tab
+                                               ├─ classify (subject → status)
+                                               ├─ link to a facility by name, else by RAN
+                                               └─ queue every update in the "Incoming RAIS
+                                                  updates" inbox (Licensing Status tab)
+                                                       │
+                                                       ▼
+                                          officer ACCEPTS  → the status is rolled onto the
+                                          (one row, or          facility in the register
+                                           "Accept all")
 ```
 
-The dashboard then updates on its own — rolling a facility's stage forward
-triggers the existing `onFacilityWrite` function, which recomputes
-`aggregates/dashboard`.
+The connector itself never writes to the register — nothing changes silently.
+Accepting an update writes the facility, which triggers the existing
+`onFacilityWrite` function to recompute `aggregates/dashboard`.
 
 ## What it does and does not do
 
@@ -40,13 +43,18 @@ triggers the existing `onFacilityWrite` function, which recomputes
   it; a genuine **reset** (rejection / returned / declination / withdrawal /
   additional-info) moves it backward when it is the newest event. The ordering
   rule lives in `lib/rules/supersede.ts` (`shouldSupersede` / `resolveFacilityStatus`).
-- **Confident vs. queued:** it auto-applies only a strong facility match (the
-  same `score ≥ 0.72` "auto" tier the Bulk Approval matcher uses). Weak/no
-  matches, and notifications it cannot classify, are saved with
-  `reviewStatus: "needs-review"` and wait in the **Needs review** panel on the
-  Licensing Status tab for an officer to confirm the facility, then apply. An
-  officer-confirmed facility match is preserved when later emails for the same
-  RAN arrive without a facility of their own (e.g. a body-less *Payment Pending*).
+- **Review &amp; accept inbox:** every imported email is queued
+  (`reviewStatus: "needs-review"`) in the **Incoming RAIS updates** inbox on the
+  Licensing Status tab, showing its facility and status. An officer **Accepts** a
+  row — or **Accept all recognised** — and only then is the status rolled onto the
+  register. The connector applies nothing on its own.
+- **Links a facility by name, then by RAN.** Payment, board-approval and internal
+  "data form assigned" emails name only a RAN, never the facility. `linkByRan`
+  resolves those from a RAN → facility map built from the register's recorded
+  authorisation numbers (`auths[].number`) and from every previously-matched
+  workflow — so once an application is tied to a facility, its later
+  notifications link themselves. Genuinely new RANs get a one-time facility
+  picker; matching one "teaches" it for next time.
 - **Does not:** flip a facility to officially **licensed** or write the dated
   `licenceEvent` that feeds the register's licensed count and the weekly report.
   That remains a deliberate action through the R1–R6 rules

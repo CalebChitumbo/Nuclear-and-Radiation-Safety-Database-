@@ -122,10 +122,14 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Review & Assessment", stage: "Improvement Actions Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
-    // RAIS "Additional Information Required": more info needed to continue the
-    // review & assessment.
-    test: /additional information|further information required|request(ed)? for (additional|further) information/i,
+    // RAIS "Additional Information Required" / "Request for Further Particulars
+    // or Information": more info needed to continue the review & assessment.
+    test: /additional information|further information required|further particulars|request(ed)? for (additional|further) (information|particulars)/i,
     map: { phase: "Review & Assessment", stage: "Further Information Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
+  },
+  {
+    test: /review remarks/i,
+    map: { phase: "Review & Assessment", stage: "Review Remarks", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
     test: /external review|internal review|review and evaluation|review and assessment/i,
@@ -142,7 +146,7 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Approval (CEO/Board)", stage: "CEO Approval", responsibleParty: "CEO", priority: "CRITICAL" },
   },
   {
-    test: /board licence approval|rpa board/i,
+    test: /board licence approval|rpa board|board approval/i,
     map: { phase: "Approval (CEO/Board)", stage: "Board Approval", responsibleParty: "Board", priority: "CRITICAL" },
   },
   {
@@ -172,6 +176,12 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Inspection", stage: "Inspection", responsibleParty: "Inspection Team", priority: "NORMAL" },
   },
   // --- Applicant-side intake ------------------------------------------------
+  {
+    // Applicant filling a transfer/decommission/other licence form (RAIS internal
+    // "… Form VI data form assigned" notifications).
+    test: /application for transfer of licence|transfer of licence form|application for (variation|decommission)/i,
+    map: { phase: "Application", stage: "Application Submission", responsibleParty: "Applicant", priority: "APPLICANT" },
+  },
   {
     // RAIS email: "… Licence Request Submitted successfully" — applicant has
     // filed; the application now sits with the Authority.
@@ -731,6 +741,93 @@ export function ingestDecision(r: LicenceWorkflow): "auto" | "review" {
   if (!r.facilityId) return "review";
   if (r.stage === "Unrecognized") return "review";
   return classifyMatch(r.matchScore ?? 0) === "auto" ? "auto" : "review";
+}
+
+// ---------------------------------------------------------------------------
+// RAN-based linking ("remember the facility for an application")
+// ---------------------------------------------------------------------------
+
+/** A facility a RAN is known to belong to. */
+export interface RanFacility {
+  id: string;
+  name: string;
+  facCode: string;
+}
+
+/**
+ * Build a RAN → facility map from the register's recorded authorisation numbers.
+ * Each facility carries its licence/application RAN(s) in `auths[].number`
+ * (e.g. AUTH/USE.REN/0692), so an email that cites only a RAN can still be tied
+ * to its facility.
+ */
+export function ranMapFromFacilities(
+  facilities: Facility[],
+): Map<string, RanFacility> {
+  const m = new Map<string, RanFacility>();
+  for (const f of facilities) {
+    for (const a of f.auths || []) {
+      if (a.number) {
+        m.set(a.number.toUpperCase(), {
+          id: f.id,
+          name: f.name,
+          facCode: f.facCode,
+        });
+      }
+    }
+  }
+  return m;
+}
+
+/**
+ * Extend a RAN → facility map with previously-matched workflow records. This is
+ * the "memory": once any email for an application RAN (or its payment RAN) has
+ * been tied to a facility, every later notification for it links itself.
+ */
+export function addWorkflowsToRanMap(
+  map: Map<string, RanFacility>,
+  workflows: LicenceWorkflow[],
+): Map<string, RanFacility> {
+  for (const w of workflows) {
+    if (!w.facilityId) continue;
+    const fac: RanFacility = {
+      id: w.facilityId,
+      name: w.facilityName,
+      facCode: w.facCode,
+    };
+    if (w.ran) map.set(w.ran.toUpperCase(), fac);
+    if (w.paymentRan) map.set(w.paymentRan.toUpperCase(), fac);
+  }
+  return map;
+}
+
+/**
+ * Second-pass linking for records that name no facility (payment, board-approval
+ * and internal "data form assigned" emails carry only a RAN). Fills the facility
+ * from the RAN → facility map. Run AFTER linkFacilities so a real name match
+ * always wins; this only rescues the ones it left unmatched.
+ */
+export function linkByRan(
+  records: LicenceWorkflow[],
+  ranToFacility: Map<string, RanFacility>,
+): LicenceWorkflow[] {
+  if (!ranToFacility.size) return records;
+  return records.map((r) => {
+    if (r.facilityId) return r;
+    const keys = [r.ran, r.paymentRan].filter(Boolean) as string[];
+    for (const k of keys) {
+      const hit = ranToFacility.get(k.toUpperCase());
+      if (hit) {
+        return {
+          ...r,
+          facilityId: hit.id,
+          facilityName: r.facilityName || hit.name,
+          facCode: r.facCode || hit.facCode,
+          matchScore: 1, // RAN identity is an exact link
+        };
+      }
+    }
+    return r;
+  });
 }
 
 // ---------------------------------------------------------------------------

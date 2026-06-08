@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  addWorkflowsToRanMap,
   ingestDecision,
+  linkByRan,
   linkFacilities,
   parseNotifications,
+  ranMapFromFacilities,
 } from "../lib/rules/parseNotifications";
 import { recordLicence } from "../lib/rules/recordLicence";
 import type { Facility, LicenceWorkflow, WeekDef } from "../lib/rules/types";
@@ -275,6 +278,74 @@ describe("Form I Approved → officer confirms the type (§4b)", () => {
     });
     expect(m.facilityWrite.licensed).toBe(false);
     expect(m.facilityWrite.auths.some((a) => a.type === "Importation Licence")).toBe(true);
+  });
+});
+
+describe("RAN-based linking (rescues no-facility emails)", () => {
+  it("ranMapFromFacilities maps each recorded authorisation RAN to its facility", () => {
+    const facilities = [
+      fac({
+        id: "brace",
+        name: "Braceline",
+        facCode: "FAC/0344",
+        auths: [
+          { type: "Renewal of Use/Possession Licence", number: "AUTH/USE.REN/0692", date: "" },
+        ],
+      }),
+    ];
+    const map = ranMapFromFacilities(facilities);
+    expect(map.get("AUTH/USE.REN/0692")?.id).toBe("brace");
+  });
+
+  it("linkByRan fills a no-facility record from its RAN, leaving matched ones untouched", () => {
+    const map = new Map([
+      ["AUTH/USE.REN/0914", { id: "kcm", name: "KONKOLA COPPER MINE PLC", facCode: "" }],
+    ]);
+    const unmatched: LicenceWorkflow = { ...baseRecord, id: "a", ran: "AUTH/USE.REN/0914", facilityId: null, facilityName: "" };
+    const matched: LicenceWorkflow = { ...baseRecord, id: "b", ran: "AUTH/USE.REN/0001", facilityId: "other", facilityName: "Other" };
+    const [u, m] = linkByRan([unmatched, matched], map);
+    expect(u.facilityId).toBe("kcm");
+    expect(u.facilityName).toBe("KONKOLA COPPER MINE PLC");
+    expect(u.matchScore).toBe(1);
+    expect(m.facilityId).toBe("other"); // a real match is never overwritten
+  });
+
+  it("remembers a facility by application RAN and payment RAN from prior workflows", () => {
+    const prior: LicenceWorkflow = {
+      ...baseRecord,
+      ran: "AUTH/USE.REN/1098",
+      paymentRan: "AUTH/PAY/1042",
+      facilityId: "kcm",
+      facilityName: "KONKOLA",
+    };
+    const map = addWorkflowsToRanMap(new Map(), [prior]);
+    expect(map.get("AUTH/USE.REN/1098")?.id).toBe("kcm");
+    expect(map.get("AUTH/PAY/1042")?.id).toBe("kcm");
+    // A later payment-only notification (cites only AUTH/PAY/1042) links itself.
+    const pay: LicenceWorkflow = { ...baseRecord, id: "p", ran: "AUTH/PAY/1042", paymentRan: "AUTH/PAY/1042", facilityId: null, facilityName: "" };
+    expect(linkByRan([pay], map)[0].facilityId).toBe("kcm");
+  });
+
+  it("rescues a board-approval email that names only a RAN (end to end)", () => {
+    const facilities = [
+      fac({
+        id: "brace",
+        name: "Braceline",
+        facCode: "FAC/0344",
+        auths: [
+          { type: "Renewal of Use/Possession Licence", number: "AUTH/USE.REN/0692", date: "" },
+        ],
+      }),
+    ];
+    const f = feed(
+      "BOARD APPROVAL REQUEST OF IONISING RADIATION LICENCE",
+      "Hello,\nBOARD approval data form of AUTH/USE.REN/0692 has been assigned to you.",
+    );
+    const parsed = linkFacilities(parseNotifications(f), facilities);
+    expect(parsed[0].facilityId).toBeNull(); // no facility name in the body
+    const linked = linkByRan(parsed, ranMapFromFacilities(facilities));
+    expect(linked[0].facilityId).toBe("brace");
+    expect(linked[0].currentStatus).toBe("Pending Board Approval (FORM I)");
   });
 });
 

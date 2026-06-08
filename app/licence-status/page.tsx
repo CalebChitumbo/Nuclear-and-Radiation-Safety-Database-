@@ -7,10 +7,13 @@ import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { useToast } from "@/components/Toast";
 import {
+  addWorkflowsToRanMap,
   buildReport,
   formatReportText,
+  linkByRan,
   linkFacilities,
   parseNotifications,
+  ranMapFromFacilities,
   type WorkflowReport,
 } from "@/lib/rules/parseNotifications";
 import { detectType } from "@/lib/rules/detectType";
@@ -72,11 +75,18 @@ export default function LicenceStatusPage() {
   const [rows, setRows] = useState<LicenceWorkflow[] | null>(null);
   const [committing, setCommitting] = useState(false);
 
-  // Items the email connector queued for a human to confirm the facility match.
-  const needsReview = useMemo(
-    () => (saved ?? []).filter((r) => r.reviewStatus === "needs-review"),
-    [saved],
-  );
+  // The incoming-email inbox: everything the connector queued, awaiting accept.
+  // Re-link by RAN in the UI too, so a pending email whose RAN is in the register
+  // (or was matched on a sibling notification) shows its facility right away,
+  // without waiting for the connector to re-process it.
+  const needsReview = useMemo(() => {
+    const pending = (saved ?? []).filter((r) => r.reviewStatus === "needs-review");
+    const map = addWorkflowsToRanMap(
+      ranMapFromFacilities(facilities ?? []),
+      saved ?? [],
+    );
+    return linkByRan(pending, map);
+  }, [saved, facilities]);
 
   const facById = useMemo(
     () => new Map((facilities || []).map((f) => [f.id, f])),
@@ -172,7 +182,13 @@ export default function LicenceStatusPage() {
 
   const analyze = () => {
     const parsed = parseNotifications(text);
-    const linked = linkFacilities(parsed, facilities || []);
+    // Match by name first, then rescue RAN-only notifications using the register
+    // and everything already imported (the "remembered" RAN → facility links).
+    const ranMap = addWorkflowsToRanMap(
+      ranMapFromFacilities(facilities || []),
+      saved || [],
+    );
+    const linked = linkByRan(linkFacilities(parsed, facilities || []), ranMap);
     setRows(linked);
     if (!parsed.length) {
       toast.push("Nothing recognised in the pasted text.", "error");
@@ -180,6 +196,31 @@ export default function LicenceStatusPage() {
       toast.push(
         `Parsed ${parsed.length} applications from the dashboard.`,
         "success",
+      );
+    }
+  };
+
+  // Accept every recognised (facility-matched) incoming email at once — rolls
+  // each one's status onto its facility in the register.
+  const acceptAllReady = async (readyItems: LicenceWorkflow[]) => {
+    if (!user || !readyItems.length) return;
+    const recs: LicenceWorkflow[] = readyItems.map((row) => ({
+      ...row,
+      reviewStatus: "applied",
+      source: row.source ?? "email",
+    }));
+    try {
+      const s = await store();
+      const res = await s.saveLicenceWorkflows(recs, user.uid);
+      toast.push(
+        `Applied ${recs.length} update(s) — ${res.facilitiesUpdated} facility status(es) updated.`,
+        "success",
+      );
+      reload();
+    } catch (err) {
+      toast.push(
+        `Could not apply: ${err instanceof Error ? err.message : err}`,
+        "error",
       );
     }
   };
@@ -235,89 +276,102 @@ export default function LicenceStatusPage() {
 
   return (
     <div className="space-y-4 staggered">
-      {needsReview.length ? (
-        <ReviewQueue
-          items={needsReview}
-          facilities={facilities || []}
-          onApply={applyReviewed}
-        />
-      ) : null}
+      {/* The inbox — incoming RAIS emails, each with its status, ready to accept */}
+      <IncomingInbox
+        items={needsReview}
+        facilities={facilities || []}
+        onAccept={applyReviewed}
+        onAcceptAllReady={acceptAllReady}
+      />
 
+      {/* The two licence-issuing emails (§4): confirm the type, record via R1–R6 */}
       {readyToLicense.length ? (
         <ReadyToLicense items={readyToLicense} onApprove={approveLicence} />
       ) : null}
 
-      {/* Paste + analyze */}
-      <div className="card p-5">
-        <label className="caps text-[10px] text-gunmetal/60">
-          Paste the RAIS dashboard notifications
-        </label>
-        <textarea
-          className="input mt-1 font-mono-nums"
-          rows={7}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Copy the whole RAIS 'assigned data forms' feed and paste it here…"
-        />
-        <div className="text-[11px] text-gunmetal/55 mt-1">
-          Each notification (separated by <code>+ Show More</code>) is read,
-          grouped per application RAN, and placed in the pipeline. Nothing is
-          saved until you press <strong>Save to database</strong>.
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            className="btn btn-primary"
-            onClick={analyze}
-            disabled={!facilities}
-          >
-            Analyze dashboard
-          </button>
-          {isDirty ? (
-            <button className="btn btn-ghost" onClick={() => setRows(null)}>
-              Discard parse
-            </button>
-          ) : null}
-        </div>
-      </div>
+      {/* Manual paste + full pipeline board — secondary, tucked behind a disclosure */}
+      <details className="card p-4">
+        <summary className="font-black cursor-pointer select-none">
+          Manual paste &amp; pipeline board
+          <span className="text-xs text-gunmetal/55 font-normal ml-2">
+            paste a RAIS dashboard feed, or review the full tracked pipeline
+          </span>
+        </summary>
 
-      {report ? (
-        <>
-          <ReportPanel report={report} onCopy={copyReport} />
-          <KanbanBoard records={records} />
-          <ReviewTable
-            records={records}
-            facilities={facilities || []}
-            editable={isDirty}
-            onChange={updateRow}
-          />
-          {isDirty ? (
-            <div className="card p-5 flex flex-wrap items-center gap-3">
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="caps text-[10px] text-gunmetal/60">
+              Paste the RAIS dashboard notifications
+            </label>
+            <textarea
+              className="input mt-1 font-mono-nums"
+              rows={7}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Copy the whole RAIS 'assigned data forms' feed and paste it here…"
+            />
+            <div className="text-[11px] text-gunmetal/55 mt-1">
+              Each notification (separated by <code>+ Show More</code>) is read,
+              grouped per application RAN, and placed in the pipeline. Nothing is
+              saved until you press <strong>Save to database</strong>.
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 className="btn btn-primary"
-                disabled={committing}
-                onClick={commit}
+                onClick={analyze}
+                disabled={!facilities}
               >
-                {committing
-                  ? "Saving…"
-                  : `Save ${rows?.length ?? 0} applications to database`}
+                Analyze dashboard
               </button>
-              <div className="text-xs text-gunmetal/60">
-                Matched facilities will have their stage updated in the register.
-              </div>
+              {isDirty ? (
+                <button className="btn btn-ghost" onClick={() => setRows(null)}>
+                  Discard parse
+                </button>
+              ) : null}
             </div>
+          </div>
+
+          {report ? (
+            <>
+              <ReportPanel report={report} onCopy={copyReport} />
+              <KanbanBoard records={records} />
+              <ReviewTable
+                records={records}
+                facilities={facilities || []}
+                editable={isDirty}
+                onChange={updateRow}
+              />
+              {isDirty ? (
+                <div className="card p-5 flex flex-wrap items-center gap-3">
+                  <button
+                    className="btn btn-primary"
+                    disabled={committing}
+                    onClick={commit}
+                  >
+                    {committing
+                      ? "Saving…"
+                      : `Save ${rows?.length ?? 0} applications to database`}
+                  </button>
+                  <div className="text-xs text-gunmetal/60">
+                    Matched facilities will have their status updated in the
+                    register.
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-gunmetal/55 px-1">
+                  Showing the last saved status. Paste a fresh dashboard and press
+                  Analyze to update.
+                </div>
+              )}
+            </>
           ) : (
-            <div className="text-xs text-gunmetal/55 px-1">
-              Showing the last saved status. Paste a fresh dashboard and press
-              Analyze to update.
+            <div className="text-sm text-gunmetal/60">
+              Paste a RAIS dashboard feed above and press{" "}
+              <strong>Analyze dashboard</strong> to see the full pipeline.
             </div>
           )}
-        </>
-      ) : (
-        <div className="card p-6 text-sm text-gunmetal/60">
-          No licensing status yet. Paste the RAIS dashboard above and press{" "}
-          <strong>Analyze dashboard</strong> to see where every application sits.
         </div>
-      )}
+      </details>
     </div>
   );
 }
@@ -646,95 +700,204 @@ function ReviewTable({
 // ---------------------------------------------------------------------------
 
 /**
- * Applications the automatic email connector (ingestRaisEmail) parsed but could
- * not confidently match to the register. An officer confirms the facility and
- * applies it (which rolls the stage onto that facility), or dismisses it.
+ * The incoming-email inbox. Every RAIS notification the connector imported waits
+ * here with its status until an officer accepts it (which rolls that status onto
+ * the facility in the register) or dismisses it. Items whose facility is known —
+ * matched by name or by RAN — sit in "Ready to apply" and can be accepted in
+ * bulk; the rest need a facility picked once (after which future emails for the
+ * same application link themselves).
  */
-function ReviewQueue({
+function IncomingInbox({
   items,
   facilities,
-  onApply,
+  onAccept,
+  onAcceptAllReady,
 }: {
   items: LicenceWorkflow[];
   facilities: Facility[];
-  onApply: (row: LicenceWorkflow, facilityId: string | null) => void;
+  onAccept: (row: LicenceWorkflow, facilityId: string | null) => void;
+  onAcceptAllReady: (rows: LicenceWorkflow[]) => void;
 }) {
-  const facOptions = facilities.slice(0, 300);
+  const facOptions = facilities.slice(0, 400);
   const [picked, setPicked] = useState<Record<string, string>>({});
   const choiceFor = (r: LicenceWorkflow) => picked[r.id] ?? (r.facilityId || "");
+  const statusOf = (r: LicenceWorkflow) => r.currentStatus || r.stage;
+
+  const ready = items.filter((r) => r.facilityId);
+  const needs = items.filter((r) => !r.facilityId);
+
+  if (!items.length) {
+    return (
+      <div className="card p-5 flex items-center gap-3">
+        <span className="chip green shrink-0">✓ inbox clear</span>
+        <div className="text-sm text-gunmetal/70">
+          No incoming RAIS updates to review. New notification emails appear here
+          automatically.
+        </div>
+      </div>
+    );
+  }
+
+  // Resolve a row to its currently-chosen facility (for the bulk accept).
+  const resolveRow = (r: LicenceWorkflow): LicenceWorkflow => {
+    const id = choiceFor(r);
+    const f = facilities.find((x) => x.id === id);
+    return {
+      ...r,
+      facilityId: id || null,
+      facilityName: f ? f.name : r.facilityName,
+      facCode: f ? f.facCode : r.facCode,
+    };
+  };
 
   return (
     <div
       className="card overflow-hidden"
-      style={{ borderLeft: "3px solid var(--status-stalled)" }}
+      style={{ borderLeft: "3px solid var(--rpa-green-dark, #00A050)" }}
     >
-      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2">
+      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2 flex-wrap">
         <div className="font-black">
-          Needs review
+          Incoming RAIS updates
           <span className="text-xs text-gunmetal/55 font-normal ml-2">
-            {items.length} from email — confirm the facility, then apply
+            {items.length} from email — accept to update the register
           </span>
         </div>
-        <span className="chip amber shrink-0">✉ auto-imported</span>
+        {ready.length ? (
+          <button
+            className="btn btn-primary shrink-0"
+            onClick={() =>
+              onAcceptAllReady(
+                ready.map(resolveRow).filter((r) => r.facilityId),
+              )
+            }
+          >
+            Accept all recognised ({ready.length})
+          </button>
+        ) : (
+          <span className="chip amber shrink-0">✉ auto-imported</span>
+        )}
       </div>
 
-      <div className="divide-y divide-gunmetal/8">
-        {items.map((r) => {
-          const choice = choiceFor(r);
-          return (
-            <div key={r.id} className="p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-bold leading-tight">
-                    {r.facilityName || <em>(no facility name in email)</em>}
+      {ready.length ? (
+        <>
+          <div className="px-4 sm:px-5 pt-3 pb-1 caps text-[10px] text-gunmetal/50">
+            Ready to apply — facility recognised
+          </div>
+          <div className="divide-y divide-gunmetal/8">
+            {ready.map((r) => {
+              const choice = choiceFor(r);
+              return (
+                <div key={r.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-bold leading-tight">
+                        {r.facilityName}
+                      </div>
+                      <div className="text-[11px] text-gunmetal/55">
+                        {r.ran} · {r.ranType}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-[var(--rpa-green-dark,#0a7a4a)]">
+                        {statusOf(r)}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => onAccept(r, choice || null)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => onAccept(r, null)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-gunmetal/55">
-                    {r.ran || "no RAN"} · {r.ranType}
-                  </div>
+                  <details className="mt-2">
+                    <summary className="text-[11px] text-gunmetal/50 cursor-pointer">
+                      wrong facility?
+                    </summary>
+                    <select
+                      className="input mt-1"
+                      value={choice}
+                      onChange={(e) =>
+                        setPicked((p) => ({ ...p, [r.id]: e.target.value }))
+                      }
+                    >
+                      {choice && !facOptions.some((f) => f.id === choice) ? (
+                        <option value={choice}>{r.facilityName}</option>
+                      ) : null}
+                      {facOptions.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </details>
                 </div>
-                <span className="chip shrink-0">{r.stage}</span>
-              </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
 
-              {r.emailSubject ? (
-                <div className="text-[11px] text-gunmetal/50 mt-1 truncate">
-                  ✉ {r.emailSubject}
-                </div>
-              ) : null}
-
-              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-                <div>
-                  <div className="caps text-[10px] text-gunmetal/50 mb-1">
-                    Match to register
-                  </div>
-                  <select
-                    className="input"
-                    value={choice}
-                    onChange={(e) =>
-                      setPicked((p) => ({ ...p, [r.id]: e.target.value }))
-                    }
-                  >
-                    <option value="">— no match (dismiss) —</option>
-                    {choice && !facOptions.some((f) => f.id === choice) ? (
-                      <option value={choice}>{r.facilityName}</option>
+      {needs.length ? (
+        <>
+          <div className="px-4 sm:px-5 pt-3 pb-1 caps text-[10px] text-gunmetal/50 border-t border-gunmetal/8">
+            Needs a facility — match once; future emails for it link automatically
+          </div>
+          <div className="divide-y divide-gunmetal/8">
+            {needs.map((r) => {
+              const choice = choiceFor(r);
+              return (
+                <div key={r.id} className="p-4">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{statusOf(r)}</div>
+                    <div className="text-[11px] text-gunmetal/55">
+                      {r.ran || "no RAN"} · {r.ranType}
+                    </div>
+                    {r.emailSubject ? (
+                      <div className="text-[11px] text-gunmetal/50 truncate">
+                        ✉ {r.emailSubject}
+                      </div>
                     ) : null}
-                    {facOptions.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <div>
+                      <div className="caps text-[10px] text-gunmetal/50 mb-1">
+                        Match to register
+                      </div>
+                      <select
+                        className="input"
+                        value={choice}
+                        onChange={(e) =>
+                          setPicked((p) => ({ ...p, [r.id]: e.target.value }))
+                        }
+                      >
+                        <option value="">— no match (dismiss) —</option>
+                        {facOptions.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => onAccept(r, choice || null)}
+                    >
+                      {choice ? "Apply" : "Dismiss"}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => onApply(r, choice || null)}
-                >
-                  {choice ? "Apply" : "Dismiss"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
