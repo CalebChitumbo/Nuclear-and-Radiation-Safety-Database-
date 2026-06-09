@@ -872,9 +872,18 @@ function IncomingInbox({
               return (
                 <div key={r.id} className="p-4">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold">{statusOf(r)}</div>
+                    <div className="font-bold leading-tight">
+                      {r.facilityName || (
+                        <em className="text-gunmetal/50 font-normal">
+                          (facility not named in email)
+                        </em>
+                      )}
+                    </div>
                     <div className="text-[11px] text-gunmetal/55">
                       {r.ran || "no RAN"} · {r.ranType}
+                    </div>
+                    <div className="mt-1 text-sm font-semibold">
+                      {statusOf(r)}
                     </div>
                     {r.emailSubject ? (
                       <div className="text-[11px] text-gunmetal/50 truncate">
