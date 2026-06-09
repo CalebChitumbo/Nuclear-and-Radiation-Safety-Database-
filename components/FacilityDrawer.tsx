@@ -153,6 +153,11 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
               <Field label="Practice" value={facility.practice || "—"} />
               <Field label="Stage" value={facility.stage} />
               <Field label="Sequence #" value={String(facility.no || "—")} />
+              {facility.currentStatus ? (
+                <div className="col-span-2">
+                  <Field label="RAIS status" value={facility.currentStatus} />
+                </div>
+              ) : null}
             </dl>
           </section>
 

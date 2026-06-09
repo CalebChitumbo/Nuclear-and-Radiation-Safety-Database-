@@ -19,6 +19,7 @@ import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import { recordLicence } from "../rules/recordLicence";
+import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
   type DashboardAggregate,
@@ -40,6 +41,18 @@ function requireDb(): Firestore {
   const db = getDb();
   if (!db) throw new Error("Firestore is not configured.");
   return db;
+}
+
+/**
+ * Drop keys whose value is `undefined`. The web Firestore SDK rejects undefined
+ * field values (unlike the Admin SDK, which sets ignoreUndefinedProperties). The
+ * parser emits optional keys (paymentRan, currentStatus, special…) as undefined
+ * when absent, so sanitize before any client write.
+ */
+function stripUndefined<T extends object>(o: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) if (v !== undefined) out[k] = v;
+  return out as T;
 }
 
 class FirebaseStore implements DataStore {
@@ -266,26 +279,52 @@ class FirebaseStore implements DataStore {
     const docId = (w: LicenceWorkflow) =>
       (w.ran || w.id).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
 
-    const stageByFacility = new Map<string, Facility["stage"]>();
-    for (const item of items) {
+    const saved = items.map((item) => ({ ...item, updatedAt: now, updatedBy: uid }));
+    const touched = new Set<string>();
+    for (const item of saved) {
       const ref = doc(db, "licenceWorkflows", docId(item));
-      batch.set(ref, { ...item, updatedAt: now, updatedBy: uid }, { merge: true });
+      batch.set(ref, stripUndefined(item), { merge: true });
       if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
-        stageByFacility.set(item.facilityId, item.facilityStage);
+        touched.add(item.facilityId);
       }
     }
 
-    // Roll the stage up onto each matched facility (skip already-licensed ones).
+    // Resolve each matched facility's single displayed status (the most recent
+    // applicable workflow), rolling its currentStatus + coarse stage onto the
+    // register. Never downgrade an already-licensed facility.
     let facilitiesUpdated = 0;
-    if (stageByFacility.size) {
-      const facilities = await this.listFacilities();
+    if (touched.size) {
+      const [facilities, stored] = await Promise.all([
+        this.listFacilities(),
+        this.listLicenceWorkflows(),
+      ]);
       const facMap = new Map(facilities.map((f) => [f.id, f]));
-      for (const [facilityId, stage] of stageByFacility) {
+      // Stored workflows overlaid with the ones we just wrote (keyed by doc id).
+      const byId = new Map<string, LicenceWorkflow>();
+      for (const w of stored) byId.set(w.id, w);
+      for (const item of saved) byId.set(docId(item), item);
+      const wfByFacility = new Map<string, LicenceWorkflow[]>();
+      for (const w of byId.values()) {
+        if (!w.facilityId) continue;
+        const arr = wfByFacility.get(w.facilityId) || [];
+        arr.push(w);
+        wfByFacility.set(w.facilityId, arr);
+      }
+      for (const facilityId of touched) {
         const fac = facMap.get(facilityId);
-        if (fac && !fac.licensed && fac.stage !== stage) {
+        if (!fac || fac.licensed) continue;
+        const resolved = resolveFacilityStatus(wfByFacility.get(facilityId) || []);
+        if (!resolved) continue;
+        if (fac.stage !== resolved.stage || fac.currentStatus !== resolved.currentStatus) {
           batch.set(
             doc(db, "facilities", facilityId),
-            { ...fac, stage, updatedAt: now, updatedBy: uid },
+            stripUndefined({
+              ...fac,
+              stage: resolved.stage,
+              currentStatus: resolved.currentStatus,
+              updatedAt: now,
+              updatedBy: uid,
+            }),
             { merge: true },
           );
           facilitiesUpdated++;

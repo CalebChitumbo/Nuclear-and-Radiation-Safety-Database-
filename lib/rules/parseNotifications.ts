@@ -1,5 +1,15 @@
 import { classifyMatch, matchOne } from "./matching";
 import {
+  BY_SUBJECT_NORM,
+  RAIS_TEMPLATES,
+  STATUS_TO_STAGE,
+  TEMPLATES_BY_BODY_PHRASE,
+  normalizeSubject,
+  ranHint,
+  type NewApplicationStatus,
+  type RaisTemplate,
+} from "./raisTemplates";
+import {
   type Facility,
   type LicenceWorkflow,
   type Stage,
@@ -38,6 +48,14 @@ interface Mapping {
   clearsPayment?: boolean;
   bottleneck?: boolean;
   unrecognized?: boolean;
+  /**
+   * Canonical RAIS status from the email-template table (raisTemplates.ts) when
+   * the email subject matched a template. Drives the facility's displayed
+   * `currentStatus` and (via STATUS_TO_STAGE) its rolled-up `facilityStage`.
+   */
+  currentStatus?: NewApplicationStatus;
+  /** The two licence-issuing cases + resets (see LicenceWorkflow.special). */
+  special?: "renewal-auto" | "form-i-prompt" | "reset";
 }
 
 /**
@@ -104,10 +122,14 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Review & Assessment", stage: "Improvement Actions Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
-    // RAIS "Additional Information Required": more info needed to continue the
-    // review & assessment.
-    test: /additional information|further information required|request(ed)? for (additional|further) information/i,
+    // RAIS "Additional Information Required" / "Request for Further Particulars
+    // or Information": more info needed to continue the review & assessment.
+    test: /additional information|further information required|further particulars|request(ed)? for (additional|further) (information|particulars)/i,
     map: { phase: "Review & Assessment", stage: "Further Information Required", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
+  },
+  {
+    test: /review remarks/i,
+    map: { phase: "Review & Assessment", stage: "Review Remarks", responsibleParty: "NRSO / Applicant", priority: "HIGH" },
   },
   {
     test: /external review|internal review|review and evaluation|review and assessment/i,
@@ -124,7 +146,7 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
     map: { phase: "Approval (CEO/Board)", stage: "CEO Approval", responsibleParty: "CEO", priority: "CRITICAL" },
   },
   {
-    test: /board licence approval|rpa board/i,
+    test: /board licence approval|rpa board|board approval/i,
     map: { phase: "Approval (CEO/Board)", stage: "Board Approval", responsibleParty: "Board", priority: "CRITICAL" },
   },
   {
@@ -155,6 +177,12 @@ const RULES: Array<{ test: RegExp; map: Mapping }> = [
   },
   // --- Applicant-side intake ------------------------------------------------
   {
+    // Applicant filling a transfer/decommission/other licence form (RAIS internal
+    // "… Form VI data form assigned" notifications).
+    test: /application for transfer of licence|transfer of licence form|application for (variation|decommission)/i,
+    map: { phase: "Application", stage: "Application Submission", responsibleParty: "Applicant", priority: "APPLICANT" },
+  },
+  {
     // RAIS email: "… Licence Request Submitted successfully" — applicant has
     // filed; the application now sits with the Authority.
     test: /submitted successfully|request submitted|submission successful/i,
@@ -184,6 +212,104 @@ export function classifyNotification(title: string): Mapping {
   for (const rule of RULES) {
     if (rule.test.test(t)) return rule.map;
   }
+  return UNRECOGNIZED;
+}
+
+// The two "…Licence Application Approved" templates (collision pair) and the
+// withdrawal template, resolved once for the disambiguation/suffix checks.
+const APPROVED_RENEWAL = RAIS_TEMPLATES.find((t) => t.special === "renewal-auto");
+const APPROVED_FORM_I = RAIS_TEMPLATES.find((t) => t.special === "form-i-prompt");
+const WITHDRAWAL_TEMPLATE = RAIS_TEMPLATES.find((t) => t.sr === 149);
+
+/** Build a classification Mapping from a matched email template. */
+function mappingFromTemplate(t: RaisTemplate): Mapping {
+  return {
+    phase: t.phase,
+    // The canonical status doubles as the card's sub-stage label — informative
+    // and consistent with the displayed currentStatus.
+    stage: t.status,
+    responsibleParty: t.responsibleParty,
+    priority: t.priority,
+    outstandingPayment: t.outstandingPayment,
+    clearsPayment: t.clearsPayment,
+    bottleneck: t.bottleneck,
+    currentStatus: t.status,
+    special: t.special,
+  };
+}
+
+/**
+ * Resolve the two "…Licence Application Approved" templates, which differ only by
+ * the word "Renewal" in the subject and "a renewal" vs "an" in the body. Once a
+ * subject matches one of them, the workflow RAN type is the second check the spec
+ * requires: USE.REN ⇒ the renewal row, plain USE ⇒ the Form-I (new) row. If the
+ * RAN is silent/ambiguous, keep the subject's own row.
+ */
+function disambiguate(
+  t: RaisTemplate,
+  hint: ReturnType<typeof ranHint>,
+): RaisTemplate {
+  if (t.special !== "renewal-auto" && t.special !== "form-i-prompt") return t;
+  if (hint === "USE.REN") return APPROVED_RENEWAL ?? t;
+  if (hint === "USE") return APPROVED_FORM_I ?? t;
+  return t;
+}
+
+/**
+ * Classify a RAIS email using the authoritative template table (raisTemplates),
+ * keyed on the SUBJECT, with the legacy regex RULES as a backward-compatible
+ * fallback for dashboard-paste vocabularies. Deterministic, no LLM.
+ *
+ *  1. exact normalized-subject hit (the dependable key) — the master "Workflow
+ *     Assignment" template carries its real stage in the body's data-form name,
+ *     so those defer to the legacy RULES on the body;
+ *  2. withdrawal subjects (templated "##WorkflowInstanceName## Withdrawal");
+ *  3. distinctive body-phrase fallback when the subject is missing/unmatched;
+ *  4. legacy RULES on the subject (then body) — keeps every previously-handled
+ *     phrasing working exactly as before (this is the backward-compat seam);
+ *  5. UNRECOGNIZED.
+ */
+export function classifyEmail(input: {
+  subject: string;
+  body: string;
+  primaryRan?: string;
+}): Mapping {
+  const subjectNorm = normalizeSubject(input.subject);
+  const hint = ranHint(input.primaryRan || "");
+
+  // 1. Primary: exact subject match.
+  const exact = subjectNorm ? BY_SUBJECT_NORM.get(subjectNorm) : undefined;
+  if (exact) {
+    if (exact.generic) {
+      const legacy = classifyNotification(input.body);
+      if (!legacy.unrecognized) return { ...legacy, currentStatus: exact.status };
+      return mappingFromTemplate(exact);
+    }
+    return mappingFromTemplate(disambiguate(exact, hint));
+  }
+
+  // 2. Withdrawal: subject is "<instance> Withdrawal" (leading placeholder).
+  if (WITHDRAWAL_TEMPLATE && /\bwithdrawal$/.test(subjectNorm)) {
+    return mappingFromTemplate(WITHDRAWAL_TEMPLATE);
+  }
+
+  // 3. Fallback: distinctive body phrase.
+  const bodyNorm = normalizeSubject(input.body);
+  if (bodyNorm) {
+    for (const t of TEMPLATES_BY_BODY_PHRASE) {
+      if (t.bodyPhraseNorm && bodyNorm.includes(t.bodyPhraseNorm)) {
+        return mappingFromTemplate(disambiguate(t, hint));
+      }
+    }
+  }
+
+  // 4. Legacy regex rules (subject, then body) for dashboard-paste vocabularies.
+  const legacy = classifyNotification(input.subject);
+  if (!legacy.unrecognized) return legacy;
+  const legacyBody = classifyNotification(input.body);
+  if (!legacyBody.unrecognized) return legacyBody;
+
+  // 5. Nothing matched.
   return UNRECOGNIZED;
 }
 
@@ -284,6 +410,23 @@ export function extractFacility(block: string): { name: string; facCode: string 
   if ((m = block.match(/carried out on\s+([^\n]+?)\s+facility has been/i))) {
     return { name: cleanName(m[1]), facCode: "" };
   }
+
+  // A forwarded plain-text body often hard-wraps long lines (~78 chars), which
+  // can split the facility name across two lines and defeat the line-anchored
+  // patterns above (e.g. "… MINEXEC (PTY)\nLIMITED process has been assigned …").
+  // Retry the inline patterns on a whitespace-collapsed copy; each keeps a strong
+  // trailing anchor, so the now newline-spanning capture stays bounded.
+  const flat = block.replace(/\s+/g, " ");
+  if ((m = flat.match(/data form of\s+\S+\s+(.+?)\s+process has been assigned/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+  if ((m = flat.match(/working in\s+(.+?)\s+Facility on\b/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+  if ((m = flat.match(/granted to Facility\s*-\s*(.+?)\s+is about to expire/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+
   // FAC code on its own as a last resort.
   const fac = block.match(FAC_RE);
   return { name: "", facCode: fac ? fac[0].toUpperCase() : "" };
@@ -300,7 +443,7 @@ function extractDate(block: string): string {
 // Pipeline ordering
 // ---------------------------------------------------------------------------
 
-const PHASE_RANK: Record<WorkflowPhase, number> = {
+export const PHASE_RANK: Record<WorkflowPhase, number> = {
   Application: 1,
   Payment: 2,
   "Accounts Clearance": 3,
@@ -352,6 +495,17 @@ function facilityStageFor(phase: WorkflowPhase, stage: string): Stage {
   }
 }
 
+/**
+ * The Stage to roll onto a facility for a classified notification. When the email
+ * matched a template, the canonical status's mapped Stage is authoritative;
+ * otherwise fall back to the phase-based mapping (the legacy dashboard-paste path).
+ */
+function facilityStageForMap(map: Mapping): Stage {
+  return map.currentStatus
+    ? STATUS_TO_STAGE[map.currentStatus]
+    : facilityStageFor(map.phase, map.stage);
+}
+
 // ---------------------------------------------------------------------------
 // Block splitting + aggregation
 // ---------------------------------------------------------------------------
@@ -384,9 +538,11 @@ export function parseNotifications(text: string): LicenceWorkflow[] {
 
   blocks.forEach((block, i) => {
     const title = firstLine(block);
-    const map = classifyNotification(title);
     const rans = allRans(block);
     const ran = primaryRan(rans);
+    // Subject (title) is the primary key; the RAN type disambiguates the two
+    // near-identical "…Application Approved" templates.
+    const map = classifyEmail({ subject: title, body: block, primaryRan: ran });
     const { name, facCode } = extractFacility(block);
     const payRan = paymentRan(block);
     const date = extractDate(block);
@@ -427,7 +583,15 @@ export function parseNotifications(text: string): LicenceWorkflow[] {
         r.facCode || "",
         r.ran,
         r.lastSeen,
-        { phase: r.phase, stage: r.stage, responsibleParty: r.responsibleParty, priority: r.priority, outstandingPayment: r.outstandingPayment },
+        {
+          phase: r.phase,
+          stage: r.stage,
+          responsibleParty: r.responsibleParty,
+          priority: r.priority,
+          outstandingPayment: r.outstandingPayment,
+          currentStatus: r.currentStatus,
+          special: r.special,
+        },
       );
       byRan.delete(r.ran);
       byRan.delete(`name:${(r.facilityName || "").toLowerCase()}`);
@@ -466,7 +630,9 @@ function makeRecord(
     paymentRan: payRan || undefined,
     alerts: [],
     notifications: title ? [title] : [],
-    facilityStage: facilityStageFor(map.phase, map.stage),
+    facilityStage: facilityStageForMap(map),
+    currentStatus: map.currentStatus,
+    special: map.special,
     lastSeen: date,
   };
 }
@@ -504,7 +670,9 @@ function mergeInto(
     rec.responsibleParty = map.responsibleParty;
     rec.priority = map.priority;
     rec.notificationTitle = title || rec.notificationTitle;
-    rec.facilityStage = facilityStageFor(map.phase, map.stage);
+    rec.facilityStage = facilityStageForMap(map);
+    rec.currentStatus = map.currentStatus;
+    rec.special = map.special;
   }
 }
 
@@ -590,6 +758,93 @@ export function ingestDecision(r: LicenceWorkflow): "auto" | "review" {
   if (!r.facilityId) return "review";
   if (r.stage === "Unrecognized") return "review";
   return classifyMatch(r.matchScore ?? 0) === "auto" ? "auto" : "review";
+}
+
+// ---------------------------------------------------------------------------
+// RAN-based linking ("remember the facility for an application")
+// ---------------------------------------------------------------------------
+
+/** A facility a RAN is known to belong to. */
+export interface RanFacility {
+  id: string;
+  name: string;
+  facCode: string;
+}
+
+/**
+ * Build a RAN → facility map from the register's recorded authorisation numbers.
+ * Each facility carries its licence/application RAN(s) in `auths[].number`
+ * (e.g. AUTH/USE.REN/0692), so an email that cites only a RAN can still be tied
+ * to its facility.
+ */
+export function ranMapFromFacilities(
+  facilities: Facility[],
+): Map<string, RanFacility> {
+  const m = new Map<string, RanFacility>();
+  for (const f of facilities) {
+    for (const a of f.auths || []) {
+      if (a.number) {
+        m.set(a.number.toUpperCase(), {
+          id: f.id,
+          name: f.name,
+          facCode: f.facCode,
+        });
+      }
+    }
+  }
+  return m;
+}
+
+/**
+ * Extend a RAN → facility map with previously-matched workflow records. This is
+ * the "memory": once any email for an application RAN (or its payment RAN) has
+ * been tied to a facility, every later notification for it links itself.
+ */
+export function addWorkflowsToRanMap(
+  map: Map<string, RanFacility>,
+  workflows: LicenceWorkflow[],
+): Map<string, RanFacility> {
+  for (const w of workflows) {
+    if (!w.facilityId) continue;
+    const fac: RanFacility = {
+      id: w.facilityId,
+      name: w.facilityName,
+      facCode: w.facCode,
+    };
+    if (w.ran) map.set(w.ran.toUpperCase(), fac);
+    if (w.paymentRan) map.set(w.paymentRan.toUpperCase(), fac);
+  }
+  return map;
+}
+
+/**
+ * Second-pass linking for records that name no facility (payment, board-approval
+ * and internal "data form assigned" emails carry only a RAN). Fills the facility
+ * from the RAN → facility map. Run AFTER linkFacilities so a real name match
+ * always wins; this only rescues the ones it left unmatched.
+ */
+export function linkByRan(
+  records: LicenceWorkflow[],
+  ranToFacility: Map<string, RanFacility>,
+): LicenceWorkflow[] {
+  if (!ranToFacility.size) return records;
+  return records.map((r) => {
+    if (r.facilityId) return r;
+    const keys = [r.ran, r.paymentRan].filter(Boolean) as string[];
+    for (const k of keys) {
+      const hit = ranToFacility.get(k.toUpperCase());
+      if (hit) {
+        return {
+          ...r,
+          facilityId: hit.id,
+          facilityName: r.facilityName || hit.name,
+          facCode: r.facCode || hit.facCode,
+          matchScore: 1, // RAN identity is an exact link
+        };
+      }
+    }
+    return r;
+  });
 }
 
 // ---------------------------------------------------------------------------

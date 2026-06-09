@@ -330,22 +330,29 @@ class MockStore implements DataStore {
     }
     s.licenceWorkflows = [...byRan.values()];
 
-    // Roll each matched application's stage up onto its facility so the register
+    // Roll each matched application's status up onto its facility so the register
     // and the Overview pipeline reflect the imported RAIS status.
     const stageByFacility = new Map<string, Facility["stage"]>();
+    const statusByFacility = new Map<string, Facility["currentStatus"]>();
     for (const item of items) {
       if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
         stageByFacility.set(item.facilityId, item.facilityStage);
+        statusByFacility.set(item.facilityId, item.currentStatus);
       }
     }
     let facilitiesUpdated = 0;
     if (stageByFacility.size) {
       s.facilities = s.facilities.map((f) => {
         const stage = stageByFacility.get(f.id);
+        const currentStatus = statusByFacility.get(f.id);
         // Never override an already-Licensed facility from a workflow import.
-        if (stage && !f.licensed && f.stage !== stage) {
+        if (
+          stage &&
+          !f.licensed &&
+          (f.stage !== stage || f.currentStatus !== currentStatus)
+        ) {
           facilitiesUpdated++;
-          return { ...f, stage, updatedAt: now, updatedBy: uid };
+          return { ...f, stage, currentStatus, updatedAt: now, updatedBy: uid };
         }
         return f;
       });

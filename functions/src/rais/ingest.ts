@@ -20,10 +20,13 @@ import * as logger from "firebase-functions/logger";
 import { getFirestore } from "firebase-admin/firestore";
 
 import {
-  ingestDecision,
+  addWorkflowsToRanMap,
+  linkByRan,
   linkFacilities,
   parseNotifications,
+  ranMapFromFacilities,
 } from "./rules/parseNotifications";
+import { shouldSupersede } from "./rules/supersede";
 import type { Facility, LicenceWorkflow } from "./rules/types";
 import { isAuthorized, pickEmailText, type InboundRequest } from "./email";
 
@@ -54,15 +57,32 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
     (d) => ({ id: d.id, ...d.data() }) as Facility,
   );
 
+  // Load existing workflows once: needed to remember which facility a RAN belongs
+  // to, and to supersede the pending inbox row per RAN.
+  const wfSnap = await db.collection("licenceWorkflows").get();
+  const allWorkflows = wfSnap.docs.map(
+    (d) => ({ id: d.id, ...d.data() }) as LicenceWorkflow,
+  );
+  const existingById = new Map(allWorkflows.map((w) => [w.id, w]));
+
   // Real RAIS emails put the notification type in the SUBJECT and open the body
   // with "Hello,". The parser classifies on the first line, so prepend the
   // subject — that mirrors how the pasted dashboard leads with the title.
   const feed = subject ? `${subject}\n${text}` : text;
 
-  // Drop pure footer/noise blocks; keep unclassified-but-real ones for review.
-  const records = linkFacilities(parseNotifications(feed), facilities).filter(
-    (r) => !(r.stage === "Unrecognized" && !r.ran && !r.facilityName),
+  // Classify + match. linkFacilities matches on the facility NAME; linkByRan then
+  // rescues the payment / board-approval / internal "data form" emails that cite
+  // only a RAN, using the facility the register (auths) or a previous
+  // notification already tied to that RAN — so the officer doesn't re-match it.
+  const ranMap = addWorkflowsToRanMap(
+    ranMapFromFacilities(facilities),
+    allWorkflows,
   );
+  const records = linkByRan(
+    linkFacilities(parseNotifications(feed), facilities),
+    ranMap,
+  ).filter((r) => !(r.stage === "Unrecognized" && !r.ran && !r.facilityName));
+
   const empty: IngestSummary = {
     parsed: 0,
     applied: 0,
@@ -72,35 +92,61 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
   };
   if (!records.length) return empty;
 
-  // Never clobber a record an officer has already resolved (or one we already
-  // auto-applied): a resend must not knock it back into the review queue.
-  const refs = records.map((r) => db.doc(`licenceWorkflows/${docId(r)}`));
-  const existing = await db.getAll(...refs);
-  const appliedAlready = new Set(
-    existing
-      .filter((s) => s.exists && s.get("reviewStatus") === "applied")
-      .map((s) => s.id),
-  );
-
-  const facById = new Map(facilities.map((f) => [f.id, f]));
   const batch = db.batch();
   const now = new Date().toISOString();
   const summary: IngestSummary = { ...empty, parsed: records.length };
 
-  records.forEach((r, i) => {
-    if (appliedAlready.has(refs[i].id)) {
+  records.forEach((r) => {
+    const ref = db.doc(`licenceWorkflows/${docId(r)}`);
+    const prev = existingById.get(ref.id) || null;
+
+    // Inherit a facility a prior notification already established for this RAN
+    // (belt-and-braces alongside linkByRan).
+    let rec = r;
+    if (!r.facilityId && prev && prev.facilityId) {
+      rec = {
+        ...r,
+        facilityId: prev.facilityId,
+        facilityName: r.facilityName || prev.facilityName,
+        facCode: r.facCode || prev.facCode,
+        matchScore: Math.max(r.matchScore ?? 0, prev.matchScore ?? 0),
+      };
+    }
+
+    // A stale or duplicate re-send must not overwrite a fresher pending row.
+    const supersedes = shouldSupersede(
+      prev
+        ? {
+            date: prev.lastSeen,
+            receivedAt: prev.receivedAt,
+            phase: prev.phase,
+            currentStatus: prev.currentStatus,
+            special: prev.special,
+            reviewStatus: prev.reviewStatus,
+          }
+        : null,
+      {
+        date: rec.lastSeen,
+        receivedAt: now,
+        phase: rec.phase,
+        currentStatus: rec.currentStatus,
+        special: rec.special,
+      },
+    );
+    if (!supersedes) {
       summary.skipped++;
       return;
     }
 
-    const decision = ingestDecision(r);
-    const reviewStatus = decision === "auto" ? "applied" : "needs-review";
+    // Everything is queued for the officer to ACCEPT. The connector never writes
+    // to the register itself — the accept action does, through the store (and the
+    // R1–R6 rules for the two licence-issuing cases). Nothing changes silently.
     batch.set(
-      refs[i],
+      ref,
       {
-        ...r,
+        ...rec,
         source: "email",
-        reviewStatus,
+        reviewStatus: "needs-review",
         receivedAt: now,
         emailSubject: subject || "",
         updatedAt: now,
@@ -108,23 +154,7 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
       },
       { merge: true },
     );
-
-    if (decision !== "auto") {
-      summary.queued++;
-      return;
-    }
-    summary.applied++;
-
-    // Roll the stage onto the matched facility (never downgrade a licensed one).
-    const fac = r.facilityId ? facById.get(r.facilityId) : undefined;
-    if (fac && !fac.licensed && fac.stage !== r.facilityStage) {
-      batch.set(
-        db.doc(`facilities/${fac.id}`),
-        { ...fac, stage: r.facilityStage, updatedAt: now, updatedBy: BOT },
-        { merge: true },
-      );
-      summary.facilitiesUpdated++;
-    }
+    summary.queued++;
   });
 
   await batch.commit();

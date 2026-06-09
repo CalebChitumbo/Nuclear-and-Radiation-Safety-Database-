@@ -13,37 +13,61 @@ RAIS notification email
         ▼
 Inbound-email provider  ──HTTP POST──►  ingestRaisEmail  (Cloud Function)
  (CloudMailin / Mailgun)                       │
-                                               ├─ parse + match to the register
-                                               ├─ confident match  → apply: update
-                                               │                     licenceWorkflows + roll
-                                               │                     the facility's stage forward
-                                               └─ weak / no match   → queue: "Needs review"
-                                                                      on the Licensing Status tab
+                                               ├─ classify (subject → status)
+                                               ├─ link to a facility by name, else by RAN
+                                               └─ queue every update in the "Incoming RAIS
+                                                  updates" inbox (Licensing Status tab)
+                                                       │
+                                                       ▼
+                                          officer ACCEPTS  → the status is rolled onto the
+                                          (one row, or          facility in the register
+                                           "Accept all")
 ```
 
-The dashboard then updates on its own — rolling a facility's stage forward
-triggers the existing `onFacilityWrite` function, which recomputes
-`aggregates/dashboard`.
+The connector itself never writes to the register — nothing changes silently.
+Accepting an update writes the facility, which triggers the existing
+`onFacilityWrite` function to recompute `aggregates/dashboard`.
 
 ## What it does and does not do
 
-- **Does:** keep each application's *pipeline stage* current (Payment Pending →
-  Accounts Clearance → Under Review → CEO Approval → Licence Issued …), and roll
-  that stage onto a confidently-matched facility in the register.
-- **Confident vs. queued:** it auto-applies only a strong facility match (the
-  same `score ≥ 0.72` "auto" tier the Bulk Approval matcher uses). Weak/no
-  matches, and notifications it cannot classify, are saved with
-  `reviewStatus: "needs-review"` and wait in the **Needs review** panel on the
-  Licensing Status tab for an officer to confirm the facility, then apply.
+- **Classifies by the email subject** against the authoritative RPA template
+  mapping (`lib/rules/raisTemplates.ts`, generated from
+  `rais-email-status-mapping.csv` — 64 templates). Each email yields a canonical
+  `currentStatus` (the spreadsheet's `NewApplicationStatus`) and a coarse `Stage`
+  it rolls up to. Dashboard-paste titles that aren't email subjects still fall
+  back to the legacy regex rules. The classifier is pure/deterministic (no LLM).
+- **Keeps one current status per facility, that supersedes the previous.** A
+  facility shows the status of the **most recent applicable** email for its
+  active application (`currentStatus` + the coarse `stage`). Forward progression
+  replaces the shown status; a **stale or duplicate** older email never regresses
+  it; a genuine **reset** (rejection / returned / declination / withdrawal /
+  additional-info) moves it backward when it is the newest event. The ordering
+  rule lives in `lib/rules/supersede.ts` (`shouldSupersede` / `resolveFacilityStatus`).
+- **Review &amp; accept inbox:** every imported email is queued
+  (`reviewStatus: "needs-review"`) in the **Incoming RAIS updates** inbox on the
+  Licensing Status tab, showing its facility and status. An officer **Accepts** a
+  row — or **Accept all recognised** — and only then is the status rolled onto the
+  register. The connector applies nothing on its own.
+- **Links a facility by name, then by RAN.** Payment, board-approval and internal
+  "data form assigned" emails name only a RAN, never the facility. `linkByRan`
+  resolves those from a RAN → facility map built from the register's recorded
+  authorisation numbers (`auths[].number`) and from every previously-matched
+  workflow — so once an application is tied to a facility, its later
+  notifications link themselves. Genuinely new RANs get a one-time facility
+  picker; matching one "teaches" it for next time.
 - **Does not:** flip a facility to officially **licensed** or write the dated
   `licenceEvent` that feeds the register's licensed count and the weekly report.
   That remains a deliberate action through the R1–R6 rules
   (`lib/rules/recordLicence.ts`) — the connector never bypasses them. An
-  already-licensed facility is never downgraded by an incoming email.
+  already-licensed facility is never downgraded by an incoming email. The two
+  licence-issuing emails — **Renewal Approved** and **Form I Approved** — surface
+  in the **Ready to license** panel: a renewal is one click; Form I first asks the
+  officer "Is this a Use/Possession licence?" (Yes → Licensed; No → record the
+  actual authorisation type, e.g. Import, without licensing).
 - **Idempotent:** records are keyed by their workflow RAN, so the same email
-  arriving twice updates the same row instead of duplicating it. A re-sent email
-  will **not** knock an already-applied (or officer-resolved) item back into the
-  queue.
+  arriving twice updates the same row instead of duplicating it. A re-sent or
+  stale email will **not** knock an already-applied (or officer-resolved) item
+  back into the queue, nor regress its status.
 
 ## 1. Deploy the function
 
@@ -82,7 +106,11 @@ Writes use the Admin SDK and bypass Firestore security rules, so the endpoint
 > in your own Google account on a timer, finds new RAIS emails, and posts each
 > to this function — no forwarding-address confirmation, no third party. Paste
 > it in at <https://script.google.com>, set `ENDPOINT` + `SECRET`, run it once to
-> authorize, then add a 15-minute time trigger.
+> authorize, then add a 15-minute time trigger. It matches the whole
+> `rpa.gov.zm` domain (so internal "… data form assigned" notifications, which
+> can come from a different address than `eLicensing@rpa.gov.zm`, are caught) and
+> de-duplicates per **message** — so a new notification that lands in a thread it
+> already touched is still forwarded.
 
 If you prefer a true inbound webhook instead, point a provider at the endpoint:
 
