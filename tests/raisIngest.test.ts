@@ -349,6 +349,19 @@ describe("RAN-based linking (rescues no-facility emails)", () => {
   });
 });
 
+describe("facility name extraction tolerates line-wrapped bodies", () => {
+  it("extracts a facility name split across a hard-wrapped line", () => {
+    // Gmail's getPlainBody() wraps long lines, which had split the name and
+    // produced "(no facility name in email)".
+    const f = feed(
+      "Application Submission Form I data form assigned",
+      "Hi,\n\nApplication Submission Form I data form of RPA/LIC/0606 MINEXEC (PTY)\nLIMITED process has been assigned to you. Please fill in the required information.",
+    );
+    const r = parseNotifications(f).find((x) => x.ran === "RPA/LIC/0606");
+    expect(r?.facilityName).toBe("MINEXEC (PTY) LIMITED");
+  });
+});
+
 describe("resets and weak matches", () => {
   it("classifies a rejection as a reset and queues it when no facility matches", () => {
     const f = feed(

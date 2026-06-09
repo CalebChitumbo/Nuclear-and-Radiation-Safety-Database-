@@ -410,6 +410,23 @@ export function extractFacility(block: string): { name: string; facCode: string 
   if ((m = block.match(/carried out on\s+([^\n]+?)\s+facility has been/i))) {
     return { name: cleanName(m[1]), facCode: "" };
   }
+
+  // A forwarded plain-text body often hard-wraps long lines (~78 chars), which
+  // can split the facility name across two lines and defeat the line-anchored
+  // patterns above (e.g. "… MINEXEC (PTY)\nLIMITED process has been assigned …").
+  // Retry the inline patterns on a whitespace-collapsed copy; each keeps a strong
+  // trailing anchor, so the now newline-spanning capture stays bounded.
+  const flat = block.replace(/\s+/g, " ");
+  if ((m = flat.match(/data form of\s+\S+\s+(.+?)\s+process has been assigned/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+  if ((m = flat.match(/working in\s+(.+?)\s+Facility on\b/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+  if ((m = flat.match(/granted to Facility\s*-\s*(.+?)\s+is about to expire/i))) {
+    return { name: cleanName(m[1]), facCode: "" };
+  }
+
   // FAC code on its own as a last resort.
   const fac = block.match(FAC_RE);
   return { name: "", facCode: fac ? fac[0].toUpperCase() : "" };
