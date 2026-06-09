@@ -6,25 +6,43 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { norm } from "@/lib/rules/matching";
-import { PROVINCES, SECTORS, STAGES, type Province, type Sector, type Stage } from "@/lib/rules/types";
+import {
+  PROVINCES,
+  SECTORS,
+  STAGES,
+  type Facility,
+  type Province,
+  type Sector,
+  type Stage,
+} from "@/lib/rules/types";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  /** Receives the created facility (e.g. to link an incoming email to it). */
+  onCreated?: (facility: Facility) => void;
+  /** Seed the form (used when creating a facility from an incoming RAIS email). */
+  initialName?: string;
+  initialFacCode?: string;
 }
 
-export function AddFacilityDialog({ open, onClose, onCreated }: Props) {
+export function AddFacilityDialog({
+  open,
+  onClose,
+  onCreated,
+  initialName,
+  initialFacCode,
+}: Props) {
   const { user } = useAuth();
   const toast = useToast();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName ?? "");
   const [district, setDistrict] = useState("");
   const [province, setProvince] = useState<Province>("Lusaka");
   const [practice, setPractice] = useState("");
   const [sector, setSector] = useState<Sector>("Private");
   const [licensed, setLicensed] = useState(false);
   const [stage, setStage] = useState<Stage>("No Application Submitted");
-  const [facCode, setFacCode] = useState("");
+  const [facCode, setFacCode] = useState(initialFacCode ?? "");
   const [busy, setBusy] = useState(false);
 
   if (!open) return null;
@@ -34,7 +52,7 @@ export function AddFacilityDialog({ open, onClose, onCreated }: Props) {
     setBusy(true);
     try {
       const s = await store();
-      await s.addFacility(
+      const created = await s.addFacility(
         {
           no: 0,
           name: name.trim(),
@@ -51,7 +69,7 @@ export function AddFacilityDialog({ open, onClose, onCreated }: Props) {
         user.uid,
       );
       toast.push(`Facility "${name}" added.`, "success");
-      onCreated?.();
+      onCreated?.(created);
       onClose();
       // reset
       setName("");

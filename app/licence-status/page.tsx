@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { useToast } from "@/components/Toast";
+import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import {
   addWorkflowsToRanMap,
   buildReport,
@@ -74,6 +75,8 @@ export default function LicenceStatusPage() {
   const [text, setText] = useState(SAMPLE);
   const [rows, setRows] = useState<LicenceWorkflow[] | null>(null);
   const [committing, setCommitting] = useState(false);
+  // An inbox row the officer is turning into a brand-new register facility.
+  const [addingFor, setAddingFor] = useState<LicenceWorkflow | null>(null);
 
   // The incoming-email inbox: everything the connector queued, awaiting accept.
   // Re-link by RAN in the UI too, so a pending email whose RAN is in the register
@@ -282,6 +285,19 @@ export default function LicenceStatusPage() {
         facilities={facilities || []}
         onAccept={applyReviewed}
         onAcceptAllReady={acceptAllReady}
+        onAddFacility={setAddingFor}
+      />
+
+      {/* Create a brand-new register facility from an incoming email, then link it. */}
+      <AddFacilityDialog
+        key={addingFor?.id ?? "none"}
+        open={!!addingFor}
+        initialName={addingFor?.facilityName || ""}
+        initialFacCode={addingFor?.facCode || ""}
+        onClose={() => setAddingFor(null)}
+        onCreated={(fac) => {
+          if (addingFor) applyReviewed(addingFor, fac.id);
+        }}
       />
 
       {/* The two licence-issuing emails (§4): confirm the type, record via R1–R6 */}
@@ -712,11 +728,13 @@ function IncomingInbox({
   facilities,
   onAccept,
   onAcceptAllReady,
+  onAddFacility,
 }: {
   items: LicenceWorkflow[];
   facilities: Facility[];
   onAccept: (row: LicenceWorkflow, facilityId: string | null) => void;
   onAcceptAllReady: (rows: LicenceWorkflow[]) => void;
+  onAddFacility: (row: LicenceWorkflow) => void;
 }) {
   const facOptions = facilities.slice(0, 400);
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -892,6 +910,17 @@ function IncomingInbox({
                       {choice ? "Apply" : "Dismiss"}
                     </button>
                   </div>
+
+                  {/* New applicant not yet in the register — create + link in one step. */}
+                  <button
+                    type="button"
+                    className="mt-2 text-[11px] font-bold text-[var(--rpa-green-dark,#0a7a4a)] hover:underline"
+                    onClick={() => onAddFacility(r)}
+                  >
+                    + Add{" "}
+                    {r.facilityName ? `"${r.facilityName}"` : "a new facility"} to
+                    the register
+                  </button>
                 </div>
               );
             })}
