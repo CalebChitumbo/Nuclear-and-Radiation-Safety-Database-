@@ -19,6 +19,10 @@ import {
 } from "@/lib/rules/parseNotifications";
 import { detectType } from "@/lib/rules/detectType";
 import {
+  isUsePossessionWorkflow,
+  workflowLicenceType,
+} from "@/lib/rules/licenceFamily";
+import {
   LICENCE_TYPES,
   WORKFLOW_PHASES,
   isUseP,
@@ -60,6 +64,40 @@ const PRIORITY_META: Record<
   APPLICANT: { label: "🔵 Applicant", chip: "slate", dot: "#2C5D7A" },
 };
 
+// Short labels for the licence family a workflow belongs to. Use/Possession
+// (green) drives the facility's renewal status on the register; everything else
+// (slate) is a standalone authorisation that does not.
+const SHORT_FAMILY: Partial<Record<LicenceType, string>> = {
+  "Renewal of Use/Possession Licence": "Renewal",
+  "New Use/Possession Licence": "New use",
+  "Importation Licence": "Import",
+  "Export Licence": "Export",
+  "Transfer Licence": "Transfer",
+  "Transport Licence": "Transport",
+  "Transit Licence": "Transit",
+  "Variation of Terms and Conditions": "Variation",
+  "Design and Construction Licence": "Design & Construction",
+  "Decommissioning Licence": "Decommissioning",
+};
+
+/** A chip naming the licence family, so officers see what an update will touch. */
+function FamilyChip({ row }: { row: LicenceWorkflow }) {
+  const type = workflowLicenceType(row);
+  const isUse = isUseP(type);
+  return (
+    <span
+      className={`chip ${isUse ? "green" : "slate"}`}
+      title={
+        isUse
+          ? "Use/Possession — updates the facility's renewal status"
+          : "Standalone authorisation — does not change renewal status"
+      }
+    >
+      {SHORT_FAMILY[type] || type}
+    </span>
+  );
+}
+
 export default function LicenceStatusPage() {
   const { user, canEditAS } = useAuth();
   const toast = useToast();
@@ -96,14 +134,18 @@ export default function LicenceStatusPage() {
     [facilities],
   );
 
-  // Applications whose certificate has been issued but whose facility is not yet
-  // officially Licensed — these await the one-click approval below.
+  // Use/Possession applications whose certificate has been issued but whose
+  // facility is not yet officially Licensed — these await the one-click approval
+  // below (R1–R6). Standalone authorisations (import/transit/…) are NOT shown:
+  // they are recorded automatically when their email is accepted, so surfacing
+  // them here too would double-record the authorisation.
   const readyToLicense = useMemo(
     () =>
       (saved ?? []).filter((r) => {
         if (r.reviewStatus === "needs-review") return false;
         if (r.facilityStage !== "Licence / Certificate Issued") return false;
         if (!r.facilityId) return false;
+        if (!isUsePossessionWorkflow(r)) return false;
         const f = facById.get(r.facilityId);
         return !!f && !f.licensed;
       }),
@@ -814,9 +856,18 @@ function IncomingInbox({
                       <div className="text-[11px] text-gunmetal/55">
                         {r.ran} · {r.ranType}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-[var(--rpa-green-dark,#0a7a4a)]">
-                        {statusOf(r)}
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <FamilyChip row={r} />
+                        <span className="text-sm font-semibold">
+                          {statusOf(r)}
+                        </span>
                       </div>
+                      {!isUsePossessionWorkflow(r) ? (
+                        <div className="text-[11px] text-gunmetal/55 mt-1">
+                          Standalone authorisation — recorded on the facility,
+                          renewal status unchanged.
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -882,8 +933,9 @@ function IncomingInbox({
                     <div className="text-[11px] text-gunmetal/55">
                       {r.ran || "no RAN"} · {r.ranType}
                     </div>
-                    <div className="mt-1 text-sm font-semibold">
-                      {statusOf(r)}
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <FamilyChip row={r} />
+                      <span className="text-sm font-semibold">{statusOf(r)}</span>
                     </div>
                     {r.emailSubject ? (
                       <div className="text-[11px] text-gunmetal/50 truncate">

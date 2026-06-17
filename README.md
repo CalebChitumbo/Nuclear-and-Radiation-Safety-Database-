@@ -208,6 +208,28 @@ to officially licensed still goes through the R1–R6 rules.
 
 Setup, security and provider steps: **[`docs/rais-email-ingestion.md`](docs/rais-email-ingestion.md)**.
 
+### Renewal status vs standalone authorisations
+
+The facilities register tracks **one** thing: a facility's Use/Possession
+licensing state — is it licensed, and if not, where is its renewal in the
+pipeline. So only **Use/Possession** applications (a new FORM-I licence or a
+renewal) move a facility's register status. Every other RAIS update — import,
+export, transfer, transport, transit, variation, design & construction,
+decommissioning — is a **standalone authorisation**: when its email is
+accepted (and the authorisation has been issued) it is recorded on the facility
+and counted toward the licences-issued totals, but it never changes the renewal
+status shown on the register. The classifier lives in
+`lib/rules/licenceFamily.ts` (`isUsePossessionWorkflow` /
+`workflowLicenceType`); accepting an email applies it in
+`saveLicenceWorkflows`.
+
+The **Licences** page (`/licences`) reports the totals this produces:
+authorisations issued by type (renewal + new use + import + transit + …), and —
+derived from each facility's most recent Use/Possession licence date — which
+facilities hold a current use licence **for a chosen year** versus those whose
+renewal is still in the pipeline (and at which stage). `lib/rules/licenceStats.ts`
+computes it; the Overview surfaces a summary.
+
 ---
 
 ## Tests

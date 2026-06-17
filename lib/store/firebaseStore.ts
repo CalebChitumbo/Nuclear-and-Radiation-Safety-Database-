@@ -18,6 +18,11 @@ import {
 import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
+import {
+  isUsePossessionWorkflow,
+  workflowIssueDate,
+  workflowLicenceType,
+} from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
@@ -273,6 +278,7 @@ class FirebaseStore implements DataStore {
     const db = requireDb();
     const batch = writeBatch(db);
     const now = new Date().toISOString();
+    const weeks = weeksSeed as WeekDef[];
 
     // Deterministic doc id from the RAN so re-importing a dashboard upserts the
     // same application rather than duplicating it.
@@ -280,55 +286,109 @@ class FirebaseStore implements DataStore {
       (w.ran || w.id).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
 
     const saved = items.map((item) => ({ ...item, updatedAt: now, updatedBy: uid }));
-    const touched = new Set<string>();
     for (const item of saved) {
-      const ref = doc(db, "licenceWorkflows", docId(item));
-      batch.set(ref, stripUndefined(item), { merge: true });
-      if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
-        touched.add(item.facilityId);
-      }
+      batch.set(doc(db, "licenceWorkflows", docId(item)), stripUndefined(item), {
+        merge: true,
+      });
     }
 
-    // Resolve each matched facility's single displayed status (the most recent
-    // applicable workflow), rolling its currentStatus + coarse stage onto the
-    // register. Never downgrade an already-licensed facility.
+    // Workflows in this save that resolved to a real register facility.
+    const matched = saved.filter(
+      (w) => w.facilityId && !w.facilityName.includes("Unrecognized"),
+    );
+
     let facilitiesUpdated = 0;
-    if (touched.size) {
+    if (matched.length) {
       const [facilities, stored] = await Promise.all([
         this.listFacilities(),
         this.listLicenceWorkflows(),
       ]);
-      const facMap = new Map(facilities.map((f) => [f.id, f]));
-      // Stored workflows overlaid with the ones we just wrote (keyed by doc id).
-      const byId = new Map<string, LicenceWorkflow>();
-      for (const w of stored) byId.set(w.id, w);
-      for (const item of saved) byId.set(docId(item), item);
-      const wfByFacility = new Map<string, LicenceWorkflow[]>();
-      for (const w of byId.values()) {
-        if (!w.facilityId) continue;
-        const arr = wfByFacility.get(w.facilityId) || [];
-        arr.push(w);
-        wfByFacility.set(w.facilityId, arr);
+      // Working copies so an auth append and a stage roll-up on the same facility
+      // are merged into a single write.
+      const facMap = new Map(facilities.map((f) => [f.id, { ...f }]));
+      const dirty = new Set<string>();
+
+      // 1. Standalone authorisations. An issued non-Use/Possession application
+      //    (import/transit/transfer/variation/export/…) is recorded as an
+      //    authorisation the facility holds — it counts toward the licences
+      //    issued, but NEVER changes the facility's licensed/renewal status.
+      //    Use/Possession issuance is excluded on purpose: it must go through the
+      //    R1–R6 "Mark Licensed" step in the Ready-to-license panel.
+      for (const w of matched) {
+        if (isUsePossessionWorkflow(w)) continue;
+        if (w.facilityStage !== "Licence / Certificate Issued") continue;
+        if (!w.ran) continue;
+        const fac = facMap.get(w.facilityId as string);
+        if (!fac) continue;
+        const already = (fac.auths || []).some(
+          (a) => a.number && a.number.toUpperCase() === w.ran.toUpperCase(),
+        );
+        if (already) continue;
+
+        const type = workflowLicenceType(w);
+        const eventRef = doc(collection(db, "licenceEvents"));
+        const result = recordLicence({
+          facility: fac,
+          number: w.ran,
+          type,
+          defaultType: type,
+          date: workflowIssueDate(w),
+          weeks,
+          uid,
+          newEventId: eventRef.id,
+        });
+        batch.set(eventRef, { ...result.event, id: eventRef.id });
+        facMap.set(fac.id, result.facilityWrite);
+        dirty.add(fac.id);
       }
-      for (const facilityId of touched) {
+
+      // 2. Use/Possession renewal status. Resolve each matched facility's single
+      //    displayed status from the most recent applicable Use/Possession
+      //    workflow (stored ∪ just-saved). Standalone authorisations are excluded
+      //    so an import/transfer email can never overwrite the renewal stage.
+      //    Never downgrade an already-licensed facility.
+      const upByFacility = new Map<string, LicenceWorkflow[]>();
+      const overlay = new Map<string, LicenceWorkflow>();
+      for (const w of stored) overlay.set(w.id, w);
+      for (const item of saved) overlay.set(docId(item), item);
+      for (const w of overlay.values()) {
+        if (!w.facilityId || !isUsePossessionWorkflow(w)) continue;
+        const arr = upByFacility.get(w.facilityId) || [];
+        arr.push(w);
+        upByFacility.set(w.facilityId, arr);
+      }
+      const upTouched = new Set(
+        matched
+          .filter((w) => isUsePossessionWorkflow(w))
+          .map((w) => w.facilityId as string),
+      );
+      for (const facilityId of upTouched) {
         const fac = facMap.get(facilityId);
         if (!fac || fac.licensed) continue;
-        const resolved = resolveFacilityStatus(wfByFacility.get(facilityId) || []);
+        const resolved = resolveFacilityStatus(upByFacility.get(facilityId) || []);
         if (!resolved) continue;
-        if (fac.stage !== resolved.stage || fac.currentStatus !== resolved.currentStatus) {
-          batch.set(
-            doc(db, "facilities", facilityId),
-            stripUndefined({
-              ...fac,
-              stage: resolved.stage,
-              currentStatus: resolved.currentStatus,
-              updatedAt: now,
-              updatedBy: uid,
-            }),
-            { merge: true },
-          );
-          facilitiesUpdated++;
+        if (
+          fac.stage !== resolved.stage ||
+          fac.currentStatus !== resolved.currentStatus
+        ) {
+          facMap.set(facilityId, {
+            ...fac,
+            stage: resolved.stage,
+            currentStatus: resolved.currentStatus,
+          });
+          dirty.add(facilityId);
         }
+      }
+
+      // 3. Write each changed facility exactly once.
+      for (const facilityId of dirty) {
+        const fac = facMap.get(facilityId) as Facility;
+        batch.set(
+          doc(db, "facilities", facilityId),
+          stripUndefined({ ...fac, updatedAt: now, updatedBy: uid }),
+          { merge: true },
+        );
+        facilitiesUpdated++;
       }
     }
 
