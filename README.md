@@ -223,6 +223,15 @@ status shown on the register. The classifier lives in
 `workflowLicenceType`); accepting an email applies it in
 `saveLicenceWorkflows`.
 
+**FORM-I numbers (`RPA/LIC/####`)** encode no licence type — they may be
+use/possession, import, transport, transit or design & construction. The
+Incoming-updates inbox shows a type selector on these rows; the officer
+classifies the number **once** and that choice is stored on the workflow
+(`officerType`) and reused for every later notification with the same RAN, so an
+import keeps being treated as an import. Until classified, a FORM-I number falls
+back to a use/possession application (the common case), and its approval still
+offers the Yes/No prompt in the Ready-to-license panel.
+
 The **Licences** page (`/licences`) reports the totals this produces:
 authorisations issued by type (renewal + new use + import + transit + …), and —
 derived from each facility's most recent Use/Possession licence date — which

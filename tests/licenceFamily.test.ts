@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isAmbiguousLicenceRan,
   isUsePossessionWorkflow,
   workflowIssueDate,
   workflowLicenceType,
@@ -78,6 +79,38 @@ describe("isUsePossessionWorkflow", () => {
         currentStatus: "Import Application Received",
       }),
     ).toBe(false);
+  });
+});
+
+describe("officer-assigned type wins", () => {
+  it("officerType overrides the RAN and status guess (both directions)", () => {
+    // A FORM-I number the officer classified as an import.
+    expect(
+      workflowLicenceType({ ran: "RPA/LIC/0543", officerType: "Importation Licence" }),
+    ).toBe("Importation Licence");
+    expect(
+      isUsePossessionWorkflow({
+        ran: "RPA/LIC/0543",
+        officerType: "Importation Licence",
+      }),
+    ).toBe(false);
+    // And a number the officer pinned to Use/Possession stays in the pipeline.
+    expect(
+      isUsePossessionWorkflow({
+        ran: "RPA/LIC/0543",
+        officerType: "New Use/Possession Licence",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("isAmbiguousLicenceRan", () => {
+  it("flags RPA/LIC FORM-I numbers only", () => {
+    expect(isAmbiguousLicenceRan("RPA/LIC/0543")).toBe(true);
+    expect(isAmbiguousLicenceRan("RPA-LIC-0543")).toBe(true);
+    expect(isAmbiguousLicenceRan("AUTH/USE.REN/0872")).toBe(false);
+    expect(isAmbiguousLicenceRan("AUTH/IMP/0099")).toBe(false);
+    expect(isAmbiguousLicenceRan("")).toBe(false);
   });
 });
 

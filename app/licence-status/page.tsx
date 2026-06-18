@@ -19,6 +19,7 @@ import {
 } from "@/lib/rules/parseNotifications";
 import { detectType } from "@/lib/rules/detectType";
 import {
+  isAmbiguousLicenceRan,
   isUsePossessionWorkflow,
   workflowLicenceType,
 } from "@/lib/rules/licenceFamily";
@@ -165,6 +166,7 @@ export default function LicenceStatusPage() {
   const applyReviewed = async (
     row: LicenceWorkflow,
     facilityId: string | null,
+    officerType?: LicenceType,
   ) => {
     if (!user) return;
     const f = facilityId
@@ -175,6 +177,7 @@ export default function LicenceStatusPage() {
       facilityId: facilityId || null,
       facilityName: f ? f.name : row.facilityName,
       facCode: f ? f.facCode : row.facCode,
+      officerType: officerType ?? row.officerType,
       reviewStatus: "applied",
       source: row.source ?? "email",
     };
@@ -234,7 +237,19 @@ export default function LicenceStatusPage() {
       saved || [],
     );
     const linked = linkByRan(linkFacilities(parsed, facilities || []), ranMap);
-    setRows(linked);
+    // Carry a previously officer-assigned licence type over to the freshly
+    // parsed records for the same RAN, so a classified FORM-I number keeps its
+    // type instead of falling back to the guess.
+    const typeByRan = new Map<string, LicenceType>();
+    for (const w of saved || []) {
+      if (w.officerType && w.ran) typeByRan.set(w.ran.toUpperCase(), w.officerType);
+    }
+    const withTypes = linked.map((r) =>
+      !r.officerType && r.ran && typeByRan.has(r.ran.toUpperCase())
+        ? { ...r, officerType: typeByRan.get(r.ran.toUpperCase()) }
+        : r,
+    );
+    setRows(withTypes);
     if (!parsed.length) {
       toast.push("Nothing recognised in the pasted text.", "error");
     } else {
@@ -774,14 +789,32 @@ function IncomingInbox({
 }: {
   items: LicenceWorkflow[];
   facilities: Facility[];
-  onAccept: (row: LicenceWorkflow, facilityId: string | null) => void;
+  onAccept: (
+    row: LicenceWorkflow,
+    facilityId: string | null,
+    officerType?: LicenceType,
+  ) => void;
   onAcceptAllReady: (rows: LicenceWorkflow[]) => void;
   onAddFacility: (row: LicenceWorkflow) => void;
 }) {
   const facOptions = facilities.slice(0, 400);
   const [picked, setPicked] = useState<Record<string, string>>({});
+  const [pickedType, setPickedType] = useState<Record<string, LicenceType>>({});
   const choiceFor = (r: LicenceWorkflow) => picked[r.id] ?? (r.facilityId || "");
   const statusOf = (r: LicenceWorkflow) => r.currentStatus || r.stage;
+
+  // The licence type to use for a FORM-I (RPA/LIC) number: the officer's pending
+  // pick, then any type already assigned to the number, then the best guess.
+  const chosenTypeFor = (r: LicenceWorkflow): LicenceType =>
+    pickedType[r.id] ?? r.officerType ?? workflowLicenceType(r);
+  // For ambiguous LIC numbers the effective type comes from the picker; other
+  // RANs keep whatever they already carry.
+  const officerTypeFor = (r: LicenceWorkflow): LicenceType | undefined =>
+    isAmbiguousLicenceRan(r.ran) ? chosenTypeFor(r) : r.officerType;
+  // A row reflecting the pending classification, so the family chip / notes
+  // update live as the officer changes the dropdown.
+  const effectiveRow = (r: LicenceWorkflow): LicenceWorkflow =>
+    isAmbiguousLicenceRan(r.ran) ? { ...r, officerType: chosenTypeFor(r) } : r;
 
   const ready = items.filter((r) => r.facilityId);
   const needs = items.filter((r) => !r.facilityId);
@@ -798,7 +831,7 @@ function IncomingInbox({
     );
   }
 
-  // Resolve a row to its currently-chosen facility (for the bulk accept).
+  // Resolve a row to its currently-chosen facility + type (for the bulk accept).
   const resolveRow = (r: LicenceWorkflow): LicenceWorkflow => {
     const id = choiceFor(r);
     const f = facilities.find((x) => x.id === id);
@@ -807,8 +840,43 @@ function IncomingInbox({
       facilityId: id || null,
       facilityName: f ? f.name : r.facilityName,
       facCode: f ? f.facCode : r.facCode,
+      officerType: officerTypeFor(r),
     };
   };
+
+  // The FORM-I classifier: only RPA/LIC numbers, whose type can't be read from
+  // the number. The choice sticks to the number for every later notification.
+  const renderTypePicker = (r: LicenceWorkflow) =>
+    isAmbiguousLicenceRan(r.ran) ? (
+      <div className="mt-2 rounded-lg bg-mist p-2">
+        <div className="caps text-[10px] text-gunmetal/60 mb-1">
+          FORM-I licence — set the application type
+          {!r.officerType && !pickedType[r.id] ? (
+            <span className="text-[var(--status-stalled)]"> · not set</span>
+          ) : null}
+        </div>
+        <select
+          className="input"
+          value={chosenTypeFor(r)}
+          onChange={(e) =>
+            setPickedType((p) => ({
+              ...p,
+              [r.id]: e.target.value as LicenceType,
+            }))
+          }
+        >
+          {LICENCE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <div className="text-[11px] text-gunmetal/55 mt-1">
+          {r.ran} carries no type — your choice sticks to this number for every
+          future notification.
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div
@@ -857,12 +925,12 @@ function IncomingInbox({
                         {r.ran} · {r.ranType}
                       </div>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <FamilyChip row={r} />
+                        <FamilyChip row={effectiveRow(r)} />
                         <span className="text-sm font-semibold">
                           {statusOf(r)}
                         </span>
                       </div>
-                      {!isUsePossessionWorkflow(r) ? (
+                      {!isUsePossessionWorkflow(effectiveRow(r)) ? (
                         <div className="text-[11px] text-gunmetal/55 mt-1">
                           Standalone authorisation — recorded on the facility,
                           renewal status unchanged.
@@ -872,7 +940,7 @@ function IncomingInbox({
                     <div className="flex gap-2 shrink-0">
                       <button
                         className="btn btn-primary"
-                        onClick={() => onAccept(r, choice || null)}
+                        onClick={() => onAccept(r, choice || null, officerTypeFor(r))}
                       >
                         Accept
                       </button>
@@ -884,6 +952,7 @@ function IncomingInbox({
                       </button>
                     </div>
                   </div>
+                  {renderTypePicker(r)}
                   <details className="mt-2">
                     <summary className="text-[11px] text-gunmetal/50 cursor-pointer">
                       wrong facility?
@@ -934,7 +1003,7 @@ function IncomingInbox({
                       {r.ran || "no RAN"} · {r.ranType}
                     </div>
                     <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <FamilyChip row={r} />
+                      <FamilyChip row={effectiveRow(r)} />
                       <span className="text-sm font-semibold">{statusOf(r)}</span>
                     </div>
                     {r.emailSubject ? (
@@ -943,6 +1012,8 @@ function IncomingInbox({
                       </div>
                     ) : null}
                   </div>
+
+                  {renderTypePicker(r)}
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
                     <div>
@@ -966,7 +1037,7 @@ function IncomingInbox({
                     </div>
                     <button
                       className="btn btn-primary"
-                      onClick={() => onAccept(r, choice || null)}
+                      onClick={() => onAccept(r, choice || null, officerTypeFor(r))}
                     >
                       {choice ? "Apply" : "Dismiss"}
                     </button>
@@ -996,8 +1067,10 @@ function IncomingInbox({
 // Ready-to-license approval
 // ---------------------------------------------------------------------------
 
-/** Best-guess licence type for the approval dropdown, inferred from the RAN. */
+/** Best-guess licence type for the approval dropdown: the officer-assigned type
+ *  if the number was classified, otherwise inferred from the RAN. */
 function defaultLicenceType(r: LicenceWorkflow): LicenceType {
+  if (r.officerType) return r.officerType;
   const fallback: LicenceType = /renewal/i.test(r.ranType)
     ? "Renewal of Use/Possession Licence"
     : "New Use/Possession Licence";

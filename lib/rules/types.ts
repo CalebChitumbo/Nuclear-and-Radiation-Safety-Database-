@@ -225,6 +225,15 @@ export interface LicenceWorkflow {
    */
   currentStatus?: NewApplicationStatus;
   /**
+   * The licence type an officer has assigned to this application's number. RAIS
+   * FORM-I numbers (RPA/LIC/####) don't encode a type — they may be import,
+   * design & construction, transport, transit or use/possession — so the officer
+   * classifies the number once and that choice sticks to every later
+   * notification for the same RAN (it overrides the RAN/status guess in
+   * workflowLicenceType). Absent until an officer sets it.
+   */
+  officerType?: LicenceType;
+  /**
    * Set for the two licence-issuing emails and the resets. "renewal-auto" and
    * "form-i-prompt" surface in the Ready-to-license panel for the officer's R1–R6
    * action; "reset" marks rejection/returned/declination/withdrawal/additional-info

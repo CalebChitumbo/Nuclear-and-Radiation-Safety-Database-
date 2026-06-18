@@ -96,6 +96,75 @@ describe("saveLicenceWorkflows — licence family drives where an update lands",
     expect(after.stage).toBe(originalStage); // import never drives the renewal stage
   });
 
+  it("treats a FORM-I (RPA/LIC) number classified as Import as a standalone authorisation", async () => {
+    const licensed = (await mockStore.listFacilities()).find((f) => f.licensed)!;
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "RPA/LIC/0543",
+          ranType: "New Licence / Import",
+          facilityId: licensed.id,
+          facilityName: licensed.name,
+          facilityStage: "Licence / Certificate Issued",
+          officerType: "Importation Licence", // officer's one-time classification
+        }),
+      ],
+      "u",
+    );
+    const after = (await mockStore.listFacilities()).find((f) => f.id === licensed.id)!;
+    expect(after.stage).toBe("Licensed"); // renewal status untouched
+    expect(
+      (after.auths || []).some(
+        (a) => a.type === "Importation Licence" && a.number === "RPA/LIC/0543",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the officer-assigned type when a later notification for the same number omits it", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+    // First notification: classify the FORM-I number as Import (still mid-stage).
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "RPA/LIC/0600",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Waiting for Payment",
+          currentStatus:
+            "Payment Pending - Awaiting Proof of Payment (POP) from Applicant",
+          officerType: "Importation Licence",
+        }),
+      ],
+      "u",
+    );
+    // Later notification for the same number, this time issued and WITHOUT a type.
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "RPA/LIC/0600",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Licence / Certificate Issued",
+          officerType: undefined,
+        }),
+      ],
+      "u",
+    );
+
+    const rec = (await mockStore.listLicenceWorkflows()).find(
+      (w) => w.ran === "RPA/LIC/0600",
+    )!;
+    expect(rec.officerType).toBe("Importation Licence"); // sticks to the number
+
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect(after.licensed).toBe(false); // import never licenses
+    expect(
+      (after.auths || []).some(
+        (a) => a.number === "RPA/LIC/0600" && a.type === "Importation Licence",
+      ),
+    ).toBe(true);
+  });
+
   it("rolls a Use/Possession renewal's status onto the facility (no authorisation until licensed)", async () => {
     const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
 

@@ -330,7 +330,18 @@ class MockStore implements DataStore {
     const weeks = weeksSeed as WeekDef[];
 
     const byRan = new Map(s.licenceWorkflows.map((w) => [w.ran || w.id, w]));
-    const saved = items.map((item) => ({ ...item, updatedAt: now, updatedBy: uid }));
+    // Preserve a previously officer-assigned type when an update omits it, so the
+    // classification sticks to the licence number across notifications. (Firebase
+    // gets this for free from merge writes.)
+    const saved = items.map((item) => {
+      const prior = byRan.get(item.ran || item.id);
+      return {
+        ...item,
+        officerType: item.officerType ?? prior?.officerType,
+        updatedAt: now,
+        updatedBy: uid,
+      };
+    });
     for (const item of saved) byRan.set(item.ran || item.id, item);
     s.licenceWorkflows = [...byRan.values()];
 
