@@ -7,22 +7,110 @@ import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
-import { LICENCE_TYPES, isUseP } from "@/lib/rules/types";
+import {
+  LICENCE_TYPES,
+  isUseP,
+  type Facility,
+  type LicenceType,
+} from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
+
+// Compact chip/column labels for the long official type names.
+const SHORT_TYPE: Partial<Record<LicenceType, string>> = {
+  "New Use/Possession Licence": "New use",
+  "Renewal of Use/Possession Licence": "Renewal",
+  "Importation Licence": "Import",
+  "Export Licence": "Export",
+  "Transfer Licence": "Transfer",
+  "Transport Licence": "Transport",
+  "Transit Licence": "Transit",
+  "Variation of Terms and Conditions": "Variation",
+  "Design and Construction Licence": "Design & Constr.",
+  "Decommissioning Licence": "Decommissioning",
+};
+
+interface AuthRow {
+  facilityId: string;
+  facilityName: string;
+  facCode: string;
+  province: string;
+  sector: string;
+  type: LicenceType;
+  number: string;
+  date: string;
+}
+
+/** Flatten every recorded authorisation across the register into one row each. */
+function flattenAuths(facilities: Facility[]): AuthRow[] {
+  const rows: AuthRow[] = [];
+  for (const f of facilities) {
+    for (const a of f.auths || []) {
+      rows.push({
+        facilityId: f.id,
+        facilityName: f.name,
+        facCode: f.facCode,
+        province: f.province,
+        sector: f.sector,
+        type: a.type,
+        number: a.number,
+        date: a.date,
+      });
+    }
+  }
+  // Newest first; undated entries (the seed) sink to the bottom.
+  return rows.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
 
 export default function LicencesPage() {
   const { data, loading } = useStoreData(async (s) => s.listFacilities(), []);
   const [year, setYear] = useState(CURRENT_YEAR);
+  // The itemized table's filters: a licence type, or the "standalone" / "use" /
+  // "all" groupings; plus a free-text search.
+  const [typeFilter, setTypeFilter] = useState<string>("standalone");
+  const [authSearch, setAuthSearch] = useState("");
 
   const stats = useMemo(
     () => (data ? computeLicenceStats(data, year) : null),
     [data, year],
   );
+  const authRows = useMemo(() => (data ? flattenAuths(data) : []), [data]);
+  const filteredAuthRows = useMemo(() => {
+    const q = authSearch.trim().toLowerCase();
+    return authRows.filter((r) => {
+      if (typeFilter === "standalone" && isUseP(r.type)) return false;
+      if (typeFilter === "use" && !isUseP(r.type)) return false;
+      if (
+        typeFilter !== "standalone" &&
+        typeFilter !== "use" &&
+        typeFilter !== "all" &&
+        r.type !== typeFilter
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        r.facilityName.toLowerCase().includes(q) ||
+        (r.number || "").toLowerCase().includes(q) ||
+        (r.facCode || "").toLowerCase().includes(q)
+      );
+    });
+  }, [authRows, typeFilter, authSearch]);
 
   if (loading || !stats) {
     return <div className="caps text-xs text-gunmetal/60">Loading…</div>;
   }
+
+  // Filter chips: "All standalone" + each non-Use/Possession type that has at
+  // least one record, then Use/Possession and All-types escape hatches.
+  const typeChips: { key: string; label: string; count: number }[] = [
+    { key: "standalone", label: "All standalone", count: stats.otherTotal },
+    ...LICENCE_TYPES.filter(
+      (t) => !isUseP(t) && (stats.issuedByType[t] || 0) > 0,
+    ).map((t) => ({ key: t, label: SHORT_TYPE[t] || t, count: stats.issuedByType[t] || 0 })),
+    { key: "use", label: "Use/Possession", count: stats.useTotal },
+    { key: "all", label: "All types", count: stats.totalIssued },
+  ];
 
   // Issued counts split the way the register thinks about them: Use/Possession
   // (the licences that confer "licensed") vs every standalone authorisation.
@@ -107,6 +195,101 @@ export default function LicencesPage() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Bars title="Use / Possession licences by type" rows={useRows} />
         <Bars title="Standalone authorisations by type" rows={otherRows} />
+      </section>
+
+      {/* Itemized authorisations — which facility holds which licence */}
+      <section className="card overflow-hidden">
+        <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex flex-wrap items-center justify-between gap-3">
+          <div className="font-black">
+            Authorisations on record
+            <span className="text-xs text-gunmetal/55 font-normal ml-2">
+              {filteredAuthRows.length} shown
+            </span>
+          </div>
+          <input
+            className="input max-w-[260px]"
+            placeholder="facility, number, FAC…"
+            value={authSearch}
+            onChange={(e) => setAuthSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="px-4 sm:px-5 py-3 flex flex-wrap gap-2 border-b border-gunmetal/8">
+          {typeChips.map((c) => {
+            const active = typeFilter === c.key;
+            return (
+              <button
+                key={c.key}
+                onClick={() => setTypeFilter(c.key)}
+                className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors"
+                style={{
+                  background: active ? "var(--rpa-green)" : "transparent",
+                  color: active ? "white" : "var(--gunmetal)",
+                  borderColor: active
+                    ? "var(--rpa-green)"
+                    : "rgba(26,27,29,0.12)",
+                }}
+              >
+                {c.label}{" "}
+                <span className="tabular opacity-70">{c.count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredAuthRows.length === 0 ? (
+          <div className="p-6 text-sm text-gunmetal/60">
+            {typeFilter === "standalone"
+              ? "No standalone authorisations recorded yet. Import, transfer, variation and other non-use licences appear here once their RAIS email is accepted."
+              : "No authorisations match this filter."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm tbl-sticky">
+              <thead>
+                <tr className="text-left text-xs caps text-gunmetal/55">
+                  <th className="px-4 py-2">Facility</th>
+                  <th className="px-4 py-2">Licence type</th>
+                  <th className="px-4 py-2">Number</th>
+                  <th className="px-4 py-2">Province</th>
+                  <th className="px-4 py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAuthRows.map((r, i) => (
+                  <tr
+                    key={`${r.facilityId}-${r.number || "x"}-${i}`}
+                    className="border-t border-gunmetal/8 align-top"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/facilities/${r.facilityId}`}
+                        className="font-bold text-[var(--rpa-green-dark)] hover:underline"
+                      >
+                        {r.facilityName}
+                      </Link>
+                      <div className="text-[11px] text-gunmetal/55 tabular">
+                        {r.facCode || "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
+                      >
+                        {SHORT_TYPE[r.type] || r.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 tabular">{r.number || "—"}</td>
+                    <td className="px-4 py-3">{r.province}</td>
+                    <td className="px-4 py-3 tabular text-gunmetal/70">
+                      {r.date || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* Who holds a current use licence this year */}
