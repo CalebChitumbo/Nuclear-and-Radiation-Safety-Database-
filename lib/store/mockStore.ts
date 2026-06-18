@@ -2,6 +2,7 @@ import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import {
   isUsePossessionWorkflow,
+  needsTypeClassification,
   workflowIssueDate,
   workflowLicenceType,
 } from "../rules/licenceFamily";
@@ -355,6 +356,7 @@ class MockStore implements DataStore {
     //    recorded as an authorisation the facility holds — counted toward the
     //    licences issued, but it never changes the licensed/renewal status.
     for (const w of matched) {
+      if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
       if (isUsePossessionWorkflow(w)) continue;
       if (w.facilityStage !== "Licence / Certificate Issued") continue;
       if (!w.ran) continue;
@@ -386,7 +388,7 @@ class MockStore implements DataStore {
     // 2. Use/Possession renewal status only. Standalone authorisations never
     //    drive the register stage; never downgrade an already-Licensed facility.
     for (const w of matched) {
-      if (!isUsePossessionWorkflow(w)) continue;
+      if (!isUsePossessionWorkflow(w) || needsTypeClassification(w)) continue;
       const fac = facMap.get(w.facilityId as string);
       if (!fac || fac.licensed) continue;
       if (fac.stage !== w.facilityStage || fac.currentStatus !== w.currentStatus) {

@@ -96,6 +96,28 @@ describe("saveLicenceWorkflows — licence family drives where an update lands",
     expect(after.stage).toBe(originalStage); // import never drives the renewal stage
   });
 
+  it("holds an unclassified FORM-I number out of the register entirely", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+    const originalStage = unl.stage;
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "RPA/LIC/0700",
+          ranType: "New Licence / Import",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Licence / Certificate Issued", // even when issued…
+          // …with no officerType it must not touch the register.
+        }),
+      ],
+      "u",
+    );
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect((after.auths || []).length).toBe(0); // nothing recorded
+    expect(after.stage).toBe(originalStage); // renewal stage untouched
+    expect(after.licensed).toBe(false);
+  });
+
   it("treats a FORM-I (RPA/LIC) number classified as Import as a standalone authorisation", async () => {
     const licensed = (await mockStore.listFacilities()).find((f) => f.licensed)!;
     await mockStore.saveLicenceWorkflows(

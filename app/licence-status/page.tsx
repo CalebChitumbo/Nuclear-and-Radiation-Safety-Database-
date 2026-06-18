@@ -21,6 +21,7 @@ import { detectType } from "@/lib/rules/detectType";
 import {
   isAmbiguousLicenceRan,
   isUsePossessionWorkflow,
+  needsTypeClassification,
   workflowLicenceType,
 } from "@/lib/rules/licenceFamily";
 import {
@@ -146,6 +147,7 @@ export default function LicenceStatusPage() {
         if (r.reviewStatus === "needs-review") return false;
         if (r.facilityStage !== "Licence / Certificate Issued") return false;
         if (!r.facilityId) return false;
+        if (needsTypeClassification(r)) return false; // FORM-I awaiting classification
         if (!isUsePossessionWorkflow(r)) return false;
         const f = facById.get(r.facilityId);
         return !!f && !f.licensed;
@@ -803,18 +805,23 @@ function IncomingInbox({
   const choiceFor = (r: LicenceWorkflow) => picked[r.id] ?? (r.facilityId || "");
   const statusOf = (r: LicenceWorkflow) => r.currentStatus || r.stage;
 
-  // The licence type to use for a FORM-I (RPA/LIC) number: the officer's pending
-  // pick, then any type already assigned to the number, then the best guess.
-  const chosenTypeFor = (r: LicenceWorkflow): LicenceType =>
-    pickedType[r.id] ?? r.officerType ?? workflowLicenceType(r);
-  // For ambiguous LIC numbers the effective type comes from the picker; other
-  // RANs keep whatever they already carry.
+  // The type assigned to a FORM-I (RPA/LIC) number: the officer's pending pick,
+  // then any type already saved on the number. No guessed fallback — a FORM-I
+  // number must be classified before it can be accepted.
+  const assignedTypeFor = (r: LicenceWorkflow): LicenceType | undefined =>
+    pickedType[r.id] ?? r.officerType;
+  // A FORM-I number still awaiting its (required) classification.
+  const needsType = (r: LicenceWorkflow): boolean =>
+    isAmbiguousLicenceRan(r.ran) && !assignedTypeFor(r);
+  // The officerType to persist on accept (only FORM-I numbers carry one).
   const officerTypeFor = (r: LicenceWorkflow): LicenceType | undefined =>
-    isAmbiguousLicenceRan(r.ran) ? chosenTypeFor(r) : r.officerType;
+    isAmbiguousLicenceRan(r.ran) ? assignedTypeFor(r) : r.officerType;
   // A row reflecting the pending classification, so the family chip / notes
-  // update live as the officer changes the dropdown.
-  const effectiveRow = (r: LicenceWorkflow): LicenceWorkflow =>
-    isAmbiguousLicenceRan(r.ran) ? { ...r, officerType: chosenTypeFor(r) } : r;
+  // update live as the officer picks a type.
+  const effectiveRow = (r: LicenceWorkflow): LicenceWorkflow => {
+    const t = officerTypeFor(r);
+    return t ? { ...r, officerType: t } : r;
+  };
 
   const ready = items.filter((r) => r.facilityId);
   const needs = items.filter((r) => !r.facilityId);
@@ -848,16 +855,20 @@ function IncomingInbox({
   // the number. The choice sticks to the number for every later notification.
   const renderTypePicker = (r: LicenceWorkflow) =>
     isAmbiguousLicenceRan(r.ran) ? (
-      <div className="mt-2 rounded-lg bg-mist p-2">
+      <div
+        className="mt-2 rounded-lg p-2"
+        style={{
+          background: needsType(r) ? "rgba(184,134,11,0.10)" : "var(--mist)",
+          border: needsType(r) ? "1px solid rgba(184,134,11,0.35)" : "none",
+        }}
+      >
         <div className="caps text-[10px] text-gunmetal/60 mb-1">
-          FORM-I licence — set the application type
-          {!r.officerType && !pickedType[r.id] ? (
-            <span className="text-[var(--status-stalled)]"> · not set</span>
-          ) : null}
+          FORM-I licence — choose the application type
+          <span className="text-[var(--status-stalled)]"> · required</span>
         </div>
         <select
           className="input"
-          value={chosenTypeFor(r)}
+          value={assignedTypeFor(r) ?? ""}
           onChange={(e) =>
             setPickedType((p) => ({
               ...p,
@@ -865,6 +876,9 @@ function IncomingInbox({
             }))
           }
         >
+          <option value="" disabled>
+            — choose type —
+          </option>
           {LICENCE_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -872,8 +886,8 @@ function IncomingInbox({
           ))}
         </select>
         <div className="text-[11px] text-gunmetal/55 mt-1">
-          {r.ran} carries no type — your choice sticks to this number for every
-          future notification.
+          {r.ran} carries no type — it can&apos;t be accepted until you choose
+          one. Your choice sticks to this number for every future notification.
         </div>
       </div>
     ) : null;
@@ -891,16 +905,27 @@ function IncomingInbox({
           </span>
         </div>
         {ready.length ? (
-          <button
-            className="btn btn-primary shrink-0"
-            onClick={() =>
-              onAcceptAllReady(
-                ready.map(resolveRow).filter((r) => r.facilityId),
-              )
-            }
-          >
-            Accept all recognised ({ready.length})
-          </button>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <button
+              className="btn btn-primary"
+              disabled={ready.every((r) => needsType(r))}
+              onClick={() =>
+                onAcceptAllReady(
+                  ready
+                    .filter((r) => !needsType(r))
+                    .map(resolveRow)
+                    .filter((r) => r.facilityId),
+                )
+              }
+            >
+              Accept all recognised ({ready.filter((r) => !needsType(r)).length})
+            </button>
+            {ready.some((r) => needsType(r)) ? (
+              <span className="text-[11px] text-gunmetal/55">
+                {ready.filter((r) => needsType(r)).length} FORM-I need a type first
+              </span>
+            ) : null}
+          </div>
         ) : (
           <span className="chip amber shrink-0">✉ auto-imported</span>
         )}
@@ -925,12 +950,16 @@ function IncomingInbox({
                         {r.ran} · {r.ranType}
                       </div>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <FamilyChip row={effectiveRow(r)} />
+                        {needsType(r) ? (
+                          <span className="chip amber">⚠ choose type</span>
+                        ) : (
+                          <FamilyChip row={effectiveRow(r)} />
+                        )}
                         <span className="text-sm font-semibold">
                           {statusOf(r)}
                         </span>
                       </div>
-                      {!isUsePossessionWorkflow(effectiveRow(r)) ? (
+                      {!needsType(r) && !isUsePossessionWorkflow(effectiveRow(r)) ? (
                         <div className="text-[11px] text-gunmetal/55 mt-1">
                           Standalone authorisation — recorded on the facility,
                           renewal status unchanged.
@@ -940,6 +969,12 @@ function IncomingInbox({
                     <div className="flex gap-2 shrink-0">
                       <button
                         className="btn btn-primary"
+                        disabled={needsType(r)}
+                        title={
+                          needsType(r)
+                            ? "Choose the FORM-I application type first"
+                            : undefined
+                        }
                         onClick={() => onAccept(r, choice || null, officerTypeFor(r))}
                       >
                         Accept
@@ -1003,7 +1038,11 @@ function IncomingInbox({
                       {r.ran || "no RAN"} · {r.ranType}
                     </div>
                     <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <FamilyChip row={effectiveRow(r)} />
+                      {needsType(r) ? (
+                        <span className="chip amber">⚠ choose type</span>
+                      ) : (
+                        <FamilyChip row={effectiveRow(r)} />
+                      )}
                       <span className="text-sm font-semibold">{statusOf(r)}</span>
                     </div>
                     {r.emailSubject ? (
@@ -1037,6 +1076,12 @@ function IncomingInbox({
                     </div>
                     <button
                       className="btn btn-primary"
+                      disabled={!!choice && needsType(r)}
+                      title={
+                        choice && needsType(r)
+                          ? "Choose the FORM-I application type first"
+                          : undefined
+                      }
                       onClick={() => onAccept(r, choice || null, officerTypeFor(r))}
                     >
                       {choice ? "Apply" : "Dismiss"}

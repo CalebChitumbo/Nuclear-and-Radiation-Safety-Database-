@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAmbiguousLicenceRan,
   isUsePossessionWorkflow,
+  needsTypeClassification,
   workflowIssueDate,
   workflowLicenceType,
 } from "../lib/rules/licenceFamily";
@@ -111,6 +112,20 @@ describe("isAmbiguousLicenceRan", () => {
     expect(isAmbiguousLicenceRan("AUTH/USE.REN/0872")).toBe(false);
     expect(isAmbiguousLicenceRan("AUTH/IMP/0099")).toBe(false);
     expect(isAmbiguousLicenceRan("")).toBe(false);
+  });
+});
+
+describe("needsTypeClassification", () => {
+  it("flags an unclassified FORM-I number, and only that", () => {
+    expect(needsTypeClassification({ ran: "RPA/LIC/0543" })).toBe(true);
+    expect(
+      needsTypeClassification({
+        ran: "RPA/LIC/0543",
+        officerType: "Importation Licence",
+      }),
+    ).toBe(false);
+    expect(needsTypeClassification({ ran: "AUTH/IMP/0099" })).toBe(false);
+    expect(needsTypeClassification({ ran: "AUTH/USE.REN/0872" })).toBe(false);
   });
 });
 

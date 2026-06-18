@@ -225,12 +225,13 @@ status shown on the register. The classifier lives in
 
 **FORM-I numbers (`RPA/LIC/####`)** encode no licence type — they may be
 use/possession, import, transport, transit or design & construction. The
-Incoming-updates inbox shows a type selector on these rows; the officer
-classifies the number **once** and that choice is stored on the workflow
-(`officerType`) and reused for every later notification with the same RAN, so an
-import keeps being treated as an import. Until classified, a FORM-I number falls
-back to a use/possession application (the common case), and its approval still
-offers the Yes/No prompt in the Ready-to-license panel.
+Incoming-updates inbox **requires** the officer to classify these rows: a type
+selector appears, Accept is disabled until a type is chosen, and the choice is
+stored on the workflow (`officerType`) and reused for every later notification
+with the same RAN, so an import keeps being treated as an import. Until it is
+classified, the number is held out of the register entirely — it drives no
+renewal stage and records no authorisation, so the system never guesses what a
+`RPA/LIC/####` licence is (`needsTypeClassification`).
 
 The **Licences** page (`/licences`) reports the totals this produces:
 authorisations issued by type (renewal + new use + import + transit + …), and —

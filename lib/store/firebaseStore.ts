@@ -20,6 +20,7 @@ import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import {
   isUsePossessionWorkflow,
+  needsTypeClassification,
   workflowIssueDate,
   workflowLicenceType,
 } from "../rules/licenceFamily";
@@ -315,6 +316,7 @@ class FirebaseStore implements DataStore {
       //    Use/Possession issuance is excluded on purpose: it must go through the
       //    R1–R6 "Mark Licensed" step in the Ready-to-license panel.
       for (const w of matched) {
+        if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
         if (isUsePossessionWorkflow(w)) continue;
         if (w.facilityStage !== "Licence / Certificate Issued") continue;
         if (!w.ran) continue;
@@ -353,13 +355,14 @@ class FirebaseStore implements DataStore {
       for (const item of saved) overlay.set(docId(item), item);
       for (const w of overlay.values()) {
         if (!w.facilityId || !isUsePossessionWorkflow(w)) continue;
+        if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
         const arr = upByFacility.get(w.facilityId) || [];
         arr.push(w);
         upByFacility.set(w.facilityId, arr);
       }
       const upTouched = new Set(
         matched
-          .filter((w) => isUsePossessionWorkflow(w))
+          .filter((w) => isUsePossessionWorkflow(w) && !needsTypeClassification(w))
           .map((w) => w.facilityId as string),
       );
       for (const facilityId of upTouched) {
