@@ -7,7 +7,10 @@ import { Gauge } from "@/components/Gauge";
 import { Kpi } from "@/components/Kpi";
 import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
-import { PROVINCES, STAGES } from "@/lib/rules/types";
+import { computeLicenceStats } from "@/lib/rules/licenceStats";
+import { LICENCE_TYPES, PROVINCES, STAGES, isUseP } from "@/lib/rules/types";
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 interface FeedItem {
   kind: "licence" | "inspection";
@@ -37,8 +40,13 @@ export default function DashboardPage() {
     return <div className="caps text-xs text-gunmetal/60">Loading…</div>;
   }
 
-  const { agg, events, inspections } = data;
+  const { agg, events, inspections, facilities } = data;
   const coverage = agg.total ? (agg.licensed / agg.total) * 100 : 0;
+  const licence = computeLicenceStats(facilities, CURRENT_YEAR);
+  const issuedTypeRows = LICENCE_TYPES.map((t) => ({
+    type: t,
+    count: licence.issuedByType[t] || 0,
+  })).filter((r) => r.count > 0);
   const wkEvents = events.filter((e) => e.week === selected.label);
   const wkInspections = inspections.filter((i) => i.week === selected.label);
   const renewals = wkEvents.filter(
@@ -165,6 +173,92 @@ export default function DashboardPage() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Licences issued (all types) + who holds a current use licence */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card p-5">
+          <div className="flex items-baseline justify-between mb-2">
+            <div className="caps text-xs text-gunmetal/60">
+              Licences issued (all types)
+            </div>
+            <Link
+              className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
+              href="/licences"
+            >
+              Open licences
+            </Link>
+          </div>
+          <div className="text-4xl font-black tabular">
+            {licence.totalIssued.toLocaleString()}
+          </div>
+          <div className="mt-1 text-sm text-gunmetal/70">
+            <span className="text-[var(--rpa-green-dark)] font-bold">
+              {licence.useTotal}
+            </span>{" "}
+            use/possession ·{" "}
+            <span className="font-bold">{licence.otherTotal}</span> standalone
+            authorisation{licence.otherTotal === 1 ? "" : "s"}
+          </div>
+          {issuedTypeRows.length ? (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {issuedTypeRows.map((r) => (
+                <li
+                  key={r.type}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
+                    >
+                      {isUseP(r.type) ? "Use" : "Standalone"}
+                    </span>
+                    <span>{r.type}</span>
+                  </span>
+                  <span className="tabular font-bold">{r.count}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-3 text-sm text-gunmetal/60">
+              No licences recorded yet.
+            </div>
+          )}
+        </div>
+
+        <div className="card p-5">
+          <div className="flex items-baseline justify-between mb-2">
+            <div className="caps text-xs text-gunmetal/60">
+              Use licence held — {CURRENT_YEAR}
+            </div>
+            <Link
+              className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
+              href="/licences"
+            >
+              Breakdown
+            </Link>
+          </div>
+          <ul className="space-y-2 text-sm">
+            <FlowRow
+              label={`Licensed for ${CURRENT_YEAR}`}
+              value={licence.licensedThisYear}
+              accent="green"
+            />
+            <FlowRow
+              label="Renewal not yet confirmed"
+              value={licence.licensedYearUnconfirmed}
+            />
+            <FlowRow
+              label="Not licensed"
+              value={licence.notLicensed}
+              accent="red"
+            />
+          </ul>
+          <div className="mt-3 text-[11px] text-gunmetal/55">
+            Licence year read from each facility&apos;s latest use/possession
+            licence date.
           </div>
         </div>
       </section>

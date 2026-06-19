@@ -1,5 +1,11 @@
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
+import {
+  isUsePossessionWorkflow,
+  needsTypeClassification,
+  workflowIssueDate,
+  workflowLicenceType,
+} from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
 import {
   type Activity,
@@ -322,45 +328,90 @@ class MockStore implements DataStore {
   ): Promise<{ saved: number; facilitiesUpdated: number }> {
     const s = ensure();
     const now = new Date().toISOString();
-    const byRan = new Map(
-      s.licenceWorkflows.map((w) => [w.ran || w.id, w]),
-    );
-    for (const item of items) {
-      byRan.set(item.ran || item.id, { ...item, updatedAt: now, updatedBy: uid });
-    }
+    const weeks = weeksSeed as WeekDef[];
+
+    const byRan = new Map(s.licenceWorkflows.map((w) => [w.ran || w.id, w]));
+    // Preserve a previously officer-assigned type when an update omits it, so the
+    // classification sticks to the licence number across notifications. (Firebase
+    // gets this for free from merge writes.)
+    const saved = items.map((item) => {
+      const prior = byRan.get(item.ran || item.id);
+      return {
+        ...item,
+        officerType: item.officerType ?? prior?.officerType,
+        updatedAt: now,
+        updatedBy: uid,
+      };
+    });
+    for (const item of saved) byRan.set(item.ran || item.id, item);
     s.licenceWorkflows = [...byRan.values()];
 
-    // Roll each matched application's status up onto its facility so the register
-    // and the Overview pipeline reflect the imported RAIS status.
-    const stageByFacility = new Map<string, Facility["stage"]>();
-    const statusByFacility = new Map<string, Facility["currentStatus"]>();
-    for (const item of items) {
-      if (item.facilityId && !item.facilityName.includes("Unrecognized")) {
-        stageByFacility.set(item.facilityId, item.facilityStage);
-        statusByFacility.set(item.facilityId, item.currentStatus);
+    const matched = saved.filter(
+      (w) => w.facilityId && !w.facilityName.includes("Unrecognized"),
+    );
+    const facMap = new Map(s.facilities.map((f) => [f.id, f]));
+    const dirty = new Set<string>();
+
+    // 1. Standalone authorisations. An issued non-Use/Possession application is
+    //    recorded as an authorisation the facility holds — counted toward the
+    //    licences issued, but it never changes the licensed/renewal status.
+    for (const w of matched) {
+      if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
+      if (isUsePossessionWorkflow(w)) continue;
+      if (w.facilityStage !== "Licence / Certificate Issued") continue;
+      if (!w.ran) continue;
+      const fac = facMap.get(w.facilityId as string);
+      if (!fac) continue;
+      if (
+        (fac.auths || []).some(
+          (a) => a.number && a.number.toUpperCase() === w.ran.toUpperCase(),
+        )
+      ) {
+        continue;
+      }
+      const type = workflowLicenceType(w);
+      const result = recordLicence({
+        facility: fac,
+        number: w.ran,
+        type,
+        defaultType: type,
+        date: workflowIssueDate(w),
+        weeks,
+        uid,
+        newEventId: newId("evt"),
+      });
+      s.licenceEvents.push(result.event);
+      facMap.set(fac.id, result.facilityWrite);
+      dirty.add(fac.id);
+    }
+
+    // 2. Use/Possession renewal status only. Standalone authorisations never
+    //    drive the register stage; never downgrade an already-Licensed facility.
+    for (const w of matched) {
+      if (!isUsePossessionWorkflow(w) || needsTypeClassification(w)) continue;
+      const fac = facMap.get(w.facilityId as string);
+      if (!fac || fac.licensed) continue;
+      if (fac.stage !== w.facilityStage || fac.currentStatus !== w.currentStatus) {
+        facMap.set(fac.id, {
+          ...fac,
+          stage: w.facilityStage,
+          currentStatus: w.currentStatus,
+        });
+        dirty.add(fac.id);
       }
     }
-    let facilitiesUpdated = 0;
-    if (stageByFacility.size) {
-      s.facilities = s.facilities.map((f) => {
-        const stage = stageByFacility.get(f.id);
-        const currentStatus = statusByFacility.get(f.id);
-        // Never override an already-Licensed facility from a workflow import.
-        if (
-          stage &&
-          !f.licensed &&
-          (f.stage !== stage || f.currentStatus !== currentStatus)
-        ) {
-          facilitiesUpdated++;
-          return { ...f, stage, currentStatus, updatedAt: now, updatedBy: uid };
-        }
-        return f;
-      });
+
+    if (dirty.size) {
+      s.facilities = s.facilities.map((f) =>
+        dirty.has(f.id)
+          ? { ...(facMap.get(f.id) as Facility), updatedAt: now, updatedBy: uid }
+          : f,
+      );
     }
 
     save(s);
     dispatchChange();
-    return { saved: items.length, facilitiesUpdated };
+    return { saved: items.length, facilitiesUpdated: dirty.size };
   }
 
   async updateFacility(
