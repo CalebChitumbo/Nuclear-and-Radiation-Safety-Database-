@@ -15,6 +15,7 @@ const NAV = [
   { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
   { href: "/inspections", label: "Inspections", icon: "✶" },
   { href: "/weekly", label: "Weekly Report", icon: "◷" },
+  { href: "/payroll", label: "Payroll", icon: "₭" },
 ];
 
 const ADMIN_NAV = [

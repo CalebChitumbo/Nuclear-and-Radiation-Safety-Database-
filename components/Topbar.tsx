@@ -11,6 +11,7 @@ const TITLES: Record<string, string> = {
   "/bulk-approval": "Bulk Approval",
   "/inspections": "Inspections",
   "/weekly": "Weekly Sectional Report",
+  "/payroll": "Payroll",
   "/admin/users": "User Management",
   "/settings": "Settings",
 };

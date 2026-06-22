@@ -265,3 +265,19 @@ body {
     background: white;
   }
 }
+
+/* Payroll printable sheets (payslips, leave application, requisitions, etc.) */
+.payroll-sheet {
+  max-width: 820px;
+  margin: 0 auto;
+}
+@media print {
+  .payroll-sheet {
+    box-shadow: none;
+    border: 1px solid rgba(26, 27, 29, 0.5);
+    max-width: 100%;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
