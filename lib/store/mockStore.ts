@@ -352,16 +352,21 @@ class MockStore implements DataStore {
     const facMap = new Map(s.facilities.map((f) => [f.id, f]));
     const dirty = new Set<string>();
 
-    // 1. Standalone authorisations. An issued non-Use/Possession application is
-    //    recorded as an authorisation the facility holds — counted toward the
-    //    licences issued, but it never changes the licensed/renewal status.
+    // 1. Issued applications → recorded on the facility through the R1–R6 rules.
+    //    recordLicence does the right thing per family: a confirmed
+    //    Use/Possession issuance flips the facility to officially Licensed and
+    //    logs the dated licence event; every other type (import/transit/transfer/
+    //    variation/…) is recorded as a standalone authorisation the facility holds
+    //    — counted toward the licences issued, but never changing licensed status.
     for (const w of matched) {
       if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
-      if (isUsePossessionWorkflow(w)) continue;
       if (w.facilityStage !== "Licence / Certificate Issued") continue;
       if (!w.ran) continue;
       const fac = facMap.get(w.facilityId as string);
       if (!fac) continue;
+      // A Use/Possession certificate licenses the facility; an already-licensed
+      // one is left to its manual renewal flow (never auto-record a renewal here).
+      if (isUsePossessionWorkflow(w) && fac.licensed) continue;
       if (
         (fac.auths || []).some(
           (a) => a.number && a.number.toUpperCase() === w.ran.toUpperCase(),
@@ -385,8 +390,10 @@ class MockStore implements DataStore {
       dirty.add(fac.id);
     }
 
-    // 2. Use/Possession renewal status only. Standalone authorisations never
-    //    drive the register stage; never downgrade an already-Licensed facility.
+    // 2. Use/Possession pipeline stage (pre-issuance). The issued case is handled
+    //    in step 1, which licenses the facility; here we only roll the in-flight
+    //    renewal stage forward. Standalone authorisations never drive the register
+    //    stage; never downgrade an already-Licensed facility.
     for (const w of matched) {
       if (!isUsePossessionWorkflow(w) || needsTypeClassification(w)) continue;
       const fac = facMap.get(w.facilityId as string);

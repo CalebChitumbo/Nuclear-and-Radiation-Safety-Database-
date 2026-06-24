@@ -203,8 +203,12 @@ emails to the `ingestRaisEmail` Cloud Function (via an inbound-email provider
 such as CloudMailin or Mailgun) and it runs the same parser the tab uses on a
 manual paste: confident facility matches are applied to the register
 automatically, and anything weak/ambiguous waits in the **Needs review** panel
-for an officer to confirm. It tracks *pipeline stage* only — flipping a facility
-to officially licensed still goes through the R1–R6 rules.
+for an officer to confirm. Accepting an update rolls the facility's *pipeline
+stage* forward; a **confirmed Use/Possession certificate** (the approval /
+"Licence Issued" email) goes one step further — accepting it records the licence
+through the R1–R6 rules and sets the facility **Licensed** automatically. Every
+other issued application is recorded as a standalone authorisation, and an
+already-licensed facility is never downgraded.
 
 Setup, security and provider steps: **[`docs/rais-email-ingestion.md`](docs/rais-email-ingestion.md)**.
 
@@ -213,8 +217,11 @@ Setup, security and provider steps: **[`docs/rais-email-ingestion.md`](docs/rais
 The facilities register tracks **one** thing: a facility's Use/Possession
 licensing state — is it licensed, and if not, where is its renewal in the
 pipeline. So only **Use/Possession** applications (a new FORM-I licence or a
-renewal) move a facility's register status. Every other RAIS update — import,
-export, transfer, transport, transit, variation, design & construction,
+renewal) move a facility's register status: while one is in flight the register
+shows its pipeline stage, and when its **certificate is issued**, accepting that
+email flips the facility to **Licensed** (recording the dated licence event that
+feeds the licensed count and the weekly report). Every other RAIS update —
+import, export, transfer, transport, transit, variation, design & construction,
 decommissioning — is a **standalone authorisation**: when its email is
 accepted (and the authorisation has been issued) it is recorded on the facility
 and counted toward the licences-issued totals, but it never changes the renewal

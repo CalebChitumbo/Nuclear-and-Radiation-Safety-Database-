@@ -210,6 +210,142 @@ describe("saveLicenceWorkflows — licence family drives where an update lands",
       "Payment Pending - Awaiting Proof of Payment (POP) from Applicant",
     );
     expect(after.licensed).toBe(false);
-    expect((after.auths || []).length).toBe(0); // recorded only at Mark Licensed
+    expect((after.auths || []).length).toBe(0); // recorded when issued, not mid-pipeline
+  });
+
+  it("licenses a facility when a confirmed Use/Possession certificate is issued (renewal)", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+
+    const res = await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "AUTH/USE.REN/0500",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Licence / Certificate Issued",
+          currentStatus: "Renewal Licence Approved - Licences can be downloaded",
+        }),
+      ],
+      "u",
+    );
+
+    expect(res.facilitiesUpdated).toBe(1);
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect(after.licensed).toBe(true);
+    expect(after.stage).toBe("Licensed");
+    // The licence is logged once: a dated event + an authorisation on record.
+    expect(
+      (after.auths || []).some(
+        (a) =>
+          a.number === "AUTH/USE.REN/0500" &&
+          a.type === "Renewal of Use/Possession Licence",
+      ),
+    ).toBe(true);
+    const events = await mockStore.listLicenceEvents();
+    expect(
+      events.some(
+        (e) => e.number === "AUTH/USE.REN/0500" && e.facilityId === unl.id,
+      ),
+    ).toBe(true);
+  });
+
+  it("licenses a facility when a confirmed new Use/Possession certificate is issued", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "AUTH/USE.NEW/0101",
+          ranType: "New Use Authorization",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Licence / Certificate Issued",
+          currentStatus: "Licence Approved (Use) - Licence available",
+        }),
+      ],
+      "u",
+    );
+
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect(after.licensed).toBe(true);
+    expect(after.stage).toBe("Licensed");
+    expect(
+      (after.auths || []).some(
+        (a) => a.number === "AUTH/USE.NEW/0101" && a.type === "New Use/Possession Licence",
+      ),
+    ).toBe(true);
+  });
+
+  it("licenses a facility for a FORM-I number an officer classified as Use/Possession", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+
+    await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "RPA/LIC/0815",
+          ranType: "New Licence / Import",
+          facilityId: unl.id,
+          facilityName: unl.name,
+          facilityStage: "Licence / Certificate Issued",
+          officerType: "New Use/Possession Licence", // officer's confirmation
+        }),
+      ],
+      "u",
+    );
+
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect(after.licensed).toBe(true);
+    expect(after.stage).toBe("Licensed");
+  });
+
+  it("is idempotent — re-accepting the same issued Use/Possession email does not double-record", async () => {
+    const unl = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+    const issued = () =>
+      wf({
+        ran: "AUTH/USE.REN/0777",
+        facilityId: unl.id,
+        facilityName: unl.name,
+        facilityStage: "Licence / Certificate Issued",
+        currentStatus: "Renewal Licence Approved - Licences can be downloaded",
+      });
+
+    await mockStore.saveLicenceWorkflows([issued()], "u");
+    const second = await mockStore.saveLicenceWorkflows([issued()], "u");
+
+    expect(second.facilitiesUpdated).toBe(0); // already licensed + auth on record
+    const after = (await mockStore.listFacilities()).find((f) => f.id === unl.id)!;
+    expect(after.licensed).toBe(true);
+    expect(
+      (after.auths || []).filter((a) => a.number === "AUTH/USE.REN/0777").length,
+    ).toBe(1);
+    const events = await mockStore.listLicenceEvents();
+    expect(events.filter((e) => e.number === "AUTH/USE.REN/0777").length).toBe(1);
+  });
+
+  it("does not auto-record a renewal on an already-licensed facility from an issued email", async () => {
+    const licensed = (await mockStore.listFacilities()).find((f) => f.licensed)!;
+    const before = {
+      stage: licensed.stage,
+      auths: (licensed.auths || []).length,
+    };
+
+    const res = await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "AUTH/USE.REN/0900",
+          facilityId: licensed.id,
+          facilityName: licensed.name,
+          facilityStage: "Licence / Certificate Issued",
+          currentStatus: "Renewal Licence Approved - Licences can be downloaded",
+        }),
+      ],
+      "u",
+    );
+
+    expect(res.facilitiesUpdated).toBe(0);
+    const after = (await mockStore.listFacilities()).find((f) => f.id === licensed.id)!;
+    expect(after.licensed).toBe(true);
+    expect(after.stage).toBe(before.stage); // stays "Licensed", not downgraded
+    expect((after.auths || []).length).toBe(before.auths); // renewal stays manual
   });
 });

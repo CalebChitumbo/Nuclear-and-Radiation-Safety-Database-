@@ -309,19 +309,21 @@ class FirebaseStore implements DataStore {
       const facMap = new Map(facilities.map((f) => [f.id, { ...f }]));
       const dirty = new Set<string>();
 
-      // 1. Standalone authorisations. An issued non-Use/Possession application
-      //    (import/transit/transfer/variation/export/…) is recorded as an
-      //    authorisation the facility holds — it counts toward the licences
-      //    issued, but NEVER changes the facility's licensed/renewal status.
-      //    Use/Possession issuance is excluded on purpose: it must go through the
-      //    R1–R6 "Mark Licensed" step in the Ready-to-license panel.
+      // 1. Issued applications → recorded through the R1–R6 rules. recordLicence
+      //    does the right thing per family: a confirmed Use/Possession issuance
+      //    flips the facility to officially Licensed and logs the dated licence
+      //    event; every other type (import/transit/transfer/variation/export/…) is
+      //    recorded as a standalone authorisation the facility holds — it counts
+      //    toward the licences issued, but NEVER changes its licensed status.
       for (const w of matched) {
         if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
-        if (isUsePossessionWorkflow(w)) continue;
         if (w.facilityStage !== "Licence / Certificate Issued") continue;
         if (!w.ran) continue;
         const fac = facMap.get(w.facilityId as string);
         if (!fac) continue;
+        // A Use/Possession certificate licenses the facility; an already-licensed
+        // one is left to its manual renewal flow (never auto-record a renewal).
+        if (isUsePossessionWorkflow(w) && fac.licensed) continue;
         const already = (fac.auths || []).some(
           (a) => a.number && a.number.toUpperCase() === w.ran.toUpperCase(),
         );
@@ -344,7 +346,9 @@ class FirebaseStore implements DataStore {
         dirty.add(fac.id);
       }
 
-      // 2. Use/Possession renewal status. Resolve each matched facility's single
+      // 2. Use/Possession pipeline stage (pre-issuance). The issued case is
+      //    handled in step 1, which licenses the facility; here we only roll the
+      //    in-flight renewal stage forward. Resolve each matched facility's single
       //    displayed status from the most recent applicable Use/Possession
       //    workflow (stored ∪ just-saved). Standalone authorisations are excluded
       //    so an import/transfer email can never overwrite the renewal stage.

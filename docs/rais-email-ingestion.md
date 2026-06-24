@@ -55,15 +55,20 @@ Accepting an update writes the facility, which triggers the existing
   workflow — so once an application is tied to a facility, its later
   notifications link themselves. Genuinely new RANs get a one-time facility
   picker; matching one "teaches" it for next time.
-- **Does not:** flip a facility to officially **licensed** or write the dated
-  `licenceEvent` that feeds the register's licensed count and the weekly report.
-  That remains a deliberate action through the R1–R6 rules
-  (`lib/rules/recordLicence.ts`) — the connector never bypasses them. An
-  already-licensed facility is never downgraded by an incoming email. The two
-  licence-issuing emails — **Renewal Approved** and **Form I Approved** — surface
-  in the **Ready to license** panel: a renewal is one click; Form I first asks the
-  officer "Is this a Use/Possession licence?" (Yes → Licensed; No → record the
-  actual authorisation type, e.g. Import, without licensing).
+- **Licenses on a confirmed Use/Possession certificate.** When an officer
+  **accepts** an issued ("Licence / Certificate Issued") email that is confirmed
+  to be **Use/Possession**, the facility is set officially **licensed** through
+  the R1–R6 rules (`lib/rules/recordLicence.ts`), which also writes the dated
+  `licenceEvent` that feeds the register's licensed count and the weekly report —
+  no separate "Mark Licensed" step. Every other issued type (import, transfer,
+  transit, variation, …) is recorded as a **standalone authorisation** instead,
+  leaving licensed status untouched. The connector itself still writes nothing —
+  nothing changes silently until an officer accepts — and an already-licensed
+  facility is never downgraded (its renewals stay a manual action). A FORM-I
+  number (`RPA/LIC/####`) must be classified first: only once an officer confirms
+  it is Use/Possession does accepting it license the facility. The **Ready to
+  license** panel remains as a manual fallback for the rare issued email the
+  auto-path cannot record (e.g. one that carried no RAN).
 - **Idempotent:** records are keyed by their workflow RAN, so the same email
   arriving twice updates the same row instead of duplicating it. A re-sent or
   stale email will **not** knock an already-applied (or officer-resolved) item
@@ -189,11 +194,13 @@ email type:
 | **Invoice Request Generator** | — (generic blast, no RAN) | ignored |
 | **…Withdrawal** | not classified | ⏳ queued for an officer to decide |
 
-"Approved" moves the facility's **stage** to *Licence / Certificate Issued*; it
-does **not** flip the facility to officially `licensed` — that stays a deliberate
-action through the R1–R6 rules. New subject phrasings can be added to the `RULES`
-/ `extractFacility` patterns in `lib/rules/parseNotifications.ts`
-(`tests/raisIngest.test.ts` covers the shapes above).
+"Approved" moves the facility's **stage** to *Licence / Certificate Issued*; for
+a confirmed **Use/Possession** application, accepting that email also flips the
+facility to officially `licensed` through the R1–R6 rules (other issued types are
+recorded as standalone authorisations instead). New subject phrasings can be
+added to the `RULES` / `extractFacility` patterns in
+`lib/rules/parseNotifications.ts` (`tests/raisIngest.test.ts` covers the shapes
+above).
 
 ## Local testing with the emulator
 
