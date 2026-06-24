@@ -197,7 +197,8 @@ describe("real RAIS email shapes", () => {
 // ---------------------------------------------------------------------------
 // The two licence-issuing special cases (spec §4) — parsed flag → recordLicence.
 // The connector never flips `licensed`; that happens through R1–R6 when the
-// officer approves in the Ready-to-license panel.
+// officer accepts the issued email (saveLicenceWorkflows licenses a confirmed
+// Use/Possession certificate), with the Ready-to-license panel as a fallback.
 // ---------------------------------------------------------------------------
 
 const weeks: WeekDef[] = [

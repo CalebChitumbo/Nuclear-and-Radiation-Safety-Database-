@@ -136,11 +136,13 @@ export default function LicenceStatusPage() {
     [facilities],
   );
 
-  // Use/Possession applications whose certificate has been issued but whose
-  // facility is not yet officially Licensed — these await the one-click approval
-  // below (R1–R6). Standalone authorisations (import/transit/…) are NOT shown:
-  // they are recorded automatically when their email is accepted, so surfacing
-  // them here too would double-record the authorisation.
+  // Fallback panel: Use/Possession applications whose certificate has been issued
+  // but whose facility is still not Licensed. Accepting a confirmed Use/Possession
+  // certificate now licenses its facility automatically (saveLicenceWorkflows runs
+  // R1–R6), so a row only lands here in the edge case where that could not record
+  // the licence (e.g. the email carried no RAN) — a manual override. Standalone
+  // authorisations (import/transit/…) are NOT shown: they are recorded
+  // automatically on accept, so surfacing them here too would double-record.
   const readyToLicense = useMemo(
     () =>
       (saved ?? []).filter((r) => {
@@ -822,6 +824,17 @@ function IncomingInbox({
     const t = officerTypeFor(r);
     return t ? { ...r, officerType: t } : r;
   };
+  // A confirmed Use/Possession certificate whose facility is not yet Licensed:
+  // accepting it sets the facility Licensed (saveLicenceWorkflows runs R1–R6).
+  const willLicense = (r: LicenceWorkflow): boolean => {
+    if (needsType(r)) return false;
+    if (r.facilityStage !== "Licence / Certificate Issued") return false;
+    if (!isUsePossessionWorkflow(effectiveRow(r))) return false;
+    const f = r.facilityId
+      ? facilities.find((x) => x.id === r.facilityId)
+      : undefined;
+    return !!f && !f.licensed;
+  };
 
   const ready = items.filter((r) => r.facilityId);
   const needs = items.filter((r) => !r.facilityId);
@@ -963,6 +976,15 @@ function IncomingInbox({
                         <div className="text-[11px] text-gunmetal/55 mt-1">
                           Standalone authorisation — recorded on the facility,
                           renewal status unchanged.
+                        </div>
+                      ) : null}
+                      {willLicense(r) ? (
+                        <div
+                          className="text-[11px] mt-1 font-semibold"
+                          style={{ color: "var(--status-ok, #00A050)" }}
+                        >
+                          Use/Possession certificate — accepting sets this
+                          facility Licensed.
                         </div>
                       ) : null}
                     </div>
@@ -1123,12 +1145,15 @@ function defaultLicenceType(r: LicenceWorkflow): LicenceType {
 }
 
 /**
- * Applications whose certificate has been issued (stage "Licence / Certificate
- * Issued") but which are not yet officially Licensed. Approving one records the
- * licence through the R1–R6 rules — the deliberate human step that flips the
- * register, feeds the weekly report, and is never done automatically by email.
+ * Manual-override panel for issued certificates (stage "Licence / Certificate
+ * Issued") whose facility is still not Licensed. Accepting a confirmed
+ * Use/Possession certificate now licenses the facility automatically through the
+ * R1–R6 rules, so this panel is normally empty; it only catches the edge cases
+ * the auto-path skips (e.g. an issued email that carried no RAN to record).
+ * Approving a row records the licence through the same R1–R6 rules, flipping the
+ * register and feeding the weekly report.
  *
- * Two RAIS emails land here as explicit cases (spec §4):
+ * A row can still carry one of the two RAIS issuing specials (§4):
  *  - "renewal-auto" (Renewal Approved): pre-filled as a Use/Possession renewal —
  *    one click sets the facility Licensed.
  *  - "form-i-prompt" (Form I Approved): the type is ambiguous, so the officer is
