@@ -43,6 +43,11 @@ interface FacilityShape {
 
 async function recomputeAggregate() {
   const db = getFirestore();
+  // Stamped BEFORE the register scan starts. Concurrent invocations (e.g. a
+  // bulk approval writing 30 facilities) finish in no guaranteed order, so a
+  // scan that started earlier — and therefore counted an older register —
+  // must never overwrite the result of one that started later.
+  const countedAt = Date.now();
   const snap = await db.collection("facilities").get();
   const byProvince: Record<string, AggBucket> = {};
   for (const p of PROVINCES) byProvince[p] = { total: 0, licensed: 0 };
@@ -70,15 +75,27 @@ async function recomputeAggregate() {
     if (f.stage) byStage[f.stage] = (byStage[f.stage] || 0) + 1;
   });
 
-  await db.doc("aggregates/dashboard").set({
-    total,
-    licensed,
-    unlicensed: total - licensed,
-    auths,
-    bySector,
-    byProvince,
-    byStage,
-    updatedAt: new Date().toISOString(),
+  // Transactional last-count-wins guard: drop this write if a count that
+  // STARTED later has already landed, so the dashboard can't regress to a
+  // stale total until the next facility write.
+  const ref = db.doc("aggregates/dashboard");
+  await db.runTransaction(async (tx) => {
+    const cur = await tx.get(ref);
+    const prev = (cur.exists ? cur.data() : {}) as { countedAt?: number };
+    if (typeof prev.countedAt === "number" && prev.countedAt > countedAt) {
+      return;
+    }
+    tx.set(ref, {
+      total,
+      licensed,
+      unlicensed: total - licensed,
+      auths,
+      bySector,
+      byProvince,
+      byStage,
+      countedAt,
+      updatedAt: new Date().toISOString(),
+    });
   });
 }
 
