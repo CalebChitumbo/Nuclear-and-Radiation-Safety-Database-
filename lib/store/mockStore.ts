@@ -7,6 +7,7 @@ import {
   workflowLicenceType,
 } from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
+import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
   type DashboardAggregate,
@@ -133,16 +134,32 @@ class MockStore implements DataStore {
     return [...ensure().facilities];
   }
 
+  async getFacility(id: string): Promise<Facility | null> {
+    return ensure().facilities.find((f) => f.id === id) || null;
+  }
+
   async listLicenceEvents(): Promise<LicenceEvent[]> {
     return [...ensure().licenceEvents].sort((a, b) =>
       b.date.localeCompare(a.date),
     );
   }
 
+  async listLicenceEventsFor(facilityId: string): Promise<LicenceEvent[]> {
+    return ensure()
+      .licenceEvents.filter((e) => e.facilityId === facilityId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
   async listInspections(): Promise<Inspection[]> {
     return [...ensure().inspections].sort((a, b) =>
       b.date.localeCompare(a.date),
     );
+  }
+
+  async listInspectionsFor(facilityId: string): Promise<Inspection[]> {
+    return ensure()
+      .inspections.filter((i) => i.facilityId === facilityId)
+      .sort((a, b) => b.date.localeCompare(a.date));
   }
 
   async listActivities(): Promise<Activity[]> {
@@ -392,19 +409,40 @@ class MockStore implements DataStore {
 
     // 2. Use/Possession pipeline stage (pre-issuance). The issued case is handled
     //    in step 1, which licenses the facility; here we only roll the in-flight
-    //    renewal stage forward. Standalone authorisations never drive the register
-    //    stage; never downgrade an already-Licensed facility.
-    for (const w of matched) {
-      if (!isUsePossessionWorkflow(w) || needsTypeClassification(w)) continue;
-      const fac = facMap.get(w.facilityId as string);
+    //    renewal stage forward. Mirrors firebaseStore: resolve each touched
+    //    facility's single displayed status from the most recent applicable
+    //    Use/Possession workflow (all stored, including this save), so the result
+    //    is supersede-correct instead of last-saved-wins. Standalone
+    //    authorisations never drive the register stage; never downgrade an
+    //    already-Licensed facility.
+    const upByFacility = new Map<string, LicenceWorkflow[]>();
+    for (const w of s.licenceWorkflows) {
+      if (!w.facilityId || !isUsePossessionWorkflow(w)) continue;
+      if (needsTypeClassification(w)) continue; // unclassified FORM-I: held out
+      const arr = upByFacility.get(w.facilityId) || [];
+      arr.push(w);
+      upByFacility.set(w.facilityId, arr);
+    }
+    const upTouched = new Set(
+      matched
+        .filter((w) => isUsePossessionWorkflow(w) && !needsTypeClassification(w))
+        .map((w) => w.facilityId as string),
+    );
+    for (const facilityId of upTouched) {
+      const fac = facMap.get(facilityId);
       if (!fac || fac.licensed) continue;
-      if (fac.stage !== w.facilityStage || fac.currentStatus !== w.currentStatus) {
-        facMap.set(fac.id, {
+      const resolved = resolveFacilityStatus(upByFacility.get(facilityId) || []);
+      if (!resolved) continue;
+      if (
+        fac.stage !== resolved.stage ||
+        fac.currentStatus !== resolved.currentStatus
+      ) {
+        facMap.set(facilityId, {
           ...fac,
-          stage: w.facilityStage,
-          currentStatus: w.currentStatus,
+          stage: resolved.stage,
+          currentStatus: resolved.currentStatus,
         });
-        dirty.add(fac.id);
+        dirty.add(facilityId);
       }
     }
 
