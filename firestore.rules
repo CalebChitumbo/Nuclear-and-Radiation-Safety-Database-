@@ -21,7 +21,8 @@ service cloud.firestore {
 
     function validFacility(d) {
       return d.name is string && d.name.size() > 0
-        && d.province is string
+        && d.province in ['Lusaka','Copperbelt','North-Western','Central','Northern',
+                          'Luapula','Eastern','Western','Southern','Muchinga']
         && d.sector in ['Public','Private']
         && d.licensed is bool
         && d.stage is string;
@@ -71,15 +72,26 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Weekly manual metrics: any officer may contribute their section's
+    // numbers, but the document must keep its shape and history may not be
+    // deleted by non-admins.
     match /weekMetrics/{week} {
-      allow read:  if signedIn();
-      allow write: if signedIn();
+      allow read:   if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.week == week
+        && request.resource.data.values is map;
+      allow delete: if isAdmin();
     }
 
     match /activities/{id} {
       allow read:   if signedIn();
       allow create: if signedIn() && request.resource.data.updatedBy == request.auth.uid;
-      allow update, delete:
+      // Owners may edit/remove their own entries but never reassign them to
+      // someone else (updatedBy is the audit trail); admins may do anything.
+      allow update:
+        if isAdmin() || (resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedBy == resource.data.updatedBy);
+      allow delete:
         if isAdmin() || resource.data.updatedBy == request.auth.uid;
     }
 
@@ -93,9 +105,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Staff accounts. Role/section here are mirrored into Auth custom claims by
+    // the onUserDocWrite function, so a doc with a missing/invalid pair must
+    // never be writable — it would otherwise flow into someone's token.
     match /users/{uid} {
       allow read:  if isAdmin() || request.auth.uid == uid;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.role in ['admin','officer']
+        && request.resource.data.section in [
+          'Authorisation & Standards','Inspectorate',
+          'Nuclear Safety, Security & Safeguards','National Source Inventory','All'
+        ];
+      allow delete: if isAdmin();
     }
   }
 }

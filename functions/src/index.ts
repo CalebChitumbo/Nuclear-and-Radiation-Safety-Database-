@@ -23,18 +23,10 @@ getFirestore().settings({ ignoreUndefinedProperties: true });
 
 export { ingestRaisEmail } from "./rais/ingest";
 
-const PROVINCES = [
-  "Lusaka",
-  "Copperbelt",
-  "North-Western",
-  "Central",
-  "Northern",
-  "Luapula",
-  "Eastern",
-  "Western",
-  "Southern",
-  "Muchinga",
-] as const;
+// Single source of truth for the province list: lib/rules/types.ts, copied in
+// by functions/scripts/sync-rules.js at build time. A locally re-declared copy
+// here would silently drop a newly added province from the dashboard rollup.
+import { PROVINCES } from "./rais/rules/types";
 
 interface AggBucket {
   total: number;
@@ -142,7 +134,17 @@ export const setUserClaims = onCall(async (request) => {
   let userRecord;
   try {
     userRecord = await auth.getUserByEmail(email);
-  } catch {
+    // Existing account: this call doubles as the admin's "reset password /
+    // rename" path, so apply the submitted credentials rather than silently
+    // dropping them.
+    userRecord = await auth.updateUser(userRecord.uid, {
+      password,
+      displayName: displayName || email,
+    });
+  } catch (err) {
+    // Only a missing account should fall through to creation; anything else
+    // (network, quota, invalid password) must surface to the caller.
+    if ((err as { code?: string }).code !== "auth/user-not-found") throw err;
     userRecord = await auth.createUser({
       email,
       password,
@@ -170,11 +172,18 @@ export const onUserDocWrite = onDocumentWritten(
     const after = event.data?.after?.data() as
       | { role?: string; section?: string }
       | undefined;
-    if (!after) return;
     try {
+      if (!after) {
+        // The user doc was deleted: revoke the mirrored claims so the Auth
+        // account loses all role/section access instead of keeping it forever.
+        await getAuth().setCustomUserClaims(uid, {});
+        return;
+      }
+      // Fail closed: a doc missing role/section must not inherit the broadest
+      // section ("All" passes both isAS() and isInsp() in firestore.rules).
       await getAuth().setCustomUserClaims(uid, {
         role: after.role || "officer",
-        section: after.section || "All",
+        section: after.section || "",
       });
     } catch (err) {
       console.error("Failed to sync custom claims for", uid, err);

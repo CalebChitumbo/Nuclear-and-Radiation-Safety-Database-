@@ -103,12 +103,20 @@ function timingSafeEqualStr(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
+/** Reject Mailgun signatures older than this — bounds replay of a captured request. */
+const MAILGUN_MAX_SKEW_SECONDS = 5 * 60;
+
 /** Mailgun HMAC: signature == HMAC-SHA256(signingKey, timestamp + token). */
 export function verifyMailgunSignature(
   sig: { timestamp?: string; token?: string; signature?: string },
   signingKey: string,
+  nowMs: number = Date.now(),
 ): boolean {
   if (!signingKey || !sig.timestamp || !sig.token || !sig.signature) return false;
+  // Freshness first: a captured signed request must not replay forever.
+  const ts = Number(sig.timestamp);
+  if (!Number.isFinite(ts)) return false;
+  if (Math.abs(nowMs / 1000 - ts) > MAILGUN_MAX_SKEW_SECONDS) return false;
   const expected = createHmac("sha256", signingKey)
     .update(sig.timestamp + sig.token)
     .digest("hex");
@@ -156,6 +164,25 @@ function presentedSecret(req: InboundRequest): string {
   }
 
   return str(req.query.secret).trim() || str(req.body.secret).trim();
+}
+
+/**
+ * Sender allowlist: is `from` (a raw From header, possibly "Name <a@b.c>")
+ * from one of the allowed senders? Entries may be full addresses
+ * ("noreply@rais.rpa.gov.zm") or bare domains ("rais.rpa.gov.zm", which also
+ * admits subdomains). An empty allowlist admits everyone (feature off).
+ */
+export function senderAllowed(from: string, allowlist: string[]): boolean {
+  const entries = allowlist.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!entries.length) return true;
+  const angled = /<([^<>\s]+@[^<>\s]+)>/.exec(from || "");
+  const bare = /([^<>\s"',;]+@[^<>\s"',;]+)/.exec(from || "");
+  const addr = (angled?.[1] || bare?.[1] || "").toLowerCase();
+  if (!addr) return false;
+  const domain = addr.slice(addr.lastIndexOf("@") + 1);
+  return entries.some((e) =>
+    e.includes("@") ? addr === e : domain === e || domain.endsWith(`.${e}`),
+  );
 }
 
 export interface AuthConfig {
