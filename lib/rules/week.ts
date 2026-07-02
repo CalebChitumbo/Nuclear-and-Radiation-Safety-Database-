@@ -12,6 +12,18 @@ export function toISO(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Today as YYYY-MM-DD in LOCAL time. Date inputs default from this — using
+ * toISOString() (UTC) would show yesterday between midnight and 02:00 in
+ * Zambia (UTC+2) and could file a Monday entry into the previous week.
+ */
+export function todayISO(now = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function weekForDate(date: string, weeks: WeekDef[]): WeekDef | null {
   if (!date || weeks.length === 0) return null;
   // Exact containment first — a weekday inside its Mon–Fri window.
@@ -42,7 +54,9 @@ export function weekLabelForDate(
 }
 
 export function currentWeek(weeks: WeekDef[], today = new Date()): WeekDef {
-  const iso = toISO(today);
+  // Local calendar date: the reporting week must roll over at midnight in
+  // Zambia, not at midnight UTC two hours later.
+  const iso = todayISO(today);
   const w = weekForDate(iso, weeks);
   if (w) return w;
   for (let i = weeks.length - 1; i >= 0; i--) {

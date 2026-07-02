@@ -98,11 +98,32 @@ Writes use the Admin SDK and bypass Firestore security rules, so the endpoint
 - **Mailgun HMAC** (optional, recommended for Mailgun) — set the function env
   var `MAILGUN_SIGNING_KEY` to your Mailgun *HTTP webhook signing key*. When set,
   a valid `timestamp`+`token`+`signature` is accepted with no secret in the URL.
+  Signatures older than 5 minutes are rejected, so a captured request cannot be
+  replayed later.
 
   ```bash
   # optional, Mailgun only:
   firebase functions:secrets:set MAILGUN_SIGNING_KEY   # then redeploy
   ```
+
+> Prefer the `X-Webhook-Secret` header (or basic auth) over `?secret=…` where
+> your provider allows it — query strings end up in request logs.
+
+### Optional: restrict which senders are ingested
+
+The provider forwards **every** email delivered to the ingest address. To make
+sure only genuine RAIS notifications can reach the review queue, set the
+function env var `RAIS_ALLOWED_SENDERS` to a comma-separated list of addresses
+and/or domains (a domain also admits its subdomains):
+
+```bash
+# functions/.env or the Functions console:
+RAIS_ALLOWED_SENDERS=rais.rpa.gov.zm,noreply@rpa.gov.zm
+```
+
+Mail from any other sender is acknowledged (HTTP 200, so the provider doesn't
+retry) but ignored, and the rejection is logged. Leave it unset to accept all
+senders (the previous behaviour).
 
 ## 3. Point an inbound-email provider at it
 

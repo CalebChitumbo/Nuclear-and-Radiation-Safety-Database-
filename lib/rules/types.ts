@@ -290,6 +290,13 @@ export interface DashboardAggregate {
   byProvince: Record<Province, { total: number; licensed: number }>;
   byStage: Partial<Record<Stage, number>>;
   updatedAt?: string;
+  /**
+   * Epoch ms taken when the rollup's register scan STARTED, stamped by the
+   * onFacilityWrite Cloud Function. Concurrent recomputes use it as a
+   * last-count-wins guard so an earlier (stale) scan can never overwrite a
+   * later one. Absent on docs written before this guard existed.
+   */
+  countedAt?: number;
 }
 
 export interface UserDoc {

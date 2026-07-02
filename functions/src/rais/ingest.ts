@@ -5,14 +5,15 @@
  * this HTTPS endpoint and forwards every RAIS "assigned data form" notification
  * email to it. We run the SAME parser the Licensing Status tab uses on a manual
  * paste (lib/rules/parseNotifications), match each application to the register,
- * then:
- *   • auto-apply confident facility matches (score ≥ 0.72) — the workflow record
- *     is saved and the matched facility's pipeline stage is rolled forward; and
- *   • queue everything else (weak/no match, unclassifiable) with
- *     reviewStatus = "needs-review" for an officer to confirm on the tab.
+ * and queue every fresh record with reviewStatus = "needs-review" for an
+ * officer to confirm on the tab. The connector NEVER writes to the register
+ * itself — the officer's Accept action does, through the store and the R1–R6
+ * rules — so nothing changes silently.
  *
  * Writes use the Admin SDK (security rules are bypassed), so the endpoint MUST
- * authenticate every request — see isAuthorized() / RAIS_WEBHOOK_SECRET.
+ * authenticate every request — see isAuthorized() / RAIS_WEBHOOK_SECRET. Set
+ * RAIS_ALLOWED_SENDERS (comma-separated addresses or domains) to additionally
+ * reject forwarded mail from unexpected senders.
  */
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -28,7 +29,12 @@ import {
 } from "./rules/parseNotifications";
 import { shouldSupersede } from "./rules/supersede";
 import type { Facility, LicenceWorkflow } from "./rules/types";
-import { isAuthorized, pickEmailText, type InboundRequest } from "./email";
+import {
+  isAuthorized,
+  pickEmailText,
+  senderAllowed,
+  type InboundRequest,
+} from "./email";
 
 /** Shared secret the provider must present. Set with:
  *  firebase functions:secrets:set RAIS_WEBHOOK_SECRET */
@@ -43,11 +49,12 @@ function docId(w: LicenceWorkflow): string {
 
 interface IngestSummary {
   parsed: number;
-  applied: number;
   queued: number;
   skipped: number;
-  facilitiesUpdated: number;
 }
+
+/** Firestore write batches cap at 500 ops; stay safely under it. */
+const BATCH_LIMIT = 450;
 
 async function ingest(text: string, subject: string): Promise<IngestSummary> {
   const db = getFirestore();
@@ -83,16 +90,14 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
     ranMap,
   ).filter((r) => !(r.stage === "Unrecognized" && !r.ran && !r.facilityName));
 
-  const empty: IngestSummary = {
-    parsed: 0,
-    applied: 0,
-    queued: 0,
-    skipped: 0,
-    facilitiesUpdated: 0,
-  };
+  const empty: IngestSummary = { parsed: 0, queued: 0, skipped: 0 };
   if (!records.length) return empty;
 
-  const batch = db.batch();
+  // Batched in chunks: a single Firestore batch caps at 500 ops, and a big
+  // multi-record feed forwarded as one email must not abort wholesale.
+  let batch = db.batch();
+  let batchOps = 0;
+  const batches = [batch];
   const now = new Date().toISOString();
   const summary: IngestSummary = { ...empty, parsed: records.length };
 
@@ -141,6 +146,12 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
     // Everything is queued for the officer to ACCEPT. The connector never writes
     // to the register itself — the accept action does, through the store (and the
     // R1–R6 rules for the two licence-issuing cases). Nothing changes silently.
+    if (batchOps >= BATCH_LIMIT) {
+      batch = db.batch();
+      batches.push(batch);
+      batchOps = 0;
+    }
+    batchOps++;
     batch.set(
       ref,
       {
@@ -157,7 +168,7 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
     summary.queued++;
   });
 
-  await batch.commit();
+  for (const b of batches) await b.commit();
   return summary;
 }
 
@@ -207,7 +218,24 @@ export const ingestRaisEmail = onRequest(
       return;
     }
 
-    const { subject, text } = pickEmailText(inbound.body);
+    const { subject, text, from } = pickEmailText(inbound.body);
+
+    // Optional second gate: the provider forwards EVERY email delivered to the
+    // ingest address, so restrict which senders may feed the register queue.
+    const allowedSenders = (process.env.RAIS_ALLOWED_SENDERS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!senderAllowed(from, allowedSenders)) {
+      logger.warn("ingestRaisEmail: sender not on RAIS_ALLOWED_SENDERS", {
+        from,
+        subject,
+      });
+      // 200 so the provider marks it delivered and does not retry forever.
+      res.status(200).json({ ok: true, ignored: "sender not allowed" });
+      return;
+    }
+
     if (!text) {
       // 200 so the provider marks it delivered and does not retry forever.
       res.status(200).json({ ok: true, ignored: "no readable email body" });

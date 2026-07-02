@@ -42,6 +42,12 @@ export function Bars({ title, rows, max, showCounts = true }: Props) {
               <div
                 className="relative h-2 mt-1 rounded-full overflow-hidden"
                 style={{ background: "rgba(26,27,29,0.06)" }}
+                role="img"
+                aria-label={
+                  r.primary !== undefined
+                    ? `${r.label}: ${r.primary} of ${r.total}`
+                    : `${r.label}: ${r.total}`
+                }
               >
                 <div
                   className="absolute inset-y-0 left-0"

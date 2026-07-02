@@ -13,8 +13,14 @@ import type {
 export interface DataStore {
   ready(): Promise<void>;
   listFacilities(): Promise<Facility[]>;
+  /** One facility by id — a single doc read, not a register scan. */
+  getFacility(id: string): Promise<Facility | null>;
   listLicenceEvents(): Promise<LicenceEvent[]>;
+  /** Events for one facility, newest first (indexed query in Firebase mode). */
+  listLicenceEventsFor(facilityId: string): Promise<LicenceEvent[]>;
   listInspections(): Promise<Inspection[]>;
+  /** Inspections for one facility, newest first (indexed query in Firebase mode). */
+  listInspectionsFor(facilityId: string): Promise<Inspection[]>;
   listActivities(): Promise<Activity[]>;
   listLicenceWorkflows(): Promise<LicenceWorkflow[]>;
   listUsers(): Promise<UserDoc[]>;

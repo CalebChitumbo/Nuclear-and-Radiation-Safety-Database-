@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import { FacilityDrawer } from "@/components/FacilityDrawer";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { StatusPill } from "@/components/StatusPill";
 import { useAuth } from "@/lib/auth";
 import { useStoreData } from "@/lib/storeHooks";
@@ -24,7 +25,10 @@ const PAGE_SIZE = 50;
 
 export default function FacilitiesPage() {
   const { canEditAS } = useAuth();
-  const { data } = useStoreData(async (s) => s.listFacilities(), []);
+  const { data, loading, error, reload } = useStoreData(
+    async (s) => s.listFacilities(),
+    [],
+  );
   const [search, setSearch] = useState("");
   const [province, setProvince] = useState<"" | Province>("");
   const [sector, setSector] = useState<"" | Sector>("");
@@ -33,37 +37,52 @@ export default function FacilitiesPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
-  const facilities: Facility[] = data || [];
+  const facilities: Facility[] = useMemo(() => data || [], [data]);
+  const initialLoading = loading && !data;
+
+  // Normalise each facility's search haystack once per data load, not five
+  // norm() calls per facility per keystroke.
+  const indexed = useMemo(
+    () =>
+      facilities.map((f) => ({
+        f,
+        hay: [
+          f.nameLower,
+          norm(f.practice),
+          norm(f.district),
+          norm(f.facCode),
+          ...(f.auths || []).map((a) => norm(a.number)),
+        ].join(" "),
+      })),
+    [facilities],
+  );
 
   const filtered = useMemo(() => {
     const q = norm(search);
-    return facilities.filter((f) => {
-      if (province && f.province !== province) return false;
-      if (sector && f.sector !== sector) return false;
-      if (statusFilter === "licensed" && !f.licensed) return false;
-      if (statusFilter === "unlicensed" && f.licensed) return false;
-      if (!q) return true;
-      const hay = [
-        f.nameLower,
-        norm(f.practice),
-        norm(f.district),
-        norm(f.facCode),
-        ...(f.auths || []).map((a) => norm(a.number)),
-      ].join(" ");
-      return hay.includes(q);
-    });
-  }, [facilities, search, province, sector, statusFilter]);
+    return indexed
+      .filter(({ f, hay }) => {
+        if (province && f.province !== province) return false;
+        if (sector && f.sector !== sector) return false;
+        if (statusFilter === "licensed" && !f.licensed) return false;
+        if (statusFilter === "unlicensed" && f.licensed) return false;
+        return !q || hay.includes(q);
+      })
+      .map(({ f }) => f);
+  }, [indexed, search, province, sector, statusFilter]);
 
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
+  const openFacility = useCallback((id: string) => setOpenId(id), []);
 
   return (
     <div className="space-y-4 staggered">
+      {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
       <div className="card p-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
-          <label className="caps text-[10px] text-gunmetal/60">
-            Search ({filtered.length} of {facilities.length})
+          <label htmlFor="facility-search" className="caps text-[10px] text-gunmetal/60">
+            Search ({initialLoading ? "…" : `${filtered.length} of ${facilities.length}`})
           </label>
           <input
+            id="facility-search"
             className="input mt-1"
             placeholder="name, practice, district, FAC, licence number…"
             value={search}
@@ -115,6 +134,7 @@ export default function FacilitiesPage() {
             {(["all", "licensed", "unlicensed"] as Filter[]).map((f) => (
               <button
                 key={f}
+                aria-pressed={statusFilter === f}
                 onClick={() => {
                   setStatusFilter(f);
                   setPage(0);
@@ -154,11 +174,7 @@ export default function FacilitiesPage() {
             </thead>
             <tbody>
               {visible.map((f) => (
-                <FacilityRow
-                  key={f.id}
-                  f={f}
-                  onOpen={() => setOpenId(f.id)}
-                />
+                <FacilityRow key={f.id} f={f} onOpen={openFacility} />
               ))}
               {visible.length === 0 ? (
                 <tr>
@@ -166,7 +182,9 @@ export default function FacilitiesPage() {
                     colSpan={7}
                     className="px-4 py-10 text-center text-gunmetal/55"
                   >
-                    No facilities match these filters.
+                    {initialLoading
+                      ? "Loading the register…"
+                      : "No facilities match these filters."}
                   </td>
                 </tr>
               ) : null}
@@ -188,13 +206,26 @@ export default function FacilitiesPage() {
   );
 }
 
-function FacilityRow({ f, onOpen }: { f: Facility; onOpen: () => void }) {
+const FacilityRow = memo(function FacilityRow({
+  f,
+  onOpen,
+}: {
+  f: Facility;
+  onOpen: (id: string) => void;
+}) {
   const otherAuths = (f.auths || []).filter((a) => !isUseP(a.type));
   const usePAuths = (f.auths || []).filter((a) => isUseP(a.type));
+  // Auths are appended chronologically — show the newest licence number, not
+  // the original seeded one.
+  const latestUseP = usePAuths[usePAuths.length - 1];
   return (
     <tr
       className="border-t border-gunmetal/8 hover:bg-mist cursor-pointer transition-colors"
-      onClick={onOpen}
+      onClick={() => onOpen(f.id)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onOpen(f.id);
+      }}
     >
       <td className="px-4 py-3">
         <div className="font-bold">{f.name}</div>
@@ -216,7 +247,7 @@ function FacilityRow({ f, onOpen }: { f: Facility; onOpen: () => void }) {
         {f.licensed ? (
           <div>
             <div className="text-sm font-bold text-[var(--rpa-green-dark)]">
-              {usePAuths[0]?.number || "Licensed"}
+              {latestUseP?.number || "Licensed"}
             </div>
             {otherAuths.length > 0 ? (
               <AuthBadge
@@ -253,7 +284,7 @@ function FacilityRow({ f, onOpen }: { f: Facility; onOpen: () => void }) {
       </td>
     </tr>
   );
-}
+});
 
 function AuthBadge({
   count,

@@ -12,7 +12,6 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 
 import { getFirebaseAuth, isMockMode } from "./firebase";
-import { mockStore } from "./store/mockStore";
 import type { Role, Section, UserDoc } from "./rules/types";
 
 interface AuthState {
@@ -96,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (isMockMode) {
+      const { mockStore } = await import("./store/mockStore");
       const users = await mockStore.listUsers();
       const match = users.find(
         (u) => u.email.toLowerCase() === email.toLowerCase(),

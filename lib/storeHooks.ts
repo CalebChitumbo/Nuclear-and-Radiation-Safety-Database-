@@ -13,9 +13,15 @@ import type { DataStore } from "./store/types";
 export function useStoreData<T>(
   loader: (s: DataStore) => Promise<T>,
   deps: unknown[] = [],
-): { data: T | null; loading: boolean; reload: () => void } {
+): {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+  reload: () => void;
+} {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -26,9 +32,15 @@ export function useStoreData<T>(
       const value = await loader(s);
       if (!cancelled) {
         setData(value);
+        setError(null);
         setLoading(false);
       }
-    })().catch(() => !cancelled && setLoading(false));
+    })().catch((e: unknown) => {
+      if (cancelled) return;
+      // Keep any previously loaded data on screen; report why the refresh failed.
+      setError(e instanceof Error ? e.message : "Failed to load data.");
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -47,5 +59,5 @@ export function useStoreData<T>(
     }
   }, []);
 
-  return { data, loading, reload: () => setTick((t) => t + 1) };
+  return { data, loading, error, reload: () => setTick((t) => t + 1) };
 }

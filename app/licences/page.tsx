@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
 import {
@@ -15,6 +16,10 @@ import {
 } from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
+// The register's licence history starts well after 2000 — stepping the year
+// selector below this only ever yields empty results.
+const MIN_YEAR = 2000;
+const AUTH_PAGE_SIZE = 50;
 
 // Compact chip/column labels for the long official type names.
 const SHORT_TYPE: Partial<Record<LicenceType, string>> = {
@@ -63,12 +68,16 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
 }
 
 export default function LicencesPage() {
-  const { data, loading } = useStoreData(async (s) => s.listFacilities(), []);
+  const { data, loading, error, reload } = useStoreData(
+    async (s) => s.listFacilities(),
+    [],
+  );
   const [year, setYear] = useState(CURRENT_YEAR);
   // The itemized table's filters: a licence type, or the "standalone" / "use" /
   // "all" groupings; plus a free-text search.
   const [typeFilter, setTypeFilter] = useState<string>("standalone");
   const [authSearch, setAuthSearch] = useState("");
+  const [page, setPage] = useState(0);
 
   const stats = useMemo(
     () => (data ? computeLicenceStats(data, year) : null),
@@ -97,9 +106,16 @@ export default function LicencesPage() {
     });
   }, [authRows, typeFilter, authSearch]);
 
-  if (loading || !stats) {
-    return <div className="caps text-xs text-gunmetal/60">Loading…</div>;
+  if (!stats) {
+    return error ? (
+      <LoadErrorBanner error={error} onRetry={reload} />
+    ) : (
+      <div className="caps text-xs text-gunmetal/60">Loading…</div>
+    );
   }
+
+  // The auth log is append-only and already 500+ rows; render it in pages.
+  const visibleAuthRows = filteredAuthRows.slice(0, (page + 1) * AUTH_PAGE_SIZE);
 
   // Filter chips: "All standalone" + each non-Use/Possession type that has at
   // least one record, then Use/Possession and All-types escape hatches.
@@ -145,8 +161,9 @@ export default function LicencesPage() {
           <span className="caps text-[10px] text-gunmetal/60">Licence year</span>
           <div className="inline-flex items-center rounded-lg border border-gunmetal/10 overflow-hidden">
             <button
-              className="px-3 py-2 text-sm font-bold"
+              className="px-3 py-2 text-sm font-bold disabled:opacity-30"
               onClick={() => setYear((y) => y - 1)}
+              disabled={year <= MIN_YEAR}
               aria-label="Previous year"
             >
               ‹
@@ -209,8 +226,12 @@ export default function LicencesPage() {
           <input
             className="input max-w-[260px]"
             placeholder="facility, number, FAC…"
+            aria-label="Search authorisations"
             value={authSearch}
-            onChange={(e) => setAuthSearch(e.target.value)}
+            onChange={(e) => {
+              setAuthSearch(e.target.value);
+              setPage(0);
+            }}
           />
         </div>
 
@@ -220,7 +241,11 @@ export default function LicencesPage() {
             return (
               <button
                 key={c.key}
-                onClick={() => setTypeFilter(c.key)}
+                aria-pressed={active}
+                onClick={() => {
+                  setTypeFilter(c.key);
+                  setPage(0);
+                }}
                 className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors"
                 style={{
                   background: active ? "var(--rpa-green)" : "transparent",
@@ -256,7 +281,7 @@ export default function LicencesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAuthRows.map((r, i) => (
+                {visibleAuthRows.map((r, i) => (
                   <tr
                     key={`${r.facilityId}-${r.number || "x"}-${i}`}
                     className="border-t border-gunmetal/8 align-top"
@@ -288,6 +313,17 @@ export default function LicencesPage() {
                 ))}
               </tbody>
             </table>
+            {visibleAuthRows.length < filteredAuthRows.length ? (
+              <div className="p-3 text-center border-t border-gunmetal/10">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Load more ({filteredAuthRows.length - visibleAuthRows.length}{" "}
+                  remaining)
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

@@ -25,6 +25,11 @@ export default function SettingsPage() {
         "application/json",
       );
       toast.push("Full data export downloaded.", "success");
+    } catch (err) {
+      toast.push(
+        `Export failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -42,6 +47,11 @@ export default function SettingsPage() {
         "text/csv",
       );
       toast.push("Register CSV downloaded.", "success");
+    } catch (err) {
+      toast.push(
+        `Export failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -60,6 +70,11 @@ export default function SettingsPage() {
         "application/vnd.ms-excel",
       );
       toast.push("Register spreadsheet downloaded.", "success");
+    } catch (err) {
+      toast.push(
+        `Export failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -131,8 +146,8 @@ export default function SettingsPage() {
                 </span>
                 <button
                   className="btn btn-danger"
-                  onClick={() => {
-                    resetMockStore();
+                  onClick={async () => {
+                    await resetMockStore();
                     toast.push("Mock data reset to seed.", "success");
                     setConfirmReset(false);
                   }}

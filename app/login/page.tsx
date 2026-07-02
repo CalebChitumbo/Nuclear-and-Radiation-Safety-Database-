@@ -77,7 +77,9 @@ export default function LoginPage() {
             />
           </div>
           {error ? (
-            <div className="chip red w-full justify-center">{error}</div>
+            <div role="alert" className="chip red w-full justify-center">
+              {error}
+            </div>
           ) : null}
           <button
             type="submit"

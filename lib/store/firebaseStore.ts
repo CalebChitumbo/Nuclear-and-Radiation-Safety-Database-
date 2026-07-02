@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -66,14 +67,17 @@ class FirebaseStore implements DataStore {
     requireDb();
   }
 
-  private async cacheable<T>(_key: string, loader: () => Promise<T>): Promise<T> {
-    return loader();
-  }
-
   async listFacilities(): Promise<Facility[]> {
     const db = requireDb();
     const snap = await getDocs(collection(db, "facilities"));
     return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Facility, "id">) }));
+  }
+
+  async getFacility(id: string): Promise<Facility | null> {
+    const db = requireDb();
+    const snap = await getDoc(doc(db, "facilities", id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...(snap.data() as Omit<Facility, "id">) };
   }
 
   async listLicenceEvents(): Promise<LicenceEvent[]> {
@@ -84,12 +88,38 @@ class FirebaseStore implements DataStore {
       .sort((a, b) => b.date.localeCompare(a.date));
   }
 
+  async listLicenceEventsFor(facilityId: string): Promise<LicenceEvent[]> {
+    const db = requireDb();
+    // Backed by the (facilityId ASC, date DESC) composite index.
+    const snap = await getDocs(
+      query(
+        collection(db, "licenceEvents"),
+        where("facilityId", "==", facilityId),
+        orderBy("date", "desc"),
+      ),
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<LicenceEvent, "id">) }));
+  }
+
   async listInspections(): Promise<Inspection[]> {
     const db = requireDb();
     const snap = await getDocs(collection(db, "inspections"));
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<Inspection, "id">) }))
       .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async listInspectionsFor(facilityId: string): Promise<Inspection[]> {
+    const db = requireDb();
+    // Backed by the (facilityId ASC, date DESC) composite index.
+    const snap = await getDocs(
+      query(
+        collection(db, "inspections"),
+        where("facilityId", "==", facilityId),
+        orderBy("date", "desc"),
+      ),
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Inspection, "id">) }));
   }
 
   async listActivities(): Promise<Activity[]> {

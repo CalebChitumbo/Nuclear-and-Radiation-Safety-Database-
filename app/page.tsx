@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bars } from "@/components/Bars";
 import { Gauge } from "@/components/Gauge";
 import { Kpi } from "@/components/Kpi";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
@@ -23,21 +24,25 @@ interface FeedItem {
 export default function DashboardPage() {
   const { selected } = useWeek();
 
-  const { data, loading } = useStoreData(
-    async (s) => {
-      const [agg, facilities, events, inspections] = await Promise.all([
-        s.getAggregate(),
-        s.listFacilities(),
-        s.listLicenceEvents(),
-        s.listInspections(),
-      ]);
-      return { agg, facilities, events, inspections };
-    },
-    [selected.label],
-  );
+  // The week filter below is applied client-side, so the loader doesn't depend
+  // on the selected week — refetching four collections on every week change
+  // was wasted Firestore reads.
+  const { data, error, reload } = useStoreData(async (s) => {
+    const [agg, facilities, events, inspections] = await Promise.all([
+      s.getAggregate(),
+      s.listFacilities(),
+      s.listLicenceEvents(),
+      s.listInspections(),
+    ]);
+    return { agg, facilities, events, inspections };
+  }, []);
 
-  if (loading || !data) {
-    return <div className="caps text-xs text-gunmetal/60">Loading…</div>;
+  if (!data) {
+    return error ? (
+      <LoadErrorBanner error={error} onRetry={reload} />
+    ) : (
+      <div className="caps text-xs text-gunmetal/60">Loading…</div>
+    );
   }
 
   const { agg, events, inspections, facilities } = data;

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { isMockMode } from "@/lib/firebase";
 import {
@@ -17,7 +18,11 @@ import {
 export default function AdminUsersPage() {
   const { isAdmin } = useAuth();
   const toast = useToast();
-  const { data, reload } = useStoreData(async (s) => s.listUsers(), []);
+  // Don't fire a (rules-denied) users-collection read for non-admins.
+  const { data, loading, error, reload } = useStoreData(
+    async (s) => (isAdmin ? s.listUsers() : []),
+    [isAdmin],
+  );
 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -27,6 +32,7 @@ export default function AdminUsersPage() {
   );
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [togglingUid, setTogglingUid] = useState<string | null>(null);
 
   if (!isAdmin) {
     return (
@@ -163,9 +169,10 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
       <div className="card overflow-hidden">
         <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-          Staff accounts ({data?.length || 0})
+          Staff accounts ({loading && !data ? "…" : data?.length || 0})
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -200,10 +207,23 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="px-5 py-2 text-right">
                   <button
+                    disabled={togglingUid === u.uid}
                     onClick={async () => {
-                      const s = await store();
-                      await s.setUserDisabled(u.uid, !u.disabled);
-                      reload();
+                      setTogglingUid(u.uid);
+                      try {
+                        const s = await store();
+                        await s.setUserDisabled(u.uid, !u.disabled);
+                        reload();
+                      } catch (err) {
+                        toast.push(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to update the account.",
+                          "error",
+                        );
+                      } finally {
+                        setTogglingUid(null);
+                      }
                     }}
                     className="text-xs caps font-bold"
                     style={{

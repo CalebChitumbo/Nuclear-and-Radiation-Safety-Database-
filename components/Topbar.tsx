@@ -7,6 +7,7 @@ import { useWeek } from "@/lib/weekContext";
 const TITLES: Record<string, string> = {
   "/": "Overview",
   "/facilities": "Facilities Register",
+  "/licences": "Licences & Authorisations",
   "/licence-status": "Licensing Status",
   "/bulk-approval": "Bulk Approval",
   "/inspections": "Inspections",
