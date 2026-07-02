@@ -53,6 +53,20 @@ export function Sidebar({
 
   const showCollapsed = isDesktop && collapsed;
 
+  // Escape closes the mobile drawer; while it is closed off-canvas its
+  // controls must not be reachable (hidden nav links could otherwise be
+  // tabbed into — including "Sign out").
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onMobileClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen, onMobileClose]);
+
+  const offCanvas = !isDesktop && !mobileOpen;
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -75,10 +89,15 @@ export function Sidebar({
         className={`no-print fixed inset-y-0 left-0 z-50 flex flex-col text-white lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        aria-hidden={offCanvas}
         style={{
           background: "#1A1B1D",
           width: showCollapsed ? 72 : 248,
-          transition: "width 0.18s ease, transform 0.24s ease",
+          // visibility transitions discretely at the end, so the slide-out
+          // animation still plays before the drawer is hidden.
+          transition: "width 0.18s ease, transform 0.24s ease, visibility 0.24s",
+          // Keep the off-canvas drawer out of the tab order and hit-testing.
+          visibility: offCanvas ? "hidden" : "visible",
         }}
       >
         <div className="px-4 py-5 flex items-center gap-3">

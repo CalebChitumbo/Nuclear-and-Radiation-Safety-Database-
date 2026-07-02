@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "./Drawer";
 import { StatusPill } from "./StatusPill";
 import { useAuth } from "@/lib/auth";
-import { useWeek } from "@/lib/weekContext";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { detectType } from "@/lib/rules/detectType";
@@ -26,35 +25,51 @@ interface Props {
 
 export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
   const { user, canEditAS } = useAuth();
-  const { weeks } = useWeek();
   const toast = useToast();
   const [facility, setFacility] = useState<Facility | null>(null);
   const [events, setEvents] = useState<LicenceEvent[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [number, setNumber] = useState("");
   const [type, setType] = useState<LicenceType>("New Use/Possession Licence");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [autoType, setAutoType] = useState(true);
+
+  // Targeted reads: one facility doc + its own events/inspections (indexed
+  // queries in Firebase mode) instead of downloading three whole collections.
+  const loadFacility = useCallback(async (id: string) => {
+    const s = await store();
+    return Promise.all([
+      s.getFacility(id),
+      s.listLicenceEventsFor(id),
+      s.listInspectionsFor(id),
+    ]);
+  }, []);
 
   useEffect(() => {
     if (!facilityId) {
       setFacility(null);
       return;
     }
-    (async () => {
-      const s = await store();
-      const [facs, evs, ins] = await Promise.all([
-        s.listFacilities(),
-        s.listLicenceEvents(),
-        s.listInspections(),
-      ]);
-      const f = facs.find((x) => x.id === facilityId) || null;
-      setFacility(f);
-      setEvents(evs.filter((e) => e.facilityId === facilityId));
-      setInspections(ins.filter((i) => i.facilityId === facilityId));
-    })();
-  }, [facilityId]);
+    // Cancellation guard: switching facilities quickly must not let the slower,
+    // stale response win (the drawer's actions key off facility.id).
+    let cancelled = false;
+    loadFacility(facilityId)
+      .then(([f, evs, ins]) => {
+        if (cancelled) return;
+        setFacility(f);
+        setEvents(evs);
+        setInspections(ins);
+      })
+      .catch(() => {
+        if (!cancelled) toast.push("Failed to load facility.", "error");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facilityId, loadFacility]);
 
   // Auto-detect from number as user types.
   useEffect(() => {
@@ -81,52 +96,74 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
       : "Will set this facility to Licensed."
     : "Recorded as an authorisation the facility holds. Licensing status will not change.";
 
+  const refresh = async (id: string) => {
+    const [f, evs, ins] = await loadFacility(id);
+    setFacility(f);
+    setEvents(evs);
+    setInspections(ins);
+  };
+
   const submit = async () => {
-    if (!facility || !user) return;
-    const s = await store();
-    await s.recordLicences(
-      [
-        {
-          facilityId: facility.id,
-          number,
-          type,
-          date,
-        },
-      ],
-      user.uid,
-    );
-    toast.push(
-      `Authorisation recorded for ${facility.name}.`,
-      "success",
-    );
-    setNumber("");
-    setAdding(false);
-    setAutoType(true);
-    onChanged?.();
-    // Reload local
-    const updated = (await s.listFacilities()).find((f) => f.id === facility.id);
-    if (updated) setFacility(updated);
-    setEvents(await (await s.listLicenceEvents()).filter((e) => e.facilityId === facility.id));
+    // Busy-guard: a double-click on Record must not log the same licence
+    // event (and weekly count) twice.
+    if (!facility || !user || busy) return;
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.recordLicences(
+        [
+          {
+            facilityId: facility.id,
+            number,
+            type,
+            date,
+          },
+        ],
+        user.uid,
+      );
+      toast.push(`Authorisation recorded for ${facility.name}.`, "success");
+      setNumber("");
+      setAdding(false);
+      setAutoType(true);
+      onChanged?.();
+      await refresh(facility.id);
+    } catch (err) {
+      toast.push(
+        `Recording failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const overrideStatus = async (licensed: boolean) => {
-    if (!facility || !user) return;
-    const s = await store();
-    await s.updateFacility(
-      facility.id,
-      {
-        licensed,
-        stage: licensed ? "Licensed" : "No Application Submitted",
-      },
-      user.uid,
-    );
-    toast.push(
-      `Status set to ${licensed ? "Licensed" : "Unlicensed"} (manual override).`,
-      "default",
-    );
-    onChanged?.();
-    const updated = (await s.listFacilities()).find((f) => f.id === facility.id);
-    if (updated) setFacility(updated);
+    if (!facility || !user || busy) return;
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.updateFacility(
+        facility.id,
+        {
+          licensed,
+          stage: licensed ? "Licensed" : "No Application Submitted",
+        },
+        user.uid,
+      );
+      toast.push(
+        `Status set to ${licensed ? "Licensed" : "Unlicensed"} (manual override).`,
+        "default",
+      );
+      onChanged?.();
+      await refresh(facility.id);
+    } catch (err) {
+      toast.push(
+        `Status change failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -270,6 +307,7 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
                   {canEditAS ? (
                     <button
                       className="btn btn-secondary"
+                      disabled={busy}
                       onClick={() => overrideStatus(!facility.licensed)}
                       title="Manual status override (R6 — no event recorded)"
                     >
@@ -333,8 +371,12 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
                 </div>
                 <div className="text-xs text-gunmetal/65">{effectNote}</div>
                 <div className="flex gap-2">
-                  <button className="btn btn-primary" onClick={submit}>
-                    Record
+                  <button
+                    className="btn btn-primary"
+                    disabled={busy}
+                    onClick={submit}
+                  >
+                    {busy ? "Recording…" : "Record"}
                   </button>
                   <button
                     className="btn btn-ghost"

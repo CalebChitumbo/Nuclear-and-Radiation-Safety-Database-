@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { cloneElement, useEffect, useId, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
@@ -45,6 +45,16 @@ export function AddFacilityDialog({
   const [facCode, setFacCode] = useState(initialFacCode ?? "");
   const [busy, setBusy] = useState(false);
 
+  // Escape closes the dialog, matching the Drawer this modal is styled after.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const submit = async () => {
@@ -78,6 +88,13 @@ export function AddFacilityDialog({
       setFacCode("");
       setLicensed(false);
       setStage("No Application Submitted");
+    } catch (err) {
+      // Without this the rejection was unhandled: the dialog silently stayed
+      // open and the officer had no idea the facility was never created.
+      toast.push(
+        `Could not add the facility: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -85,11 +102,20 @@ export function AddFacilityDialog({
 
   return (
     <>
-      <div className="drawer-overlay" onClick={onClose} />
-      <div className="drawer p-6 space-y-4">
+      <div className="drawer-overlay" onClick={onClose} aria-hidden="true" />
+      <div
+        className="drawer p-6 space-y-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add facility"
+      >
         <header className="flex items-center justify-between">
           <h2 className="text-lg font-black">Add facility</h2>
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button
+            className="btn btn-ghost"
+            onClick={onClose}
+            aria-label="Close dialog"
+          >
             ✕
           </button>
         </header>
@@ -200,15 +226,19 @@ function FormField({
 }: {
   label: string;
   required?: boolean;
-  children: React.ReactNode;
+  children: React.ReactElement<{ id?: string }>;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="caps text-[10px] text-gunmetal/60">
+      <label htmlFor={id} className="caps text-[10px] text-gunmetal/60">
         {label}
         {required ? " *" : ""}
       </label>
-      <div className="mt-1">{children}</div>
+      <div className="mt-1">
+        {/* Associate the single form control with its label for screen readers. */}
+        {cloneElement(children, { id })}
+      </div>
     </div>
   );
 }

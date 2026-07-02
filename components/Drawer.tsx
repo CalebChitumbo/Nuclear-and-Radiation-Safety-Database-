@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface Props {
   open: boolean;
@@ -11,6 +11,8 @@ interface Props {
 }
 
 export function Drawer({ open, onClose, title, children, footer }: Props) {
+  const panelRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -19,6 +21,15 @@ export function Drawer({ open, onClose, title, children, footer }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Move focus into the dialog on open and hand it back on close, so keyboard
+  // users aren't left tabbing through the page behind an aria-modal panel.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => previous?.focus();
+  }, [open]);
 
   if (!open) return null;
 
@@ -30,6 +41,8 @@ export function Drawer({ open, onClose, title, children, footer }: Props) {
         aria-hidden="true"
       />
       <aside
+        ref={panelRef}
+        tabIndex={-1}
         className="drawer"
         role="dialog"
         aria-modal="true"

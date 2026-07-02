@@ -5,10 +5,11 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { norm } from "@/lib/rules/matching";
-import { weekLabelForDate } from "@/lib/rules/week";
+import { todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
@@ -21,7 +22,7 @@ export default function InspectionsPage() {
   const { user, canEditInsp } = useAuth();
   const { weeks } = useWeek();
   const toast = useToast();
-  const { data, reload } = useStoreData(async (s) => {
+  const { data, error, reload } = useStoreData(async (s) => {
     const [facilities, inspections] = await Promise.all([
       s.listFacilities(),
       s.listInspections(),
@@ -32,15 +33,22 @@ export default function InspectionsPage() {
   const [facilityQuery, setFacilityQuery] = useState("");
   const [facilityId, setFacilityId] = useState<string | null>(null);
   const [facilityNameFreeText, setFacilityNameFreeText] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayISO());
   const [type, setType] = useState<InspectionType>("Routine Inspection");
   const [outcome, setOutcome] = useState<InspectionOutcome>("Compliant");
   const [notes, setNotes] = useState("");
   const [filter, setFilter] = useState<InspectionType | "">("");
   const [busy, setBusy] = useState(false);
 
-  const facilities = data?.facilities || [];
-  const inspections = data?.inspections || [];
+  const facilities = useMemo(() => data?.facilities || [], [data]);
+  const inspections = useMemo(() => data?.inspections || [], [data]);
+
+  // Where this date will land in the reporting calendar — a 2025 typo would
+  // otherwise be silently filed into the earliest 2026 week.
+  const targetWeek = useMemo(
+    () => weekLabelForDate(date, weeks, ""),
+    [date, weeks],
+  );
 
   const suggestions = useMemo(() => {
     if (!facilityQuery.trim()) return [];
@@ -86,6 +94,11 @@ export default function InspectionsPage() {
       setFacilityNameFreeText("");
       setFacilityId(null);
       reload();
+    } catch (err) {
+      toast.push(
+        `Logging the inspection failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -93,6 +106,7 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-4 staggered">
+      {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
       {canEditInsp ? (
         <div className="card p-5">
           <div className="caps text-xs text-gunmetal/60 mb-3">
@@ -149,6 +163,9 @@ export default function InspectionsPage() {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
+              <div className="text-[11px] text-gunmetal/55 mt-1">
+                Lands in: <strong>{targetWeek || "(no week match)"}</strong>
+              </div>
             </div>
             <div>
               <label className="caps text-[10px] text-gunmetal/60">Type</label>
@@ -211,6 +228,7 @@ export default function InspectionsPage() {
             ] as Array<"" | InspectionType>).map((t) => (
               <button
                 key={t || "all"}
+                aria-pressed={filter === t}
                 onClick={() => setFilter(t)}
                 className="px-3 py-1.5 text-xs caps font-bold"
                 style={{

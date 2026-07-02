@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { deriveWeekly } from "@/lib/rules/weeklyDerivation";
@@ -29,7 +30,7 @@ export default function WeeklyPage() {
   const { selected } = useWeek();
   const toast = useToast();
 
-  const { data, reload } = useStoreData(
+  const { data, error, reload } = useStoreData(
     async (s) => {
       const [events, inspections, activities, metrics] = await Promise.all([
         s.listLicenceEvents(),
@@ -42,8 +43,15 @@ export default function WeeklyPage() {
     [selected.label],
   );
 
-  if (!data) {
-    return <div className="caps text-xs text-gunmetal/60">Loading…</div>;
+  // Gate on the metrics payload actually belonging to the selected week —
+  // otherwise switching weeks briefly shows the old week's figures under the
+  // new week's heading while the refetch is in flight.
+  if (!data || (data.metrics.week ?? selected.label) !== selected.label) {
+    return error ? (
+      <LoadErrorBanner error={error} onRetry={reload} />
+    ) : (
+      <div className="caps text-xs text-gunmetal/60">Loading…</div>
+    );
   }
 
   const wkEvents = data.events.filter((e) => e.week === selected.label);
@@ -61,9 +69,16 @@ export default function WeeklyPage() {
   );
 
   const onManualChange = async (key: string, value: number) => {
-    const s = await store();
-    await s.setWeekMetricValue(selected.label, key, value);
-    reload();
+    try {
+      const s = await store();
+      await s.setWeekMetricValue(selected.label, key, value);
+      reload();
+    } catch (err) {
+      toast.push(
+        `Saving the metric failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
   };
 
   const generateBrief = () => {
@@ -189,15 +204,10 @@ function SectionTable({
                 {m.auto ? (
                   <span className="font-black">{m.value}</span>
                 ) : (
-                  <input
-                    type="number"
-                    min={0}
-                    className="input text-right"
-                    style={{ maxWidth: 100, marginLeft: "auto" }}
+                  <MetricInput
+                    label={m.label}
                     value={m.value}
-                    onChange={(e) =>
-                      onManualChange(m.key, Number(e.target.value) || 0)
-                    }
+                    onCommit={(v) => onManualChange(m.key, v)}
                   />
                 )}
               </td>
@@ -225,6 +235,54 @@ function SectionTable({
   );
 }
 
+/**
+ * Manual metric cell with local draft state, persisted on blur / Enter.
+ * Binding the input straight to the store value made multi-digit numbers
+ * untypable: every keystroke triggered an async write + full reload and the
+ * controlled input reverted to the stale value before the next keypress.
+ */
+function MetricInput({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(String(value));
+  }, [value, editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const n = Number(draft);
+    const v = Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    setDraft(String(v));
+    if (v !== value) onCommit(v);
+  };
+
+  return (
+    <input
+      type="number"
+      min={0}
+      className="input text-right"
+      style={{ maxWidth: 100, marginLeft: "auto" }}
+      aria-label={label}
+      value={draft}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
+}
+
 function ActivitiesPanel({
   weekLabel,
   activities,
@@ -241,19 +299,31 @@ function ActivitiesPanel({
   const [status, setStatus] = useState<Activity["status"]>("In Progress");
   const toast = useToast();
 
+  const [busy, setBusy] = useState(false);
+
   const add = async () => {
-    if (!text.trim()) return;
-    const s = await store();
-    await s.addActivity({
-      week: weekLabel,
-      section,
-      text: text.trim(),
-      status,
-      updatedBy: uid,
-    });
-    setText("");
-    toast.push("Activity added.", "success");
-    onReload();
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.addActivity({
+        week: weekLabel,
+        section,
+        text: text.trim(),
+        status,
+        updatedBy: uid,
+      });
+      setText("");
+      toast.push("Activity added.", "success");
+      onReload();
+    } catch (err) {
+      toast.push(
+        `Adding the activity failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -295,8 +365,8 @@ function ActivitiesPanel({
             ))}
           </select>
         </div>
-        <button className="btn btn-primary" onClick={add}>
-          Add
+        <button className="btn btn-primary" onClick={add} disabled={busy}>
+          {busy ? "Adding…" : "Add"}
         </button>
       </div>
       <table className="w-full text-sm">
@@ -332,9 +402,16 @@ function ActivitiesPanel({
                 <button
                   className="text-xs caps font-bold text-[var(--status-stalled)]"
                   onClick={async () => {
-                    const s = await store();
-                    await s.deleteActivity(a.id);
-                    onReload();
+                    try {
+                      const s = await store();
+                      await s.deleteActivity(a.id);
+                      onReload();
+                    } catch (err) {
+                      toast.push(
+                        `Removing failed: ${err instanceof Error ? err.message : err}`,
+                        "error",
+                      );
+                    }
                   }}
                 >
                   Remove

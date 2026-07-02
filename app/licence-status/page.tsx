@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { isMockMode } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { FacilitySelect } from "@/components/FacilitySelect";
+import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import {
@@ -18,6 +21,7 @@ import {
   type WorkflowReport,
 } from "@/lib/rules/parseNotifications";
 import { detectType } from "@/lib/rules/detectType";
+import { todayISO } from "@/lib/rules/week";
 import {
   isAmbiguousLicenceRan,
   isUsePossessionWorkflow,
@@ -103,18 +107,23 @@ function FamilyChip({ row }: { row: LicenceWorkflow }) {
 export default function LicenceStatusPage() {
   const { user, canEditAS } = useAuth();
   const toast = useToast();
-  const { data: facilities } = useStoreData(
+  const { data: facilities, error: facError, reload: reloadFacs } = useStoreData(
     async (s) => s.listFacilities(),
     [],
   );
-  const { data: saved, reload } = useStoreData(
+  const { data: saved, error: savedError, reload } = useStoreData(
     async (s) => s.listLicenceWorkflows(),
     [],
   );
 
-  const [text, setText] = useState(SAMPLE);
+  // Demo feed only in mock mode — a production paste box must not ship
+  // pre-filled with fabricated notifications one stray click could save.
+  const [text, setText] = useState(isMockMode ? SAMPLE : "");
   const [rows, setRows] = useState<LicenceWorkflow[] | null>(null);
   const [committing, setCommitting] = useState(false);
+  // In-flight guard shared by every accept/approve action: a double-click must
+  // not record the same licence event or authorisation twice.
+  const [saving, setSaving] = useState(false);
   // An inbox row the officer is turning into a brand-new register facility.
   const [addingFor, setAddingFor] = useState<LicenceWorkflow | null>(null);
 
@@ -159,9 +168,13 @@ export default function LicenceStatusPage() {
 
   // Parsed-then-linked records once Analyze is clicked; otherwise the persisted
   // set so the board/table survive reloads. Queued (needs-review) items live in
-  // their own panel, not the board, until an officer applies them.
-  const records =
-    rows ?? (saved ?? []).filter((r) => r.reviewStatus !== "needs-review");
+  // their own panel, not the board, until an officer applies them. Memoized —
+  // a fresh array identity here would defeat the buildReport memo and recompute
+  // the whole report on every textarea keystroke.
+  const records = useMemo(
+    () => rows ?? (saved ?? []).filter((r) => r.reviewStatus !== "needs-review"),
+    [rows, saved],
+  );
   const report: WorkflowReport | null = useMemo(
     () => (records.length ? buildReport(records) : null),
     [records],
@@ -172,7 +185,8 @@ export default function LicenceStatusPage() {
     facilityId: string | null,
     officerType?: LicenceType,
   ) => {
-    if (!user) return;
+    if (!user || saving) return;
+    setSaving(true);
     const f = facilityId
       ? (facilities || []).find((x) => x.id === facilityId)
       : undefined;
@@ -200,6 +214,8 @@ export default function LicenceStatusPage() {
         `Could not apply: ${err instanceof Error ? err.message : err}`,
         "error",
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -210,7 +226,8 @@ export default function LicenceStatusPage() {
     type: LicenceType,
     date: string,
   ) => {
-    if (!user || !row.facilityId) return;
+    if (!user || !row.facilityId || saving) return;
+    setSaving(true);
     try {
       const s = await store();
       const res = await s.recordLicences(
@@ -229,11 +246,19 @@ export default function LicenceStatusPage() {
         `Could not record licence: ${err instanceof Error ? err.message : err}`,
         "error",
       );
+    } finally {
+      setSaving(false);
     }
   };
 
   const analyze = () => {
     const parsed = parseNotifications(text);
+    if (!parsed.length) {
+      // Keep the saved pipeline view — replacing it with an empty dirty state
+      // would blank the board for a bad paste.
+      toast.push("Nothing recognised in the pasted text.", "error");
+      return;
+    }
     // Match by name first, then rescue RAN-only notifications using the register
     // and everything already imported (the "remembered" RAN → facility links).
     const ranMap = addWorkflowsToRanMap(
@@ -254,20 +279,17 @@ export default function LicenceStatusPage() {
         : r,
     );
     setRows(withTypes);
-    if (!parsed.length) {
-      toast.push("Nothing recognised in the pasted text.", "error");
-    } else {
-      toast.push(
-        `Parsed ${parsed.length} applications from the dashboard.`,
-        "success",
-      );
-    }
+    toast.push(
+      `Parsed ${parsed.length} applications from the dashboard.`,
+      "success",
+    );
   };
 
   // Accept every recognised (facility-matched) incoming email at once — rolls
   // each one's status onto its facility in the register.
   const acceptAllReady = async (readyItems: LicenceWorkflow[]) => {
-    if (!user || !readyItems.length) return;
+    if (!user || !readyItems.length || saving) return;
+    setSaving(true);
     const recs: LicenceWorkflow[] = readyItems.map((row) => ({
       ...row,
       reviewStatus: "applied",
@@ -286,6 +308,8 @@ export default function LicenceStatusPage() {
         `Could not apply: ${err instanceof Error ? err.message : err}`,
         "error",
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -340,10 +364,21 @@ export default function LicenceStatusPage() {
 
   return (
     <div className="space-y-4 staggered">
+      {facError || savedError ? (
+        <LoadErrorBanner
+          error={facError || savedError || ""}
+          onRetry={() => {
+            reloadFacs();
+            reload();
+          }}
+        />
+      ) : null}
+
       {/* The inbox — incoming RAIS emails, each with its status, ready to accept */}
       <IncomingInbox
         items={needsReview}
         facilities={facilities || []}
+        busy={saving}
         onAccept={applyReviewed}
         onAcceptAllReady={acceptAllReady}
         onAddFacility={setAddingFor}
@@ -363,7 +398,11 @@ export default function LicenceStatusPage() {
 
       {/* The two licence-issuing emails (§4): confirm the type, record via R1–R6 */}
       {readyToLicense.length ? (
-        <ReadyToLicense items={readyToLicense} onApprove={approveLicence} />
+        <ReadyToLicense
+          items={readyToLicense}
+          busy={saving}
+          onApprove={approveLicence}
+        />
       ) : null}
 
       {/* Manual paste + full pipeline board — secondary, tucked behind a disclosure */}
@@ -622,36 +661,22 @@ function ReviewTable({
   editable: boolean;
   onChange: (id: string, patch: Partial<LicenceWorkflow>) => void;
 }) {
-  const facOptions = facilities.slice(0, 300);
-
   // The register-match control is shared between the desktop table and the
   // mobile card list so editing behaves identically on every screen size.
   const renderMatch = (r: LicenceWorkflow) =>
     editable ? (
-      <select
-        className="input"
-        value={r.facilityId || ""}
-        onChange={(e) => {
-          const id = e.target.value;
-          const f = facilities.find((x) => x.id === id);
+      <FacilitySelect
+        facilities={facilities}
+        value={r.facilityId}
+        onChange={(id) => {
+          const f = id ? facilities.find((x) => x.id === id) : undefined;
           onChange(r.id, {
-            facilityId: id || null,
+            facilityId: id,
             facilityName: f ? f.name : r.facilityName,
             facCode: f ? f.facCode : r.facCode,
           });
         }}
-      >
-        <option value="">— no match —</option>
-        {/* keep the matched facility visible even past the cap */}
-        {r.facilityId && !facOptions.some((f) => f.id === r.facilityId) ? (
-          <option value={r.facilityId}>{r.facilityName}</option>
-        ) : null}
-        {facOptions.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
+      />
     ) : r.facilityId ? (
       <span className="chip green">matched</span>
     ) : (
@@ -787,12 +812,14 @@ function ReviewTable({
 function IncomingInbox({
   items,
   facilities,
+  busy,
   onAccept,
   onAcceptAllReady,
   onAddFacility,
 }: {
   items: LicenceWorkflow[];
   facilities: Facility[];
+  busy: boolean;
   onAccept: (
     row: LicenceWorkflow,
     facilityId: string | null,
@@ -801,7 +828,6 @@ function IncomingInbox({
   onAcceptAllReady: (rows: LicenceWorkflow[]) => void;
   onAddFacility: (row: LicenceWorkflow) => void;
 }) {
-  const facOptions = facilities.slice(0, 400);
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [pickedType, setPickedType] = useState<Record<string, LicenceType>>({});
   const choiceFor = (r: LicenceWorkflow) => picked[r.id] ?? (r.facilityId || "");
@@ -826,13 +852,15 @@ function IncomingInbox({
   };
   // A confirmed Use/Possession certificate whose facility is not yet Licensed:
   // accepting it sets the facility Licensed (saveLicenceWorkflows runs R1–R6).
+  // Evaluated against the facility the officer has CURRENTLY picked (the
+  // "wrong facility?" re-pick), not the original match — the banner must
+  // describe what Accept will actually do.
   const willLicense = (r: LicenceWorkflow): boolean => {
     if (needsType(r)) return false;
     if (r.facilityStage !== "Licence / Certificate Issued") return false;
     if (!isUsePossessionWorkflow(effectiveRow(r))) return false;
-    const f = r.facilityId
-      ? facilities.find((x) => x.id === r.facilityId)
-      : undefined;
+    const id = choiceFor(r);
+    const f = id ? facilities.find((x) => x.id === id) : undefined;
     return !!f && !f.licensed;
   };
 
@@ -921,7 +949,7 @@ function IncomingInbox({
           <div className="flex flex-col items-end gap-1 shrink-0">
             <button
               className="btn btn-primary"
-              disabled={ready.every((r) => needsType(r))}
+              disabled={busy || ready.every((r) => needsType(r))}
               onClick={() =>
                 onAcceptAllReady(
                   ready
@@ -931,7 +959,9 @@ function IncomingInbox({
                 )
               }
             >
-              Accept all recognised ({ready.filter((r) => !needsType(r)).length})
+              {busy
+                ? "Applying…"
+                : `Accept all recognised (${ready.filter((r) => !needsType(r)).length})`}
             </button>
             {ready.some((r) => needsType(r)) ? (
               <span className="text-[11px] text-gunmetal/55">
@@ -991,7 +1021,7 @@ function IncomingInbox({
                     <div className="flex gap-2 shrink-0">
                       <button
                         className="btn btn-primary"
-                        disabled={needsType(r)}
+                        disabled={busy || needsType(r)}
                         title={
                           needsType(r)
                             ? "Choose the FORM-I application type first"
@@ -1003,6 +1033,7 @@ function IncomingInbox({
                       </button>
                       <button
                         className="btn btn-ghost"
+                        disabled={busy}
                         onClick={() => onAccept(r, null)}
                       >
                         Dismiss
@@ -1014,22 +1045,15 @@ function IncomingInbox({
                     <summary className="text-[11px] text-gunmetal/50 cursor-pointer">
                       wrong facility?
                     </summary>
-                    <select
+                    <FacilitySelect
                       className="input mt-1"
-                      value={choice}
-                      onChange={(e) =>
-                        setPicked((p) => ({ ...p, [r.id]: e.target.value }))
+                      facilities={facilities}
+                      value={choice || null}
+                      emptyLabel="— pick the facility —"
+                      onChange={(id) =>
+                        setPicked((p) => ({ ...p, [r.id]: id || "" }))
                       }
-                    >
-                      {choice && !facOptions.some((f) => f.id === choice) ? (
-                        <option value={choice}>{r.facilityName}</option>
-                      ) : null}
-                      {facOptions.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </details>
                 </div>
               );
@@ -1081,24 +1105,18 @@ function IncomingInbox({
                       <div className="caps text-[10px] text-gunmetal/50 mb-1">
                         Match to register
                       </div>
-                      <select
-                        className="input"
-                        value={choice}
-                        onChange={(e) =>
-                          setPicked((p) => ({ ...p, [r.id]: e.target.value }))
+                      <FacilitySelect
+                        facilities={facilities}
+                        value={choice || null}
+                        emptyLabel="— no match (dismiss) —"
+                        onChange={(id) =>
+                          setPicked((p) => ({ ...p, [r.id]: id || "" }))
                         }
-                      >
-                        <option value="">— no match (dismiss) —</option>
-                        {facOptions.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <button
                       className="btn btn-primary"
-                      disabled={!!choice && needsType(r)}
+                      disabled={busy || (!!choice && needsType(r))}
                       title={
                         choice && needsType(r)
                           ? "Choose the FORM-I application type first"
@@ -1162,12 +1180,14 @@ function defaultLicenceType(r: LicenceWorkflow): LicenceType {
  */
 function ReadyToLicense({
   items,
+  busy,
   onApprove,
 }: {
   items: LicenceWorkflow[];
+  busy: boolean;
   onApprove: (row: LicenceWorkflow, type: LicenceType, date: string) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const [picks, setPicks] = useState<
     Record<string, { type: LicenceType; date: string; useP?: boolean }>
   >({});
@@ -1278,9 +1298,14 @@ function ReadyToLicense({
                 </div>
                 <button
                   className="btn btn-primary"
+                  disabled={busy}
                   onClick={() => onApprove(r, effectiveType, pick.date)}
                 >
-                  {isUseP(effectiveType) ? "Mark Licensed" : "Record authorisation"}
+                  {busy
+                    ? "Recording…"
+                    : isUseP(effectiveType)
+                      ? "Mark Licensed"
+                      : "Record authorisation"}
                 </button>
               </div>
             </div>

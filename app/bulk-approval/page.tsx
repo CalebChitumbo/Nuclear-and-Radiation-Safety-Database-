@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
+import { isMockMode } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { FacilitySelect } from "@/components/FacilitySelect";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { detectType } from "@/lib/rules/detectType";
 import { classifyMatch, matchOne, parseBulkLine } from "@/lib/rules/matching";
-import { weekLabelForDate } from "@/lib/rules/week";
+import { todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
   isUseP,
   LICENCE_TYPES,
@@ -50,10 +52,14 @@ export default function BulkApprovalPage() {
     [],
   );
 
+  // Demo lines only in mock mode: a production paste box must never ship
+  // pre-filled with fake licences one stray "Commit" would record.
   const [text, setText] = useState(
-    "Friends Care Medical Centre | AUTH/USE.REN/0781\nHitachi Construction Machinery Zambia Limited | AUTH/IMP/0150\nBrand New Medical Center | AUTH/USE.NEW/0900",
+    isMockMode
+      ? "Friends Care Medical Centre | AUTH/USE.REN/0781\nHitachi Construction Machinery Zambia Limited | AUTH/IMP/0150\nBrand New Medical Center | AUTH/USE.NEW/0900"
+      : "",
   );
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayISO());
   const [defaultType, setDefaultType] = useState<LicenceType>(
     "New Use/Possession Licence",
   );
@@ -110,18 +116,24 @@ export default function BulkApprovalPage() {
     setSummary(null);
   };
 
-  const updateRow = (idx: number, patch: Partial<ReviewRow>) => {
+  const updateRow = useCallback((idx: number, patch: Partial<ReviewRow>) => {
     setRows((r) =>
       r.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
     );
-  };
+  }, []);
 
   const commit = async () => {
     if (!user) return;
     setCommitting(true);
     try {
+      // An "include" row without a matched facility must never commit — with
+      // facilityId null and no draft it would create a blank-named facility.
       const inputs = rows
-        .filter((r) => r.decision !== "skip")
+        .filter(
+          (r) =>
+            r.decision === "create" ||
+            (r.decision === "include" && r.matchId),
+        )
         .map((r) => ({
           facilityId: r.decision === "create" ? null : r.matchId,
           number: r.number,
@@ -141,10 +153,10 @@ export default function BulkApprovalPage() {
 
       const s = await store();
       const result = await s.recordLicences(inputs, user.uid);
-      const skipped = rows.filter((r) => r.decision === "skip").length;
+      const skipped = rows.length - inputs.length;
       setSummary({ ...result.summary, skipped });
       toast.push(
-        `${inputs.length} licences recorded → register & week ${targetWeek || "—"} updated.`,
+        `${result.eventIds.length} licences recorded → register & week ${targetWeek || "—"} updated.`,
         "success",
       );
       setRows([]);
@@ -252,9 +264,10 @@ export default function BulkApprovalPage() {
                 {rows.map((r, i) => (
                   <ReviewRowEditor
                     key={i}
+                    index={i}
                     row={r}
                     facilities={facilities || []}
-                    onChange={(p) => updateRow(i, p)}
+                    onChangeRow={updateRow}
                   />
                 ))}
               </tbody>
@@ -325,15 +338,18 @@ function effectFor(type: LicenceType, fac: Facility | null, isCreate: boolean): 
   return { label: "→ authorisation only", variant: "slate" };
 }
 
-function ReviewRowEditor({
+const ReviewRowEditor = memo(function ReviewRowEditor({
+  index,
   row,
   facilities,
-  onChange,
+  onChangeRow,
 }: {
+  index: number;
   row: ReviewRow;
   facilities: Facility[];
-  onChange: (p: Partial<ReviewRow>) => void;
+  onChangeRow: (idx: number, p: Partial<ReviewRow>) => void;
 }) {
+  const onChange = (p: Partial<ReviewRow>) => onChangeRow(index, p);
   const fac = row.matchId
     ? facilities.find((f) => f.id === row.matchId) || null
     : null;
@@ -341,15 +357,6 @@ function ReviewRowEditor({
   const confidencePct = (row.score * 100).toFixed(0);
   const confidenceLabel =
     classifyMatch(row.score) === "auto" ? "Auto" : "Likely";
-
-  // The dropdown caps rendered options for performance, but the matched
-  // facility may sit beyond that cap — without its <option> the <select> would
-  // wrongly display "— no match —". Always include the matched facility so the
-  // selection it found is actually shown.
-  const facOptions =
-    fac && !facilities.slice(0, 250).some((f) => f.id === fac.id)
-      ? [fac, ...facilities.slice(0, 250)]
-      : facilities.slice(0, 250);
 
   return (
     <tr className="border-t border-gunmetal/8 align-top">
@@ -397,8 +404,9 @@ function ReviewRowEditor({
                 ))}
               </select>
               <input
-                className="input col-span-2"
+                className="input"
                 placeholder="Practice"
+                aria-label="Practice"
                 value={row.createDraft?.practice}
                 onChange={(e) =>
                   onChange({
@@ -409,30 +417,40 @@ function ReviewRowEditor({
                   })
                 }
               />
+              <input
+                className="input"
+                placeholder="District"
+                aria-label="District"
+                value={row.createDraft?.district}
+                onChange={(e) =>
+                  onChange({
+                    createDraft: {
+                      ...(row.createDraft as ReviewRow["createDraft"])!,
+                      district: e.target.value,
+                    },
+                  })
+                }
+              />
             </div>
           </div>
         ) : (
           <div>
-            <select
-              className="input"
-              value={row.matchId || ""}
-              onChange={(e) => {
-                const id = e.target.value;
-                const m = facilities.find((f) => f.id === id);
+            <FacilitySelect
+              facilities={facilities}
+              value={row.matchId}
+              onChange={(id) => {
+                const m = id ? facilities.find((f) => f.id === id) : undefined;
                 onChange({
-                  matchId: id || null,
+                  matchId: id,
                   matchName: m ? m.name : "",
                   score: 1,
+                  // An include-row stripped of its match must not stay
+                  // committable — it would create a blank facility.
+                  decision:
+                    !id && row.decision === "include" ? "skip" : row.decision,
                 });
               }}
-            >
-              <option value="">— no match —</option>
-              {facOptions.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+            />
             <div className="text-xs text-gunmetal/60 mt-1">
               {row.matchName ? (
                 <>
@@ -506,7 +524,7 @@ function ReviewRowEditor({
       </td>
     </tr>
   );
-}
+});
 
 function SummaryCell({
   label,

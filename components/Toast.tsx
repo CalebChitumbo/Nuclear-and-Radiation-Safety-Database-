@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,14 +24,24 @@ const Ctx = createContext<ToastCtx | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
+  const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  // Clear pending dismiss timers on unmount — they would otherwise call
+  // setItems on an unmounted provider.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach(clearTimeout);
+  }, []);
 
   const push = useCallback(
     (message: string, variant: ToastItem["variant"] = "default") => {
       const id = Math.random().toString(36).slice(2);
       setItems((cur) => [...cur, { id, message, variant }]);
-      setTimeout(() => {
+      const t = setTimeout(() => {
+        timers.current.delete(t);
         setItems((cur) => cur.filter((i) => i.id !== id));
       }, 4200);
+      timers.current.add(t);
     },
     [],
   );
