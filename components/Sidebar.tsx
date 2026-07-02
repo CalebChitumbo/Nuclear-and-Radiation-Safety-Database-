@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/auth";
+import { useStoreData } from "@/lib/storeHooks";
+import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 
 const NAV = [
   { href: "/", label: "Overview", icon: "▣" },
@@ -14,6 +16,7 @@ const NAV = [
   { href: "/licence-status", label: "Licensing Status", icon: "◑" },
   { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
   { href: "/inspections", label: "Inspections", icon: "✶" },
+  { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },
   { href: "/weekly", label: "Weekly Report", icon: "◷" },
 ];
 
@@ -37,7 +40,19 @@ export function Sidebar({
   onMobileClose: () => void;
 }) {
   const pathname = usePathname();
-  const { isAdmin, signOut, user } = useAuth();
+  const { isAdmin, signOut, user, canEditAS, canEditInsp } = useAuth();
+
+  // A small badge on the Inspection Requests link surfaces the cross-section
+  // handoff: new requests for the Inspectorate, reports ready for Licensing.
+  const { data: inbox } = useStoreData(
+    async (s) =>
+      deriveInspectionInbox(await s.listInspectionRequests(), {
+        canEditAS,
+        canEditInsp,
+      }),
+    [canEditAS, canEditInsp],
+  );
+  const inspectionBadge = inbox?.count || 0;
 
   // Collapsing to the icon rail is a desktop-only affordance. On phones and
   // tablets the drawer always shows the full navigation, so the narrow rail
@@ -129,6 +144,9 @@ export function Sidebar({
               collapsed={showCollapsed}
               icon={n.icon}
               label={n.label}
+              badge={
+                n.href === "/inspection-requests" ? inspectionBadge : undefined
+              }
               onNavigate={onMobileClose}
             />
           ))}
@@ -221,6 +239,7 @@ function NavLink({
   icon,
   label,
   collapsed,
+  badge,
   onNavigate,
 }: {
   href: string;
@@ -228,13 +247,15 @@ function NavLink({
   icon: string;
   label: string;
   collapsed: boolean;
+  badge?: number;
   onNavigate?: () => void;
 }) {
+  const hasBadge = typeof badge === "number" && badge > 0;
   return (
     <Link
       href={href}
       onClick={onNavigate}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-colors"
+      className="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-colors"
       style={{
         background: active ? "rgba(0,160,80,0.18)" : "transparent",
         color: active ? "#FFFFFF" : "rgba(247,244,236,0.78)",
@@ -242,10 +263,25 @@ function NavLink({
       }}
       title={collapsed ? label : undefined}
     >
-      <span className="text-base" aria-hidden="true">
+      <span className="relative text-base" aria-hidden="true">
         {icon}
+        {collapsed && hasBadge ? (
+          <span
+            className="absolute -top-1.5 -right-2 w-2 h-2 rounded-full"
+            style={{ background: "#E0A32E" }}
+          />
+        ) : null}
       </span>
-      {!collapsed ? <span>{label}</span> : null}
+      {!collapsed ? <span className="flex-1">{label}</span> : null}
+      {!collapsed && hasBadge ? (
+        <span
+          className="text-[10px] font-black tabular rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
+          style={{ background: "#E0A32E", color: "#1A1B1D" }}
+          aria-label={`${badge} needing attention`}
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }

@@ -168,6 +168,7 @@ automatically (Production for the production branch, Preview for others).
 | `facilities/{id}` | Master register row — projection of all licences held by that facility |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
 | `inspections/{id}` | The dated inspection log |
+| `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
@@ -249,17 +250,63 @@ computes it; the Overview surfaces a summary.
 
 ---
 
+## Inspectorate ↔ Licensing integration
+
+Licensing (Authorisation & Standards) and the Inspectorate now share one workflow
+for the inspections a licence depends on — typically the **pre-authorisation
+inspection** a facility needs before its licence can be issued. It closes the
+loop that used to happen over email/phone: a request is raised, worked, reported
+and actioned, all on one tracked record.
+
+**The handoff** (`/inspection-requests`, `lib/rules/inspectionRequests.ts`):
+
+1. **Licensing raises a request** — from the Inspection Requests board or straight
+   from a facility's drawer ("Request pre-authorisation inspection"). It captures
+   the facility, type, priority, an optional linked application RAN and a needed-by
+   date. The request opens in **Requested**.
+2. **The Inspectorate picks it up** — the board shows an amber badge and an
+   "incoming requests" banner. An inspector **acknowledges** it (→ Acknowledged),
+   **assigns** a named inspector and target date (→ Assigned), and **starts** it
+   (→ In Progress).
+3. **The inspection is completed** — the inspector records the outcome, the
+   **report reference** (a RAIS ref or a document link) and any findings. This
+   moves the request to **Report Ready**, and — the key integration — records a
+   dated `inspection` in the Inspectorate's log (linked by `inspectionId`/
+   `requestId`) so the weekly report and the "inspections conducted" totals pick
+   it up automatically.
+4. **Licensing is notified and actions it** — a green "reports ready" signal
+   surfaces for A&S. The officer opens the request, follows the report reference,
+   and **closes** it once the licensing step is actioned (→ Closed). Either side
+   can **cancel** while active, and both can **comment** — every action is written
+   to the request's timeline, so the conversation and history live on the record.
+
+**The state machine** (`Requested → Acknowledged → Assigned → In Progress →
+Report Ready → Closed`, plus `Cancelled`), the capability gating (who may take
+which action), the two cross-section **inbox notifications** that drive the
+sidebar badge, and the summary stats are all pure and unit-tested in
+`tests/inspectionRequests.test.ts`. The store's `updateInspectionRequest` applies
+a transition and, on completion, writes the dated inspection atomically.
+
+Security rules let **either** section write an `inspectionRequests` document
+(they collaborate on the same record) behind a shape check; deletes stay
+admin-only. The Overview and the Inspections page surface the resulting totals,
+and the facility drawer lists every request a facility has had.
+
+---
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-53 tests across `lib/rules/*` and the seed baseline:
+205 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
 - `recordLicence` — full R1–R6 worked expectation
+- `inspectionRequests` — request state machine, capability gating, inbox
+  notifications and stats for the Inspectorate ↔ Licensing handoff
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
@@ -278,7 +325,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
 │   ├── bulk-approval/      Paste → match → review → commit
-│   ├── inspections/
+│   ├── inspections/        Inspection log + "conducted" totals
+│   ├── inspection-requests/ Licensing ↔ Inspectorate pre-auth handoff board
 │   ├── weekly/             Weekly sectional report
 │   ├── admin/users/
 │   └── settings/

@@ -6,9 +6,14 @@ import { Bars } from "@/components/Bars";
 import { Gauge } from "@/components/Gauge";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { useAuth } from "@/lib/auth";
 import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
+import {
+  deriveInspectionInbox,
+  inspectionRequestStats,
+} from "@/lib/rules/inspectionRequests";
 import { LICENCE_TYPES, PROVINCES, STAGES, isUseP } from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -23,18 +28,20 @@ interface FeedItem {
 
 export default function DashboardPage() {
   const { selected } = useWeek();
+  const { canEditAS, canEditInsp } = useAuth();
 
   // The week filter below is applied client-side, so the loader doesn't depend
-  // on the selected week — refetching four collections on every week change
+  // on the selected week — refetching the collections on every week change
   // was wasted Firestore reads.
   const { data, error, reload } = useStoreData(async (s) => {
-    const [agg, facilities, events, inspections] = await Promise.all([
+    const [agg, facilities, events, inspections, requests] = await Promise.all([
       s.getAggregate(),
       s.listFacilities(),
       s.listLicenceEvents(),
       s.listInspections(),
+      s.listInspectionRequests(),
     ]);
-    return { agg, facilities, events, inspections };
+    return { agg, facilities, events, inspections, requests };
   }, []);
 
   if (!data) {
@@ -45,8 +52,13 @@ export default function DashboardPage() {
     );
   }
 
-  const { agg, events, inspections, facilities } = data;
+  const { agg, events, inspections, facilities, requests } = data;
   const coverage = agg.total ? (agg.licensed / agg.total) * 100 : 0;
+  const inspectionInbox = deriveInspectionInbox(requests, {
+    canEditAS,
+    canEditInsp,
+  });
+  const requestStats = inspectionRequestStats(requests, CURRENT_YEAR);
   const licence = computeLicenceStats(facilities, CURRENT_YEAR);
   const issuedTypeRows = LICENCE_TYPES.map((t) => ({
     type: t,
@@ -153,6 +165,60 @@ export default function DashboardPage() {
               Bulk approve
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Licensing ↔ Inspectorate handoff */}
+      <section className="card p-5">
+        <div className="flex items-baseline justify-between mb-3">
+          <div className="caps text-xs text-gunmetal/60">
+            Inspectorate ↔ Licensing workflow
+          </div>
+          <Link
+            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
+            href="/inspection-requests"
+          >
+            Open requests
+          </Link>
+        </div>
+        {inspectionInbox.count > 0 ? (
+          <div className="text-sm mb-3">
+            <span className="chip amber mr-2">{inspectionInbox.count}</span>
+            <span className="text-gunmetal/75">
+              {canEditInsp && inspectionInbox.incoming.length > 0
+                ? `${inspectionInbox.incoming.length} new request${
+                    inspectionInbox.incoming.length === 1 ? "" : "s"
+                  } awaiting the Inspectorate`
+                : null}
+              {canEditInsp &&
+              canEditAS &&
+              inspectionInbox.incoming.length > 0 &&
+              inspectionInbox.reportsReady.length > 0
+                ? " · "
+                : null}
+              {canEditAS && inspectionInbox.reportsReady.length > 0
+                ? `${inspectionInbox.reportsReady.length} report${
+                    inspectionInbox.reportsReady.length === 1 ? "" : "s"
+                  } ready to action`
+                : null}
+            </span>
+          </div>
+        ) : null}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MiniStat label="Open requests" value={requestStats.open} />
+          <MiniStat
+            label="Awaiting Inspectorate"
+            value={inspectionInbox.incoming.length}
+          />
+          <MiniStat
+            label="In progress"
+            value={inspectionInbox.inProgress.length}
+          />
+          <MiniStat
+            label="Reports ready"
+            value={requestStats.reportsReady}
+            accent
+          />
         </div>
       </section>
 
@@ -304,6 +370,29 @@ export default function DashboardPage() {
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-gunmetal/10 p-3">
+      <div
+        className={`text-2xl font-black tabular ${
+          accent ? "text-[var(--rpa-green-dark)]" : ""
+        }`}
+      >
+        {value}
+      </div>
+      <div className="caps text-[10px] text-gunmetal/60 mt-0.5">{label}</div>
     </div>
   );
 }

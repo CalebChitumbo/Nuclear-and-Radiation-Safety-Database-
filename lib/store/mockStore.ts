@@ -1,6 +1,13 @@
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import {
+  applyInspectionRequestAction,
+  buildInspectionRequest,
+  type InspectionRequestAction,
+  type NewInspectionRequestInput,
+  type RequestActor,
+} from "../rules/inspectionRequests";
+import {
   isUsePossessionWorkflow,
   needsTypeClassification,
   workflowIssueDate,
@@ -13,6 +20,7 @@ import {
   type DashboardAggregate,
   type Facility,
   type Inspection,
+  type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
@@ -33,6 +41,7 @@ interface State {
   facilities: Facility[];
   licenceEvents: LicenceEvent[];
   inspections: Inspection[];
+  inspectionRequests: InspectionRequest[];
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
@@ -44,6 +53,7 @@ function freshState(): State {
     facilities: mapAllSeed(facilitiesSeed as SeedFacility[]),
     licenceEvents: [],
     inspections: [],
+    inspectionRequests: [],
     activities: [],
     licenceWorkflows: [],
     weekMetrics: {},
@@ -85,6 +95,8 @@ function load(): State {
     const parsed = JSON.parse(raw) as State;
     // Back-compat: stores saved before the Licensing Status tab lack this array.
     if (!parsed.licenceWorkflows) parsed.licenceWorkflows = [];
+    // Back-compat: stores saved before the inspection-request workflow existed.
+    if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
     return parsed;
   } catch {
     return freshState();
@@ -339,6 +351,84 @@ class MockStore implements DataStore {
     return ins;
   }
 
+  async listInspectionRequests(): Promise<InspectionRequest[]> {
+    return [...ensure().inspectionRequests].sort((a, b) =>
+      (b.requestedAt || "").localeCompare(a.requestedAt || ""),
+    );
+  }
+
+  async listInspectionRequestsFor(
+    facilityId: string,
+  ): Promise<InspectionRequest[]> {
+    return ensure()
+      .inspectionRequests.filter((r) => r.facilityId === facilityId)
+      .sort((a, b) => (b.requestedAt || "").localeCompare(a.requestedAt || ""));
+  }
+
+  async addInspectionRequest(
+    input: NewInspectionRequestInput,
+    actor: RequestActor,
+  ): Promise<InspectionRequest> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    const week = weekLabelForDate(now.slice(0, 10), weeksSeed as WeekDef[], "");
+    const draft = buildInspectionRequest(input, actor, now, week);
+    const request: InspectionRequest = { ...draft, id: newId("insreq") };
+    s.inspectionRequests.push(request);
+    save(s);
+    dispatchChange();
+    return request;
+  }
+
+  async updateInspectionRequest(
+    id: string,
+    action: InspectionRequestAction,
+    actor: RequestActor,
+  ): Promise<InspectionRequest> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    const current = s.inspectionRequests.find((r) => r.id === id);
+    if (!current) throw new Error("Inspection request not found.");
+
+    let updated = applyInspectionRequestAction(current, action, actor, now);
+
+    // Completing a request records the dated Inspection it produced, so the
+    // Inspectorate's "inspections conducted" log and the weekly report stay in
+    // one place. Link it back onto the request.
+    if (action.kind === "complete") {
+      const week = weekLabelForDate(
+        action.completedDate,
+        weeksSeed as WeekDef[],
+        "",
+      );
+      const inspection: Inspection = {
+        id: newId("insp"),
+        date: action.completedDate,
+        week,
+        facilityId: current.facilityId,
+        facilityName: current.facilityName,
+        type: current.type,
+        outcome: action.outcome,
+        province: current.province,
+        sector: current.sector,
+        notes:
+          action.findings?.trim() ||
+          `Pre-authorisation inspection for ${current.facilityName}.`,
+        requestId: id,
+        createdAt: now,
+      };
+      s.inspections.push(inspection);
+      updated = { ...updated, inspectionId: inspection.id };
+    }
+
+    s.inspectionRequests = s.inspectionRequests.map((r) =>
+      r.id === id ? updated : r,
+    );
+    save(s);
+    dispatchChange();
+    return updated;
+  }
+
   async saveLicenceWorkflows(
     items: LicenceWorkflow[],
     uid: string,
@@ -536,6 +626,7 @@ class MockStore implements DataStore {
       facilities: s.facilities,
       licenceEvents: s.licenceEvents,
       inspections: s.inspections,
+      inspectionRequests: s.inspectionRequests,
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,

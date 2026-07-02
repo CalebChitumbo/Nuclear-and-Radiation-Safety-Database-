@@ -42,6 +42,14 @@ service cloud.firestore {
         && d.outcome in ['Compliant','Minor findings','Major findings','Non-compliant','N/A'];
     }
 
+    function validInspectionRequest(d) {
+      return d.facilityName is string && d.facilityName.size() > 0
+        && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
+        && d.status in ['Requested','Acknowledged','Assigned','In Progress',
+                        'Report Ready','Closed','Cancelled']
+        && d.timeline is list;
+    }
+
     match /facilities/{id} {
       allow read:   if signedIn();
       allow create: if isAS() && validFacility(request.resource.data);
@@ -60,6 +68,20 @@ service cloud.firestore {
       allow read:   if signedIn();
       allow create: if isInsp() && validInspection(request.resource.data);
       allow update: if isInsp() && validInspection(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Cross-section inspection requests: the Licensing (A&S) ↔ Inspectorate
+    // handoff. Either section collaborates on the same document — Licensing
+    // raises it and closes it once the report is actioned; the Inspectorate
+    // acknowledges, assigns, progresses and completes it — so both may write,
+    // guarded by a shape check. History (deletes) stays admin-only.
+    match /inspectionRequests/{id} {
+      allow read:   if signedIn();
+      allow create: if (isAS() || isInsp())
+        && validInspectionRequest(request.resource.data);
+      allow update: if (isAS() || isInsp())
+        && validInspectionRequest(request.resource.data);
       allow delete: if isAdmin();
     }
 

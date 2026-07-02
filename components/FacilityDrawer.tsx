@@ -2,17 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import Link from "next/link";
+
 import { Drawer } from "./Drawer";
 import { StatusPill } from "./StatusPill";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { detectType } from "@/lib/rules/detectType";
+import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
 import {
   type Facility,
   type Inspection,
+  type InspectionPriority,
+  type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
+  INSPECTION_PRIORITIES,
   LICENCE_TYPES,
   isUseP,
 } from "@/lib/rules/types";
@@ -29,6 +35,7 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [events, setEvents] = useState<LicenceEvent[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [requests, setRequests] = useState<InspectionRequest[]>([]);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [number, setNumber] = useState("");
@@ -36,14 +43,21 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [autoType, setAutoType] = useState(true);
 
-  // Targeted reads: one facility doc + its own events/inspections (indexed
-  // queries in Firebase mode) instead of downloading three whole collections.
+  // Inspection-request quick form
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqReason, setReqReason] = useState("");
+  const [reqPriority, setReqPriority] = useState<InspectionPriority>("Normal");
+  const [reqNeededBy, setReqNeededBy] = useState("");
+
+  // Targeted reads: one facility doc + its own events/inspections/requests
+  // (indexed queries in Firebase mode) instead of downloading whole collections.
   const loadFacility = useCallback(async (id: string) => {
     const s = await store();
     return Promise.all([
       s.getFacility(id),
       s.listLicenceEventsFor(id),
       s.listInspectionsFor(id),
+      s.listInspectionRequestsFor(id),
     ]);
   }, []);
 
@@ -56,11 +70,12 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
     // stale response win (the drawer's actions key off facility.id).
     let cancelled = false;
     loadFacility(facilityId)
-      .then(([f, evs, ins]) => {
+      .then(([f, evs, ins, reqs]) => {
         if (cancelled) return;
         setFacility(f);
         setEvents(evs);
         setInspections(ins);
+        setRequests(reqs);
       })
       .catch(() => {
         if (!cancelled) toast.push("Failed to load facility.", "error");
@@ -97,10 +112,51 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
     : "Recorded as an authorisation the facility holds. Licensing status will not change.";
 
   const refresh = async (id: string) => {
-    const [f, evs, ins] = await loadFacility(id);
+    const [f, evs, ins, reqs] = await loadFacility(id);
     setFacility(f);
     setEvents(evs);
     setInspections(ins);
+    setRequests(reqs);
+  };
+
+  const submitRequest = async () => {
+    if (!facility || !user || busy) return;
+    if (!reqReason.trim()) {
+      toast.push("Add a reason for the inspection.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.addInspectionRequest(
+        {
+          facilityId: facility.id,
+          facilityName: facility.name,
+          facCode: facility.facCode,
+          province: facility.province,
+          sector: facility.sector,
+          type: "Pre-Authorisation",
+          priority: reqPriority,
+          reason: reqReason.trim(),
+          neededBy: reqNeededBy || undefined,
+        },
+        { uid: user.uid, name: user.displayName, section: user.section },
+      );
+      toast.push(`Inspection requested for ${facility.name}.`, "success");
+      setReqReason("");
+      setReqNeededBy("");
+      setReqPriority("Normal");
+      setReqOpen(false);
+      onChanged?.();
+      await refresh(facility.id);
+    } catch (err) {
+      toast.push(
+        `Could not raise the request: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submit = async () => {
@@ -284,6 +340,122 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="caps text-xs text-gunmetal/60">
+                Inspection requests
+              </h3>
+              <Link
+                href="/inspection-requests"
+                className="text-[11px] caps font-bold text-[var(--rpa-green-dark)]"
+              >
+                Open board →
+              </Link>
+            </div>
+            {requests.length === 0 ? (
+              <div className="text-sm text-gunmetal/55">
+                No inspection requests for this facility.
+              </div>
+            ) : (
+              <ul className="space-y-1.5 text-sm">
+                {requests.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-bold">{r.type}</div>
+                      <div className="text-xs text-gunmetal/60">
+                        {r.assignedInspector
+                          ? `Inspector: ${r.assignedInspector}`
+                          : `Requested by ${r.requestedByName}`}
+                        {r.reportRef ? " · report filed" : ""}
+                      </div>
+                    </div>
+                    <span
+                      className={`chip ${REQUEST_STATUS_META[r.status].chip} shrink-0`}
+                    >
+                      {REQUEST_STATUS_META[r.status].label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {canEditAS ? (
+              !reqOpen ? (
+                <button
+                  className="btn btn-secondary mt-3"
+                  onClick={() => setReqOpen(true)}
+                >
+                  Request pre-authorisation inspection
+                </button>
+              ) : (
+                <div className="mt-3 card p-4 bg-mist space-y-3">
+                  <div>
+                    <label className="caps text-[10px] text-gunmetal/60">
+                      Reason / scope
+                    </label>
+                    <textarea
+                      className="input mt-1"
+                      rows={2}
+                      value={reqReason}
+                      onChange={(e) => setReqReason(e.target.value)}
+                      placeholder="What should the Inspectorate check?"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="caps text-[10px] text-gunmetal/60">
+                        Priority
+                      </label>
+                      <select
+                        className="input mt-1"
+                        value={reqPriority}
+                        onChange={(e) =>
+                          setReqPriority(e.target.value as InspectionPriority)
+                        }
+                      >
+                        {INSPECTION_PRIORITIES.map((p) => (
+                          <option key={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="caps text-[10px] text-gunmetal/60">
+                        Needed by
+                      </label>
+                      <input
+                        type="date"
+                        className="input mt-1"
+                        value={reqNeededBy}
+                        onChange={(e) => setReqNeededBy(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn btn-primary"
+                      disabled={busy}
+                      onClick={submitRequest}
+                    >
+                      {busy ? "Sending…" : "Send to Inspectorate"}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setReqOpen(false);
+                        setReqReason("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : null}
           </section>
 
           <section className="card p-4 bg-mist">

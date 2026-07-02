@@ -10,6 +10,7 @@ const TITLES: Record<string, string> = {
   "/licences": "Licences & Authorisations",
   "/licence-status": "Licensing Status",
   "/bulk-approval": "Bulk Approval",
+  "/inspection-requests": "Inspection Requests",
   "/inspections": "Inspections",
   "/weekly": "Weekly Sectional Report",
   "/admin/users": "User Management",

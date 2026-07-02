@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "inspectionRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "facilityId", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "facilities",
       "queryScope": "COLLECTION",
       "fields": [

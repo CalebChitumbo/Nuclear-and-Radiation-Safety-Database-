@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 
+import Link from "next/link";
+
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
@@ -42,6 +45,26 @@ export default function InspectionsPage() {
 
   const facilities = useMemo(() => data?.facilities || [], [data]);
   const inspections = useMemo(() => data?.inspections || [], [data]);
+
+  // Inspectorate's "inspections conducted" database — totals across the log.
+  const stats = useMemo(() => {
+    const year = String(new Date().getFullYear());
+    const distinct = new Set<string>();
+    let thisYear = 0;
+    let preAuth = 0;
+    for (const i of inspections) {
+      distinct.add(i.facilityId || i.facilityName);
+      if ((i.date || "").startsWith(year)) thisYear += 1;
+      if (i.type === "Pre-Authorisation") preAuth += 1;
+    }
+    return {
+      total: inspections.length,
+      thisYear,
+      facilities: distinct.size,
+      preAuth,
+      year,
+    };
+  }, [inspections]);
 
   // Where this date will land in the reporting calendar — a 2025 typo would
   // otherwise be silently filed into the earliest 2026 week.
@@ -107,6 +130,34 @@ export default function InspectionsPage() {
   return (
     <div className="space-y-4 staggered">
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
+
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Kpi label="Inspections conducted" value={stats.total} />
+        <Kpi
+          label={`Conducted in ${stats.year}`}
+          value={stats.thisYear}
+          accent="green"
+        />
+        <Kpi
+          label="Facilities inspected"
+          value={stats.facilities}
+          accent="slate"
+        />
+        <Kpi
+          label="Pre-authorisation"
+          value={stats.preAuth}
+          accent="amber"
+          caption={
+            <Link
+              className="caps font-bold text-[var(--rpa-green-dark)]"
+              href="/inspection-requests"
+            >
+              From requests →
+            </Link>
+          }
+        />
+      </section>
+
       {canEditInsp ? (
         <div className="card p-5">
           <div className="caps text-xs text-gunmetal/60 mb-3">
