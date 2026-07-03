@@ -152,7 +152,127 @@ export interface Inspection {
   province: Province | "";
   sector: Sector | "";
   notes: string;
+  /**
+   * Set when this inspection was produced by completing an InspectionRequest
+   * (the pre-authorisation handoff between Licensing and Inspectorate). Links the
+   * dated inspection log back to the workflow that asked for it.
+   */
+  requestId?: string;
   createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * Lifecycle of a cross-section inspection request — the handoff that lets the
+ * Authorisation & Standards (Licensing) section ask the Inspectorate to inspect
+ * a facility, and lets the Inspectorate report back when it is done. In pipeline
+ * order; "Cancelled" is out-of-band (reachable from any active state).
+ *
+ *   Requested → Acknowledged → Assigned → In Progress → Report Ready → Closed
+ *
+ * - Requested     Licensing raised it; waiting for the Inspectorate to pick up.
+ * - Acknowledged  Inspectorate accepted the request into its queue.
+ * - Assigned      An inspector has been named (and optionally a target date).
+ * - In Progress   The inspection is underway.
+ * - Report Ready  Inspection done + report filed; Licensing is notified to act.
+ * - Closed        Licensing has actioned the report; the loop is complete.
+ * - Cancelled     Withdrawn by Licensing or declined by the Inspectorate.
+ */
+export const INSPECTION_REQUEST_STATUSES = [
+  "Requested",
+  "Acknowledged",
+  "Assigned",
+  "In Progress",
+  "Report Ready",
+  "Closed",
+  "Cancelled",
+] as const;
+export type InspectionRequestStatus =
+  (typeof INSPECTION_REQUEST_STATUSES)[number];
+
+/** Urgency an officer sets on an inspection request. */
+export const INSPECTION_PRIORITIES = ["Urgent", "High", "Normal", "Low"] as const;
+export type InspectionPriority = (typeof INSPECTION_PRIORITIES)[number];
+
+/**
+ * One entry in an inspection request's audit trail. Every action — the initial
+ * request, an acknowledgement, an assignment, a status move, a free-text comment
+ * — appends one of these so both sections can read the full conversation and
+ * history on the request without a separate messaging system.
+ */
+export interface InspectionRequestEvent {
+  at: string;
+  by: string;
+  byName: string;
+  bySection: Section | "All" | "";
+  kind:
+    | "created"
+    | "acknowledged"
+    | "assigned"
+    | "started"
+    | "completed"
+    | "closed"
+    | "cancelled"
+    | "comment";
+  status?: InspectionRequestStatus;
+  text: string;
+}
+
+/**
+ * A request from Licensing to the Inspectorate to inspect a facility (usually a
+ * pre-authorisation inspection). It is the shared record both sections work on:
+ * Licensing creates it and later reads the report reference off it; the
+ * Inspectorate acknowledges, assigns an inspector, progresses and completes it.
+ * Completing it records a dated Inspection (linked by `inspectionId`) so the
+ * Inspectorate's "inspections conducted" database and the weekly report stay in
+ * one place.
+ */
+export interface InspectionRequest {
+  id: string;
+  facilityId: string | null;
+  facilityName: string;
+  facCode: string;
+  province: Province | "";
+  sector: Sector | "";
+  /** Kind of inspection asked for — defaults to Pre-Authorisation. */
+  type: InspectionType;
+  priority: InspectionPriority;
+  status: InspectionRequestStatus;
+  /** Why the inspection is needed (the licensing officer's justification). */
+  reason: string;
+  /** Optional link to the licensing application (RAIS RAN) driving this. */
+  workflowRan?: string;
+  /** When Licensing would like the inspection done by (ISO date, optional). */
+  neededBy?: string;
+
+  /** Requester (Licensing / Authorisation & Standards). */
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
+  requestedWeek: string;
+
+  /** Inspectorate handling. */
+  assignedInspector?: string;
+  targetDate?: string;
+  acknowledgedAt?: string;
+  startedAt?: string;
+
+  /** Completion / report. */
+  completedAt?: string;
+  completedDate?: string;
+  outcome?: InspectionOutcome;
+  /** Where the signed inspection report lives (a link, a RAIS ref, a location). */
+  reportRef?: string;
+  findings?: string;
+  /** The dated Inspection record created when this request was completed. */
+  inspectionId?: string;
+
+  /** Set when cancelled/declined. */
+  cancelReason?: string;
+
+  /** Full audit trail / conversation, oldest first. */
+  timeline: InspectionRequestEvent[];
   updatedAt?: string;
   updatedBy?: string;
 }

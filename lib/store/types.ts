@@ -1,8 +1,14 @@
 import type {
+  InspectionRequestAction,
+  NewInspectionRequestInput,
+  RequestActor,
+} from "../rules/inspectionRequests";
+import type {
   Activity,
   DashboardAggregate,
   Facility,
   Inspection,
+  InspectionRequest,
   LicenceEvent,
   LicenceWorkflow,
   UserDoc,
@@ -51,6 +57,28 @@ export interface DataStore {
     };
   }>;
   addInspection(i: Omit<Inspection, "id">): Promise<Inspection>;
+  /** Every cross-section inspection request, newest first. */
+  listInspectionRequests(): Promise<InspectionRequest[]>;
+  /** Inspection requests for one facility, newest first (indexed in Firebase). */
+  listInspectionRequestsFor(facilityId: string): Promise<InspectionRequest[]>;
+  /**
+   * Raise a new inspection request (Licensing → Inspectorate). Opens in the
+   * "Requested" state with an audit-trail entry.
+   */
+  addInspectionRequest(
+    input: NewInspectionRequestInput,
+    actor: RequestActor,
+  ): Promise<InspectionRequest>;
+  /**
+   * Advance a request through its lifecycle (acknowledge / assign / start /
+   * complete / close / cancel / comment). Completing one also records the dated
+   * Inspection it produced and links it back (`inspectionId`).
+   */
+  updateInspectionRequest(
+    id: string,
+    action: InspectionRequestAction,
+    actor: RequestActor,
+  ): Promise<InspectionRequest>;
   /**
    * Upsert parsed RAIS workflow records (keyed by RAN) and roll each matched
    * facility's stage up onto its facility doc. Returns how many facility stages
@@ -74,6 +102,7 @@ export interface DataStore {
     facilities: Facility[];
     licenceEvents: LicenceEvent[];
     inspections: Inspection[];
+    inspectionRequests: InspectionRequest[];
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;

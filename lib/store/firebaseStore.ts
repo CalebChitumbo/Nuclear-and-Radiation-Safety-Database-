@@ -20,6 +20,13 @@ import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import {
+  applyInspectionRequestAction,
+  buildInspectionRequest,
+  type InspectionRequestAction,
+  type NewInspectionRequestInput,
+  type RequestActor,
+} from "../rules/inspectionRequests";
+import {
   isUsePossessionWorkflow,
   needsTypeClassification,
   workflowIssueDate,
@@ -32,6 +39,7 @@ import {
   type DashboardAggregate,
   type Facility,
   type Inspection,
+  type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
@@ -298,8 +306,105 @@ class FirebaseStore implements DataStore {
   async addInspection(i: Omit<Inspection, "id">): Promise<Inspection> {
     const db = requireDb();
     const week = weekLabelForDate(i.date, weeksSeed as WeekDef[], "");
-    const ref = await addDoc(collection(db, "inspections"), { ...i, week });
+    const ref = await addDoc(
+      collection(db, "inspections"),
+      stripUndefined({ ...i, week }),
+    );
     return { ...i, week, id: ref.id };
+  }
+
+  async listInspectionRequests(): Promise<InspectionRequest[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "inspectionRequests"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<InspectionRequest, "id">) }))
+      .sort((a, b) => (b.requestedAt || "").localeCompare(a.requestedAt || ""));
+  }
+
+  async listInspectionRequestsFor(
+    facilityId: string,
+  ): Promise<InspectionRequest[]> {
+    const db = requireDb();
+    // Backed by the (facilityId ASC, requestedAt DESC) composite index.
+    const snap = await getDocs(
+      query(
+        collection(db, "inspectionRequests"),
+        where("facilityId", "==", facilityId),
+        orderBy("requestedAt", "desc"),
+      ),
+    );
+    return snap.docs.map(
+      (d) => ({ id: d.id, ...(d.data() as Omit<InspectionRequest, "id">) }),
+    );
+  }
+
+  async addInspectionRequest(
+    input: NewInspectionRequestInput,
+    actor: RequestActor,
+  ): Promise<InspectionRequest> {
+    const db = requireDb();
+    const now = new Date().toISOString();
+    const week = weekLabelForDate(now.slice(0, 10), weeksSeed as WeekDef[], "");
+    const draft = buildInspectionRequest(input, actor, now, week);
+    const ref = doc(collection(db, "inspectionRequests"));
+    const request: InspectionRequest = { ...draft, id: ref.id };
+    await setDoc(ref, stripUndefined(request));
+    return request;
+  }
+
+  async updateInspectionRequest(
+    id: string,
+    action: InspectionRequestAction,
+    actor: RequestActor,
+  ): Promise<InspectionRequest> {
+    const db = requireDb();
+    const now = new Date().toISOString();
+    const ref = doc(db, "inspectionRequests", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("Inspection request not found.");
+    const current = {
+      id: snap.id,
+      ...(snap.data() as Omit<InspectionRequest, "id">),
+    };
+
+    let updated = applyInspectionRequestAction(current, action, actor, now);
+
+    // Completing a request records the dated Inspection it produced (atomically
+    // with the request update) and links it back, so the Inspectorate's log and
+    // the weekly report see the completed inspection.
+    if (action.kind === "complete") {
+      const batch = writeBatch(db);
+      const week = weekLabelForDate(
+        action.completedDate,
+        weeksSeed as WeekDef[],
+        "",
+      );
+      const inspRef = doc(collection(db, "inspections"));
+      const inspection: Inspection = {
+        id: inspRef.id,
+        date: action.completedDate,
+        week,
+        facilityId: current.facilityId,
+        facilityName: current.facilityName,
+        type: current.type,
+        outcome: action.outcome,
+        province: current.province,
+        sector: current.sector,
+        notes:
+          action.findings?.trim() ||
+          `Pre-authorisation inspection for ${current.facilityName}.`,
+        requestId: id,
+        createdAt: now,
+      };
+      updated = { ...updated, inspectionId: inspRef.id };
+      batch.set(inspRef, stripUndefined(inspection));
+      batch.set(ref, stripUndefined(updated), { merge: true });
+      await batch.commit();
+      return updated;
+    }
+
+    await setDoc(ref, stripUndefined(updated), { merge: true });
+    return updated;
   }
 
   async saveLicenceWorkflows(
@@ -504,14 +609,21 @@ class FirebaseStore implements DataStore {
   }
 
   async exportAll() {
-    const [facilities, licenceEvents, inspections, activities, licenceWorkflows] =
-      await Promise.all([
-        this.listFacilities(),
-        this.listLicenceEvents(),
-        this.listInspections(),
-        this.listActivities(),
-        this.listLicenceWorkflows(),
-      ]);
+    const [
+      facilities,
+      licenceEvents,
+      inspections,
+      inspectionRequests,
+      activities,
+      licenceWorkflows,
+    ] = await Promise.all([
+      this.listFacilities(),
+      this.listLicenceEvents(),
+      this.listInspections(),
+      this.listInspectionRequests(),
+      this.listActivities(),
+      this.listLicenceWorkflows(),
+    ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
     const weekMetrics: Record<string, WeekMetrics> = {};
@@ -522,6 +634,7 @@ class FirebaseStore implements DataStore {
       facilities,
       licenceEvents,
       inspections,
+      inspectionRequests,
       activities,
       licenceWorkflows,
       weekMetrics,
