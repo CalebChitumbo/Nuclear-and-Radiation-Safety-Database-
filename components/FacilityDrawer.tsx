@@ -57,7 +57,9 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
       s.getFacility(id),
       s.listLicenceEventsFor(id),
       s.listInspectionsFor(id),
-      s.listInspectionRequestsFor(id),
+      // Secondary: a missing rule/index for this new collection must not stop
+      // the facility itself from opening. Degrade to an empty list.
+      s.listInspectionRequestsFor(id).catch(() => []),
     ]);
   }, []);
 

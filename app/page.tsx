@@ -39,7 +39,10 @@ export default function DashboardPage() {
       s.listFacilities(),
       s.listLicenceEvents(),
       s.listInspections(),
-      s.listInspectionRequests(),
+      // The inspection-request summary is secondary: if this collection can't be
+      // read yet (e.g. its security rules haven't been deployed), the core
+      // dashboard must still load. Degrade to an empty list rather than failing.
+      s.listInspectionRequests().catch(() => []),
     ]);
     return { agg, facilities, events, inspections, requests };
   }, []);

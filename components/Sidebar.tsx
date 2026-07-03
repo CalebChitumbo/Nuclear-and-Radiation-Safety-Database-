@@ -45,11 +45,12 @@ export function Sidebar({
   // A small badge on the Inspection Requests link surfaces the cross-section
   // handoff: new requests for the Inspectorate, reports ready for Licensing.
   const { data: inbox } = useStoreData(
-    async (s) =>
-      deriveInspectionInbox(await s.listInspectionRequests(), {
-        canEditAS,
-        canEditInsp,
-      }),
+    async (s) => {
+      // Never let the badge read break the shell: if the collection isn't
+      // readable yet (rules not deployed), just show no badge.
+      const requests = await s.listInspectionRequests().catch(() => []);
+      return deriveInspectionInbox(requests, { canEditAS, canEditInsp });
+    },
     [canEditAS, canEditInsp],
   );
   const inspectionBadge = inbox?.count || 0;
