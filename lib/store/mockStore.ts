@@ -1,5 +1,19 @@
 import { computeAggregate } from "../rules/aggregate";
+import {
+  applyCommitteeAction,
+  buildCommitteeSubmission,
+  type CommitteeAction,
+  type CommitteeActor,
+  type NewCommitteeSubmissionInput,
+} from "../rules/committee";
 import { detectType } from "../rules/detectType";
+import {
+  applyFormIIAction,
+  buildFurtherParticulars,
+  type FormIIAction,
+  type FormIIActor,
+  type NewFormIIInput,
+} from "../rules/formII";
 import {
   applyInspectionRequestAction,
   buildInspectionRequest,
@@ -7,6 +21,7 @@ import {
   type NewInspectionRequestInput,
   type RequestActor,
 } from "../rules/inspectionRequests";
+import { inspectionGate, raisDateToISO } from "../rules/sla";
 import {
   isUsePossessionWorkflow,
   needsTypeClassification,
@@ -17,13 +32,16 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type CommitteeSubmission,
   type DashboardAggregate,
   type Facility,
+  type FurtherParticularsRecord,
   type Inspection,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type ReconciliationRecord,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -42,6 +60,9 @@ interface State {
   licenceEvents: LicenceEvent[];
   inspections: Inspection[];
   inspectionRequests: InspectionRequest[];
+  committeeSubmissions: CommitteeSubmission[];
+  furtherParticulars: FurtherParticularsRecord[];
+  reconciliations: Record<string, ReconciliationRecord>;
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
@@ -54,6 +75,9 @@ function freshState(): State {
     licenceEvents: [],
     inspections: [],
     inspectionRequests: [],
+    committeeSubmissions: [],
+    furtherParticulars: [],
+    reconciliations: {},
     activities: [],
     licenceWorkflows: [],
     weekMetrics: {},
@@ -97,6 +121,11 @@ function load(): State {
     if (!parsed.licenceWorkflows) parsed.licenceWorkflows = [];
     // Back-compat: stores saved before the inspection-request workflow existed.
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
+    // Back-compat: stores saved before the TECHCOM / Form II / reconciliation
+    // trackers existed.
+    if (!parsed.committeeSubmissions) parsed.committeeSubmissions = [];
+    if (!parsed.furtherParticulars) parsed.furtherParticulars = [];
+    if (!parsed.reconciliations) parsed.reconciliations = {};
     return parsed;
   } catch {
     return freshState();
@@ -421,12 +450,158 @@ class MockStore implements DataStore {
       updated = { ...updated, inspectionId: inspection.id };
     }
 
+    // The SOP's verification gate: closing a pre-authorisation request whose
+    // inspection came back SATISFACTORY files the application for TECHCOM (the
+    // digital "awaiting TECHCOM" file). Idempotent — a request files at most
+    // one submission.
+    if (
+      action.kind === "close" &&
+      current.type === "Pre-Authorisation" &&
+      inspectionGate(current.outcome)?.satisfactory &&
+      !s.committeeSubmissions.some((c) => c.inspectionRequestId === id)
+    ) {
+      const draft = buildCommitteeSubmission(
+        {
+          ran: current.workflowRan,
+          facilityId: current.facilityId,
+          facilityName: current.facilityName,
+          facCode: current.facCode,
+          province: current.province,
+          sector: current.sector,
+          inspectionRequestId: id,
+          inspectionOutcome: current.outcome,
+          reportRef: current.reportRef,
+        },
+        { uid: actor.uid, name: actor.name },
+        now,
+      );
+      s.committeeSubmissions.push({ ...draft, id: newId("techcom") });
+    }
+
     s.inspectionRequests = s.inspectionRequests.map((r) =>
       r.id === id ? updated : r,
     );
     save(s);
     dispatchChange();
     return updated;
+  }
+
+  async listCommitteeSubmissions(): Promise<CommitteeSubmission[]> {
+    return [...ensure().committeeSubmissions].sort((a, b) =>
+      (b.submittedAt || "").localeCompare(a.submittedAt || ""),
+    );
+  }
+
+  async addCommitteeSubmission(
+    input: NewCommitteeSubmissionInput,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    const submission: CommitteeSubmission = {
+      ...buildCommitteeSubmission(input, actor, now),
+      id: newId("techcom"),
+    };
+    s.committeeSubmissions.push(submission);
+    save(s);
+    dispatchChange();
+    return submission;
+  }
+
+  async updateCommitteeSubmission(
+    id: string,
+    action: CommitteeAction,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission> {
+    const s = ensure();
+    const current = s.committeeSubmissions.find((c) => c.id === id);
+    if (!current) throw new Error("Committee submission not found.");
+    const updated = applyCommitteeAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+    );
+    s.committeeSubmissions = s.committeeSubmissions.map((c) =>
+      c.id === id ? updated : c,
+    );
+    save(s);
+    dispatchChange();
+    return updated;
+  }
+
+  async listFurtherParticulars(): Promise<FurtherParticularsRecord[]> {
+    return [...ensure().furtherParticulars].sort((a, b) =>
+      (b.issuedDate || "").localeCompare(a.issuedDate || ""),
+    );
+  }
+
+  async addFurtherParticulars(
+    input: NewFormIIInput,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    const record: FurtherParticularsRecord = {
+      ...buildFurtherParticulars(input, actor, now),
+      id: newId("formii"),
+    };
+    s.furtherParticulars.push(record);
+    save(s);
+    dispatchChange();
+    return record;
+  }
+
+  async updateFurtherParticulars(
+    id: string,
+    action: FormIIAction,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord> {
+    const s = ensure();
+    const current = s.furtherParticulars.find((r) => r.id === id);
+    if (!current) throw new Error("Form II record not found.");
+    const updated = applyFormIIAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+    );
+    s.furtherParticulars = s.furtherParticulars.map((r) =>
+      r.id === id ? updated : r,
+    );
+    save(s);
+    dispatchChange();
+    return updated;
+  }
+
+  async updateLicenceWorkflow(
+    id: string,
+    patch: Partial<LicenceWorkflow>,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    const now = new Date().toISOString();
+    s.licenceWorkflows = s.licenceWorkflows.map((w) =>
+      w.id === id ? { ...w, ...patch, updatedAt: now, updatedBy: uid } : w,
+    );
+    save(s);
+    dispatchChange();
+  }
+
+  async listReconciliations(): Promise<ReconciliationRecord[]> {
+    return Object.values(ensure().reconciliations).sort((a, b) =>
+      b.month.localeCompare(a.month),
+    );
+  }
+
+  async setReconciliation(
+    rec: ReconciliationRecord,
+    _uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    s.reconciliations[rec.month] = rec;
+    save(s);
+    dispatchChange();
   }
 
   async saveLicenceWorkflows(
@@ -440,12 +615,22 @@ class MockStore implements DataStore {
     const byRan = new Map(s.licenceWorkflows.map((w) => [w.ran || w.id, w]));
     // Preserve a previously officer-assigned type when an update omits it, so the
     // classification sticks to the licence number across notifications. (Firebase
-    // gets this for free from merge writes.)
+    // gets this for free from merge writes.) Same for the Form I checklist and
+    // its completeness date, and stamp firstSeen — the fallback start of the
+    // 44-working-day clock — the first time a RAN is ever saved.
     const saved = items.map((item) => {
       const prior = byRan.get(item.ran || item.id);
       return {
         ...item,
         officerType: item.officerType ?? prior?.officerType,
+        checklist: item.checklist ?? prior?.checklist,
+        completeReceivedAt: item.completeReceivedAt ?? prior?.completeReceivedAt,
+        firstSeen:
+          prior?.firstSeen ??
+          item.firstSeen ??
+          item.receivedAt?.slice(0, 10) ??
+          raisDateToISO(item.lastSeen) ??
+          now.slice(0, 10),
         updatedAt: now,
         updatedBy: uid,
       };
@@ -627,6 +812,8 @@ class MockStore implements DataStore {
       licenceEvents: s.licenceEvents,
       inspections: s.inspections,
       inspectionRequests: s.inspectionRequests,
+      committeeSubmissions: s.committeeSubmissions,
+      furtherParticulars: s.furtherParticulars,
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,

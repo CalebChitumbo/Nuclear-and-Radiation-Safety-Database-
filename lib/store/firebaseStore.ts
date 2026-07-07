@@ -4,6 +4,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -18,7 +19,21 @@ import {
 
 import { getDb, getFbFunctions } from "../firebase";
 import { computeAggregate } from "../rules/aggregate";
+import {
+  applyCommitteeAction,
+  buildCommitteeSubmission,
+  type CommitteeAction,
+  type CommitteeActor,
+  type NewCommitteeSubmissionInput,
+} from "../rules/committee";
 import { detectType } from "../rules/detectType";
+import {
+  applyFormIIAction,
+  buildFurtherParticulars,
+  type FormIIAction,
+  type FormIIActor,
+  type NewFormIIInput,
+} from "../rules/formII";
 import {
   applyInspectionRequestAction,
   buildInspectionRequest,
@@ -26,6 +41,7 @@ import {
   type NewInspectionRequestInput,
   type RequestActor,
 } from "../rules/inspectionRequests";
+import { inspectionGate, raisDateToISO } from "../rules/sla";
 import {
   isUsePossessionWorkflow,
   needsTypeClassification,
@@ -36,13 +52,16 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type CommitteeSubmission,
   type DashboardAggregate,
   type Facility,
+  type FurtherParticularsRecord,
   type Inspection,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type ReconciliationRecord,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -403,8 +422,178 @@ class FirebaseStore implements DataStore {
       return updated;
     }
 
+    // The SOP's verification gate: closing a pre-authorisation request whose
+    // inspection came back SATISFACTORY files the application for TECHCOM (the
+    // digital "awaiting TECHCOM" file), atomically with the close. Idempotent —
+    // a request files at most one submission.
+    if (
+      action.kind === "close" &&
+      current.type === "Pre-Authorisation" &&
+      inspectionGate(current.outcome)?.satisfactory
+    ) {
+      const existing = await getDocs(
+        query(
+          collection(db, "committeeSubmissions"),
+          where("inspectionRequestId", "==", id),
+        ),
+      );
+      if (existing.empty) {
+        const batch = writeBatch(db);
+        const subRef = doc(collection(db, "committeeSubmissions"));
+        const draft = buildCommitteeSubmission(
+          {
+            ran: current.workflowRan,
+            facilityId: current.facilityId,
+            facilityName: current.facilityName,
+            facCode: current.facCode,
+            province: current.province,
+            sector: current.sector,
+            inspectionRequestId: id,
+            inspectionOutcome: current.outcome,
+            reportRef: current.reportRef,
+          },
+          { uid: actor.uid, name: actor.name },
+          now,
+        );
+        batch.set(subRef, stripUndefined({ ...draft, id: subRef.id }));
+        batch.set(ref, stripUndefined(updated), { merge: true });
+        await batch.commit();
+        return updated;
+      }
+    }
+
     await setDoc(ref, stripUndefined(updated), { merge: true });
     return updated;
+  }
+
+  async listCommitteeSubmissions(): Promise<CommitteeSubmission[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "committeeSubmissions"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<CommitteeSubmission, "id">) }))
+      .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+  }
+
+  async addCommitteeSubmission(
+    input: NewCommitteeSubmissionInput,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission> {
+    const db = requireDb();
+    const now = new Date().toISOString();
+    const ref = doc(collection(db, "committeeSubmissions"));
+    const submission: CommitteeSubmission = {
+      ...buildCommitteeSubmission(input, actor, now),
+      id: ref.id,
+    };
+    await setDoc(ref, stripUndefined(submission));
+    return submission;
+  }
+
+  async updateCommitteeSubmission(
+    id: string,
+    action: CommitteeAction,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission> {
+    const db = requireDb();
+    const ref = doc(db, "committeeSubmissions", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("Committee submission not found.");
+    const current = {
+      id: snap.id,
+      ...(snap.data() as Omit<CommitteeSubmission, "id">),
+    };
+    const updated = applyCommitteeAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+    );
+    await setDoc(ref, stripUndefined(updated), { merge: true });
+    return updated;
+  }
+
+  async listFurtherParticulars(): Promise<FurtherParticularsRecord[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "furtherParticulars"));
+    return snap.docs
+      .map(
+        (d) =>
+          ({ id: d.id, ...(d.data() as Omit<FurtherParticularsRecord, "id">) }),
+      )
+      .sort((a, b) => (b.issuedDate || "").localeCompare(a.issuedDate || ""));
+  }
+
+  async addFurtherParticulars(
+    input: NewFormIIInput,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord> {
+    const db = requireDb();
+    const now = new Date().toISOString();
+    const ref = doc(collection(db, "furtherParticulars"));
+    const record: FurtherParticularsRecord = {
+      ...buildFurtherParticulars(input, actor, now),
+      id: ref.id,
+    };
+    await setDoc(ref, stripUndefined(record));
+    return record;
+  }
+
+  async updateFurtherParticulars(
+    id: string,
+    action: FormIIAction,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord> {
+    const db = requireDb();
+    const ref = doc(db, "furtherParticulars", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("Form II record not found.");
+    const current = {
+      id: snap.id,
+      ...(snap.data() as Omit<FurtherParticularsRecord, "id">),
+    };
+    const updated = applyFormIIAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+    );
+    await setDoc(ref, stripUndefined(updated), { merge: true });
+    return updated;
+  }
+
+  async updateLicenceWorkflow(
+    id: string,
+    patch: Partial<LicenceWorkflow>,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    // A key explicitly present with an `undefined` value clears that field
+    // (e.g. completeReceivedAt when the checklist stops being complete) — the
+    // web SDK needs deleteField() for that, and merge keeps everything else.
+    const write: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    for (const [k, v] of Object.entries(patch)) {
+      write[k] = v === undefined ? deleteField() : v;
+    }
+    await setDoc(doc(db, "licenceWorkflows", id), write, { merge: true });
+  }
+
+  async listReconciliations(): Promise<ReconciliationRecord[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "reconciliations"));
+    return snap.docs
+      .map((d) => d.data() as ReconciliationRecord)
+      .sort((a, b) => b.month.localeCompare(a.month));
+  }
+
+  async setReconciliation(
+    rec: ReconciliationRecord,
+    _uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(doc(db, "reconciliations", rec.month), stripUndefined(rec));
   }
 
   async saveLicenceWorkflows(
@@ -421,7 +610,27 @@ class FirebaseStore implements DataStore {
     const docId = (w: LicenceWorkflow) =>
       (w.ran || w.id).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
 
-    const saved = items.map((item) => ({ ...item, updatedAt: now, updatedBy: uid }));
+    // Loaded up front (not just for the matched-facility roll-up below): the
+    // prior doc decides whether firstSeen — the fallback start of the SOP's
+    // 44-working-day clock — is already stamped. Merge writes preserve every
+    // other prior field (officerType, checklist, completeReceivedAt) for free.
+    const stored = await this.listLicenceWorkflows();
+    const priorById = new Map(stored.map((w) => [w.id, w]));
+
+    const saved = items.map((item) => {
+      const prior = priorById.get(docId(item));
+      return {
+        ...item,
+        firstSeen:
+          prior?.firstSeen ??
+          item.firstSeen ??
+          item.receivedAt?.slice(0, 10) ??
+          raisDateToISO(item.lastSeen) ??
+          now.slice(0, 10),
+        updatedAt: now,
+        updatedBy: uid,
+      };
+    });
     for (const item of saved) {
       batch.set(doc(db, "licenceWorkflows", docId(item)), stripUndefined(item), {
         merge: true,
@@ -435,10 +644,7 @@ class FirebaseStore implements DataStore {
 
     let facilitiesUpdated = 0;
     if (matched.length) {
-      const [facilities, stored] = await Promise.all([
-        this.listFacilities(),
-        this.listLicenceWorkflows(),
-      ]);
+      const facilities = await this.listFacilities();
       // Working copies so an auth append and a stage roll-up on the same facility
       // are merged into a single write.
       const facMap = new Map(facilities.map((f) => [f.id, { ...f }]));
@@ -614,6 +820,8 @@ class FirebaseStore implements DataStore {
       licenceEvents,
       inspections,
       inspectionRequests,
+      committeeSubmissions,
+      furtherParticulars,
       activities,
       licenceWorkflows,
     ] = await Promise.all([
@@ -621,6 +829,12 @@ class FirebaseStore implements DataStore {
       this.listLicenceEvents(),
       this.listInspections(),
       this.listInspectionRequests(),
+      this.listCommitteeSubmissions().catch(
+        () => [] as CommitteeSubmission[],
+      ),
+      this.listFurtherParticulars().catch(
+        () => [] as FurtherParticularsRecord[],
+      ),
       this.listActivities(),
       this.listLicenceWorkflows(),
     ]);
@@ -635,6 +849,8 @@ class FirebaseStore implements DataStore {
       licenceEvents,
       inspections,
       inspectionRequests,
+      committeeSubmissions,
+      furtherParticulars,
       activities,
       licenceWorkflows,
       weekMetrics,

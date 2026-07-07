@@ -363,6 +363,23 @@ export interface LicenceWorkflow {
   /** Most recent date seen in the notifications (DD/MM/YYYY as pasted). */
   lastSeen: string;
   /**
+   * ISO date this application first entered the system (first paste/email for
+   * its RAN). The fallback start of the SOP's 44-working-day clock when no
+   * complete-application date has been recorded. Absent on older docs.
+   */
+  firstSeen?: string;
+  /**
+   * The officer's Form I completeness checklist for this application — which
+   * SOP attachments have been received, keyed by FORM_I_CHECKLIST item id.
+   */
+  checklist?: Record<string, boolean>;
+  /**
+   * ISO date the application was recorded COMPLETE (every required Form I
+   * attachment received). This is the SOP's day zero for the 44-working-day
+   * licence target; stamped when the checklist is completed.
+   */
+  completeReceivedAt?: string;
+  /**
    * How this record entered the system: an officer paste on the Licensing
    * Status tab, or the automatic RAIS email connector (ingestRaisEmail).
    */
@@ -379,6 +396,127 @@ export interface LicenceWorkflow {
   emailSubject?: string;
   updatedAt?: string;
   updatedBy?: string;
+}
+
+/**
+ * Lifecycle of an application before the Technical Committee and the Board —
+ * the digital "complete applications awaiting TECHCOM" file. In pipeline
+ * order; the two terminal exits are a Form III rejection and the issued
+ * licence.
+ *
+ *   Awaiting TECHCOM → Awaiting Board → Board Approved → Licence Issued
+ *                    ↘ Rejected (Form III)   (from either committee stage)
+ */
+export const COMMITTEE_STATUSES = [
+  "Awaiting TECHCOM",
+  "Awaiting Board",
+  "Board Approved",
+  "Licence Issued",
+  "Rejected (Form III)",
+  "Withdrawn",
+] as const;
+export type CommitteeStatus = (typeof COMMITTEE_STATUSES)[number];
+
+/** One entry in a committee submission's audit trail. */
+export interface CommitteeEvent {
+  at: string;
+  by: string;
+  byName: string;
+  kind:
+    | "created"
+    | "techcom-approved"
+    | "board-approved"
+    | "rejected"
+    | "issued"
+    | "withdrawn"
+    | "comment";
+  status?: CommitteeStatus;
+  text: string;
+}
+
+/**
+ * A complete application submitted for committee review — created when the
+ * pre-authorisation inspection comes back satisfactory (the SOP's gate), or
+ * added manually. Tracks the MNRS → TECHCOM → Board path, the Form III
+ * rejection notice, and finally the issued licence.
+ */
+export interface CommitteeSubmission {
+  id: string;
+  ran?: string;
+  facilityId: string | null;
+  facilityName: string;
+  facCode: string;
+  province: Province | "";
+  sector: Sector | "";
+  status: CommitteeStatus;
+  /** The pre-authorisation inspection that cleared this application. */
+  inspectionRequestId?: string;
+  inspectionOutcome?: InspectionOutcome;
+  /** Where the bundled inspection report lives (RAIS ref / link / file). */
+  reportRef?: string;
+  submittedAt: string;
+  submittedBy: string;
+  submittedByName: string;
+  /** Committee decisions. */
+  techcomDate?: string;
+  boardDate?: string;
+  /** Form III (Notice of Rejection) reference, when rejected. */
+  formIIIRef?: string;
+  /** Licence issued after Board approval (Form IV). */
+  licenceNumber?: string;
+  licenceDate?: string;
+  timeline: CommitteeEvent[];
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * A Form II — Request for Further Particulars — issued to a client, with the
+ * SOP's response window tracked against it. "Expired" is derived (still
+ * awaiting a response past the due date), not stored.
+ */
+export const FORM_II_STATUSES = [
+  "Awaiting Response",
+  "Responded",
+  "Withdrawn",
+] as const;
+export type FormIIStatus = (typeof FORM_II_STATUSES)[number];
+
+export interface FurtherParticularsRecord {
+  id: string;
+  ran?: string;
+  facilityId: string | null;
+  facilityName: string;
+  facCode: string;
+  /** What was requested from the client. */
+  details: string;
+  /** ISO date the Form II was issued. */
+  issuedDate: string;
+  /** ISO due date — issuedDate + the SOP's response window (working days). */
+  dueDate: string;
+  status: FormIIStatus;
+  respondedDate?: string;
+  /** Closing note (what was received, or why withdrawn). */
+  note?: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * The monthly reconciliation with Accounts (SOP: by the 5th of the following
+ * month, confirm every paid-up facility has been licensed). One record per
+ * calendar month, keyed "YYYY-MM".
+ */
+export interface ReconciliationRecord {
+  month: string;
+  done: boolean;
+  doneBy?: string;
+  doneByName?: string;
+  doneAt?: string;
+  note?: string;
 }
 
 export interface WeekMetrics {

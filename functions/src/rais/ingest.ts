@@ -159,6 +159,9 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
         source: "email",
         reviewStatus: "needs-review",
         receivedAt: now,
+        // The fallback start of the SOP's 44-working-day clock: the date this
+        // RAN first entered the system. Never restamped on later emails.
+        firstSeen: prev?.firstSeen ?? now.slice(0, 10),
         emailSubject: subject || "",
         updatedAt: now,
         updatedBy: BOT,
