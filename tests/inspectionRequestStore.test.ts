@@ -83,6 +83,46 @@ describe("mock store — inspection request lifecycle (the integration seam)", (
     expect(closed.status).toBe("Closed");
     // created + acknowledge + assign + start + complete + close = 6 entries.
     expect(closed.timeline).toHaveLength(6);
+
+    // The SOP's gate: a satisfactory pre-authorisation close files the
+    // application for TECHCOM with the inspection report bundled.
+    const submissions = await mockStore.listCommitteeSubmissions();
+    expect(submissions).toHaveLength(1);
+    expect(submissions[0].status).toBe("Awaiting TECHCOM");
+    expect(submissions[0].inspectionRequestId).toBe(req.id);
+    expect(submissions[0].ran).toBe("AUTH/USE.NEW/0203");
+    expect(submissions[0].reportRef).toBe("RPA/INSP/2026/044");
+  });
+
+  it("does NOT file for TECHCOM when the inspection was unsatisfactory", async () => {
+    const facilities = await mockStore.listFacilities();
+    const fac = facilities[0];
+    const req = await mockStore.addInspectionRequest(
+      {
+        facilityId: fac.id,
+        facilityName: fac.name,
+        facCode: fac.facCode,
+        province: fac.province,
+        sector: fac.sector,
+        reason: "pre-auth",
+      },
+      AS,
+    );
+    await mockStore.updateInspectionRequest(req.id, { kind: "acknowledge" }, INSP);
+    await mockStore.updateInspectionRequest(
+      req.id,
+      {
+        kind: "complete",
+        outcome: "Non-compliant",
+        reportRef: "R/9",
+        completedDate: "2026-05-01",
+      },
+      INSP,
+    );
+    await mockStore.updateInspectionRequest(req.id, { kind: "close" }, AS);
+
+    // Unsatisfactory outcome routes back (Form II / rejection) — never TECHCOM.
+    expect(await mockStore.listCommitteeSubmissions()).toHaveLength(0);
   });
 
   it("keeps the request out of the register's licensed status (no side effects)", async () => {

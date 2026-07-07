@@ -17,6 +17,14 @@ import {
   inspectionRequestStats,
 } from "@/lib/rules/inspectionRequests";
 import {
+  PRE_AUTH_INSPECTION_TARGET,
+  SLA_STATE_META,
+  inspectionRequestSla,
+  overdueInspectionRequests,
+  slaPhrase,
+} from "@/lib/rules/sla";
+import { todayISO } from "@/lib/rules/week";
+import {
   INSPECTION_PRIORITIES,
   INSPECTION_REQUEST_STATUSES,
   INSPECTION_TYPES,
@@ -76,6 +84,11 @@ export default function InspectionRequestsPage() {
   const stats = useMemo(
     () => inspectionRequestStats(requests, CURRENT_YEAR),
     [requests],
+  );
+  const today = todayISO();
+  const overdue = useMemo(
+    () => overdueInspectionRequests(requests, today),
+    [requests, today],
   );
 
   const suggestions = useMemo(() => {
@@ -166,6 +179,15 @@ export default function InspectionRequestsPage() {
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
       {/* Attention banners — the cross-section handoff signals */}
+      {overdue.length > 0 ? (
+        <Banner
+          tone="red"
+          title={`${overdue.length} inspection ${
+            overdue.length === 1 ? "request is" : "requests are"
+          } past the ${PRE_AUTH_INSPECTION_TARGET}-working-day SOP window`}
+          body="The SOP requires a recommended pre-authorisation inspection to be conducted within 26 working days. Prioritise these."
+        />
+      ) : null}
       {canEditInsp && inbox.incoming.length > 0 ? (
         <Banner
           tone="amber"
@@ -186,12 +208,18 @@ export default function InspectionRequestsPage() {
       ) : null}
 
       {/* Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Kpi label="Open requests" value={stats.open} />
         <Kpi
           label="Awaiting Inspectorate"
           value={inbox.incoming.length}
           accent="amber"
+        />
+        <Kpi
+          label={`Overdue (${PRE_AUTH_INSPECTION_TARGET}-day SOP)`}
+          value={overdue.length}
+          accent={overdue.length ? "red" : "slate"}
+          caption="Working days from the request"
         />
         <Kpi
           label="Reports ready"
@@ -440,6 +468,11 @@ function RequestCard({
   onOpen: () => void;
 }) {
   const priority = REQUEST_PRIORITY_META[r.priority];
+  const sla = inspectionRequestSla(r, todayISO());
+  // Surface the 26-day clock when it needs attention; a quietly on-track or
+  // met clock just shows its due date on the right.
+  const slaAlert =
+    sla && (sla.state === "due-soon" || sla.state === "overdue" || sla.state === "met-late");
   return (
     <li>
       <button
@@ -451,11 +484,18 @@ function RequestCard({
             <div className="font-bold truncate">{r.facilityName}</div>
             <div className="text-xs text-gunmetal/60 mt-0.5">
               <span className="chip slate mr-1">{r.type}</span>
-              <span className={`chip ${priority.chip}`}>{priority.label}</span>
+              <span className={`chip ${priority.chip} mr-1`}>{priority.label}</span>
+              {slaAlert && sla ? (
+                <span className={`chip ${SLA_STATE_META[sla.state].chip}`}>
+                  {slaPhrase(sla)}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="text-[11px] tabular text-gunmetal/55 text-right shrink-0">
-            {r.neededBy ? <div>by {r.neededBy}</div> : null}
+            {sla && !slaAlert && sla.state !== "met" ? (
+              <div>due {sla.dueDate}</div>
+            ) : null}
             {r.facCode ? <div className="caps">{r.facCode}</div> : null}
           </div>
         </div>
@@ -514,14 +554,22 @@ function Banner({
   title,
   body,
 }: {
-  tone: "amber" | "green";
+  tone: "amber" | "green" | "red";
   title: string;
   body: string;
 }) {
   const bg =
-    tone === "green" ? "rgba(0,160,80,0.10)" : "rgba(184,134,11,0.12)";
+    tone === "green"
+      ? "rgba(0,160,80,0.10)"
+      : tone === "red"
+        ? "rgba(190,49,38,0.10)"
+        : "rgba(184,134,11,0.12)";
   const border =
-    tone === "green" ? "rgba(0,160,80,0.35)" : "rgba(184,134,11,0.35)";
+    tone === "green"
+      ? "rgba(0,160,80,0.35)"
+      : tone === "red"
+        ? "rgba(190,49,38,0.35)"
+        : "rgba(184,134,11,0.35)";
   return (
     <div
       className="card p-4"

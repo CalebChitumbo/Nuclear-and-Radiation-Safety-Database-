@@ -85,6 +85,42 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // TECHCOM / Board tracker — the digital "complete applications awaiting
+    // TECHCOM" file. Written by Licensing (A&S); created automatically when a
+    // satisfactory pre-authorisation request is closed, so the Inspectorate may
+    // also create/update one through that shared close action.
+    match /committeeSubmissions/{id} {
+      allow read:   if signedIn();
+      allow create, update: if (isAS() || isInsp())
+        && request.resource.data.facilityName is string
+        && request.resource.data.facilityName.size() > 0
+        && request.resource.data.status in ['Awaiting TECHCOM','Awaiting Board',
+             'Board Approved','Licence Issued','Rejected (Form III)','Withdrawn']
+        && request.resource.data.timeline is list;
+      allow delete: if isAdmin();
+    }
+
+    // Form II (further particulars) tracker — issued and actioned by Licensing.
+    match /furtherParticulars/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isAS()
+        && request.resource.data.facilityName is string
+        && request.resource.data.issuedDate is string
+        && request.resource.data.dueDate is string
+        && request.resource.data.status in ['Awaiting Response','Responded','Withdrawn'];
+      allow delete: if isAdmin();
+    }
+
+    // Monthly reconciliation with Accounts (SOP: by the 5th of the following
+    // month). One doc per calendar month.
+    match /reconciliations/{month} {
+      allow read:   if signedIn();
+      allow create, update: if isAS()
+        && request.resource.data.month == month
+        && request.resource.data.done is bool;
+      allow delete: if isAdmin();
+    }
+
     // RAIS licensing-status tracker: imported on the Licensing Status tab by
     // Authorisation & Standards officers; readable by any signed-in user.
     match /licenceWorkflows/{id} {

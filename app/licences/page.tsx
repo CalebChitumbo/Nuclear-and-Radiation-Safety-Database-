@@ -6,13 +6,24 @@ import { useMemo, useState } from "react";
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { useToast } from "@/components/Toast";
+import { useAuth } from "@/lib/auth";
+import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
+import {
+  AGEING_STATE_META,
+  RENEWAL_TARGET,
+  applicationAgeing,
+  isRenewalRan,
+} from "@/lib/rules/sla";
+import { todayISO } from "@/lib/rules/week";
 import {
   LICENCE_TYPES,
   isUseP,
   type Facility,
   type LicenceType,
+  type ReconciliationRecord,
 } from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -68,10 +79,16 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
 }
 
 export default function LicencesPage() {
-  const { data, loading, error, reload } = useStoreData(
-    async (s) => s.listFacilities(),
-    [],
-  );
+  const { data, loading, error, reload } = useStoreData(async (s) => {
+    const [facilities, workflows, reconciliations] = await Promise.all([
+      s.listFacilities(),
+      // Secondary panels degrade to empty if their collections aren't
+      // readable yet (rules not deployed) — the licence stats must still load.
+      s.listLicenceWorkflows().catch(() => []),
+      s.listReconciliations().catch(() => []),
+    ]);
+    return { facilities, workflows, reconciliations };
+  }, []);
   const [year, setYear] = useState(CURRENT_YEAR);
   // The itemized table's filters: a licence type, or the "standalone" / "use" /
   // "all" groupings; plus a free-text search.
@@ -80,10 +97,13 @@ export default function LicencesPage() {
   const [page, setPage] = useState(0);
 
   const stats = useMemo(
-    () => (data ? computeLicenceStats(data, year) : null),
+    () => (data ? computeLicenceStats(data.facilities, year) : null),
     [data, year],
   );
-  const authRows = useMemo(() => (data ? flattenAuths(data) : []), [data]);
+  const authRows = useMemo(
+    () => (data ? flattenAuths(data.facilities) : []),
+    [data],
+  );
   const filteredAuthRows = useMemo(() => {
     const q = authSearch.trim().toLowerCase();
     return authRows.filter((r) => {
@@ -106,7 +126,7 @@ export default function LicencesPage() {
     });
   }, [authRows, typeFilter, authSearch]);
 
-  if (!stats) {
+  if (!data || !stats) {
     return error ? (
       <LoadErrorBanner error={error} onRetry={reload} />
     ) : (
@@ -212,6 +232,16 @@ export default function LicencesPage() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Bars title="Use / Possession licences by type" rows={useRows} />
         <Bars title="Standalone authorisations by type" rows={otherRows} />
+      </section>
+
+      {/* The SOP's renewal cycle: 1 Oct issue of Form IX, 15-working-day
+          issuance once complete, monthly reconciliation with Accounts. */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RenewalSeasonPanel workflows={data.workflows} />
+        <ReconciliationPanel
+          reconciliations={data.reconciliations}
+          onChanged={reload}
+        />
       </section>
 
       {/* Itemized authorisations — which facility holds which licence */}
@@ -413,4 +443,222 @@ function BreakdownCard({
       <div className="mt-1 text-[11px] text-gunmetal/55">{note}</div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// SOP renewal season + monthly Accounts reconciliation
+// ---------------------------------------------------------------------------
+
+/**
+ * In-flight renewal applications against the SOP's 15-working-day issuance
+ * clock. The renewal cycle itself starts 1st October (Form IX + supplementary
+ * forms issued), so the panel reminds the section when the season is open.
+ */
+function RenewalSeasonPanel({
+  workflows,
+}: {
+  workflows: import("@/lib/rules/types").LicenceWorkflow[];
+}) {
+  const today = todayISO();
+  const renewals = useMemo(() => {
+    const summary = applicationAgeing(
+      workflows.filter((w) => isRenewalRan(w.ran)),
+      today,
+    );
+    return summary;
+  }, [workflows, today]);
+
+  // The season runs 1 Oct → 31 Dec (licences expire 31 Dec).
+  const month = Number(today.slice(5, 7));
+  const seasonOpen = month >= 10;
+
+  return (
+    <div className="card p-5">
+      <div className="caps text-xs text-gunmetal/60 mb-1">
+        Renewal season — {RENEWAL_TARGET}-working-day clock
+      </div>
+      <div className="text-xs text-gunmetal/60 mb-3">
+        {seasonOpen
+          ? "The renewal cycle is OPEN (began 1 October): issue Form IX and follow up technical information to raise invoices."
+          : "The renewal cycle opens 1 October (Form IX + supplementary forms). Complete renewals must be licensed within 15 working days."}
+      </div>
+      {renewals.rows.length === 0 ? (
+        <div className="text-sm text-gunmetal/60 py-4">
+          No renewal applications are currently in flight.
+        </div>
+      ) : (
+        <>
+          <div className="text-sm mb-2">
+            <b className="tabular">{renewals.rows.length}</b> renewal
+            {renewals.rows.length === 1 ? "" : "s"} in flight ·{" "}
+            <span
+              className={
+                renewals.overdue ? "text-[var(--status-stalled)] font-bold" : ""
+              }
+            >
+              {renewals.overdue} over the {RENEWAL_TARGET}-day target
+            </span>
+          </div>
+          <ul className="space-y-1.5 text-sm">
+            {renewals.rows.slice(0, 6).map((r) => (
+              <li
+                key={r.workflow.id}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="truncate">
+                  {r.workflow.facilityName || r.workflow.ran}
+                </span>
+                <span
+                  className={`chip ${AGEING_STATE_META[r.state].chip} shrink-0`}
+                >
+                  {r.ageDays} wd
+                </span>
+              </li>
+            ))}
+          </ul>
+          {renewals.rows.length > 6 ? (
+            <Link
+              className="text-xs caps font-bold text-[var(--rpa-green-dark)] mt-2 inline-block"
+              href="/licensing-process"
+            >
+              All {renewals.rows.length} on Licensing Process →
+            </Link>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The SOP's monthly close-out: reconcile the Accounts report by the 5th of the
+ * following month to confirm every paid-up facility has been licensed. One
+ * tick per month, with who/when recorded.
+ */
+function ReconciliationPanel({
+  reconciliations,
+  onChanged,
+}: {
+  reconciliations: ReconciliationRecord[];
+  onChanged: () => void;
+}) {
+  const { user, canEditAS } = useAuth();
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const today = todayISO();
+  const byMonth = useMemo(
+    () => new Map(reconciliations.map((r) => [r.month, r])),
+    [reconciliations],
+  );
+
+  // The last six calendar months, current first. Reconciliation for month M is
+  // due the 5th of M+1.
+  const months = useMemo(() => {
+    const out: { month: string; due: string }[] = [];
+    const [y0, m0] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
+    for (let i = 0; i < 6; i++) {
+      const m = m0 - 1 - i;
+      const y = y0 + Math.floor(m / 12);
+      const mm = ((m % 12) + 12) % 12;
+      const month = `${y}-${String(mm + 1).padStart(2, "0")}`;
+      const dueM = mm + 1;
+      const dueY = dueM >= 12 ? y + 1 : y;
+      const due = `${dueY}-${String((dueM % 12) + 1).padStart(2, "0")}-05`;
+      out.push({ month, due });
+    }
+    return out;
+  }, [today]);
+
+  const toggle = async (month: string, done: boolean) => {
+    if (!user || busy) return;
+    setBusy(month);
+    try {
+      const s = await store();
+      await s.setReconciliation(
+        {
+          month,
+          done,
+          doneBy: done ? user.uid : undefined,
+          doneByName: done ? user.displayName : undefined,
+          doneAt: done ? new Date().toISOString() : undefined,
+        },
+        user.uid,
+      );
+      toast.push(
+        done ? `${month} reconciled with Accounts.` : `${month} reopened.`,
+        "success",
+      );
+      onChanged();
+    } catch (err) {
+      toast.push(
+        `Could not save: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="card p-5">
+      <div className="caps text-xs text-gunmetal/60 mb-1">
+        Monthly reconciliation with Accounts
+      </div>
+      <div className="text-xs text-gunmetal/60 mb-3">
+        By the 5th of each month, confirm against the Accounts report that every
+        paid-up facility has been licensed.
+      </div>
+      <ul className="divide-y divide-gunmetal/8">
+        {months.map(({ month, due }) => {
+          const rec = byMonth.get(month);
+          const done = !!rec?.done;
+          const overdue = !done && today > due;
+          return (
+            <li
+              key={month}
+              className="py-2 flex items-center justify-between gap-3 text-sm"
+            >
+              <div>
+                <span className="font-bold tabular">{monthLabel(month)}</span>
+                <span className="text-[11px] text-gunmetal/55 ml-2">
+                  due {due}
+                </span>
+                {done && rec?.doneByName ? (
+                  <div className="text-[11px] text-gunmetal/55">
+                    by {rec.doneByName} · {(rec.doneAt || "").slice(0, 10)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`chip ${done ? "green" : overdue ? "red" : "slate"}`}
+                >
+                  {done ? "Reconciled" : overdue ? "Overdue" : "Pending"}
+                </span>
+                {canEditAS ? (
+                  <button
+                    className="btn btn-ghost"
+                    disabled={busy === month}
+                    onClick={() => toggle(month, !done)}
+                  >
+                    {busy === month ? "…" : done ? "Undo" : "Mark done"}
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }

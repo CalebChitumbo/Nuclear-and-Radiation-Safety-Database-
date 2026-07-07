@@ -1,16 +1,25 @@
 import type {
+  CommitteeAction,
+  CommitteeActor,
+  NewCommitteeSubmissionInput,
+} from "../rules/committee";
+import type { FormIIAction, FormIIActor, NewFormIIInput } from "../rules/formII";
+import type {
   InspectionRequestAction,
   NewInspectionRequestInput,
   RequestActor,
 } from "../rules/inspectionRequests";
 import type {
   Activity,
+  CommitteeSubmission,
   DashboardAggregate,
   Facility,
+  FurtherParticularsRecord,
   Inspection,
   InspectionRequest,
   LicenceEvent,
   LicenceWorkflow,
+  ReconciliationRecord,
   UserDoc,
   WeekDef,
   WeekMetrics,
@@ -72,13 +81,41 @@ export interface DataStore {
   /**
    * Advance a request through its lifecycle (acknowledge / assign / start /
    * complete / close / cancel / comment). Completing one also records the dated
-   * Inspection it produced and links it back (`inspectionId`).
+   * Inspection it produced and links it back (`inspectionId`). Closing a
+   * pre-authorisation request with a SATISFACTORY outcome also files a
+   * CommitteeSubmission (the SOP's gate → TECHCOM handoff).
    */
   updateInspectionRequest(
     id: string,
     action: InspectionRequestAction,
     actor: RequestActor,
   ): Promise<InspectionRequest>;
+  /**
+   * The TECHCOM / Board queue — the digital "complete applications awaiting
+   * TECHCOM" file. Newest first.
+   */
+  listCommitteeSubmissions(): Promise<CommitteeSubmission[]>;
+  addCommitteeSubmission(
+    input: NewCommitteeSubmissionInput,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission>;
+  /** TECHCOM/Board decisions, issuance, rejection (Form III), comments. */
+  updateCommitteeSubmission(
+    id: string,
+    action: CommitteeAction,
+    actor: CommitteeActor,
+  ): Promise<CommitteeSubmission>;
+  /** Form II (further particulars) tracker, newest first. */
+  listFurtherParticulars(): Promise<FurtherParticularsRecord[]>;
+  addFurtherParticulars(
+    input: NewFormIIInput,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord>;
+  updateFurtherParticulars(
+    id: string,
+    action: FormIIAction,
+    actor: FormIIActor,
+  ): Promise<FurtherParticularsRecord>;
   /**
    * Upsert parsed RAIS workflow records (keyed by RAN) and roll each matched
    * facility's stage up onto its facility doc. Returns how many facility stages
@@ -88,6 +125,18 @@ export interface DataStore {
     items: LicenceWorkflow[],
     uid: string,
   ): Promise<{ saved: number; facilitiesUpdated: number }>;
+  /**
+   * Patch one tracked application (checklist ticks, completeness date). An
+   * `undefined` value clears that field.
+   */
+  updateLicenceWorkflow(
+    id: string,
+    patch: Partial<LicenceWorkflow>,
+    uid: string,
+  ): Promise<void>;
+  /** Monthly Accounts reconciliation checklist (SOP: by the 5th). */
+  listReconciliations(): Promise<ReconciliationRecord[]>;
+  setReconciliation(rec: ReconciliationRecord, uid: string): Promise<void>;
   updateFacility(id: string, patch: Partial<Facility>, uid: string): Promise<void>;
   addFacility(f: Omit<Facility, "id">, uid: string): Promise<Facility>;
   provisionUser(input: {
@@ -103,6 +152,8 @@ export interface DataStore {
     licenceEvents: LicenceEvent[];
     inspections: Inspection[];
     inspectionRequests: InspectionRequest[];
+    committeeSubmissions: CommitteeSubmission[];
+    furtherParticulars: FurtherParticularsRecord[];
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;

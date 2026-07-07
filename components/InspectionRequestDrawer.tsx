@@ -15,6 +15,13 @@ import {
   type InspectionRequestActionKind,
 } from "@/lib/rules/inspectionRequests";
 import {
+  PRE_AUTH_INSPECTION_TARGET,
+  SLA_STATE_META,
+  inspectionGate,
+  inspectionRequestSla,
+  slaPhrase,
+} from "@/lib/rules/sla";
+import {
   INSPECTION_OUTCOMES,
   type InspectionOutcome,
   type InspectionRequest,
@@ -167,6 +174,43 @@ export function InspectionRequestDrawer({
 
   const statusMeta = REQUEST_STATUS_META[shown.status];
   const priorityMeta = REQUEST_PRIORITY_META[shown.priority];
+  const sla = inspectionRequestSla(shown, todayISO());
+  const gate = inspectionGate(shown.outcome);
+
+  // The unsatisfactory route: raise the Form II straight off the report, so
+  // the further-particulars clock starts with everything prefilled.
+  const issueFormII = async () => {
+    if (!actor || busy) return;
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.addFurtherParticulars(
+        {
+          ran: shown.workflowRan,
+          facilityId: shown.facilityId,
+          facilityName: shown.facilityName,
+          facCode: shown.facCode,
+          details:
+            shown.findings?.trim() ||
+            `Address the findings of the ${shown.type.toLowerCase()} inspection (report ${shown.reportRef || "on file"}).`,
+          issuedDate: todayISO(),
+        },
+        actor,
+      );
+      toast.push(
+        "Form II issued — tracked under Licensing Process with its 14-working-day response window.",
+        "success",
+      );
+      onChanged();
+    } catch (err) {
+      toast.push(
+        `Could not issue Form II: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Drawer open onClose={onClose} title={shown.facilityName}>
@@ -177,6 +221,11 @@ export function InspectionRequestDrawer({
             {priorityMeta.label} priority
           </span>
           <span className="chip slate">{shown.type}</span>
+          {sla ? (
+            <span className={`chip ${SLA_STATE_META[sla.state].chip}`}>
+              {SLA_STATE_META[sla.state].label} · {slaPhrase(sla)}
+            </span>
+          ) : null}
           {shown.facCode ? (
             <span className="chip caps">{shown.facCode}</span>
           ) : null}
@@ -191,8 +240,9 @@ export function InspectionRequestDrawer({
             sub={fmt(shown.requestedAt)}
           />
           <Field
-            label="Needed by"
-            value={shown.neededBy || "—"}
+            label={`SOP due (${PRE_AUTH_INSPECTION_TARGET} working days)`}
+            value={sla ? sla.dueDate : "—"}
+            sub={shown.neededBy ? `officer asked by ${shown.neededBy}` : undefined}
           />
           {shown.assignedInspector ? (
             <Field
@@ -249,6 +299,35 @@ export function InspectionRequestDrawer({
               >
                 View on facility →
               </Link>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* The SOP's verification gate: the outcome routes the application. */}
+        {gate && shown.type === "Pre-Authorisation" ? (
+          <div
+            className="mt-4 card p-3"
+            style={{
+              background: gate.satisfactory
+                ? "rgba(0,160,80,0.08)"
+                : "rgba(190,49,38,0.07)",
+              borderColor: gate.satisfactory
+                ? "rgba(0,160,80,0.3)"
+                : "rgba(190,49,38,0.3)",
+            }}
+          >
+            <div className="caps text-[10px] text-gunmetal/60">
+              Next step per SOP
+            </div>
+            <div className="text-sm mt-1">{gate.guidance}</div>
+            {!gate.satisfactory && canEditAS ? (
+              <button
+                className="btn btn-secondary mt-2"
+                disabled={busy}
+                onClick={issueFormII}
+              >
+                {busy ? "Working…" : "Issue Form II (further particulars)"}
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -376,6 +455,15 @@ export function InspectionRequestDrawer({
 
           {(open === "acknowledge" || open === "start" || open === "close") ? (
             <div className="mt-3 space-y-3">
+              {open === "close" &&
+              gate?.satisfactory &&
+              shown.type === "Pre-Authorisation" ? (
+                <div className="text-[11px] text-gunmetal/60">
+                  The inspection was satisfactory — closing files this
+                  application in the <b>TECHCOM queue</b> automatically, with the
+                  report reference bundled.
+                </div>
+              ) : null}
               <NoteField note={note} setNote={setNote} label="Note (optional)" />
               <RunButton busy={busy} onClick={() => run(open)}>
                 {ACTION_LABEL[open]}

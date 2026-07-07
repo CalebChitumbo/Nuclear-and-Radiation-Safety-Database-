@@ -14,6 +14,12 @@ import {
   deriveInspectionInbox,
   inspectionRequestStats,
 } from "@/lib/rules/inspectionRequests";
+import {
+  NEW_LICENCE_TARGET,
+  applicationAgeing,
+  overdueInspectionRequests,
+} from "@/lib/rules/sla";
+import { todayISO } from "@/lib/rules/week";
 import { LICENCE_TYPES, PROVINCES, STAGES, isUseP } from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -34,17 +40,20 @@ export default function DashboardPage() {
   // on the selected week — refetching the collections on every week change
   // was wasted Firestore reads.
   const { data, error, reload } = useStoreData(async (s) => {
-    const [agg, facilities, events, inspections, requests] = await Promise.all([
-      s.getAggregate(),
-      s.listFacilities(),
-      s.listLicenceEvents(),
-      s.listInspections(),
-      // The inspection-request summary is secondary: if this collection can't be
-      // read yet (e.g. its security rules haven't been deployed), the core
-      // dashboard must still load. Degrade to an empty list rather than failing.
-      s.listInspectionRequests().catch(() => []),
-    ]);
-    return { agg, facilities, events, inspections, requests };
+    const [agg, facilities, events, inspections, requests, workflows] =
+      await Promise.all([
+        s.getAggregate(),
+        s.listFacilities(),
+        s.listLicenceEvents(),
+        s.listInspections(),
+        // The inspection-request summary is secondary: if this collection can't
+        // be read yet (e.g. its security rules haven't been deployed), the core
+        // dashboard must still load. Degrade to an empty list rather than
+        // failing. Same for the workflow tracker feeding the SOP clocks.
+        s.listInspectionRequests().catch(() => []),
+        s.listLicenceWorkflows().catch(() => []),
+      ]);
+    return { agg, facilities, events, inspections, requests, workflows };
   }, []);
 
   if (!data) {
@@ -55,13 +64,16 @@ export default function DashboardPage() {
     );
   }
 
-  const { agg, events, inspections, facilities, requests } = data;
+  const { agg, events, inspections, facilities, requests, workflows } = data;
   const coverage = agg.total ? (agg.licensed / agg.total) * 100 : 0;
   const inspectionInbox = deriveInspectionInbox(requests, {
     canEditAS,
     canEditInsp,
   });
   const requestStats = inspectionRequestStats(requests, CURRENT_YEAR);
+  const today = todayISO();
+  const ageing = applicationAgeing(workflows, today);
+  const overdueRequests = overdueInspectionRequests(requests, today);
   const licence = computeLicenceStats(facilities, CURRENT_YEAR);
   const issuedTypeRows = LICENCE_TYPES.map((t) => ({
     type: t,
@@ -222,6 +234,47 @@ export default function DashboardPage() {
             value={requestStats.reportsReady}
             accent
           />
+        </div>
+      </section>
+
+      {/* The SOP's statutory clocks (working days) */}
+      <section className="card p-5">
+        <div className="flex items-baseline justify-between mb-3">
+          <div className="caps text-xs text-gunmetal/60">
+            SOP timelines — working-day clocks
+          </div>
+          <Link
+            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
+            href="/licensing-process"
+          >
+            Open licensing process
+          </Link>
+        </div>
+        {ageing.overdue + overdueRequests.length > 0 ? (
+          <div className="text-sm mb-3">
+            <span className="chip red mr-2">
+              {ageing.overdue + overdueRequests.length}
+            </span>
+            <span className="text-gunmetal/75">
+              {ageing.overdue > 0
+                ? `${ageing.overdue} application${
+                    ageing.overdue === 1 ? "" : "s"
+                  } past the ${NEW_LICENCE_TARGET}-working-day target`
+                : null}
+              {ageing.overdue > 0 && overdueRequests.length > 0 ? " · " : null}
+              {overdueRequests.length > 0
+                ? `${overdueRequests.length} inspection${
+                    overdueRequests.length === 1 ? "" : "s"
+                  } past the 26-day window`
+                : null}
+            </span>
+          </div>
+        ) : null}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MiniStat label="Applications in flight" value={ageing.rows.length} />
+          <MiniStat label="On track" value={ageing.onTrack} accent />
+          <MiniStat label="At risk" value={ageing.atRisk} />
+          <MiniStat label="Over target" value={ageing.overdue} />
         </div>
       </section>
 

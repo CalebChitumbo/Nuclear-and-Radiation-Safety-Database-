@@ -21,6 +21,7 @@ import {
   type WorkflowReport,
 } from "@/lib/rules/parseNotifications";
 import { detectType } from "@/lib/rules/detectType";
+import { AGEING_STATE_META, applicationAge } from "@/lib/rules/sla";
 import { todayISO } from "@/lib/rules/week";
 import {
   isAmbiguousLicenceRan,
@@ -620,6 +621,10 @@ function KanbanBoard({ records }: { records: LicenceWorkflow[] }) {
 
 function WorkflowCard({ record: r }: { record: LicenceWorkflow }) {
   const meta = PRIORITY_META[r.priority];
+  // Age against the SOP clock (44 working days; 15 for renewals). Quietly
+  // on-track applications don't need a chip — surface at-risk / over-target.
+  const age = applicationAge(r, todayISO());
+  const ageAlert = age && age.state !== "on-track";
   return (
     <div
       className="card card-hover p-2.5"
@@ -631,8 +636,13 @@ function WorkflowCard({ record: r }: { record: LicenceWorkflow }) {
       <div className="text-[11px] tabular text-gunmetal/55">{r.ran}</div>
       <div className="text-xs mt-1">{r.stage}</div>
       <div className="text-[11px] text-gunmetal/60 mt-1">{r.responsibleParty}</div>
-      {r.outstandingPayment || r.bottleneck || !r.facilityId ? (
+      {r.outstandingPayment || r.bottleneck || !r.facilityId || ageAlert ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {ageAlert && age ? (
+            <span className={`chip ${AGEING_STATE_META[age.state].chip}`}>
+              {age.ageDays} wd · {AGEING_STATE_META[age.state].label}
+            </span>
+          ) : null}
           {r.outstandingPayment ? (
             <span className="chip amber">⚠ payment</span>
           ) : null}

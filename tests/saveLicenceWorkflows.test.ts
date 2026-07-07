@@ -348,4 +348,36 @@ describe("saveLicenceWorkflows — licence family drives where an update lands",
     expect(after.stage).toBe(before.stage); // stays "Licensed", not downgraded
     expect((after.auths || []).length).toBe(before.auths); // renewal stays manual
   });
+
+  it("stamps firstSeen once and preserves the checklist across re-imports (the 44-day clock)", async () => {
+    // First import: firstSeen derived from the parsed RAIS date (DD/MM/YYYY).
+    await mockStore.saveLicenceWorkflows(
+      [wf({ ran: "AUTH/USE.NEW/0500", lastSeen: "10/06/2026" })],
+      "u",
+    );
+    let saved = (await mockStore.listLicenceWorkflows()).find(
+      (w) => w.ran === "AUTH/USE.NEW/0500",
+    )!;
+    expect(saved.firstSeen).toBe("2026-06-10");
+
+    // Officer records the completeness checklist on the tracked application.
+    await mockStore.updateLicenceWorkflow(
+      saved.id,
+      { checklist: { "form-i": true }, completeReceivedAt: "2026-06-12" },
+      "u",
+    );
+
+    // A later notification for the same RAN must not restart the clock or drop
+    // the checklist.
+    await mockStore.saveLicenceWorkflows(
+      [wf({ ran: "AUTH/USE.NEW/0500", lastSeen: "01/07/2026", phase: "Review & Assessment" })],
+      "u",
+    );
+    saved = (await mockStore.listLicenceWorkflows()).find(
+      (w) => w.ran === "AUTH/USE.NEW/0500",
+    )!;
+    expect(saved.firstSeen).toBe("2026-06-10");
+    expect(saved.checklist).toEqual({ "form-i": true });
+    expect(saved.completeReceivedAt).toBe("2026-06-12");
+  });
 });
