@@ -14,6 +14,7 @@ const NAV = [
   { href: "/facilities", label: "Facilities", icon: "▤" },
   { href: "/licences", label: "Licences", icon: "▦" },
   { href: "/licence-status", label: "Licensing Status", icon: "◑" },
+  { href: "/licensing-process", label: "Licensing Process", icon: "◔" },
   { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
   { href: "/inspections", label: "Inspections", icon: "✶" },
   { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },

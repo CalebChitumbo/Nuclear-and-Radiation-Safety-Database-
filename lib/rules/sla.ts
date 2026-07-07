@@ -268,6 +268,36 @@ export interface ApplicationAgeingSummary {
 }
 
 /**
+ * Age ONE application against its SOP target (44 working days, or 15 for a
+ * renewal). Null when the application is not active or carries no usable
+ * start date.
+ */
+export function applicationAge(
+  w: LicenceWorkflow,
+  todayISO: string,
+): ApplicationAge | null {
+  if (!isActiveApplication(w)) return null;
+  const startDate = workflowStartDate(w);
+  if (!startDate) return null;
+  const target = isRenewalRan(w.ran) ? RENEWAL_TARGET : NEW_LICENCE_TARGET;
+  const atRiskAfter = isRenewalRan(w.ran)
+    ? Math.max(1, RENEWAL_TARGET - DUE_SOON_THRESHOLD)
+    : APPLICATION_AT_RISK_AFTER;
+  const ageDays = workingDaysBetween(startDate, todayISO);
+  const dueDate = addWorkingDays(startDate, target);
+  const state: AgeingState =
+    ageDays > target ? "overdue" : ageDays >= atRiskAfter ? "at-risk" : "on-track";
+  return {
+    workflow: w,
+    startDate,
+    ageDays,
+    dueDate,
+    state,
+    waitingOnApplicant: /applicant|licensee/i.test(w.responsibleParty || ""),
+  };
+}
+
+/**
  * Age every active application against the SOP's 44-working-day target.
  * Renewal applications use the 15-working-day renewal target instead.
  */
@@ -280,27 +310,12 @@ export function applicationAgeing(
 
   for (const w of workflows) {
     if (!isActiveApplication(w)) continue;
-    const startDate = workflowStartDate(w);
-    if (!startDate) {
+    const row = applicationAge(w, todayISO);
+    if (!row) {
       undated++;
       continue;
     }
-    const target = isRenewalRan(w.ran) ? RENEWAL_TARGET : NEW_LICENCE_TARGET;
-    const atRiskAfter = isRenewalRan(w.ran)
-      ? Math.max(1, RENEWAL_TARGET - DUE_SOON_THRESHOLD)
-      : APPLICATION_AT_RISK_AFTER;
-    const ageDays = workingDaysBetween(startDate, todayISO);
-    const dueDate = addWorkingDays(startDate, target);
-    const state: AgeingState =
-      ageDays > target ? "overdue" : ageDays >= atRiskAfter ? "at-risk" : "on-track";
-    rows.push({
-      workflow: w,
-      startDate,
-      ageDays,
-      dueDate,
-      state,
-      waitingOnApplicant: /applicant|licensee/i.test(w.responsibleParty || ""),
-    });
+    rows.push(row);
   }
 
   rows.sort((a, b) => b.ageDays - a.ageDays);

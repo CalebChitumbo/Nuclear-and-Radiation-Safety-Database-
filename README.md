@@ -169,6 +169,9 @@ automatically (Production for the production branch, Preview for others).
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
 | `inspections/{id}` | The dated inspection log |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
+| `committeeSubmissions/{id}` | The TECHCOM / Board tracker — the digital "complete applications awaiting TECHCOM" file, through Board approval, Form III rejection or licence issuance |
+| `furtherParticulars/{id}` | Form II (request for further particulars) tracker with its 14-working-day response window |
+| `reconciliations/{YYYY-MM}` | Monthly Accounts reconciliation ticks (SOP: by the 5th of the following month) |
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
@@ -294,19 +297,67 @@ and the facility drawer lists every request a facility has had.
 
 ---
 
+## The SOP's statutory clocks (working days)
+
+The RPA licensing SOP measures every deadline in **working days** — weekends
+and Zambian public holidays excluded (`lib/rules/workingDays.ts` computes the
+holiday calendar, including Easter and the moveable Monday holidays). The app
+enforces the four clocks end-to-end:
+
+| Clock | SOP target | Where it lives |
+|---|---|---|
+| Pre-authorisation inspection | **26 working days** from the recommendation | Inspection Requests board + drawer: due date, countdown, overdue banner |
+| New licence issued | **44 working days** from a *complete* application | Licensing Process page + Overview "SOP timelines" panel; age chips on the Licensing Status board |
+| Renewal issued | **15 working days** from a complete renewal | Renewal-season panel on Licences; renewals auto-detected by RAN (`USE.REN`) |
+| Form II response | **14 working days** for the client | Form II tracker on Licensing Process; expired = rejection candidate |
+
+**The verification gate.** The inspection outcome routes the application, per
+the SOP (`lib/rules/sla.ts` → `inspectionGate`): a **satisfactory** outcome
+(Compliant / Minor findings) means closing the request files the application
+in the **TECHCOM queue** automatically, with the report reference bundled; an
+**unsatisfactory** one offers "Issue Form II" straight off the report.
+
+**The Licensing Process page** (`/licensing-process`) is the section's
+internal cockpit:
+
+1. **Applications vs the 44-day target** — every in-flight application aged
+   in working days (at risk from day 30), with the **Form I completeness
+   checklist** (`lib/rules/checklist.ts`) per application: ticking every
+   required SOP attachment records the application COMPLETE and starts the
+   clock from that date (until then the first-seen date is used).
+2. **TECHCOM & Board** (`lib/rules/committee.ts`) — the digital "complete
+   applications awaiting TECHCOM" file: TECHCOM recommendation → Board
+   approval → licence issued (Form IV), or rejection with the Form III
+   reference recorded; full audit trail per submission.
+3. **Form II tracker** (`lib/rules/formII.ts`) — every request for further
+   particulars with its response window; expired requests are flagged as the
+   SOP's candidates for rejection.
+
+The Licences page adds the **renewal season** panel (cycle opens 1 October;
+in-flight renewals against the 15-day clock) and the **monthly reconciliation
+with Accounts** checklist (due the 5th of the following month).
+
+---
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-205 tests across `lib/rules/*` and the seed baseline, including:
+261 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
 - `recordLicence` — full R1–R6 worked expectation
 - `inspectionRequests` — request state machine, capability gating, inbox
   notifications and stats for the Inspectorate ↔ Licensing handoff
+- `workingDays` — the Zambian holiday calendar (Easter computus, moveable
+  Mondays, Sunday observance) and working-day arithmetic
+- `sla` — the SOP clocks (26 / 44 / 15 / 14 working days), the inspection
+  outcome gate, and application ageing
+- `committee` / `formII` / `checklist` — the TECHCOM/Board state machine,
+  Form II response windows, and Form I completeness
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
@@ -327,6 +378,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── bulk-approval/      Paste → match → review → commit
 │   ├── inspections/        Inspection log + "conducted" totals
 │   ├── inspection-requests/ Licensing ↔ Inspectorate pre-auth handoff board
+│   ├── licensing-process/  SOP clocks · TECHCOM & Board · Form II · checklists
 │   ├── weekly/             Weekly sectional report
 │   ├── admin/users/
 │   └── settings/
