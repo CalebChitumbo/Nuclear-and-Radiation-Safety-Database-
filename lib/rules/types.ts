@@ -411,9 +411,35 @@ export interface DailyEntry {
   value?: number;
   /** Note text, or an optional remark attached to a count. */
   text?: string;
+  /**
+   * The border post this count came from (NSSS vehicle screening). Each
+   * border coordinator logs their own figure; the day's official total is the
+   * sum across borders. Absent on non-border entries.
+   */
+  border?: string;
+  /**
+   * Marks the NSSS senior officer's official daily confirmation (a `note`
+   * entry recording the confirmed screening total). Never set on the border
+   * coordinators' count entries — the numbers stay single-sourced.
+   */
+  official?: boolean;
   createdAt?: string;
   updatedBy?: string;
   updatedByName?: string;
+}
+
+/**
+ * A border post / office the NSSS section screens vehicles at. Coordinators
+ * pick their border when logging a daily screening count; deactivated borders
+ * keep their history but stop appearing in the picker. Managed by the NSSS
+ * section (and admins) on the NSSS tab.
+ */
+export interface Border {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt?: string;
+  updatedBy?: string;
 }
 
 export interface Activity {

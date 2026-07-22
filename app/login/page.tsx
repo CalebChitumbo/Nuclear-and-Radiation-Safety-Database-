@@ -10,6 +10,7 @@ const DEMO_ACCOUNTS = [
   { email: "admin@rpa.gov.zm", role: "Administrator" },
   { email: "as.officer@rpa.gov.zm", role: "Authorisation & Standards officer" },
   { email: "inspector@rpa.gov.zm", role: "Inspectorate officer" },
+  { email: "nsss@rpa.gov.zm", role: "Nuclear Safety, Security & Safeguards officer" },
 ];
 
 export default function LoginPage() {

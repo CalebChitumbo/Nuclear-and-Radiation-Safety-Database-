@@ -18,6 +18,12 @@ service cloud.firestore {
         section() == 'All' || isAdmin()
       );
     }
+    function isNSSS() {
+      return signedIn() && (
+        section() == 'Nuclear Safety, Security & Safeguards' ||
+        section() == 'All' || isAdmin()
+      );
+    }
 
     function validFacility(d) {
       return d.name is string && d.name.size() > 0
@@ -119,6 +125,20 @@ service cloud.firestore {
           && request.resource.data.updatedBy == resource.data.updatedBy);
       allow delete:
         if isAdmin() || (signedIn() && resource.data.updatedBy == request.auth.uid);
+    }
+
+    // Border posts the NSSS section screens vehicles at. The border list is
+    // managed by NSSS (and admins): coordinators pick their border when
+    // logging a daily screening count. Deactivating (active=false) hides a
+    // border from the picker but keeps its logged history; deletes stay
+    // admin-only.
+    match /borders/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isNSSS()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.active is bool;
+      allow delete: if isAdmin();
     }
 
     // Weekly manual metrics: any officer may contribute their section's

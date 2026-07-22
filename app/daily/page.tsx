@@ -11,46 +11,57 @@ import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
+import { QuickLogWizard } from "@/components/daily/QuickLogWizard";
 import {
-  dailyMetricOptions,
+  borderSums,
+  buildOfficialScreeningText,
   entriesForDate,
   entriesForWeek,
   mergeWeekManualValues,
+  vehicleScreeningKey,
 } from "@/lib/rules/daily";
 import {
   isUsePossessionWorkflow,
   needsTypeClassification,
 } from "@/lib/rules/licenceFamily";
-import { norm } from "@/lib/rules/matching";
-import { todayISO, weekLabelForDate } from "@/lib/rules/week";
+import { parseISO, toISO, todayISO, weekLabelForDate } from "@/lib/rules/week";
 import { deriveWeekly } from "@/lib/rules/weeklyDerivation";
 import {
-  INSPECTION_OUTCOMES,
-  INSPECTION_TYPES,
   SECTIONS,
-  type Facility,
-  type InspectionOutcome,
-  type InspectionType,
+  type Border,
+  type DailyEntry,
   type Section,
 } from "@/lib/rules/types";
 
+/** Short tab labels so the section switcher fits a phone screen. */
+const SHORT_SECTION: Record<Section, string> = {
+  "Authorisation & Standards": "Licensing (A&S)",
+  Inspectorate: "Inspectorate",
+  "Nuclear Safety, Security & Safeguards": "NSSS",
+  "National Source Inventory": "NSI",
+};
+
+function addDays(iso: string, delta: number): string {
+  const d = parseISO(iso);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return toISO(d);
+}
+
 /**
- * Daily Updates — each section logs its day as it happens and the system
- * totals the week by itself:
+ * Daily Updates — the field-first logging hub. Every section logs its day one
+ * question at a time (built to be used on a phone at a facility or a border
+ * post), and the week totals itself from those entries:
  *
- * - Inspectorate: the facilities inspected today (logged straight into the
- *   inspections register, which is already daily-dated).
- * - Licensing (A&S): today's recorded licences, plus the issued-certificate
- *   suggestions waiting to be confirmed on the Smart Status Update tab.
- * - NSSS / NSI: numbers against the section's metrics (vehicles screened,
- *   sources verified, …) and free-text notes.
- *
- * Count entries land on the same metric keys the weekly report uses, so the
- * week's totals build up entry by entry — at the end of the week the weekly
- * report is already written.
+ * - Inspectorate taps through facility → type → outcome; the entry lands in
+ *   the inspections register.
+ * - Licensing sees today's recorded licences and the issued-certificate
+ *   confirmations waiting on Smart Status Update, and logs its counts.
+ * - NSSS border coordinators pick their border post and enter the vehicles
+ *   screened; the senior officer sees the live per-border breakdown and
+ *   confirms the official daily total.
  */
 export default function DailyUpdatesPage() {
-  const { user, canEditInsp } = useAuth();
+  const { user } = useAuth();
   const { weeks, setSelected } = useWeek();
   const toast = useToast();
   const router = useRouter();
@@ -69,19 +80,35 @@ export default function DailyUpdatesPage() {
 
   const { data, error, reload } = useStoreData(
     async (s) => {
-      const [facilities, events, inspections, entries, workflows, metrics] =
-        await Promise.all([
-          s.listFacilities(),
-          s.listLicenceEvents(),
-          s.listInspections(),
-          // Degrade gracefully until the dailyEntries rules are deployed.
-          s.listDailyEntries().catch(() => []),
-          s.listLicenceWorkflows().catch(() => []),
-          weekLabel
-            ? s.getWeekMetrics(weekLabel)
-            : Promise.resolve({ week: "", values: {} }),
-        ]);
-      return { facilities, events, inspections, entries, workflows, metrics };
+      const [
+        facilities,
+        events,
+        inspections,
+        entries,
+        workflows,
+        borders,
+        metrics,
+      ] = await Promise.all([
+        s.listFacilities(),
+        s.listLicenceEvents(),
+        s.listInspections(),
+        // Degrade gracefully until the dailyEntries/borders rules are deployed.
+        s.listDailyEntries().catch(() => []),
+        s.listLicenceWorkflows().catch(() => []),
+        s.listBorders().catch(() => []),
+        weekLabel
+          ? s.getWeekMetrics(weekLabel)
+          : Promise.resolve({ week: "", values: {} }),
+      ]);
+      return {
+        facilities,
+        events,
+        inspections,
+        entries,
+        workflows,
+        borders,
+        metrics,
+      };
     },
     [weekLabel],
   );
@@ -94,11 +121,13 @@ export default function DailyUpdatesPage() {
     );
   }
 
-  const { facilities, events, inspections, entries, workflows, metrics } = data;
+  const { facilities, events, inspections, entries, workflows, borders, metrics } =
+    data;
 
   const dayEvents = events.filter((e) => e.date === date);
   const dayInspections = inspections.filter((i) => i.date === date);
   const dayEntries = entriesForDate(entries, date);
+  const daySectionEntries = dayEntries.filter((e) => e.section === section);
 
   // Week-so-far rollup: auto figures from the dated registers + manual metrics
   // with the week's daily counts taking precedence over typed weekly values.
@@ -109,8 +138,8 @@ export default function DailyUpdatesPage() {
   const weekReport = deriveWeekly(wkEvents, wkInspections, merged.values);
 
   // Licensing suggestions: issued Use/Possession certificates whose facility is
-  // still not marked Licensed — the officer confirms them on Smart Status
-  // Update (same predicate as that tab's "Ready to license" panel).
+  // still not marked Licensed — confirmed on Smart Status Update (same
+  // predicate as that tab's "Ready to license" panel).
   const facById = new Map(facilities.map((f) => [f.id, f]));
   const readyToConfirm = workflows.filter((r) => {
     if (r.reviewStatus === "needs-review") return false;
@@ -124,6 +153,7 @@ export default function DailyUpdatesPage() {
 
   const editable = canEditSection(user, section);
   const isAdmin = user?.role === "admin";
+  const today = todayISO();
 
   const openWeeklyReport = () => {
     const w = weeks.find((x) => x.label === weekLabel);
@@ -146,51 +176,74 @@ export default function DailyUpdatesPage() {
 
   return (
     <div className="space-y-4 staggered">
-      {/* Day picker + week landing */}
-      <div className="card p-5 flex items-end justify-between flex-wrap gap-3">
-        <div className="flex items-end gap-4 flex-wrap">
-          <div>
-            <label className="caps text-[10px] text-gunmetal/60">Day</label>
-            <input
-              type="date"
-              className="input mt-1"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+      {/* Day picker — compact, thumb-friendly */}
+      <div className="card p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label className="caps text-[10px] text-gunmetal/60">Day</label>
+              <input
+                type="date"
+                className="input mt-1"
+                style={{ maxWidth: 170 }}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-1.5 pb-0.5">
+              <button
+                className={`btn ${date === today ? "btn-primary" : "btn-secondary"} px-3 py-2 text-xs`}
+                onClick={() => setDate(today)}
+              >
+                Today
+              </button>
+              <button
+                className={`btn ${date === addDays(today, -1) ? "btn-primary" : "btn-secondary"} px-3 py-2 text-xs`}
+                onClick={() => setDate(addDays(today, -1))}
+              >
+                Yesterday
+              </button>
+            </div>
           </div>
-          <div>
-            <div className="caps text-[10px] text-gunmetal/60">
-              Counts toward
+          <div className="flex items-end gap-3">
+            <div className="text-right">
+              <div className="caps text-[10px] text-gunmetal/60">
+                Counts toward
+              </div>
+              <div className="text-sm sm:text-base font-black">
+                {weekLabel || "(outside the calendar)"}
+              </div>
             </div>
-            <div className="text-lg font-black">
-              {weekLabel || "(outside the reporting calendar)"}
-            </div>
+            <button
+              className="btn btn-secondary hidden sm:inline-flex"
+              onClick={openWeeklyReport}
+            >
+              Weekly report
+            </button>
           </div>
         </div>
-        <button className="btn btn-secondary" onClick={openWeeklyReport}>
-          Open weekly report
-        </button>
       </div>
 
-      {/* Section switcher */}
-      <div className="flex flex-wrap gap-2">
+      {/* Section switcher — scrolls sideways on a phone */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {SECTIONS.map((s) => {
           const active = section === s;
           return (
             <button
               key={s}
               aria-pressed={active}
+              title={s}
               onClick={() => setSection(s)}
-              className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors"
+              className="shrink-0 px-4 py-2 rounded-full text-sm font-bold border transition-colors"
               style={{
-                background: active ? "var(--rpa-green)" : "transparent",
+                background: active ? "var(--rpa-green)" : "var(--white)",
                 color: active ? "white" : "var(--gunmetal)",
                 borderColor: active
                   ? "var(--rpa-green)"
                   : "rgba(26,27,29,0.12)",
               }}
             >
-              {s}
+              {SHORT_SECTION[s]}
             </button>
           );
         })}
@@ -198,16 +251,73 @@ export default function DailyUpdatesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <div className="lg:col-span-2 space-y-4">
-          {/* Section-specific automatic feed for the day */}
-          {section === "Inspectorate" ? (
-            <InspectorateDayCard
+          {/* The guided quick-log — the hero of the page */}
+          {editable && weekLabel && user ? (
+            <QuickLogWizard
+              section={section}
               date={date}
               weekLabel={weekLabel}
+              user={{ uid: user.uid, name: user.displayName }}
               facilities={facilities}
-              dayInspections={dayInspections}
-              canLog={canEditInsp}
+              borders={borders}
+              canManageBorders={canEditSection(
+                user,
+                "Nuclear Safety, Security & Safeguards",
+              )}
               onLogged={reload}
             />
+          ) : !weekLabel ? (
+            <div className="card p-5 text-sm text-gunmetal/60">
+              Pick a date inside the reporting calendar to log entries.
+            </div>
+          ) : (
+            <div className="card p-5 text-sm text-gunmetal/60">
+              Only {section} officers (or admins) can log entries for this
+              section. Switch to your section above.
+            </div>
+          )}
+
+          {/* NSSS: live per-border screening breakdown + official confirm */}
+          {section === "Nuclear Safety, Security & Safeguards" ? (
+            <BorderScreeningCard
+              date={date}
+              weekLabel={weekLabel}
+              entries={daySectionEntries}
+              borders={borders}
+              canConfirm={editable}
+              user={user ? { uid: user.uid, name: user.displayName } : null}
+              onChanged={reload}
+            />
+          ) : null}
+
+          {/* Section day feeds */}
+          {section === "Inspectorate" ? (
+            <div className="card p-4 sm:p-5">
+              <div className="caps text-xs text-gunmetal/60 mb-2">
+                Facilities inspected on {date}
+              </div>
+              {dayInspections.length ? (
+                <ul className="space-y-2 text-sm">
+                  {dayInspections.map((i) => (
+                    <li
+                      key={i.id}
+                      className="flex items-center justify-between gap-2 flex-wrap"
+                    >
+                      <span className="font-bold">{i.facilityName}</span>
+                      <span className="text-xs text-gunmetal/60">
+                        <span className="chip slate mr-1">{i.type}</span>
+                        <span className="chip">{i.outcome}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm text-gunmetal/55">
+                  Nothing yet — log the first inspection above. Each one lands
+                  in the register and the weekly report automatically.
+                </div>
+              )}
+            </div>
           ) : null}
 
           {section === "Authorisation & Standards" ? (
@@ -219,58 +329,62 @@ export default function DailyUpdatesPage() {
           ) : null}
 
           {/* The day's logged entries for this section */}
-          <div className="card overflow-hidden">
-            <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
+          <div className="card overflow-hidden" id="day-log">
+            <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 font-black">
               Logged on {date}
               <span className="text-xs text-gunmetal/55 font-normal ml-2">
-                {section}
+                {SHORT_SECTION[section]}
               </span>
             </div>
             <ul className="divide-y divide-gunmetal/8">
-              {dayEntries
-                .filter((e) => e.section === section)
-                .map((e) => (
-                  <li
-                    key={e.id}
-                    className="px-5 py-3 flex items-start justify-between gap-3"
-                  >
-                    <div>
-                      {e.kind === "count" ? (
-                        <div className="text-sm">
-                          <span className="font-bold">{e.label}</span>
-                          <span className="chip green ml-2 tabular">
-                            +{e.value ?? 0}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-sm whitespace-pre-line">
-                          {e.text}
-                        </div>
-                      )}
-                      {e.kind === "count" && e.text ? (
-                        <div className="text-xs text-gunmetal/60 mt-0.5">
-                          {e.text}
-                        </div>
-                      ) : null}
-                      {e.updatedByName ? (
-                        <div className="text-[11px] text-gunmetal/50 mt-0.5">
-                          {e.updatedByName}
-                        </div>
-                      ) : null}
-                    </div>
-                    {isAdmin || (user && e.updatedBy === user.uid) ? (
-                      <button
-                        className="text-xs caps font-bold text-[var(--status-stalled)]"
-                        onClick={() => removeEntry(e.id)}
-                      >
-                        Remove
-                      </button>
+              {daySectionEntries.map((e) => (
+                <li
+                  key={e.id}
+                  className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
+                >
+                  <div>
+                    {e.kind === "count" ? (
+                      <div className="text-sm">
+                        <span className="font-bold">{e.label}</span>
+                        <span className="chip green ml-2 tabular">
+                          +{e.value ?? 0}
+                        </span>
+                        {e.border ? (
+                          <span className="chip slate ml-1">{e.border}</span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="text-sm whitespace-pre-line">
+                        {e.official ? (
+                          <span className="chip green mr-1">official</span>
+                        ) : null}
+                        {e.text}
+                      </div>
+                    )}
+                    {e.kind === "count" && e.text ? (
+                      <div className="text-xs text-gunmetal/60 mt-0.5">
+                        {e.text}
+                      </div>
                     ) : null}
-                  </li>
-                ))}
-              {dayEntries.filter((e) => e.section === section).length === 0 ? (
-                <li className="px-5 py-6 text-sm text-gunmetal/55">
-                  Nothing logged for {section} on this day yet.
+                    {e.updatedByName ? (
+                      <div className="text-[11px] text-gunmetal/50 mt-0.5">
+                        {e.updatedByName}
+                      </div>
+                    ) : null}
+                  </div>
+                  {isAdmin || (user && e.updatedBy === user.uid) ? (
+                    <button
+                      className="text-xs caps font-bold text-[var(--status-stalled)] shrink-0"
+                      onClick={() => removeEntry(e.id)}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+              {daySectionEntries.length === 0 ? (
+                <li className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">
+                  Nothing logged for {SHORT_SECTION[section]} on this day yet.
                 </li>
               ) : null}
             </ul>
@@ -278,27 +392,6 @@ export default function DailyUpdatesPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Entry forms */}
-          {editable && weekLabel ? (
-            <AddEntryCard
-              section={section}
-              date={date}
-              weekLabel={weekLabel}
-              uid={user?.uid || ""}
-              userName={user?.displayName || ""}
-              onAdded={reload}
-            />
-          ) : !weekLabel ? (
-            <div className="card p-5 text-sm text-gunmetal/60">
-              Pick a date inside the reporting calendar to log entries.
-            </div>
-          ) : (
-            <div className="card p-5 text-sm text-gunmetal/60">
-              Only {section} officers (or admins) can log entries for this
-              section.
-            </div>
-          )}
-
           {/* Week so far */}
           <div className="card overflow-hidden">
             <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
@@ -356,71 +449,64 @@ export default function DailyUpdatesPage() {
   );
 }
 
-/** Quick facility-inspection logging for the Inspectorate's day. */
-function InspectorateDayCard({
+/**
+ * The NSSS senior officer's view of the day: vehicles screened per border
+ * post as the coordinators log in, the grand total, and the one-tap official
+ * confirmation (stored as an auditable `official` note — the numbers stay
+ * single-sourced from the coordinators' entries).
+ */
+function BorderScreeningCard({
   date,
   weekLabel,
-  facilities,
-  dayInspections,
-  canLog,
-  onLogged,
+  entries,
+  borders,
+  canConfirm,
+  user,
+  onChanged,
 }: {
   date: string;
   weekLabel: string;
-  facilities: Facility[];
-  dayInspections: Array<{
-    id: string;
-    facilityName: string;
-    type: InspectionType;
-    outcome: InspectionOutcome;
-  }>;
-  canLog: boolean;
-  onLogged: () => void;
+  entries: DailyEntry[];
+  borders: Border[];
+  canConfirm: boolean;
+  user: { uid: string; name: string } | null;
+  onChanged: () => void;
 }) {
   const toast = useToast();
-  const [query, setQuery] = useState("");
-  const [facilityId, setFacilityId] = useState<string | null>(null);
-  const [type, setType] = useState<InspectionType>("Routine Inspection");
-  const [outcome, setOutcome] = useState<InspectionOutcome>("Compliant");
   const [busy, setBusy] = useState(false);
 
-  const suggestions = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = norm(query);
-    return facilities.filter((f) => f.nameLower.includes(q)).slice(0, 6);
-  }, [facilities, query]);
+  const key = vehicleScreeningKey();
+  const sums = borderSums(entries, key);
+  const official = entries.find((e) => e.official);
 
-  const selected = facilityId
-    ? facilities.find((f) => f.id === facilityId) || null
-    : null;
+  // Every active border (0s visible so the senior sees who hasn't reported),
+  // plus any border that logged today but was since deactivated/renamed.
+  const names = new Set<string>(borders.filter((b) => b.active).map((b) => b.name));
+  for (const name of Object.keys(sums.byBorder)) names.add(name);
+  const rows = [...names]
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ name, value: sums.byBorder[name] || 0 }));
 
-  const submit = async () => {
-    const fname = selected ? selected.name : query.trim();
-    if (!fname) {
-      toast.push("Type or pick the facility that was inspected.", "error");
-      return;
-    }
+  const confirm = async () => {
+    if (!user || busy || sums.total <= 0) return;
     setBusy(true);
     try {
       const s = await store();
-      await s.addInspection({
+      await s.addDailyEntry({
         date,
         week: weekLabel,
-        facilityId: selected ? selected.id : null,
-        facilityName: fname,
-        type,
-        outcome,
-        notes: "",
-        province: selected ? selected.province : "",
-        sector: selected ? selected.sector : "",
+        section: "Nuclear Safety, Security & Safeguards",
+        kind: "note",
+        text: buildOfficialScreeningText(date, sums),
+        official: true,
+        updatedBy: user.uid,
+        updatedByName: user.name,
       });
-      toast.push(`Inspection recorded for ${fname}.`, "success");
-      setQuery("");
-      setFacilityId(null);
-      onLogged();
+      toast.push("Official daily total confirmed.", "success");
+      onChanged();
     } catch (err) {
       toast.push(
-        `Recording failed: ${err instanceof Error ? err.message : err}`,
+        `Confirming failed: ${err instanceof Error ? err.message : err}`,
         "error",
       );
     } finally {
@@ -429,98 +515,69 @@ function InspectorateDayCard({
   };
 
   return (
-    <div className="card p-5">
-      <div className="caps text-xs text-gunmetal/60 mb-2">
-        Facilities inspected on {date}
+    <div className="card p-4 sm:p-5">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <div className="caps text-xs text-gunmetal/60">
+          Vehicles screened on {date}
+        </div>
+        <div className="text-2xl font-black tabular">{sums.total}</div>
       </div>
-      {dayInspections.length ? (
-        <ul className="space-y-1.5 text-sm mb-3">
-          {dayInspections.map((i) => (
-            <li key={i.id} className="flex items-center justify-between gap-2">
-              <span className="font-bold">{i.facilityName}</span>
-              <span className="text-xs text-gunmetal/60">
-                <span className="chip slate mr-1">{i.type}</span>
-                <span className="chip">{i.outcome}</span>
+
+      {rows.length === 0 && sums.unspecified === 0 ? (
+        <div className="text-sm text-gunmetal/55 mt-2">
+          No border posts configured yet — add them when logging vehicles
+          screened, or on the NSSS tab.
+        </div>
+      ) : (
+        <ul className="mt-3 space-y-1.5 text-sm">
+          {rows.map((r) => (
+            <li key={r.name} className="flex items-center justify-between gap-2">
+              <span className={r.value ? "font-bold" : "text-gunmetal/55"}>
+                {r.name}
+              </span>
+              <span
+                className={`tabular ${r.value ? "font-black" : "text-gunmetal/40"}`}
+              >
+                {r.value || "—"}
               </span>
             </li>
           ))}
+          {sums.unspecified > 0 ? (
+            <li className="flex items-center justify-between gap-2">
+              <span className="text-gunmetal/70">Head office / other</span>
+              <span className="tabular font-black">{sums.unspecified}</span>
+            </li>
+          ) : null}
         </ul>
-      ) : (
-        <div className="text-sm text-gunmetal/55 mb-3">
-          No inspections recorded for this day yet.
-        </div>
       )}
 
-      {canLog ? (
-        <div className="border-t border-gunmetal/8 pt-3">
-          <div className="caps text-[10px] text-gunmetal/60 mb-2">
-            Add an inspected facility
+      <div className="mt-3 pt-3 border-t border-gunmetal/8">
+        {official ? (
+          <div className="text-sm">
+            <span className="chip green mr-2">Official total confirmed</span>
+            <span className="text-xs text-gunmetal/60">
+              by {official.updatedByName || "an officer"}
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div className="relative sm:col-span-3">
-              <input
-                className="input"
-                placeholder="Facility inspected…"
-                value={selected ? selected.name : query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setFacilityId(null);
-                }}
-              />
-              {suggestions.length > 0 && !selected ? (
-                <ul className="absolute left-0 right-0 mt-1 z-20 card max-h-52 overflow-y-auto">
-                  {suggestions.map((f) => (
-                    <li
-                      key={f.id}
-                      onClick={() => {
-                        setFacilityId(f.id);
-                        setQuery(f.name);
-                      }}
-                      className="px-3 py-2 text-sm hover:bg-mist cursor-pointer"
-                    >
-                      <div className="font-bold">{f.name}</div>
-                      <div className="text-xs text-gunmetal/60">
-                        {f.facCode || "—"} · {f.province}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-            <select
-              className="input"
-              value={type}
-              onChange={(e) => setType(e.target.value as InspectionType)}
-              aria-label="Inspection type"
-            >
-              {INSPECTION_TYPES.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              className="input"
-              value={outcome}
-              onChange={(e) => setOutcome(e.target.value as InspectionOutcome)}
-              aria-label="Outcome"
-            >
-              {INSPECTION_OUTCOMES.map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-            <button
-              className="btn btn-primary"
-              disabled={busy}
-              onClick={submit}
-            >
-              {busy ? "Saving…" : "Record"}
-            </button>
+        ) : canConfirm ? (
+          <button
+            className="btn btn-secondary w-full"
+            disabled={busy || sums.total <= 0}
+            onClick={confirm}
+          >
+            {busy
+              ? "Confirming…"
+              : sums.total > 0
+                ? `Confirm official total (${sums.total}) ✓`
+                : "Waiting for border figures…"}
+          </button>
+        ) : (
+          <div className="text-xs text-gunmetal/55">
+            The senior officer confirms the official total once all borders
+            have reported.
           </div>
-          <div className="text-[11px] text-gunmetal/55 mt-1">
-            Entries land in the inspections register and count in the weekly
-            report automatically.
-          </div>
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }
@@ -541,7 +598,7 @@ function LicensingDayCard({
   readyPreview: Array<{ id: string; facilityName: string; ran: string }>;
 }) {
   return (
-    <div className="card p-5 space-y-4">
+    <div className="card p-4 sm:p-5 space-y-4">
       <div>
         <div className="caps text-xs text-gunmetal/60 mb-2">
           Licences recorded today
@@ -549,7 +606,10 @@ function LicensingDayCard({
         {dayEvents.length ? (
           <ul className="space-y-1.5 text-sm">
             {dayEvents.map((e) => (
-              <li key={e.id} className="flex items-center justify-between gap-2">
+              <li
+                key={e.id}
+                className="flex items-center justify-between gap-2 flex-wrap"
+              >
                 <span>
                   <span className="font-bold">{e.facilityName}</span>
                   <span className="text-xs text-gunmetal/60 ml-2">
@@ -586,11 +646,12 @@ function LicensingDayCard({
         {readyCount ? (
           <ul className="mt-2 space-y-1 text-sm">
             {readyPreview.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2">
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-2"
+              >
                 <span className="font-bold">{r.facilityName}</span>
-                <span className="text-xs tabular text-gunmetal/60">
-                  {r.ran}
-                </span>
+                <span className="text-xs tabular text-gunmetal/60">{r.ran}</span>
               </li>
             ))}
             {readyCount > readyPreview.length ? (
@@ -605,171 +666,6 @@ function LicensingDayCard({
             for a one-click confirmation.
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/** Numeric + note entry forms for the selected section and day. */
-function AddEntryCard({
-  section,
-  date,
-  weekLabel,
-  uid,
-  userName,
-  onAdded,
-}: {
-  section: Section;
-  date: string;
-  weekLabel: string;
-  uid: string;
-  userName: string;
-  onAdded: () => void;
-}) {
-  const toast = useToast();
-  const options = useMemo(() => dailyMetricOptions(section), [section]);
-  const [metricKey, setMetricKey] = useState("");
-  const [value, setValue] = useState("");
-  const [remark, setRemark] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  // The section decides the metric list; reset a stale pick when it changes.
-  const effectiveKey =
-    options.some((o) => o.key === metricKey) && metricKey
-      ? metricKey
-      : options[0]?.key || "";
-
-  const addCount = async () => {
-    const opt = options.find((o) => o.key === effectiveKey);
-    const n = Number(value);
-    if (!opt) return;
-    if (!Number.isFinite(n) || n <= 0) {
-      toast.push("Enter a number greater than zero.", "error");
-      return;
-    }
-    setBusy(true);
-    try {
-      const s = await store();
-      await s.addDailyEntry({
-        date,
-        week: weekLabel,
-        section,
-        kind: "count",
-        metricKey: opt.key,
-        label: opt.label,
-        value: Math.floor(n),
-        text: remark.trim() || undefined,
-        updatedBy: uid,
-        updatedByName: userName,
-      });
-      toast.push(`${opt.label}: +${Math.floor(n)} logged.`, "success");
-      setValue("");
-      setRemark("");
-      onAdded();
-    } catch (err) {
-      toast.push(
-        `Saving failed: ${err instanceof Error ? err.message : err}`,
-        "error",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const addNote = async () => {
-    if (!note.trim()) return;
-    setBusy(true);
-    try {
-      const s = await store();
-      await s.addDailyEntry({
-        date,
-        week: weekLabel,
-        section,
-        kind: "note",
-        text: note.trim(),
-        updatedBy: uid,
-        updatedByName: userName,
-      });
-      toast.push("Note logged.", "success");
-      setNote("");
-      onAdded();
-    } catch (err) {
-      toast.push(
-        `Saving failed: ${err instanceof Error ? err.message : err}`,
-        "error",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="card p-5 space-y-4">
-      <div>
-        <div className="caps text-xs text-gunmetal/60 mb-2">
-          Log today&apos;s numbers
-        </div>
-        <div className="space-y-2">
-          <select
-            className="input"
-            value={effectiveKey}
-            onChange={(e) => setMetricKey(e.target.value)}
-            aria-label="Metric"
-          >
-            {options.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              min={1}
-              className="input"
-              placeholder="How many?"
-              aria-label="Count"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addCount();
-              }}
-            />
-            <button
-              className="btn btn-primary shrink-0"
-              disabled={busy}
-              onClick={addCount}
-            >
-              Add
-            </button>
-          </div>
-          <input
-            className="input"
-            placeholder="Remark (optional)"
-            aria-label="Remark"
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-gunmetal/8 pt-3">
-        <div className="caps text-xs text-gunmetal/60 mb-2">Log a note</div>
-        <textarea
-          className="input"
-          rows={2}
-          placeholder="What happened today?"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <button
-          className="btn btn-secondary mt-2"
-          disabled={busy || !note.trim()}
-          onClick={addNote}
-        >
-          Add note
-        </button>
       </div>
     </div>
   );

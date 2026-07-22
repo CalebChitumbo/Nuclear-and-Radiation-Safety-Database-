@@ -22,6 +22,59 @@ export function dailyMetricOptions(
   }));
 }
 
+export const NSSS_SECTION: Section = "Nuclear Safety, Security & Safeguards";
+export const VEHICLE_SCREENING_LABEL = "Vehicle Screening (units)";
+
+/** The weekly-report metric key the border screening counts land on. */
+export function vehicleScreeningKey(): string {
+  return metricKey(NSSS_SECTION, VEHICLE_SCREENING_LABEL);
+}
+
+export interface BorderSums {
+  /** Sum per named border post (only borders that appear in the entries). */
+  byBorder: Record<string, number>;
+  /** Counts logged without a border (head office / other). */
+  unspecified: number;
+  total: number;
+}
+
+/**
+ * Split one metric's count entries by the border post they came from — the
+ * senior officer's per-border breakdown and grand total for a day (or any
+ * other slice the caller has already filtered to).
+ */
+export function borderSums(entries: DailyEntry[], key: string): BorderSums {
+  const byBorder: Record<string, number> = {};
+  let unspecified = 0;
+  let total = 0;
+  for (const e of entries) {
+    if (e.kind !== "count" || e.metricKey !== key) continue;
+    const v = typeof e.value === "number" && Number.isFinite(e.value) ? e.value : 0;
+    total += v;
+    if (e.border) byBorder[e.border] = (byBorder[e.border] || 0) + v;
+    else unspecified += v;
+  }
+  return { byBorder, unspecified, total };
+}
+
+/**
+ * The text of the senior officer's official daily confirmation note —
+ * "Official vehicles-screened total for 2026-07-22: 143 — Chirundu 60,
+ * Kasumbalesa 50, Head office / other 33". Stored on an `official` note entry
+ * so the confirmation is auditable without double counting the numbers.
+ */
+export function buildOfficialScreeningText(
+  date: string,
+  sums: BorderSums,
+): string {
+  const parts = Object.entries(sums.byBorder)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, v]) => `${name} ${v}`);
+  if (sums.unspecified > 0) parts.push(`Head office / other ${sums.unspecified}`);
+  const breakdown = parts.length ? ` — ${parts.join(", ")}` : "";
+  return `Official vehicles-screened total for ${date}: ${sums.total}${breakdown}`;
+}
+
 /** Sum of daily count entries per metricKey across the given entries. */
 export function dailyCountSums(entries: DailyEntry[]): Record<string, number> {
   const sums: Record<string, number> = {};

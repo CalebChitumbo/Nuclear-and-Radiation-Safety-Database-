@@ -73,6 +73,7 @@ Sign in with any of the demo accounts — any non-empty password works:
 | `admin@rpa.gov.zm` | Administrator (full access) |
 | `as.officer@rpa.gov.zm` | Authorisation & Standards officer |
 | `inspector@rpa.gov.zm` | Inspectorate officer |
+| `nsss@rpa.gov.zm` | Nuclear Safety, Security & Safeguards officer |
 
 Data persists to `localStorage`. **Settings → Reset mock data** wipes it back
 to the seed.
@@ -181,7 +182,8 @@ automatically (Production for the production branch, Preview for others).
 | `inspections/{id}` | The dated inspection log |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
-| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the weekly metric keys) and notes; a week's daily sums take precedence over typed weekly figures |
+| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the weekly metric keys, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
+| `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
@@ -311,16 +313,30 @@ trackable — and the facility drawer lists every request a facility has had.
 ## Daily Updates → weekly rollup
 
 The **Daily Updates** tab (`/daily`) replaces once-a-week data entry: each
-section logs its day as it happens and the week totals itself.
+section logs its day as it happens and the week totals itself. Logging is a
+**one-question-at-a-time guided flow built for a phone in the field** — big
+tap targets, no dropdowns, the numeric keypad for numbers, and a "logged ✓"
+screen with one-tap "log another" (`components/daily/QuickLogWizard.tsx`).
+Sections share one account each (Licensing, Inspectorate, NSSS — created by
+the admin under Users), and each account lands directly on its own flow.
 
-- **Inspectorate** records the facilities inspected today — entries go straight
-  into the dated `inspections` register, so the dashboard, weekly report and
-  facility history all update from the same record.
+- **Inspectorate** taps through *which facility → what type → outcome →
+  confirm* — the entry goes straight into the dated `inspections` register, so
+  the dashboard, weekly report and facility history all update from the same
+  record.
 - **Licensing (A&S)** sees the licences recorded that day plus the
   issued-certificate suggestions waiting for confirmation on Smart Status
-  Update ("these facilities appear licensed — confirm it").
-- **NSSS / NSI** log numbers against their manual metrics (vehicles screened,
-  sources verified, …) and free-text notes.
+  Update ("these facilities appear licensed — confirm it"), and logs its
+  engagement/TWG counts in two taps.
+- **NSSS** is border-aware: vehicle-screening counts ask *which border post*
+  first. Each border coordinator logs their own daily figure on the shared
+  NSSS account; the Daily Updates page shows the **live per-border breakdown
+  and grand total**, and the senior officer taps **Confirm official total** —
+  stored as an auditable `official` note so the numbers stay single-sourced
+  from the coordinators' entries. Border posts live in the `borders`
+  collection, managed by NSSS/admins on the NSSS tab (deactivating keeps
+  history); the NSSS dashboard adds a screening-by-border breakdown.
+- **NSI** logs numbers against its metrics and free-text notes the same way.
 
 Count entries are stored in `dailyEntries` on the **same metric keys** the
 weekly report uses (`lib/rules/daily.ts` + `MANUAL_METRICS_BY_SECTION`), so the
@@ -337,7 +353,7 @@ week, where the brief/PDF export works exactly as before.
 npm test
 ```
 
-223 tests across `lib/rules/*` and the seed baseline, including:
+227 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -346,8 +362,9 @@ npm test
   notifications and stats for the Inspectorate ↔ Licensing handoff
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
-- `daily` — daily-entry sums, the daily-over-weekly precedence rule, and that
-  daily metric keys match the weekly report's exactly
+- `daily` — daily-entry sums, the daily-over-weekly precedence rule, that
+  daily metric keys match the weekly report's exactly, and the per-border
+  screening sums + official-total text
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping

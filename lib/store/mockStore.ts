@@ -17,6 +17,7 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type Border,
   type DailyEntry,
   type DashboardAggregate,
   type Facility,
@@ -47,7 +48,24 @@ interface State {
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
   dailyEntries: DailyEntry[];
+  borders: Border[];
   users: UserDoc[];
+}
+
+export function borderId(name: string): string {
+  return name.trim().replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+}
+
+/** Demo border posts (mock mode only — a real deployment adds its own). */
+function defaultBorders(): Border[] {
+  return [
+    "Chirundu",
+    "Kasumbalesa",
+    "Nakonde",
+    "Kazungula",
+    "Mwami",
+    "Victoria Falls",
+  ].map((name) => ({ id: borderId(name), name, active: true }));
 }
 
 function freshState(): State {
@@ -60,6 +78,7 @@ function freshState(): State {
     licenceWorkflows: [],
     weekMetrics: {},
     dailyEntries: [],
+    borders: defaultBorders(),
     users: [
       {
         uid: "demo-admin",
@@ -82,6 +101,13 @@ function freshState(): State {
         role: "officer",
         section: "Inspectorate",
       },
+      {
+        uid: "demo-nsss",
+        email: "nsss@rpa.gov.zm",
+        displayName: "NSSS Officer",
+        role: "officer",
+        section: "Nuclear Safety, Security & Safeguards",
+      },
     ],
   };
 }
@@ -102,6 +128,18 @@ function load(): State {
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
     // Back-compat: stores saved before the Daily Updates tab existed.
     if (!parsed.dailyEntries) parsed.dailyEntries = [];
+    // Back-compat: stores saved before border posts existed.
+    if (!parsed.borders) parsed.borders = defaultBorders();
+    // Back-compat: add the NSSS demo account to older saved stores.
+    if (!parsed.users.some((u) => u.uid === "demo-nsss")) {
+      parsed.users.push({
+        uid: "demo-nsss",
+        email: "nsss@rpa.gov.zm",
+        displayName: "NSSS Officer",
+        role: "officer",
+        section: "Nuclear Safety, Security & Safeguards",
+      });
+    }
     return parsed;
   } catch {
     return freshState();
@@ -233,6 +271,52 @@ class MockStore implements DataStore {
   async deleteDailyEntry(id: string): Promise<void> {
     const s = ensure();
     s.dailyEntries = s.dailyEntries.filter((e) => e.id !== id);
+    save(s);
+    dispatchChange();
+  }
+
+  async listBorders(): Promise<Border[]> {
+    return [...ensure().borders].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async addBorder(name: string, uid: string): Promise<Border> {
+    const s = ensure();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("A border name is required.");
+    const id = borderId(trimmed);
+    const existing = s.borders.find((b) => b.id === id);
+    // Idempotent on name: re-adding an existing border just reactivates it.
+    if (existing) {
+      if (!existing.active) {
+        existing.active = true;
+        existing.updatedBy = uid;
+        save(s);
+        dispatchChange();
+      }
+      return existing;
+    }
+    const border: Border = {
+      id,
+      name: trimmed,
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    s.borders.push(border);
+    save(s);
+    dispatchChange();
+    return border;
+  }
+
+  async setBorderActive(
+    id: string,
+    active: boolean,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    s.borders = s.borders.map((b) =>
+      b.id === id ? { ...b, active, updatedBy: uid } : b,
+    );
     save(s);
     dispatchChange();
   }
@@ -666,6 +750,7 @@ class MockStore implements DataStore {
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
       dailyEntries: s.dailyEntries,
+      borders: s.borders,
     };
   }
 }

@@ -36,6 +36,7 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type Border,
   type DailyEntry,
   type DashboardAggregate,
   type Facility,
@@ -199,6 +200,45 @@ class FirebaseStore implements DataStore {
   async deleteDailyEntry(id: string): Promise<void> {
     const db = requireDb();
     await deleteDoc(doc(db, "dailyEntries", id));
+  }
+
+  async listBorders(): Promise<Border[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "borders"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<Border, "id">) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async addBorder(name: string, uid: string): Promise<Border> {
+    const db = requireDb();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("A border name is required.");
+    // Deterministic id from the name so re-adding upserts (and reactivates)
+    // the same border instead of duplicating it.
+    const id = trimmed.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+    const border: Border = {
+      id,
+      name: trimmed,
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    await setDoc(doc(db, "borders", id), border, { merge: true });
+    return border;
+  }
+
+  async setBorderActive(
+    id: string,
+    active: boolean,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(
+      doc(db, "borders", id),
+      { active, updatedBy: uid },
+      { merge: true },
+    );
   }
 
   async setWeekMetricValue(
@@ -647,6 +687,7 @@ class FirebaseStore implements DataStore {
       activities,
       licenceWorkflows,
       dailyEntries,
+      borders,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -654,8 +695,9 @@ class FirebaseStore implements DataStore {
       this.listInspectionRequests(),
       this.listActivities(),
       this.listLicenceWorkflows(),
-      // Degrade gracefully until the dailyEntries rules are deployed.
+      // Degrade gracefully until the dailyEntries/borders rules are deployed.
       this.listDailyEntries().catch(() => [] as DailyEntry[]),
+      this.listBorders().catch(() => [] as Border[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -672,6 +714,7 @@ class FirebaseStore implements DataStore {
       licenceWorkflows,
       weekMetrics,
       dailyEntries,
+      borders,
     };
   }
 }

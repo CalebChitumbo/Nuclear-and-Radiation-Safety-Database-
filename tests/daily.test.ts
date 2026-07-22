@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  borderSums,
+  buildOfficialScreeningText,
   dailyCountSums,
   dailyMetricOptions,
   effectiveValuesByWeek,
@@ -7,6 +9,7 @@ import {
   entriesForWeek,
   mergeWeekManualValues,
   sumMetricAcrossWeeks,
+  vehicleScreeningKey,
 } from "../lib/rules/daily";
 import { deriveWeekly, metricKey } from "../lib/rules/weeklyDerivation";
 import type { DailyEntry, WeekMetrics } from "../lib/rules/types";
@@ -121,5 +124,47 @@ describe("entry filters", () => {
     const b = count(2, { date: "2026-06-02", week: W23 });
     expect(entriesForDate([a, b], "2026-05-27")).toEqual([a]);
     expect(entriesForWeek([a, b], W23)).toEqual([b]);
+  });
+});
+
+describe("border screening", () => {
+  it("exposes the screening metric on the weekly report's key", () => {
+    expect(vehicleScreeningKey()).toBe(SCREEN);
+  });
+
+  it("splits sums per border with an unspecified bucket and grand total", () => {
+    const sums = borderSums(
+      [
+        count(60, { border: "Chirundu" }),
+        count(40, { border: "Chirundu" }),
+        count(50, { border: "Kasumbalesa" }),
+        count(33), // head office / other
+        note(), // ignored
+        count(9, { metricKey: metricKey(NSSS, "TWG Meetings"), border: "Chirundu" }),
+      ],
+      SCREEN,
+    );
+    expect(sums.byBorder).toEqual({ Chirundu: 100, Kasumbalesa: 50 });
+    expect(sums.unspecified).toBe(33);
+    expect(sums.total).toBe(183);
+  });
+
+  it("border entries still sum into the weekly rollup unchanged", () => {
+    const merged = mergeWeekManualValues({}, [
+      count(60, { border: "Chirundu" }),
+      count(50, { border: "Kasumbalesa" }),
+    ]);
+    expect(merged.values[SCREEN]).toBe(110);
+  });
+
+  it("builds the official confirmation text, largest border first", () => {
+    const text = buildOfficialScreeningText("2026-05-27", {
+      byBorder: { Kasumbalesa: 50, Chirundu: 100 },
+      unspecified: 33,
+      total: 183,
+    });
+    expect(text).toBe(
+      "Official vehicles-screened total for 2026-05-27: 183 — Chirundu 100, Kasumbalesa 50, Head office / other 33",
+    );
   });
 });
