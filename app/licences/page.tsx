@@ -151,10 +151,11 @@ export default function LicencesPage() {
     <div className="space-y-6 staggered">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black">Licences &amp; authorisations</h1>
+          <h1 className="text-xl font-black">Authorisations</h1>
           <p className="text-sm text-gunmetal/60">
-            Every licence issued — renewals, new use/possession, and standalone
-            authorisations — and who holds a current use licence.
+            Authorisation statistics built from the facilities register — every
+            licence issued (renewals, new use/possession, standalone
+            authorisations) and who holds a current use licence.
           </p>
         </div>
         <div className="flex items-center gap-2">

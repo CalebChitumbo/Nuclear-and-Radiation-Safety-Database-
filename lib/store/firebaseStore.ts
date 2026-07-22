@@ -36,6 +36,7 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type DailyEntry,
   type DashboardAggregate,
   type Facility,
   type Inspection,
@@ -169,6 +170,35 @@ class FirebaseStore implements DataStore {
     const snap = await getDoc(ref);
     if (snap.exists()) return snap.data() as WeekMetrics;
     return { week, values: {}, status: {}, submittedBy: {} };
+  }
+
+  async listWeekMetricsAll(): Promise<WeekMetrics[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "weekMetrics"));
+    return snap.docs.map((d) => d.data() as WeekMetrics);
+  }
+
+  async listDailyEntries(): Promise<DailyEntry[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "dailyEntries"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<DailyEntry, "id">) }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
+    const db = requireDb();
+    const createdAt = new Date().toISOString();
+    const ref = await addDoc(
+      collection(db, "dailyEntries"),
+      stripUndefined({ ...e, createdAt }),
+    );
+    return { ...e, id: ref.id, createdAt };
+  }
+
+  async deleteDailyEntry(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "dailyEntries", id));
   }
 
   async setWeekMetricValue(
@@ -616,6 +646,7 @@ class FirebaseStore implements DataStore {
       inspectionRequests,
       activities,
       licenceWorkflows,
+      dailyEntries,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -623,6 +654,8 @@ class FirebaseStore implements DataStore {
       this.listInspectionRequests(),
       this.listActivities(),
       this.listLicenceWorkflows(),
+      // Degrade gracefully until the dailyEntries rules are deployed.
+      this.listDailyEntries().catch(() => [] as DailyEntry[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -638,6 +671,7 @@ class FirebaseStore implements DataStore {
       activities,
       licenceWorkflows,
       weekMetrics,
+      dailyEntries,
     };
   }
 }

@@ -388,6 +388,34 @@ export interface WeekMetrics {
   status?: Record<string, "Pending" | "In Progress" | "Done">;
 }
 
+/**
+ * One daily log line from a section — the unit of the Daily Updates tab.
+ * `count` entries carry a number against a metric (keyed with the SAME
+ * metricKey the weekly report uses, so daily figures sum straight into the
+ * weekly totals); `note` entries are free-text "what happened today" lines.
+ * Dated licences and inspections are NOT duplicated here — those collections
+ * are already daily-dated and the Daily Updates tab reads them directly.
+ */
+export interface DailyEntry {
+  id: string;
+  /** YYYY-MM-DD (local Zambia date the work happened). */
+  date: string;
+  /** Reporting week the date lands in (weekLabelForDate). */
+  week: string;
+  section: Section;
+  kind: "count" | "note";
+  /** metricKey(section, label) — present on count entries. */
+  metricKey?: string;
+  /** Human label of the metric (count entries). */
+  label?: string;
+  value?: number;
+  /** Note text, or an optional remark attached to a count. */
+  text?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+}
+
 export interface Activity {
   id: string;
   week: string;

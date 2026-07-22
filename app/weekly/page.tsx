@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
+import { entriesForWeek, mergeWeekManualValues } from "@/lib/rules/daily";
 import { deriveWeekly } from "@/lib/rules/weeklyDerivation";
 import type { Activity } from "@/lib/rules/types";
 
@@ -32,13 +35,17 @@ export default function WeeklyPage() {
 
   const { data, error, reload } = useStoreData(
     async (s) => {
-      const [events, inspections, activities, metrics] = await Promise.all([
-        s.listLicenceEvents(),
-        s.listInspections(),
-        s.listActivities(),
-        s.getWeekMetrics(selected.label),
-      ]);
-      return { events, inspections, activities, metrics };
+      const [events, inspections, activities, metrics, dailyEntries] =
+        await Promise.all([
+          s.listLicenceEvents(),
+          s.listInspections(),
+          s.listActivities(),
+          s.getWeekMetrics(selected.label),
+          // Daily Updates roll up into this report; degrade to empty until the
+          // dailyEntries rules are deployed.
+          s.listDailyEntries().catch(() => []),
+        ]);
+      return { events, inspections, activities, metrics, dailyEntries };
     },
     [selected.label],
   );
@@ -62,11 +69,13 @@ export default function WeeklyPage() {
     (a) => a.week === selected.label,
   );
 
-  const report = deriveWeekly(
-    wkEvents,
-    wkInspections,
-    data.metrics.values || {},
-  );
+  // Manual metrics: the week's Daily Updates counts take precedence over a
+  // value typed here, per metric — a section logging daily never gets its
+  // numbers overwritten or double counted.
+  const wkDaily = entriesForWeek(data.dailyEntries, selected.label);
+  const merged = mergeWeekManualValues(data.metrics.values || {}, wkDaily);
+
+  const report = deriveWeekly(wkEvents, wkInspections, merged.values);
 
   const onManualChange = async (key: string, value: number) => {
     try {
@@ -126,6 +135,9 @@ export default function WeeklyPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Link className="btn btn-ghost" href="/daily">
+            Daily updates
+          </Link>
           <button className="btn btn-secondary" onClick={generateBrief}>
             Generate brief
           </button>
@@ -141,6 +153,7 @@ export default function WeeklyPage() {
           section={sec.section}
           metrics={sec.metrics}
           total={sec.total}
+          fromDaily={merged.fromDaily}
           onManualChange={onManualChange}
         />
       ))}
@@ -176,11 +189,14 @@ function SectionTable({
   section,
   metrics,
   total,
+  fromDaily,
   onManualChange,
 }: {
   section: string;
   metrics: Array<{ key: string; label: string; auto: boolean; value: number }>;
   total: { label: string; value: number } | null;
+  /** Metric keys whose value is summed from Daily Updates (read-only here). */
+  fromDaily: Set<string>;
   onManualChange: (key: string, value: number) => void;
 }) {
   return (
@@ -201,7 +217,7 @@ function SectionTable({
             <tr key={m.key} className="border-t border-gunmetal/8">
               <td className="px-5 py-2">{m.label}</td>
               <td className="px-5 py-2 text-right tabular">
-                {m.auto ? (
+                {m.auto || fromDaily.has(m.key) ? (
                   <span className="font-black">{m.value}</span>
                 ) : (
                   <MetricInput
@@ -214,6 +230,10 @@ function SectionTable({
               <td className="px-5 py-2">
                 {m.auto ? (
                   <span className="chip green">auto</span>
+                ) : fromDaily.has(m.key) ? (
+                  <Link href="/daily" title="Summed from Daily Updates">
+                    <span className="chip green">daily</span>
+                  </Link>
                 ) : (
                   <span className="chip">manual</span>
                 )}

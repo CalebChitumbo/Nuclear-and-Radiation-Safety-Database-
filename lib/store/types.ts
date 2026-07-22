@@ -5,6 +5,7 @@ import type {
 } from "../rules/inspectionRequests";
 import type {
   Activity,
+  DailyEntry,
   DashboardAggregate,
   Facility,
   Inspection,
@@ -33,7 +34,13 @@ export interface DataStore {
   getAggregate(): Promise<DashboardAggregate>;
   getWeeks(): Promise<WeekDef[]>;
   getWeekMetrics(week: string): Promise<WeekMetrics>;
+  /** Every stored week's manual metrics — for cross-week dashboards (NSSS). */
+  listWeekMetricsAll(): Promise<WeekMetrics[]>;
   setWeekMetricValue(week: string, key: string, value: number): Promise<void>;
+  /** Every daily log entry (Daily Updates tab), newest date first. */
+  listDailyEntries(): Promise<DailyEntry[]>;
+  addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
+  deleteDailyEntry(id: string): Promise<void>;
   addActivity(a: Omit<Activity, "id">): Promise<Activity>;
   updateActivity(id: string, patch: Partial<Activity>): Promise<void>;
   deleteActivity(id: string): Promise<void>;
@@ -106,5 +113,6 @@ export interface DataStore {
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;
+    dailyEntries: DailyEntry[];
   }>;
 }

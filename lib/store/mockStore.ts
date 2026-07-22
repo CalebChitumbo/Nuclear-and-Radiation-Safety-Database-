@@ -17,6 +17,7 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type DailyEntry,
   type DashboardAggregate,
   type Facility,
   type Inspection,
@@ -45,6 +46,7 @@ interface State {
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
+  dailyEntries: DailyEntry[];
   users: UserDoc[];
 }
 
@@ -57,6 +59,7 @@ function freshState(): State {
     activities: [],
     licenceWorkflows: [],
     weekMetrics: {},
+    dailyEntries: [],
     users: [
       {
         uid: "demo-admin",
@@ -97,6 +100,8 @@ function load(): State {
     if (!parsed.licenceWorkflows) parsed.licenceWorkflows = [];
     // Back-compat: stores saved before the inspection-request workflow existed.
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
+    // Back-compat: stores saved before the Daily Updates tab existed.
+    if (!parsed.dailyEntries) parsed.dailyEntries = [];
     return parsed;
   } catch {
     return freshState();
@@ -200,6 +205,36 @@ class MockStore implements DataStore {
       s.weekMetrics[week] ||
       ({ week, values: {}, status: {}, submittedBy: {} } as WeekMetrics)
     );
+  }
+
+  async listWeekMetricsAll(): Promise<WeekMetrics[]> {
+    return Object.values(ensure().weekMetrics);
+  }
+
+  async listDailyEntries(): Promise<DailyEntry[]> {
+    return [...ensure().dailyEntries].sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
+  }
+
+  async addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
+    const s = ensure();
+    const entry: DailyEntry = {
+      ...e,
+      id: newId("day"),
+      createdAt: new Date().toISOString(),
+    };
+    s.dailyEntries.push(entry);
+    save(s);
+    dispatchChange();
+    return entry;
+  }
+
+  async deleteDailyEntry(id: string): Promise<void> {
+    const s = ensure();
+    s.dailyEntries = s.dailyEntries.filter((e) => e.id !== id);
+    save(s);
+    dispatchChange();
   }
 
   async setWeekMetricValue(
@@ -630,6 +665,7 @@ class MockStore implements DataStore {
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
+      dailyEntries: s.dailyEntries,
     };
   }
 }
