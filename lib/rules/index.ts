@@ -5,3 +5,5 @@ export * from "./week";
 export * from "./recordLicence";
 export * from "./weeklyDerivation";
 export * from "./aggregate";
+export * from "./daily";
+export * from "./inspectionStats";

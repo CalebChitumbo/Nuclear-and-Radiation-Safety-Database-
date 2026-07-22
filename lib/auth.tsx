@@ -155,3 +155,18 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }
+
+/**
+ * May this user log/edit entries for the given section? Admins and "All"
+ * accounts may act for any section; officers only for their own. Mirrors the
+ * canEditAS / canEditInsp flags for the two sections that predate this helper.
+ */
+export function canEditSection(
+  user: UserDoc | null,
+  section: Section,
+): boolean {
+  return (
+    !!user &&
+    (user.role === "admin" || user.section === "All" || user.section === section)
+  );
+}

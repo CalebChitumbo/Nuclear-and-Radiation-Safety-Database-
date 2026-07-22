@@ -36,6 +36,8 @@ import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   type Activity,
+  type Border,
+  type DailyEntry,
   type DashboardAggregate,
   type Facility,
   type Inspection,
@@ -169,6 +171,74 @@ class FirebaseStore implements DataStore {
     const snap = await getDoc(ref);
     if (snap.exists()) return snap.data() as WeekMetrics;
     return { week, values: {}, status: {}, submittedBy: {} };
+  }
+
+  async listWeekMetricsAll(): Promise<WeekMetrics[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "weekMetrics"));
+    return snap.docs.map((d) => d.data() as WeekMetrics);
+  }
+
+  async listDailyEntries(): Promise<DailyEntry[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "dailyEntries"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<DailyEntry, "id">) }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
+    const db = requireDb();
+    const createdAt = new Date().toISOString();
+    const ref = await addDoc(
+      collection(db, "dailyEntries"),
+      stripUndefined({ ...e, createdAt }),
+    );
+    return { ...e, id: ref.id, createdAt };
+  }
+
+  async deleteDailyEntry(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "dailyEntries", id));
+  }
+
+  async listBorders(): Promise<Border[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "borders"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<Border, "id">) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async addBorder(name: string, uid: string): Promise<Border> {
+    const db = requireDb();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("A border name is required.");
+    // Deterministic id from the name so re-adding upserts (and reactivates)
+    // the same border instead of duplicating it.
+    const id = trimmed.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+    const border: Border = {
+      id,
+      name: trimmed,
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    await setDoc(doc(db, "borders", id), border, { merge: true });
+    return border;
+  }
+
+  async setBorderActive(
+    id: string,
+    active: boolean,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(
+      doc(db, "borders", id),
+      { active, updatedBy: uid },
+      { merge: true },
+    );
   }
 
   async setWeekMetricValue(
@@ -616,6 +686,8 @@ class FirebaseStore implements DataStore {
       inspectionRequests,
       activities,
       licenceWorkflows,
+      dailyEntries,
+      borders,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -623,6 +695,9 @@ class FirebaseStore implements DataStore {
       this.listInspectionRequests(),
       this.listActivities(),
       this.listLicenceWorkflows(),
+      // Degrade gracefully until the dailyEntries/borders rules are deployed.
+      this.listDailyEntries().catch(() => [] as DailyEntry[]),
+      this.listBorders().catch(() => [] as Border[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -638,6 +713,8 @@ class FirebaseStore implements DataStore {
       activities,
       licenceWorkflows,
       weekMetrics,
+      dailyEntries,
+      borders,
     };
   }
 }

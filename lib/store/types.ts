@@ -5,6 +5,8 @@ import type {
 } from "../rules/inspectionRequests";
 import type {
   Activity,
+  Border,
+  DailyEntry,
   DashboardAggregate,
   Facility,
   Inspection,
@@ -33,7 +35,19 @@ export interface DataStore {
   getAggregate(): Promise<DashboardAggregate>;
   getWeeks(): Promise<WeekDef[]>;
   getWeekMetrics(week: string): Promise<WeekMetrics>;
+  /** Every stored week's manual metrics — for cross-week dashboards (NSSS). */
+  listWeekMetricsAll(): Promise<WeekMetrics[]>;
   setWeekMetricValue(week: string, key: string, value: number): Promise<void>;
+  /** Every daily log entry (Daily Updates tab), newest date first. */
+  listDailyEntries(): Promise<DailyEntry[]>;
+  addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
+  deleteDailyEntry(id: string): Promise<void>;
+  /** Border posts (active and inactive), name order. */
+  listBorders(): Promise<Border[]>;
+  /** Add a border post (idempotent on name). NSSS + admin. */
+  addBorder(name: string, uid: string): Promise<Border>;
+  /** Hide/show a border in the picker without losing its history. */
+  setBorderActive(id: string, active: boolean, uid: string): Promise<void>;
   addActivity(a: Omit<Activity, "id">): Promise<Activity>;
   updateActivity(id: string, patch: Partial<Activity>): Promise<void>;
   deleteActivity(id: string): Promise<void>;
@@ -106,5 +120,7 @@ export interface DataStore {
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;
+    dailyEntries: DailyEntry[];
+    borders: Border[];
   }>;
 }

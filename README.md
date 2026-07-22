@@ -2,9 +2,20 @@
 
 A production-grade, multi-user web application for the **Radiation Protection
 Authority of Zambia (RPA) — Nuclear & Radiation Safety Department**. It
-unifies the licensing register, authorisations, inspections, and weekly
+unifies the licensing register, authorisations, inspections, and daily/weekly
 sectional reporting into one system, backed by Firebase and pre-seeded with
 the real register of 474 facilities.
+
+**Navigation** (sidebar, in order): Overview · Facilities · **Authorisations**
+(`/licences` — authorisation statistics built from the register) ·
+**Inspectorate** (`/inspectorate` — the section's own dashboard: inspections
+per type over a week/month/year, outcomes, enforcement actions, the forward
+inspection schedule, and the log/register) · **Nuclear Safety, Security &
+Safeguards** (`/nsss` — the NSSS section's metrics dashboard: vehicle
+screening, IAEA meetings, engagements, TWG) · **Smart Status Update**
+(`/licence-status` — the self-updating RAIS workflow tracker) · Bulk Approval ·
+Inspection Requests (the Licensing ↔ Inspectorate interface) · **Daily
+Updates** (`/daily` — each section logs its day; the week totals itself).
 
 This is the implementation of the build specification in `BUILD_SPEC.md`
 (supplied with the project upload).
@@ -62,6 +73,7 @@ Sign in with any of the demo accounts — any non-empty password works:
 | `admin@rpa.gov.zm` | Administrator (full access) |
 | `as.officer@rpa.gov.zm` | Authorisation & Standards officer |
 | `inspector@rpa.gov.zm` | Inspectorate officer |
+| `nsss@rpa.gov.zm` | Nuclear Safety, Security & Safeguards officer |
 
 Data persists to `localStorage`. **Settings → Reset mock data** wipes it back
 to the seed.
@@ -170,6 +182,8 @@ automatically (Production for the production branch, Preview for others).
 | `inspections/{id}` | The dated inspection log |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
+| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the weekly metric keys, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
+| `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
@@ -199,7 +213,7 @@ paste is atomic — if any write fails, none apply.
 
 ## Automatic RAIS email ingestion
 
-The Licensing Status tab can update itself. Forward the RAIS status-change
+The Smart Status Update tab can update itself. Forward the RAIS status-change
 emails to the `ingestRaisEmail` Cloud Function (via an inbound-email provider
 such as CloudMailin or Mailgun) and it runs the same parser the tab uses on a
 manual paste: confident facility matches are applied to the register
@@ -241,7 +255,7 @@ classified, the number is held out of the register entirely — it drives no
 renewal stage and records no authorisation, so the system never guesses what a
 `RPA/LIC/####` licence is (`needsTypeClassification`).
 
-The **Licences** page (`/licences`) reports the totals this produces:
+The **Authorisations** page (`/licences`) reports the totals this produces:
 authorisations issued by type (renewal + new use + import + transit + …), and —
 derived from each facility's most recent Use/Possession licence date — which
 facilities hold a current use licence **for a chosen year** versus those whose
@@ -289,8 +303,47 @@ a transition and, on completion, writes the dated inspection atomically.
 
 Security rules let **either** section write an `inspectionRequests` document
 (they collaborate on the same record) behind a shape check; deletes stay
-admin-only. The Overview and the Inspections page surface the resulting totals,
-and the facility drawer lists every request a facility has had.
+admin-only. The Overview and the Inspectorate tab surface the resulting totals
+— the Inspectorate tab's **schedule** panel lists every active request by its
+target / needed-by date so the pipeline between the two sections stays
+trackable — and the facility drawer lists every request a facility has had.
+
+---
+
+## Daily Updates → weekly rollup
+
+The **Daily Updates** tab (`/daily`) replaces once-a-week data entry: each
+section logs its day as it happens and the week totals itself. Logging is a
+**one-question-at-a-time guided flow built for a phone in the field** — big
+tap targets, no dropdowns, the numeric keypad for numbers, and a "logged ✓"
+screen with one-tap "log another" (`components/daily/QuickLogWizard.tsx`).
+Sections share one account each (Licensing, Inspectorate, NSSS — created by
+the admin under Users), and each account lands directly on its own flow.
+
+- **Inspectorate** taps through *which facility → what type → outcome →
+  confirm* — the entry goes straight into the dated `inspections` register, so
+  the dashboard, weekly report and facility history all update from the same
+  record.
+- **Licensing (A&S)** sees the licences recorded that day plus the
+  issued-certificate suggestions waiting for confirmation on Smart Status
+  Update ("these facilities appear licensed — confirm it"), and logs its
+  engagement/TWG counts in two taps.
+- **NSSS** is border-aware: vehicle-screening counts ask *which border post*
+  first. Each border coordinator logs their own daily figure on the shared
+  NSSS account; the Daily Updates page shows the **live per-border breakdown
+  and grand total**, and the senior officer taps **Confirm official total** —
+  stored as an auditable `official` note so the numbers stay single-sourced
+  from the coordinators' entries. Border posts live in the `borders`
+  collection, managed by NSSS/admins on the NSSS tab (deactivating keeps
+  history); the NSSS dashboard adds a screening-by-border breakdown.
+- **NSI** logs numbers against its metrics and free-text notes the same way.
+
+Count entries are stored in `dailyEntries` on the **same metric keys** the
+weekly report uses (`lib/rules/daily.ts` + `MANUAL_METRICS_BY_SECTION`), so the
+weekly table shows the week's daily sum per metric — marked **daily** and
+read-only there; metrics with no daily entries keep the direct weekly input.
+"Generate weekly report" on the daily tab jumps to `/weekly` for the selected
+week, where the brief/PDF export works exactly as before.
 
 ---
 
@@ -300,13 +353,18 @@ and the facility drawer lists every request a facility has had.
 npm test
 ```
 
-205 tests across `lib/rules/*` and the seed baseline, including:
+227 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
 - `recordLicence` — full R1–R6 worked expectation
 - `inspectionRequests` — request state machine, capability gating, inbox
   notifications and stats for the Inspectorate ↔ Licensing handoff
+- `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
+  per-type and outcome counts, and the schedule ordering
+- `daily` — daily-entry sums, the daily-over-weekly precedence rule, that
+  daily metric keys match the weekly report's exactly, and the per-border
+  screening sums + official-total text
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
@@ -324,10 +382,15 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── login/
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
+│   ├── licences/           Authorisations tab — statistics from the register
+│   ├── inspectorate/       Inspectorate dashboard, schedule, log + register
+│   ├── inspections/        (moved) redirects to /inspectorate
+│   ├── nsss/               Nuclear Safety, Security & Safeguards dashboard
+│   ├── licence-status/     Smart Status Update — RAIS workflow tracker
 │   ├── bulk-approval/      Paste → match → review → commit
-│   ├── inspections/        Inspection log + "conducted" totals
 │   ├── inspection-requests/ Licensing ↔ Inspectorate pre-auth handoff board
-│   ├── weekly/             Weekly sectional report
+│   ├── daily/              Daily Updates — per-section daily logging
+│   ├── weekly/             Weekly sectional report (fed by Daily Updates)
 │   ├── admin/users/
 │   └── settings/
 ├── components/             UI primitives — Logo, Sidebar, Topbar, Drawer, Kpi, Bars, Gauge, Toast …

@@ -161,11 +161,11 @@ export default function DashboardPage() {
             />
           </ul>
           <div className="mt-4 flex gap-2">
-            <Link className="btn btn-secondary" href="/weekly">
-              Open weekly report
+            <Link className="btn btn-secondary" href="/daily">
+              Daily updates
             </Link>
-            <Link className="btn btn-ghost" href="/bulk-approval">
-              Bulk approve
+            <Link className="btn btn-ghost" href="/weekly">
+              Weekly report
             </Link>
           </div>
         </div>
@@ -262,7 +262,7 @@ export default function DashboardPage() {
               className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
               href="/licences"
             >
-              Open licences
+              Open authorisations
             </Link>
           </div>
           <div className="text-4xl font-black tabular">

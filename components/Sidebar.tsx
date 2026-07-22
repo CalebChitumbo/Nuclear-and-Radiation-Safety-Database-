@@ -12,12 +12,17 @@ import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 const NAV = [
   { href: "/", label: "Overview", icon: "▣" },
   { href: "/facilities", label: "Facilities", icon: "▤" },
-  { href: "/licences", label: "Licences", icon: "▦" },
-  { href: "/licence-status", label: "Licensing Status", icon: "◑" },
+  { href: "/licences", label: "Authorisations", icon: "▦" },
+  { href: "/inspectorate", label: "Inspectorate", icon: "✶" },
+  {
+    href: "/nsss",
+    label: "Nuclear Safety, Security & Safeguards",
+    icon: "⬢",
+  },
+  { href: "/licence-status", label: "Smart Status Update", icon: "◑" },
   { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
-  { href: "/inspections", label: "Inspections", icon: "✶" },
   { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },
-  { href: "/weekly", label: "Weekly Report", icon: "◷" },
+  { href: "/daily", label: "Daily Updates", icon: "✎" },
 ];
 
 const ADMIN_NAV = [

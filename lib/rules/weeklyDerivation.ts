@@ -3,6 +3,7 @@ import type {
   InspectionType,
   LicenceEvent,
   LicenceType,
+  Section,
 } from "./types";
 
 export interface MetricRow {
@@ -76,6 +77,18 @@ const NSI_MANUAL_METRICS = [
   "Discrepancies identified",
   "Team meetings held",
 ];
+
+/**
+ * The manual (typed-in) metrics each section reports, keyed by section. This is
+ * the single list the weekly report AND the Daily Updates tab draw from, so a
+ * daily count entry lands on exactly the metric key the weekly table sums.
+ */
+export const MANUAL_METRICS_BY_SECTION: Record<Section, readonly string[]> = {
+  "Authorisation & Standards": AS_MANUAL_METRICS,
+  Inspectorate: INSP_MANUAL_METRICS,
+  "Nuclear Safety, Security & Safeguards": NSSS_MANUAL_METRICS,
+  "National Source Inventory": NSI_MANUAL_METRICS,
+};
 
 export function sectionKey(section: string): string {
   return section
