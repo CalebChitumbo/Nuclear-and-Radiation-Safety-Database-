@@ -16,6 +16,7 @@ import type {
   UserDoc,
   WeekDef,
   WeekMetrics,
+  WorkflowNote,
 } from "../rules/types";
 
 export interface DataStore {
@@ -31,6 +32,19 @@ export interface DataStore {
   listInspectionsFor(facilityId: string): Promise<Inspection[]>;
   listActivities(): Promise<Activity[]>;
   listLicenceWorkflows(): Promise<LicenceWorkflow[]>;
+  /** Applications linked to one facility, most recently updated first. */
+  listLicenceWorkflowsFor(facilityId: string): Promise<LicenceWorkflow[]>;
+  /**
+   * Append an officer comment to an application's notes & history trail,
+   * keyed by its RAN (or record id when it has no RAN). Any signed-in officer
+   * may comment — the trail is the shared memory between the officers who work
+   * on the same application. Appends only; nothing else on the record changes.
+   */
+  addWorkflowNote(
+    ran: string,
+    text: string,
+    actor: RequestActor,
+  ): Promise<WorkflowNote>;
   listUsers(): Promise<UserDoc[]>;
   getAggregate(): Promise<DashboardAggregate>;
   getWeeks(): Promise<WeekDef[]>;
@@ -96,11 +110,15 @@ export interface DataStore {
   /**
    * Upsert parsed RAIS workflow records (keyed by RAN) and roll each matched
    * facility's stage up onto its facility doc. Returns how many facility stages
-   * were updated. Used by the Licensing Status tab.
+   * were updated. Used by the Licensing Status tab. Each record whose visible
+   * status changed also gets an automatic history entry appended to its notes
+   * trail (workflowHistoryOnSave); pass `actor` so those entries carry the
+   * officer's name, not just the uid.
    */
   saveLicenceWorkflows(
     items: LicenceWorkflow[],
     uid: string,
+    actor?: RequestActor,
   ): Promise<{ saved: number; facilitiesUpdated: number }>;
   updateFacility(id: string, patch: Partial<Facility>, uid: string): Promise<void>;
   addFacility(f: Omit<Facility, "id">, uid: string): Promise<Facility>;

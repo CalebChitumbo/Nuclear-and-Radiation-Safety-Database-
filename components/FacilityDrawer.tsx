@@ -6,11 +6,16 @@ import Link from "next/link";
 
 import { Drawer } from "./Drawer";
 import { StatusPill } from "./StatusPill";
+import { WorkflowNotesPanel } from "./WorkflowNotesPanel";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { detectType } from "@/lib/rules/detectType";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
+import {
+  workflowCommentCount,
+  workflowStatusLabel,
+} from "@/lib/rules/workflowNotes";
 import {
   type Facility,
   type Inspection,
@@ -18,6 +23,7 @@ import {
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
+  type LicenceWorkflow,
   INSPECTION_PRIORITIES,
   LICENCE_TYPES,
   isUseP,
@@ -36,6 +42,7 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
   const [events, setEvents] = useState<LicenceEvent[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [requests, setRequests] = useState<InspectionRequest[]>([]);
+  const [workflows, setWorkflows] = useState<LicenceWorkflow[]>([]);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [number, setNumber] = useState("");
@@ -60,6 +67,8 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
       // Secondary: a missing rule/index for this new collection must not stop
       // the facility itself from opening. Degrade to an empty list.
       s.listInspectionRequestsFor(id).catch(() => []),
+      // The facility's tracked applications, with their officer notes/history.
+      s.listLicenceWorkflowsFor(id).catch(() => []),
     ]);
   }, []);
 
@@ -72,12 +81,13 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
     // stale response win (the drawer's actions key off facility.id).
     let cancelled = false;
     loadFacility(facilityId)
-      .then(([f, evs, ins, reqs]) => {
+      .then(([f, evs, ins, reqs, wfs]) => {
         if (cancelled) return;
         setFacility(f);
         setEvents(evs);
         setInspections(ins);
         setRequests(reqs);
+        setWorkflows(wfs);
       })
       .catch(() => {
         if (!cancelled) toast.push("Failed to load facility.", "error");
@@ -114,11 +124,12 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
     : "Recorded as an authorisation the facility holds. Licensing status will not change.";
 
   const refresh = async (id: string) => {
-    const [f, evs, ins, reqs] = await loadFacility(id);
+    const [f, evs, ins, reqs, wfs] = await loadFacility(id);
     setFacility(f);
     setEvents(evs);
     setInspections(ins);
     setRequests(reqs);
+    setWorkflows(wfs);
   };
 
   const submitRequest = async () => {
@@ -255,6 +266,50 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
               ) : null}
             </dl>
           </section>
+
+          {workflows.length ? (
+            <section>
+              <h3 className="caps text-xs text-gunmetal/60 mb-2">
+                Applications — officer notes &amp; history
+              </h3>
+              <div className="text-[11px] text-gunmetal/55 mb-2">
+                What is happening on each application, and the notes officers
+                left for whoever works on it next.
+              </div>
+              <ul className="space-y-2">
+                {workflows.map((w) => {
+                  const n = workflowCommentCount(w);
+                  return (
+                    <li key={w.id} className="card p-3">
+                      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm tabular">
+                            {w.ran || w.id}
+                          </div>
+                          <div className="text-xs text-gunmetal/60">
+                            {workflowStatusLabel(w)}
+                          </div>
+                        </div>
+                        {w.lastSeen ? (
+                          <span className="text-xs tabular text-gunmetal/55 shrink-0">
+                            {w.lastSeen}
+                          </span>
+                        ) : null}
+                      </div>
+                      <details className="mt-2">
+                        <summary className="text-[11px] font-bold text-[var(--rpa-green-dark,#0a7a4a)] cursor-pointer select-none">
+                          💬 Notes &amp; history{n ? ` (${n})` : ""}
+                        </summary>
+                        <div className="mt-3">
+                          <WorkflowNotesPanel workflow={w} />
+                        </div>
+                      </details>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
 
           <section>
             <h3 className="caps text-xs text-gunmetal/60 mb-2">
