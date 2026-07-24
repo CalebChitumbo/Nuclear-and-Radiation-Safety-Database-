@@ -93,10 +93,25 @@ service cloud.firestore {
 
     // RAIS licensing-status tracker: imported on the Smart Status Update tab by
     // Authorisation & Standards officers; readable by any signed-in user.
+    //
+    // The `notes` trail (officer comments + automatic status history) is the
+    // shared memory on an application — cross-section awareness is its point —
+    // so ANY signed-in officer may APPEND to it: the write may touch nothing
+    // but notes/updatedAt/updatedBy and may never shrink the trail. Everything
+    // else on the record stays A&S-only.
+    function notesAppendOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['notes', 'updatedAt', 'updatedBy'])
+        && request.resource.data.notes is list
+        && (!('notes' in resource.data)
+            || request.resource.data.notes.size() >= resource.data.notes.size());
+    }
+
     match /licenceWorkflows/{id} {
       allow read:   if signedIn();
       allow create: if isAS() && request.resource.data.ran is string;
-      allow update: if isAS() && request.resource.data.ran is string;
+      allow update: if (isAS() && request.resource.data.ran is string)
+        || (signedIn() && notesAppendOnly());
       allow delete: if isAdmin();
     }
 

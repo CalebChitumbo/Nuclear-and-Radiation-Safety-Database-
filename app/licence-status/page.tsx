@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { isMockMode } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { ApplicationHistoryDrawer } from "@/components/ApplicationHistoryDrawer";
 import { FacilitySelect } from "@/components/FacilitySelect";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { useToast } from "@/components/Toast";
@@ -28,6 +29,10 @@ import {
   needsTypeClassification,
   workflowLicenceType,
 } from "@/lib/rules/licenceFamily";
+import {
+  latestWorkflowComment,
+  workflowCommentCount,
+} from "@/lib/rules/workflowNotes";
 import {
   LICENCE_TYPES,
   WORKFLOW_PHASES,
@@ -86,6 +91,46 @@ const SHORT_FAMILY: Partial<Record<LicenceType, string>> = {
   "Decommissioning Licence": "Decommissioning",
 };
 
+/**
+ * The latest officer note on an application, surfaced right where the accept /
+ * approve decision happens — so the background a colleague left ("waiting on
+ * POP", "director unreachable") is read BEFORE acting, plus the door into the
+ * full notes & history trail.
+ */
+function NotePeek({
+  row,
+  onOpen,
+}: {
+  row: LicenceWorkflow;
+  onOpen: () => void;
+}) {
+  const last = latestWorkflowComment(row);
+  const n = workflowCommentCount(row);
+  return (
+    <div className="mt-2 flex items-start gap-2 flex-wrap">
+      {last ? (
+        <div className="text-[11px] text-gunmetal/70 bg-mist rounded-lg px-2 py-1 min-w-0">
+          ❝{" "}
+          <span className="italic">
+            {last.text.length > 140 ? `${last.text.slice(0, 140)}…` : last.text}
+          </span>
+          <span className="text-gunmetal/50">
+            {" "}
+            — {last.byName || "Officer"}
+          </span>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className="text-[11px] font-bold text-[var(--rpa-green-dark,#0a7a4a)] hover:underline shrink-0"
+        onClick={onOpen}
+      >
+        💬 Notes &amp; history{n ? ` (${n})` : ""}
+      </button>
+    </div>
+  );
+}
+
 /** A chip naming the licence family, so officers see what an update will touch. */
 function FamilyChip({ row }: { row: LicenceWorkflow }) {
   const type = workflowLicenceType(row);
@@ -126,6 +171,14 @@ export default function LicenceStatusPage() {
   const [saving, setSaving] = useState(false);
   // An inbox row the officer is turning into a brand-new register facility.
   const [addingFor, setAddingFor] = useState<LicenceWorkflow | null>(null);
+  // The application whose notes & history drawer is open.
+  const [viewing, setViewing] = useState<LicenceWorkflow | null>(null);
+
+  // Who is acting — stamped onto comments and automatic history entries so the
+  // trail answers "which officer was working on this".
+  const actor = user
+    ? { uid: user.uid, name: user.displayName, section: user.section }
+    : undefined;
 
   // The incoming-email inbox: everything the connector queued, awaiting accept.
   // Re-link by RAN in the UI too, so a pending email whose RAN is in the register
@@ -144,6 +197,20 @@ export default function LicenceStatusPage() {
     () => new Map((facilities || []).map((f) => [f.id, f])),
     [facilities],
   );
+
+  // The persisted record for each RAN — the notes & history trail lives there.
+  // A freshly parsed board row is resolved through this map so the drawer always
+  // shows the saved trail (and comments attach to the tracked record).
+  const savedByRan = useMemo(() => {
+    const m = new Map<string, LicenceWorkflow>();
+    for (const w of saved || []) m.set((w.ran || w.id).toUpperCase(), w);
+    return m;
+  }, [saved]);
+  const savedFor = (r: LicenceWorkflow) =>
+    savedByRan.get((r.ran || r.id).toUpperCase());
+  const openHistory = (r: LicenceWorkflow) => setViewing(savedFor(r) ?? r);
+  const commentCountFor = (r: LicenceWorkflow) =>
+    workflowCommentCount(savedFor(r) ?? r);
 
   // Fallback panel: Use/Possession applications whose certificate has been issued
   // but whose facility is still not Licensed. Accepting a confirmed Use/Possession
@@ -201,7 +268,7 @@ export default function LicenceStatusPage() {
     };
     try {
       const s = await store();
-      const res = await s.saveLicenceWorkflows([rec], user.uid);
+      const res = await s.saveLicenceWorkflows([rec], user.uid, actor);
       toast.push(
         facilityId
           ? `Applied — ${res.facilitiesUpdated} facility stage updated.`
@@ -297,7 +364,7 @@ export default function LicenceStatusPage() {
     }));
     try {
       const s = await store();
-      const res = await s.saveLicenceWorkflows(recs, user.uid);
+      const res = await s.saveLicenceWorkflows(recs, user.uid, actor);
       toast.push(
         `Applied ${recs.length} update(s) — ${res.facilitiesUpdated} facility status(es) updated.`,
         "success",
@@ -324,7 +391,7 @@ export default function LicenceStatusPage() {
     setCommitting(true);
     try {
       const s = await store();
-      const res = await s.saveLicenceWorkflows(rows, user.uid);
+      const res = await s.saveLicenceWorkflows(rows, user.uid, actor);
       toast.push(
         `Saved ${res.saved} applications · ${res.facilitiesUpdated} facility stages updated.`,
         "success",
@@ -374,6 +441,14 @@ export default function LicenceStatusPage() {
         />
       ) : null}
 
+      {/* Per-application notes & history — the officers' shared memory pad */}
+      <ApplicationHistoryDrawer
+        workflow={viewing}
+        isSaved={!!(viewing && savedFor(viewing))}
+        onClose={() => setViewing(null)}
+        onChanged={reload}
+      />
+
       {/* The inbox — incoming RAIS emails, each with its status, ready to accept */}
       <IncomingInbox
         items={needsReview}
@@ -382,6 +457,7 @@ export default function LicenceStatusPage() {
         onAccept={applyReviewed}
         onAcceptAllReady={acceptAllReady}
         onAddFacility={setAddingFor}
+        onOpenHistory={openHistory}
       />
 
       {/* Create a brand-new register facility from an incoming email, then link it. */}
@@ -402,6 +478,7 @@ export default function LicenceStatusPage() {
           items={readyToLicense}
           busy={saving}
           onApprove={approveLicence}
+          onOpenHistory={openHistory}
         />
       ) : null}
 
@@ -450,12 +527,18 @@ export default function LicenceStatusPage() {
           {report ? (
             <>
               <ReportPanel report={report} onCopy={copyReport} />
-              <KanbanBoard records={records} />
+              <KanbanBoard
+                records={records}
+                onOpen={openHistory}
+                commentCountFor={commentCountFor}
+              />
               <ReviewTable
                 records={records}
                 facilities={facilities || []}
                 editable={isDirty}
                 onChange={updateRow}
+                onOpenHistory={openHistory}
+                commentCountFor={commentCountFor}
               />
               {isDirty ? (
                 <div className="card p-5 flex flex-wrap items-center gap-3">
@@ -580,13 +663,26 @@ function ReportPanel({
 // Kanban board
 // ---------------------------------------------------------------------------
 
-function KanbanBoard({ records }: { records: LicenceWorkflow[] }) {
+function KanbanBoard({
+  records,
+  onOpen,
+  commentCountFor,
+}: {
+  records: LicenceWorkflow[];
+  onOpen: (r: LicenceWorkflow) => void;
+  commentCountFor: (r: LicenceWorkflow) => number;
+}) {
   const columns = WORKFLOW_PHASES.filter(
     (ph) => ph !== "Other" || records.some((r) => r.phase === "Other"),
   );
   return (
     <div className="card p-5 overflow-x-auto">
-      <div className="font-black mb-3">Licensing pipeline</div>
+      <div className="font-black mb-3">
+        Licensing pipeline
+        <span className="text-xs text-gunmetal/55 font-normal ml-2">
+          click an application for its notes &amp; history
+        </span>
+      </div>
       <div className="flex gap-3" style={{ minWidth: "min-content" }}>
         {columns.map((phase) => {
           const items = records.filter((r) => r.phase === phase);
@@ -602,7 +698,12 @@ function KanbanBoard({ records }: { records: LicenceWorkflow[] }) {
               </div>
               <div className="space-y-2">
                 {items.map((r) => (
-                  <WorkflowCard key={r.id} record={r} />
+                  <WorkflowCard
+                    key={r.id}
+                    record={r}
+                    comments={commentCountFor(r)}
+                    onOpen={() => onOpen(r)}
+                  />
                 ))}
                 {!items.length ? (
                   <div className="text-[11px] text-gunmetal/35 py-3 text-center">
@@ -618,12 +719,23 @@ function KanbanBoard({ records }: { records: LicenceWorkflow[] }) {
   );
 }
 
-function WorkflowCard({ record: r }: { record: LicenceWorkflow }) {
+function WorkflowCard({
+  record: r,
+  comments,
+  onOpen,
+}: {
+  record: LicenceWorkflow;
+  comments: number;
+  onOpen: () => void;
+}) {
   const meta = PRIORITY_META[r.priority];
   return (
-    <div
-      className="card card-hover p-2.5"
+    <button
+      type="button"
+      onClick={onOpen}
+      className="card card-hover p-2.5 w-full text-left block"
       style={{ borderLeft: `3px solid ${meta.dot}` }}
+      title="Open notes & history"
     >
       <div className="text-sm font-bold leading-tight">
         {r.facilityName || "(unmatched facility)"}
@@ -631,8 +743,13 @@ function WorkflowCard({ record: r }: { record: LicenceWorkflow }) {
       <div className="text-[11px] tabular text-gunmetal/55">{r.ran}</div>
       <div className="text-xs mt-1">{r.stage}</div>
       <div className="text-[11px] text-gunmetal/60 mt-1">{r.responsibleParty}</div>
-      {r.outstandingPayment || r.bottleneck || !r.facilityId ? (
+      {r.outstandingPayment || r.bottleneck || !r.facilityId || comments > 0 ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {comments > 0 ? (
+            <span className="chip green" title={`${comments} officer note(s)`}>
+              💬 {comments}
+            </span>
+          ) : null}
           {r.outstandingPayment ? (
             <span className="chip amber">⚠ payment</span>
           ) : null}
@@ -642,7 +759,7 @@ function WorkflowCard({ record: r }: { record: LicenceWorkflow }) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </button>
   );
 }
 
@@ -655,11 +772,15 @@ function ReviewTable({
   facilities,
   editable,
   onChange,
+  onOpenHistory,
+  commentCountFor,
 }: {
   records: LicenceWorkflow[];
   facilities: Facility[];
   editable: boolean;
   onChange: (id: string, patch: Partial<LicenceWorkflow>) => void;
+  onOpenHistory: (r: LicenceWorkflow) => void;
+  commentCountFor: (r: LicenceWorkflow) => number;
 }) {
   // The register-match control is shared between the desktop table and the
   // mobile card list so editing behaves identically on every screen size.
@@ -683,6 +804,21 @@ function ReviewTable({
       <span className="chip">unmatched</span>
     );
 
+  // Shared by both layouts: open the application's notes & history trail.
+  const renderNotes = (r: LicenceWorkflow) => {
+    const n = commentCountFor(r);
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={() => onOpenHistory(r)}
+        title="Notes & history"
+      >
+        💬 {n > 0 ? n : "Notes"}
+      </button>
+    );
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 font-black">
@@ -703,6 +839,7 @@ function ReviewTable({
               <th className="px-4 py-2">Responsible</th>
               <th className="px-4 py-2">Priority</th>
               <th className="px-4 py-2">Register match</th>
+              <th className="px-4 py-2">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -733,6 +870,7 @@ function ReviewTable({
                   </span>
                 </td>
                 <td className="px-4 py-3">{renderMatch(r)}</td>
+                <td className="px-4 py-3">{renderNotes(r)}</td>
               </tr>
             ))}
           </tbody>
@@ -790,6 +928,8 @@ function ReviewTable({
               </div>
               {renderMatch(r)}
             </div>
+
+            <div className="mt-3">{renderNotes(r)}</div>
           </div>
         ))}
       </div>
@@ -816,6 +956,7 @@ function IncomingInbox({
   onAccept,
   onAcceptAllReady,
   onAddFacility,
+  onOpenHistory,
 }: {
   items: LicenceWorkflow[];
   facilities: Facility[];
@@ -827,6 +968,7 @@ function IncomingInbox({
   ) => void;
   onAcceptAllReady: (rows: LicenceWorkflow[]) => void;
   onAddFacility: (row: LicenceWorkflow) => void;
+  onOpenHistory: (row: LicenceWorkflow) => void;
 }) {
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [pickedType, setPickedType] = useState<Record<string, LicenceType>>({});
@@ -1040,6 +1182,7 @@ function IncomingInbox({
                       </button>
                     </div>
                   </div>
+                  <NotePeek row={r} onOpen={() => onOpenHistory(r)} />
                   {renderTypePicker(r)}
                   <details className="mt-2">
                     <summary className="text-[11px] text-gunmetal/50 cursor-pointer">
@@ -1098,6 +1241,7 @@ function IncomingInbox({
                     ) : null}
                   </div>
 
+                  <NotePeek row={r} onOpen={() => onOpenHistory(r)} />
                   {renderTypePicker(r)}
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -1182,10 +1326,12 @@ function ReadyToLicense({
   items,
   busy,
   onApprove,
+  onOpenHistory,
 }: {
   items: LicenceWorkflow[];
   busy: boolean;
   onApprove: (row: LicenceWorkflow, type: LicenceType, date: string) => void;
+  onOpenHistory: (row: LicenceWorkflow) => void;
 }) {
   const today = todayISO();
   const [picks, setPicks] = useState<
@@ -1239,6 +1385,8 @@ function ReadyToLicense({
                   {r.currentStatus || "Licence / Certificate Issued"}
                 </span>
               </div>
+
+              <NotePeek row={r} onOpen={() => onOpenHistory(r)} />
 
               {isFormI ? (
                 <div className="mt-3">

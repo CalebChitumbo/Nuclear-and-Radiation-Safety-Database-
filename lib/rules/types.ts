@@ -305,6 +305,31 @@ export const WORKFLOW_PRIORITIES = [
 export type WorkflowPriority = (typeof WORKFLOW_PRIORITIES)[number];
 
 /**
+ * One entry in an application's notes & history trail — the shared memory pad
+ * officers keep on a licence workflow (RAN). "comment" entries are typed by an
+ * officer (any section) so whoever picks the application up next has the
+ * background; "status" entries are appended automatically by the store whenever
+ * a save changes what the application shows (a status move, an accepted email,
+ * a FORM-I classification), so the trail reads as a who-did-what-when history
+ * of the application without anyone having to write it up.
+ */
+export interface WorkflowNote {
+  id: string;
+  /** ISO timestamp the entry was made. */
+  at: string;
+  /** uid of the officer responsible. */
+  by: string;
+  byName: string;
+  bySection: Section | "All" | "";
+  kind: "comment" | "status";
+  text: string;
+  /** For "status" entries: the status label the application showed from here. */
+  status?: string;
+  /** How the underlying update entered the system (status entries only). */
+  source?: "paste" | "email";
+}
+
+/**
  * One licensing application tracked through the RAIS pipeline, keyed by its
  * workflow RAN (e.g. AUTH/USE.REN/1097). Produced by the Licensing Status tab's
  * parser from pasted dashboard notifications and persisted so the register stays
@@ -377,6 +402,15 @@ export interface LicenceWorkflow {
   receivedAt?: string;
   /** Subject line of the source email (for the review queue). */
   emailSubject?: string;
+  /**
+   * Officer notes & automatic status history, oldest first (see WorkflowNote).
+   * Comments are appended by officers from the application-history drawer or
+   * the facility drawer; "status" entries are appended by saveLicenceWorkflows.
+   * The trail is append-only and survives every import — an import payload
+   * never carries it, it only adds to it. Absent on records saved before the
+   * feature existed.
+   */
+  notes?: WorkflowNote[];
   updatedAt?: string;
   updatedBy?: string;
 }

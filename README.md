@@ -185,7 +185,7 @@ automatically (Production for the production branch, Preview for others).
 | `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the weekly metric keys, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
 | `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
-| `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`) |
+| `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`), carrying the application's append-only officer **notes & history** trail (`notes`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
 | `config/referenceLists` | Editable lists (provinces, stages, licence types) |
 | `users/{uid}` | Staff accounts; role + section mirrored into Auth custom claims |
@@ -261,6 +261,41 @@ derived from each facility's most recent Use/Possession licence date — which
 facilities hold a current use licence **for a chosen year** versus those whose
 renewal is still in the pipeline (and at which stage). `lib/rules/licenceStats.ts`
 computes it; the Overview surfaces a summary.
+
+---
+
+## Application notes & history — the officer handover
+
+Different officers touch the same application at different times, and the
+background used to leave the building with whoever stepped out. Every tracked
+application (each `licenceWorkflows` RAN) now carries an **append-only notes &
+history trail** so the next officer picks it up warm:
+
+- **Officer comments** — free text ("applicant promised POP by Friday — don't
+  regenerate the invoice"). Any signed-in officer of any section may comment;
+  the entry records who, which section, and when.
+- **Automatic history** — `saveLicenceWorkflows` appends a dated entry whenever
+  a save changes what the application shows: first tracking, every status move,
+  an officer accepting an incoming email, a FORM-I type classification. Nobody
+  has to write the log — working the application writes it
+  (`lib/rules/workflowNotes.ts`, unit-tested).
+
+**Where it surfaces.** On **Smart Status Update**, every pipeline card is
+clickable and the review table, incoming-email inbox and Ready-to-license
+panels carry a 💬 *Notes & history* control — the inbox and approval rows also
+show the latest comment inline, so the background is read *before* Accept /
+Approve. The drawer shows the full trail (newest first), the raw RAIS
+notifications seen for the application, and the composer. Cross-section, the
+**facility drawer** (register + `/facilities/[id]`) lists each facility's
+applications with the same expandable trail, so an inspector or NSSS officer
+sees what Licensing knows without leaving their view.
+
+Storage is clobber-proof by construction: imports never write the `notes`
+array wholesale — new entries append via `arrayUnion`, so a re-paste or a
+concurrent commenter can't erase a colleague's note. Security rules let any
+signed-in officer **append** (`notes`/`updatedAt`/`updatedBy` only, never
+shrinking the list) while everything else on the record stays A&S-only, and
+deletes stay admin-only.
 
 ---
 
@@ -353,13 +388,16 @@ week, where the brief/PDF export works exactly as before.
 npm test
 ```
 
-227 tests across `lib/rules/*` and the seed baseline, including:
+241 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
 - `recordLicence` — full R1–R6 worked expectation
 - `inspectionRequests` — request state machine, capability gating, inbox
   notifications and stats for the Inspectorate ↔ Licensing handoff
+- `workflowNotes` — the application notes & history trail: comment building,
+  the automatic history entries a save produces, and that officer comments
+  survive re-imports
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
 - `daily` — daily-entry sums, the daily-over-weekly precedence rule, that

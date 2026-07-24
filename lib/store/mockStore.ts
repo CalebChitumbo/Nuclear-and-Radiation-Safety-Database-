@@ -16,6 +16,10 @@ import {
 import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
+  buildWorkflowComment,
+  workflowHistoryOnSave,
+} from "../rules/workflowNotes";
+import {
   type Activity,
   type Border,
   type DailyEntry,
@@ -29,6 +33,7 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkflowNote,
   isUseP,
 } from "../rules/types";
 import { weekLabelForDate } from "../rules/week";
@@ -223,6 +228,43 @@ class MockStore implements DataStore {
 
   async listLicenceWorkflows(): Promise<LicenceWorkflow[]> {
     return [...ensure().licenceWorkflows];
+  }
+
+  async listLicenceWorkflowsFor(facilityId: string): Promise<LicenceWorkflow[]> {
+    return ensure()
+      .licenceWorkflows.filter((w) => w.facilityId === facilityId)
+      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  }
+
+  async addWorkflowNote(
+    ran: string,
+    text: string,
+    actor: RequestActor,
+  ): Promise<WorkflowNote> {
+    const s = ensure();
+    const key = ran.trim();
+    const target =
+      s.licenceWorkflows.find((w) => w.ran === key || w.id === key) ||
+      s.licenceWorkflows.find(
+        (w) => (w.ran || "").toUpperCase() === key.toUpperCase(),
+      );
+    if (!target) {
+      throw new Error("Application not found — save it to the tracker first.");
+    }
+    const note = buildWorkflowComment(text, actor, new Date().toISOString());
+    s.licenceWorkflows = s.licenceWorkflows.map((w) =>
+      w === target
+        ? {
+            ...w,
+            notes: [...(w.notes || []), note],
+            updatedAt: note.at,
+            updatedBy: actor.uid,
+          }
+        : w,
+    );
+    save(s);
+    dispatchChange();
+    return note;
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -551,20 +593,28 @@ class MockStore implements DataStore {
   async saveLicenceWorkflows(
     items: LicenceWorkflow[],
     uid: string,
+    actor?: RequestActor,
   ): Promise<{ saved: number; facilitiesUpdated: number }> {
     const s = ensure();
     const now = new Date().toISOString();
     const weeks = weeksSeed as WeekDef[];
+    const noteActor: RequestActor = actor ?? { uid, name: "", section: "" };
 
     const byRan = new Map(s.licenceWorkflows.map((w) => [w.ran || w.id, w]));
     // Preserve a previously officer-assigned type when an update omits it, so the
     // classification sticks to the licence number across notifications. (Firebase
-    // gets this for free from merge writes.)
+    // gets this for free from merge writes.) The notes trail is likewise owned by
+    // the stored record: an import payload never replaces it — this save only
+    // appends the automatic history entries the change produces.
     const saved = items.map((item) => {
       const prior = byRan.get(item.ran || item.id);
       return {
         ...item,
         officerType: item.officerType ?? prior?.officerType,
+        notes: [
+          ...(prior?.notes || []),
+          ...workflowHistoryOnSave(prior, item, noteActor, now),
+        ],
         updatedAt: now,
         updatedBy: uid,
       };

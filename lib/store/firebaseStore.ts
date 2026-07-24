@@ -2,6 +2,7 @@
 
 import {
   addDoc,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -35,6 +36,10 @@ import {
 import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
+  buildWorkflowComment,
+  workflowHistoryOnSave,
+} from "../rules/workflowNotes";
+import {
   type Activity,
   type Border,
   type DailyEntry,
@@ -48,6 +53,7 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkflowNote,
   isUseP,
 } from "../rules/types";
 import { weekLabelForDate } from "../rules/week";
@@ -144,6 +150,51 @@ class FirebaseStore implements DataStore {
     return snap.docs.map(
       (d) => ({ id: d.id, ...(d.data() as Omit<LicenceWorkflow, "id">) }),
     );
+  }
+
+  async listLicenceWorkflowsFor(facilityId: string): Promise<LicenceWorkflow[]> {
+    const db = requireDb();
+    // Single-field equality — covered by the automatic index; sorted client-side.
+    const snap = await getDocs(
+      query(
+        collection(db, "licenceWorkflows"),
+        where("facilityId", "==", facilityId),
+      ),
+    );
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<LicenceWorkflow, "id">) }))
+      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  }
+
+  async addWorkflowNote(
+    ran: string,
+    text: string,
+    actor: RequestActor,
+  ): Promise<WorkflowNote> {
+    const db = requireDb();
+    // Same deterministic doc id saveLicenceWorkflows uses, so the note lands on
+    // the tracked application regardless of which surface the officer wrote it
+    // from (Smart Status Update drawer or the facility drawer).
+    const id = ran.trim().replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+    const note = buildWorkflowComment(text, actor, new Date().toISOString());
+    try {
+      // updateDoc, not set+merge: a note may only attach to an application that
+      // is already tracked (a merge would create a partial doc), and arrayUnion
+      // makes the append safe against two officers commenting at once. The write
+      // touches exactly the fields the cross-section security rule allows.
+      await updateDoc(doc(db, "licenceWorkflows", id), {
+        notes: arrayUnion(stripUndefined(note)),
+        updatedAt: note.at,
+        updatedBy: actor.uid,
+      });
+    } catch (err) {
+      throw new Error(
+        `Could not add the note — the application may not be saved yet (${
+          err instanceof Error ? err.message : err
+        }).`,
+      );
+    }
+    return note;
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -480,20 +531,39 @@ class FirebaseStore implements DataStore {
   async saveLicenceWorkflows(
     items: LicenceWorkflow[],
     uid: string,
+    actor?: RequestActor,
   ): Promise<{ saved: number; facilitiesUpdated: number }> {
     const db = requireDb();
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     const weeks = weeksSeed as WeekDef[];
+    const noteActor: RequestActor = actor ?? { uid, name: "", section: "" };
 
     // Deterministic doc id from the RAN so re-importing a dashboard upserts the
     // same application rather than duplicating it.
     const docId = (w: LicenceWorkflow) =>
       (w.ran || w.id).replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
 
+    // Prior stored records: the automatic history entry for each item needs the
+    // previous status to compare against, and step 2's supersede overlay reuses
+    // the same list.
+    const stored = await this.listLicenceWorkflows();
+    const storedById = new Map(stored.map((w) => [w.id, w]));
+
     const saved = items.map((item) => ({ ...item, updatedAt: now, updatedBy: uid }));
     for (const item of saved) {
-      batch.set(doc(db, "licenceWorkflows", docId(item)), stripUndefined(item), {
+      const prior = storedById.get(docId(item));
+      const history = workflowHistoryOnSave(prior, item, noteActor, now);
+      // The notes trail is append-only: an import payload never writes the array
+      // wholesale (that would clobber a comment another officer added since this
+      // record was loaded) — new history entries append via arrayUnion and the
+      // rest of the record merges as before.
+      const payload: Record<string, unknown> = stripUndefined({ ...item });
+      delete payload.notes;
+      if (history.length) {
+        payload.notes = arrayUnion(...history.map((n) => stripUndefined(n)));
+      }
+      batch.set(doc(db, "licenceWorkflows", docId(item)), payload, {
         merge: true,
       });
     }
@@ -505,10 +575,7 @@ class FirebaseStore implements DataStore {
 
     let facilitiesUpdated = 0;
     if (matched.length) {
-      const [facilities, stored] = await Promise.all([
-        this.listFacilities(),
-        this.listLicenceWorkflows(),
-      ]);
+      const facilities = await this.listFacilities();
       // Working copies so an auth append and a stage roll-up on the same facility
       // are merged into a single write.
       const facMap = new Map(facilities.map((f) => [f.id, { ...f }]));
