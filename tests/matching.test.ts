@@ -19,6 +19,8 @@ const mk = (name: string, facCode = "", licensed = false): Facility => ({
   province: "Lusaka",
   practice: "",
   sector: "Private",
+  functional: true,
+  category: "Medical",
   licensed,
   stage: licensed ? "Licensed" : "No Application Submitted",
   facCode,

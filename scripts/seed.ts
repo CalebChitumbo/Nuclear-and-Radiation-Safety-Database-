@@ -1,6 +1,7 @@
 /**
- * Seed script — writes the 474-facility register, the 2026 reporting-week
- * calendar, and the initial aggregates/dashboard document to Firestore.
+ * Seed script — writes the facility register (2026 Facility Status List), the
+ * 2026 reporting-week calendar, and the initial aggregates/dashboard document
+ * to Firestore.
  *
  * Usage (Admin SDK against the live project):
  *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
@@ -13,6 +14,14 @@
  *
  * The script is idempotent — facility doc IDs are stable (derived from the
  * FAC/#### code or the seed sequence number), so re-running updates in place.
+ *
+ * FRESH START (`npm run seed:fresh`, i.e. `--fresh`): first DELETES the whole
+ * register and its linked history — facilities, licenceEvents, inspections,
+ * inspectionRequests, licenceWorkflows — then seeds the new register. Use for
+ * a register replacement like the 2026 Facility Status List import, where the
+ * old facility list (and the history recorded against it) must not linger.
+ * Users, weeks, weekly metrics, daily entries, borders and activities are
+ * kept.
  */
 
 import { cert, initializeApp } from "firebase-admin/app";
@@ -22,8 +31,40 @@ import { join } from "node:path";
 
 import { mapAllSeed, type SeedFacility } from "../lib/store/seeding";
 import { computeAggregate } from "../lib/rules/aggregate";
+import {
+  CATEGORIES,
+  INSPECTION_TYPES,
+  LICENCE_TYPES,
+  PROVINCES,
+  SECTORS,
+  STAGES,
+} from "../lib/rules/types";
 
 const SEED_DIR = join(process.cwd(), "seed");
+const FRESH = process.argv.includes("--fresh");
+
+/** Collections wiped by --fresh: the register + everything keyed to it. */
+const FRESH_WIPE_COLLECTIONS = [
+  "facilities",
+  "licenceEvents",
+  "inspections",
+  "inspectionRequests",
+  "licenceWorkflows",
+];
+
+async function wipeCollection(name: string) {
+  const db = getFirestore();
+  let deleted = 0;
+  for (;;) {
+    const snap = await db.collection(name).limit(400).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    deleted += snap.size;
+  }
+  console.log(`  wiped ${name} (${deleted} docs)`);
+}
 
 function init() {
   const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -62,6 +103,13 @@ async function main() {
     readFileSync(join(SEED_DIR, "weeks-2026.seed.json"), "utf-8"),
   );
 
+  if (FRESH) {
+    console.log(
+      "FRESH START — wiping the register and its linked history first…",
+    );
+    for (const c of FRESH_WIPE_COLLECTIONS) await wipeCollection(c);
+  }
+
   const facilities = mapAllSeed(facilitiesRaw);
   console.log(`Seeding ${facilities.length} facilities…`);
 
@@ -70,50 +118,15 @@ async function main() {
   });
 
   console.log("Writing reference lists + week calendar…");
+  // Single source of truth: lib/rules/types.ts — hardcoding these here once
+  // silently dropped newly added stages from the reference doc.
   await db.doc("config/referenceLists").set({
-    provinces: [
-      "Lusaka",
-      "Copperbelt",
-      "North-Western",
-      "Central",
-      "Northern",
-      "Luapula",
-      "Eastern",
-      "Western",
-      "Southern",
-      "Muchinga",
-    ],
-    sectors: ["Public", "Private"],
-    stages: [
-      "Licensed",
-      "No Application Submitted",
-      "Invoice Generation Pending",
-      "Waiting for Payment",
-      "Accounts Clearance Pending",
-      "Waiting for Review and Assessment",
-      "Under Internal Review (Further Information Required)",
-      "CEO Licence Approval Required",
-      "Import Licence Only (Not yet Use/Possession)",
-    ],
-    licenceTypes: [
-      "New Use/Possession Licence",
-      "Renewal of Use/Possession Licence",
-      "Importation Licence",
-      "Export Licence",
-      "Transfer Licence",
-      "Transport Licence",
-      "Transit Licence",
-      "Variation of Terms and Conditions",
-      "Design and Construction Licence",
-      "Decommissioning Licence",
-    ],
-    inspectionTypes: [
-      "Routine Inspection",
-      "Follow-up",
-      "Pre-Authorisation",
-      "Investigation",
-      "Enforcement Action",
-    ],
+    provinces: [...PROVINCES],
+    sectors: [...SECTORS],
+    categories: [...CATEGORIES],
+    stages: [...STAGES],
+    licenceTypes: [...LICENCE_TYPES],
+    inspectionTypes: [...INSPECTION_TYPES],
     weeks,
   });
 
@@ -121,7 +134,8 @@ async function main() {
   const agg = computeAggregate(facilities);
   await db.doc("aggregates/dashboard").set(agg);
   console.log(
-    `Done. total=${agg.total} licensed=${agg.licensed} unlicensed=${agg.unlicensed} auths=${agg.auths}`,
+    `Done. total=${agg.total} licensed=${agg.licensed} unlicensed=${agg.unlicensed} ` +
+      `functional=${agg.functional} auths=${agg.auths}`,
   );
 }
 

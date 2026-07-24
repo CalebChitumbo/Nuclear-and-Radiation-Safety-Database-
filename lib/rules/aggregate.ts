@@ -18,6 +18,9 @@ export function computeAggregate(
   for (const f of facilities) {
     if (f.licensed) agg.licensed += 1;
     else agg.unlicensed += 1;
+    // Older facility docs predate the functional flag; count them as
+    // operating, matching mapSeedFacility's default.
+    if (f.functional !== false) agg.functional! += 1;
 
     agg.auths += (f.auths || []).length;
 
@@ -25,6 +28,13 @@ export function computeAggregate(
       f.sector === "Public" ? agg.bySector.Public : agg.bySector.Private;
     sectorBucket.total += 1;
     if (f.licensed) sectorBucket.licensed += 1;
+
+    const catBucket =
+      f.category === "Non-Medical"
+        ? agg.byCategory!["Non-Medical"]
+        : agg.byCategory!.Medical;
+    catBucket.total += 1;
+    if (f.licensed) catBucket.licensed += 1;
 
     if (PROVINCES.includes(f.province)) {
       const pb = agg.byProvince[f.province];

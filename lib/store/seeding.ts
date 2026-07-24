@@ -1,8 +1,10 @@
 import { detectType } from "../rules/detectType";
 import { norm } from "../rules/matching";
 import {
+  STAGES,
   type Authorisation,
   type Facility,
+  type FacilityCategory,
   type Province,
   type Sector,
   type Stage,
@@ -20,6 +22,16 @@ export interface SeedFacility {
   auth: string;
   fac: string;
   ln: string;
+  /** "Yes"/"No" — operating status from the 2026 Facility Status List. */
+  func?: string;
+  /** "Medical" / "Non-Medical" (veterinary counts as Medical). */
+  cat?: string;
+  /** "Yes" when an earlier application stalled with no 2026 activity. */
+  stalled?: string;
+  /** Review note when the imported row needs an officer's confirmation. */
+  review?: string;
+  /** Source detail line from the status list (latest stage · date). */
+  detail?: string;
 }
 
 function safeProvince(p: string): Province {
@@ -42,18 +54,7 @@ function safeProvince(p: string): Province {
 
 function safeStage(s: string, licensed: boolean): Stage {
   if (licensed) return "Licensed";
-  const allowed: Stage[] = [
-    "Licensed",
-    "No Application Submitted",
-    "Invoice Generation Pending",
-    "Waiting for Payment",
-    "Accounts Clearance Pending",
-    "Waiting for Review and Assessment",
-    "Under Internal Review (Further Information Required)",
-    "CEO Licence Approval Required",
-    "Import Licence Only (Not yet Use/Possession)",
-  ];
-  return (allowed as string[]).includes(s)
+  return (STAGES as readonly string[]).includes(s)
     ? (s as Stage)
     : "No Application Submitted";
 }
@@ -82,7 +83,7 @@ export function mapSeedFacility(s: SeedFacility): Facility {
   const id = s.fac
     ? s.fac.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()
     : `fac-${s.n}`;
-  return {
+  const f: Facility = {
     id,
     no: s.n,
     name,
@@ -91,11 +92,27 @@ export function mapSeedFacility(s: SeedFacility): Facility {
     province: safeProvince(s.prov),
     practice: s.prac || "",
     sector: s.sec === "Public" ? ("Public" as Sector) : ("Private" as Sector),
+    // Rows predating the 2026 status-list import lack `func` — treat them as
+    // operating rather than silently shrinking the functional counts.
+    functional: s.func !== "No",
+    category:
+      s.cat === "Non-Medical"
+        ? ("Non-Medical" as FacilityCategory)
+        : ("Medical" as FacilityCategory),
     licensed,
     stage: safeStage(s.stage, licensed),
     facCode: s.fac || "",
     auths: buildAuths(s.ln, s.auth),
   };
+  // Optional flags only when set — keeps Firestore docs (and JSON exports)
+  // free of empty placeholder fields.
+  if (s.stalled === "Yes") f.stalled = true;
+  if (s.review) {
+    f.needsReview = true;
+    f.reviewNote = s.review;
+  }
+  if (s.detail) f.statusDetail = s.detail;
+  return f;
 }
 
 export function mapAllSeed(rows: SeedFacility[]): Facility[] {

@@ -42,7 +42,11 @@ import weeksSeed from "../../seed/weeks-2026.seed.json";
 import { mapAllSeed, type SeedFacility } from "./seeding";
 import type { DataStore } from "./types";
 
-const STORAGE_KEY = "rpa-mock-store-v1";
+// v2: the 2026 Facility Status List register replacement. Bumping the key
+// makes every mock/demo browser start fresh from the new seed (the old
+// register AND the history recorded against it are gone by design).
+const STORAGE_KEY = "rpa-mock-store-v2";
+const OLD_STORAGE_KEYS = ["rpa-mock-store-v1"];
 
 interface State {
   facilities: Facility[];
@@ -120,6 +124,8 @@ function freshState(): State {
 function load(): State {
   if (typeof window === "undefined") return freshState();
   try {
+    // Reclaim quota from superseded store versions.
+    for (const k of OLD_STORAGE_KEYS) window.localStorage.removeItem(k);
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       const s = freshState();

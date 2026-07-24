@@ -31,7 +31,12 @@ service cloud.firestore {
                           'Luapula','Eastern','Western','Southern','Muchinga']
         && d.sector in ['Public','Private']
         && d.licensed is bool
-        && d.stage is string;
+        && d.stage is string
+        // 2026 status-list fields — optional for docs written before them.
+        && (!('functional' in d) || d.functional is bool)
+        && (!('category' in d) || d.category in ['Medical','Non-Medical'])
+        && (!('stalled' in d) || d.stalled is bool)
+        && (!('needsReview' in d) || d.needsReview is bool);
     }
 
     function validEvent(d) {

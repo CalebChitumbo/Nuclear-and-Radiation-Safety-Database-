@@ -235,6 +235,26 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
     }
   };
 
+  /** Small direct edits to the facility record (functional/category/review). */
+  const patchFacility = async (patch: Partial<Facility>, note: string) => {
+    if (!facility || !user || busy) return;
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.updateFacility(facility.id, patch, user.uid);
+      toast.push(note, "success");
+      onChanged?.();
+      await refresh(facility.id);
+    } catch (err) {
+      toast.push(
+        `Update failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Drawer
       open={!!facilityId}
@@ -248,12 +268,48 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
           <section>
             <div className="flex items-center gap-2 flex-wrap">
               <StatusPill licensed={facility.licensed} stage={facility.stage} />
+              {facility.functional === false ? (
+                <span className="chip red">Non-Functional</span>
+              ) : (
+                <span className="chip green">Functional</span>
+              )}
+              <span className="chip">
+                {facility.category === "Non-Medical" ? "Non-Medical" : "Medical"}
+              </span>
               <span className="chip slate">{facility.sector}</span>
               <span className="chip">{facility.province}</span>
               {facility.facCode ? (
                 <span className="chip caps">{facility.facCode}</span>
               ) : null}
+              {facility.stalled ? (
+                <span
+                  className="chip amber"
+                  title="Earlier application with no 2026 activity"
+                >
+                  Stalled application
+                </span>
+              ) : null}
             </div>
+            {facility.needsReview ? (
+              <div className="mt-3 card p-3 bg-mist border border-amber-300 text-sm">
+                <div className="caps text-[10px] text-gunmetal/60">
+                  Needs review
+                </div>
+                <div className="mt-1">
+                  {facility.reviewNote ||
+                    "Imported with uncertainty — confirm this record."}
+                </div>
+                {canEditAS ? (
+                  <button
+                    className="btn btn-ghost mt-2 text-xs"
+                    disabled={busy}
+                    onClick={() => patchFacility({ needsReview: false }, "Review flag cleared.")}
+                  >
+                    Mark as verified
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
               <Field label="District" value={facility.district || "—"} />
               <Field label="Practice" value={facility.practice || "—"} />
@@ -264,7 +320,53 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
                   <Field label="RAIS status" value={facility.currentStatus} />
                 </div>
               ) : null}
+              {facility.statusDetail ? (
+                <div className="col-span-2">
+                  <Field
+                    label="2026 status list import"
+                    value={facility.statusDetail}
+                  />
+                </div>
+              ) : null}
             </dl>
+            {canEditAS ? (
+              <div className="mt-3 flex gap-2 flex-wrap">
+                <button
+                  className="btn btn-ghost text-xs"
+                  disabled={busy}
+                  onClick={() =>
+                    patchFacility(
+                      { functional: !(facility.functional !== false) },
+                      facility.functional !== false
+                        ? "Marked non-functional."
+                        : "Marked functional.",
+                    )
+                  }
+                >
+                  {facility.functional !== false
+                    ? "Mark non-functional"
+                    : "Mark functional"}
+                </button>
+                <button
+                  className="btn btn-ghost text-xs"
+                  disabled={busy}
+                  onClick={() =>
+                    patchFacility(
+                      {
+                        category:
+                          facility.category === "Non-Medical"
+                            ? "Medical"
+                            : "Non-Medical",
+                      },
+                      "Category updated.",
+                    )
+                  }
+                >
+                  Set category:{" "}
+                  {facility.category === "Non-Medical" ? "Medical" : "Non-Medical"}
+                </button>
+              </div>
+            ) : null}
           </section>
 
           {workflows.length ? (

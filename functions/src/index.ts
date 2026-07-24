@@ -35,6 +35,8 @@ interface AggBucket {
 
 interface FacilityShape {
   licensed?: boolean;
+  functional?: boolean;
+  category?: string;
   province?: string;
   sector?: string;
   stage?: string;
@@ -55,15 +57,23 @@ async function recomputeAggregate() {
     Public: { total: 0, licensed: 0 },
     Private: { total: 0, licensed: 0 },
   };
+  const byCategory = {
+    Medical: { total: 0, licensed: 0 },
+    "Non-Medical": { total: 0, licensed: 0 },
+  };
   const byStage: Record<string, number> = {};
   let total = 0;
   let licensed = 0;
+  let functional = 0;
   let auths = 0;
 
   snap.forEach((doc) => {
     const f = doc.data() as FacilityShape;
     total += 1;
     if (f.licensed) licensed += 1;
+    // Docs written before the functional flag existed count as operating,
+    // mirroring mapSeedFacility / computeAggregate in the app.
+    if (f.functional !== false) functional += 1;
     auths += Array.isArray(f.auths) ? f.auths.length : 0;
     if (f.province && PROVINCES.includes(f.province as (typeof PROVINCES)[number])) {
       byProvince[f.province].total += 1;
@@ -72,6 +82,10 @@ async function recomputeAggregate() {
     const s = f.sector === "Public" ? bySector.Public : bySector.Private;
     s.total += 1;
     if (f.licensed) s.licensed += 1;
+    const c =
+      f.category === "Non-Medical" ? byCategory["Non-Medical"] : byCategory.Medical;
+    c.total += 1;
+    if (f.licensed) c.licensed += 1;
     if (f.stage) byStage[f.stage] = (byStage[f.stage] || 0) + 1;
   });
 
@@ -89,8 +103,10 @@ async function recomputeAggregate() {
       total,
       licensed,
       unlicensed: total - licensed,
+      functional,
       auths,
       bySector,
+      byCategory,
       byProvince,
       byStage,
       countedAt,

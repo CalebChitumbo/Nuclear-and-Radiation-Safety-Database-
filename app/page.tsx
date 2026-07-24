@@ -122,7 +122,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 staggered">
       {/* KPI grid */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Kpi label="Total facilities" value={agg.total.toLocaleString()} />
         <Kpi
           label="Licensed"
@@ -134,6 +134,12 @@ export default function DashboardPage() {
           label="Unlicensed"
           value={agg.unlicensed.toLocaleString()}
           accent="red"
+        />
+        <Kpi
+          label="Functional"
+          value={(agg.functional ?? agg.total).toLocaleString()}
+          accent="green"
+          caption={`${(agg.total - (agg.functional ?? agg.total)).toLocaleString()} non-functional`}
         />
         <Kpi
           label="Authorisations on record"
