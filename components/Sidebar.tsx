@@ -12,6 +12,7 @@ import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 const NAV = [
   { href: "/", label: "Overview", icon: "▣" },
   { href: "/facilities", label: "Facilities", icon: "▤" },
+  { href: "/reports", label: "Reports", icon: "▥" },
   { href: "/licences", label: "Authorisations", icon: "▦" },
   { href: "/inspectorate", label: "Inspectorate", icon: "✶" },
   {

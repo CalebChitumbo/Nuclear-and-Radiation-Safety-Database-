@@ -1,38 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, memo, useCallback, useMemo, useState } from "react";
 
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import { FacilityDrawer } from "@/components/FacilityDrawer";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { StatusPill } from "@/components/StatusPill";
+import { downloadTextFile } from "@/components/downloadFile";
 import { useAuth } from "@/lib/auth";
 import { useStoreData } from "@/lib/storeHooks";
+import { facilitiesToCsv } from "@/lib/rules/exportCsv";
 import { norm } from "@/lib/rules/matching";
 import {
+  CATEGORIES,
   PROVINCES,
   SECTORS,
   isUseP,
   type Facility,
+  type FacilityCategory,
   type Province,
   type Sector,
 } from "@/lib/rules/types";
 
 type Filter = "all" | "licensed" | "unlicensed";
+type FuncFilter = "all" | "functional" | "non-functional";
 
 const PAGE_SIZE = 50;
 
 export default function FacilitiesPage() {
+  // useSearchParams needs a Suspense boundary during static prerender.
+  return (
+    <Suspense fallback={null}>
+      <FacilitiesInner />
+    </Suspense>
+  );
+}
+
+function FacilitiesInner() {
   const { canEditAS } = useAuth();
   const { data, loading, error, reload } = useStoreData(
     async (s) => s.listFacilities(),
     [],
   );
+  // Deep-linkable filters (the Reports page links into pre-filtered views):
+  // /facilities?lic=licensed&func=functional&cat=Medical&sector=Public
+  //            &province=Lusaka&stalled=1&review=1
+  const params = useSearchParams();
   const [search, setSearch] = useState("");
-  const [province, setProvince] = useState<"" | Province>("");
-  const [sector, setSector] = useState<"" | Sector>("");
-  const [statusFilter, setStatusFilter] = useState<Filter>("all");
+  const [province, setProvince] = useState<"" | Province>(() => {
+    const p = params.get("province");
+    return (PROVINCES as readonly string[]).includes(p || "")
+      ? (p as Province)
+      : "";
+  });
+  const [sector, setSector] = useState<"" | Sector>(() => {
+    const s = params.get("sector");
+    return (SECTORS as readonly string[]).includes(s || "") ? (s as Sector) : "";
+  });
+  const [category, setCategory] = useState<"" | FacilityCategory>(() => {
+    const c = params.get("cat");
+    return (CATEGORIES as readonly string[]).includes(c || "")
+      ? (c as FacilityCategory)
+      : "";
+  });
+  const [statusFilter, setStatusFilter] = useState<Filter>(() => {
+    const v = params.get("lic");
+    return v === "licensed" || v === "unlicensed" ? v : "all";
+  });
+  const [funcFilter, setFuncFilter] = useState<FuncFilter>(() => {
+    const v = params.get("func");
+    return v === "functional" || v === "non-functional" ? v : "all";
+  });
+  const [onlyStalled, setOnlyStalled] = useState(params.get("stalled") === "1");
+  const [onlyReview, setOnlyReview] = useState(params.get("review") === "1");
+  // Exact-stage deep link (from the Reports page). No dropdown of its own —
+  // it shows as a clearable chip while active.
+  const [stageFilter, setStageFilter] = useState<string>(
+    () => params.get("stage") || "",
+  );
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -63,12 +110,38 @@ export default function FacilitiesPage() {
       .filter(({ f, hay }) => {
         if (province && f.province !== province) return false;
         if (sector && f.sector !== sector) return false;
+        if (category && (f.category || "Medical") !== category) return false;
         if (statusFilter === "licensed" && !f.licensed) return false;
         if (statusFilter === "unlicensed" && f.licensed) return false;
+        // Docs predating the functional flag count as operating.
+        const functional = f.functional !== false;
+        if (funcFilter === "functional" && !functional) return false;
+        if (funcFilter === "non-functional" && functional) return false;
+        if (onlyStalled && !f.stalled) return false;
+        if (onlyReview && !f.needsReview) return false;
+        if (stageFilter && f.stage !== stageFilter) return false;
         return !q || hay.includes(q);
       })
       .map(({ f }) => f);
-  }, [indexed, search, province, sector, statusFilter]);
+  }, [
+    indexed,
+    search,
+    province,
+    sector,
+    category,
+    statusFilter,
+    funcFilter,
+    onlyStalled,
+    onlyReview,
+    stageFilter,
+  ]);
+
+  const exportCsv = useCallback(() => {
+    downloadTextFile(
+      `rpa-register-${new Date().toISOString().slice(0, 10)}.csv`,
+      facilitiesToCsv(filtered),
+    );
+  }, [filtered]);
 
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
   const openFacility = useCallback((id: string) => setOpenId(id), []);
@@ -76,6 +149,23 @@ export default function FacilitiesPage() {
   return (
     <div className="space-y-4 staggered">
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
+      {stageFilter ? (
+        <div className="card p-3 flex items-center gap-2 text-sm">
+          <span className="caps text-[10px] text-gunmetal/60">
+            Stage filter
+          </span>
+          <span className="chip amber">{stageFilter}</span>
+          <button
+            className="btn btn-ghost text-xs"
+            onClick={() => {
+              setStageFilter("");
+              setPage(0);
+            }}
+          >
+            ✕ Clear
+          </button>
+        </div>
+      ) : null}
       <div className="card p-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
           <label htmlFor="facility-search" className="caps text-[10px] text-gunmetal/60">
@@ -129,6 +219,24 @@ export default function FacilitiesPage() {
           </select>
         </div>
         <div>
+          <label className="caps text-[10px] text-gunmetal/60">Category</label>
+          <select
+            className="input mt-1"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value as FacilityCategory | "");
+              setPage(0);
+            }}
+          >
+            <option value="">All</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="caps text-[10px] text-gunmetal/60">Status</label>
           <div className="mt-1 inline-flex rounded-lg border border-gunmetal/10 overflow-hidden">
             {(["all", "licensed", "unlicensed"] as Filter[]).map((f) => (
@@ -151,6 +259,67 @@ export default function FacilitiesPage() {
             ))}
           </div>
         </div>
+        <div>
+          <label className="caps text-[10px] text-gunmetal/60">Operating</label>
+          <div className="mt-1 inline-flex rounded-lg border border-gunmetal/10 overflow-hidden">
+            {(
+              [
+                ["all", "All"],
+                ["functional", "Functional"],
+                ["non-functional", "Non-Functional"],
+              ] as [FuncFilter, string][]
+            ).map(([f, label]) => (
+              <button
+                key={f}
+                aria-pressed={funcFilter === f}
+                onClick={() => {
+                  setFuncFilter(f);
+                  setPage(0);
+                }}
+                className="px-3 py-2 text-xs caps font-bold"
+                style={{
+                  background:
+                    funcFilter === f ? "var(--rpa-green)" : "transparent",
+                  color: funcFilter === f ? "white" : "var(--gunmetal)",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 pb-2">
+          <label className="flex items-center gap-1.5 text-xs font-bold">
+            <input
+              type="checkbox"
+              checked={onlyStalled}
+              onChange={(e) => {
+                setOnlyStalled(e.target.checked);
+                setPage(0);
+              }}
+            />
+            Stalled
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-bold">
+            <input
+              type="checkbox"
+              checked={onlyReview}
+              onChange={(e) => {
+                setOnlyReview(e.target.checked);
+                setPage(0);
+              }}
+            />
+            Needs review
+          </label>
+        </div>
+        <button
+          className="btn btn-secondary"
+          onClick={exportCsv}
+          disabled={filtered.length === 0}
+          title="Download the current filtered view as CSV"
+        >
+          ⬇ CSV ({filtered.length})
+        </button>
         {canEditAS ? (
           <button className="btn btn-primary" onClick={() => setAdding(true)}>
             + Facility
@@ -166,7 +335,7 @@ export default function FacilitiesPage() {
                 <th className="px-4 py-3">Facility</th>
                 <th className="px-4 py-3">Province</th>
                 <th className="px-4 py-3">Practice</th>
-                <th className="px-4 py-3">Sector</th>
+                <th className="px-4 py-3">Sector / Category</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Stage / Licence</th>
                 <th className="px-4 py-3"></th>
@@ -232,13 +401,43 @@ const FacilityRow = memo(function FacilityRow({
         <div className="text-xs text-gunmetal/55 tabular">
           {f.facCode || "—"} · {f.district || "—"}
         </div>
+        {f.functional === false || f.stalled || f.needsReview ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {f.functional === false ? (
+              <span className="chip red text-[10px]">Non-Functional</span>
+            ) : null}
+            {f.stalled ? (
+              <span
+                className="chip amber text-[10px]"
+                title="Earlier application with no 2026 activity"
+              >
+                Stalled
+              </span>
+            ) : null}
+            {f.needsReview ? (
+              <span
+                className="chip amber text-[10px] cursor-help"
+                title={f.reviewNote || "Imported with uncertainty — confirm this record"}
+              >
+                Check
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </td>
       <td className="px-4 py-3 tabular">{f.province}</td>
       <td className="px-4 py-3">{f.practice || "—"}</td>
       <td className="px-4 py-3">
-        <span className={`chip ${f.sector === "Public" ? "slate" : ""}`}>
-          {f.sector}
-        </span>
+        <div className="flex flex-wrap gap-1">
+          <span className={`chip ${f.sector === "Public" ? "slate" : ""}`}>
+            {f.sector}
+          </span>
+          <span
+            className={`chip ${f.category === "Non-Medical" ? "" : "green"} text-[10px]`}
+          >
+            {f.category === "Non-Medical" ? "Non-Med" : "Medical"}
+          </span>
+        </div>
       </td>
       <td className="px-4 py-3">
         <StatusPill licensed={f.licensed} stage={f.stage} />

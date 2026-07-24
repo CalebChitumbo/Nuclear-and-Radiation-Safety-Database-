@@ -1,3 +1,4 @@
+import { categoriseFacility } from "./category";
 import { detectType } from "./detectType";
 import { norm } from "./matching";
 import { weekLabelForDate } from "./week";
@@ -130,6 +131,9 @@ export function recordLicence(input: RecordLicenceInput): RecordLicenceMutation 
     province,
     practice,
     sector,
+    // A facility being licensed right now is operating unless stated otherwise.
+    functional: d.functional ?? true,
+    category: d.category || categoriseFacility(practice, baseName),
     licensed,
     stage,
     facCode,

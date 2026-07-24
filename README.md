@@ -4,9 +4,15 @@ A production-grade, multi-user web application for the **Radiation Protection
 Authority of Zambia (RPA) — Nuclear & Radiation Safety Department**. It
 unifies the licensing register, authorisations, inspections, and daily/weekly
 sectional reporting into one system, backed by Firebase and pre-seeded with
-the real register of 474 facilities.
+the real register of **458 facilities** from the *Facility Licensing Status —
+Actual Current 2026 Position* list (23 July 2026): 399 functional / 59
+non-functional, 214 licensed, each classified Medical or Non-Medical (see
+`docs/register-2026-import.md` for the full import log).
 
-**Navigation** (sidebar, in order): Overview · Facilities · **Authorisations**
+**Navigation** (sidebar, in order): Overview · Facilities · **Reports**
+(`/reports` — live status × functional matrix, sector/category/province
+breakdowns, every count deep-linking into the filtered register, CSV export)
+· **Authorisations**
 (`/licences` — authorisation statistics built from the register) ·
 **Inspectorate** (`/inspectorate` — the section's own dashboard: inspections
 per type over a week/month/year, outcomes, enforcement actions, the forward
@@ -50,7 +56,7 @@ and is exercised by `tests/recordLicence.test.ts`. Do not bypass them.
 | Tests | Vitest |
 
 The Firestore SDK is loaded only when running in **Firebase mode**. The app
-also ships with an in-memory **mock data store** that loads the 474-facility
+also ships with an in-memory **mock data store** that loads the 458-facility
 seed at startup, so the system can be demoed and developed without Firebase
 credentials.
 
@@ -93,8 +99,19 @@ to the seed.
 4. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
-   # verify the dashboard reads 474 / 181 / 293 / 204
+   # verify the dashboard reads 458 / 214 / 244 / 399 functional
    ```
+   **Replacing an existing register** (e.g. applying the 2026 Facility Status
+   List over a previously seeded project):
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed:fresh
+   ```
+   `seed:fresh` first **deletes** `facilities`, `licenceEvents`,
+   `inspections`, `inspectionRequests` and `licenceWorkflows` (the old
+   register and the history recorded against it), then seeds the new
+   register. Users, weeks, weekly metrics, daily entries, borders and
+   activities are kept. Mock/demo browsers reset themselves automatically
+   (the mock store's storage key was bumped).
 5. Create the first admin by manually calling the `setUserClaims` callable in
    the Firebase Console, then onboard the rest from `/admin/users`.
 6. Build + deploy the app:
@@ -177,7 +194,7 @@ automatically (Production for the production branch, Preview for others).
 
 | Collection | Purpose |
 |---|---|
-| `facilities/{id}` | Master register row — projection of all licences held by that facility |
+| `facilities/{id}` | Master register row — projection of all licences held by that facility, plus its 2026 status-list axes: `functional`, `category` (Medical/Non-Medical, veterinary counts as Medical), `stalled`, `needsReview`/`reviewNote`, `statusDetail` |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
 | `inspections/{id}` | The dated inspection log |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
@@ -406,7 +423,8 @@ npm test
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
-- `seedBaseline` — verifies the §16 numbers (474 / 181 / 293 / 53 / 128 / 204)
+- `seedBaseline` — verifies the register baseline (458 / 214 / 244 / 399 functional / Medical 314)
+- `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
 
 Add Firestore rules tests with the emulator in a follow-up.
 
@@ -440,7 +458,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   └── weekContext.tsx     Global reporting-week selector
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
-├── seed/                   facilities.seed.json (474), weeks-2026.seed.json (52)
+├── seed/                   facilities.seed.json (458), weeks-2026.seed.json (52)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json
@@ -467,9 +485,9 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
 
 ## Acceptance criteria (from §16 of the spec)
 
-- [x] Seeded dashboard shows **474 total, 181 licensed, 293 unlicensed,
-      Public 53/236, Private 128/238, 204 authorisations** — verified by
-      `tests/seedBaseline.test.ts`.
+- [x] Seeded dashboard shows **458 total, 214 licensed, 244 unlicensed,
+      399 functional, Public 62/230, Private 152/228, 201 authorisations** —
+      verified by `tests/seedBaseline.test.ts` (2026 Facility Status List).
 - [x] The §6 worked expectation passes — `tests/recordLicence.test.ts`.
 - [x] Authorisations-on-Record increments on every recorded licence with or
       without an AUTH number.

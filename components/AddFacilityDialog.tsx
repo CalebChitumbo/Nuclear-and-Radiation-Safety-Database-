@@ -5,12 +5,15 @@ import { cloneElement, useEffect, useId, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
+import { categoriseFacility } from "@/lib/rules/category";
 import { norm } from "@/lib/rules/matching";
 import {
+  CATEGORIES,
   PROVINCES,
   SECTORS,
   STAGES,
   type Facility,
+  type FacilityCategory,
   type Province,
   type Sector,
   type Stage,
@@ -40,6 +43,9 @@ export function AddFacilityDialog({
   const [province, setProvince] = useState<Province>("Lusaka");
   const [practice, setPractice] = useState("");
   const [sector, setSector] = useState<Sector>("Private");
+  const [functional, setFunctional] = useState(true);
+  // "" = derive from the practice/name at submit time.
+  const [category, setCategory] = useState<"" | FacilityCategory>("");
   const [licensed, setLicensed] = useState(false);
   const [stage, setStage] = useState<Stage>("No Application Submitted");
   const [facCode, setFacCode] = useState(initialFacCode ?? "");
@@ -71,6 +77,8 @@ export function AddFacilityDialog({
           province,
           practice,
           sector,
+          functional,
+          category: category || categoriseFacility(practice, name),
           licensed,
           stage: licensed ? "Licensed" : stage,
           facCode,
@@ -174,8 +182,34 @@ export function AddFacilityDialog({
               ))}
             </select>
           </FormField>
+          <FormField label="Category">
+            <select
+              className="input"
+              value={category}
+              onChange={(e) =>
+                setCategory(e.target.value as "" | FacilityCategory)
+              }
+            >
+              <option value="">
+                Auto — {categoriseFacility(practice, name)}
+              </option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </FormField>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 text-sm font-bold">
+            <input
+              type="checkbox"
+              checked={functional}
+              onChange={(e) => setFunctional(e.target.checked)}
+            />
+            Functional
+          </label>
           <label className="flex items-center gap-2 text-sm font-bold">
             <input
               type="checkbox"

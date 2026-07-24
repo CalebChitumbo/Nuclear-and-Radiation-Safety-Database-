@@ -23,6 +23,14 @@ export type Province = (typeof PROVINCES)[number];
 export const SECTORS = ["Public", "Private"] as const;
 export type Sector = (typeof SECTORS)[number];
 
+/**
+ * Medical vs non-medical practice split for the register's filters and
+ * reports. Veterinary facilities count as Medical (clinical imaging); dealers,
+ * screening, industrial and analytical practices are Non-Medical.
+ */
+export const CATEGORIES = ["Medical", "Non-Medical"] as const;
+export type FacilityCategory = (typeof CATEGORIES)[number];
+
 export const STAGES = [
   "Licensed",
   "No Application Submitted",
@@ -42,6 +50,9 @@ export const STAGES = [
   "Board Licence Approval Required",
   "Licence / Certificate Issued",
   "Inspection in Progress",
+  // Added for the 2026 Facility Status List import — the RAIS "RPA official
+  // use" final-processing step between review and licence issue.
+  "In Final Processing",
   // Added for the RAIS email→status engine (driven by the RPA email-template
   // mapping). The granular per-email status lives on `currentStatus`; these are
   // the coarse buckets those statuses roll up to for `byStage` aggregates.
@@ -110,8 +121,30 @@ export interface Facility {
   province: Province;
   practice: string;
   sector: Sector;
+  /**
+   * Whether the facility is operating (2026 Facility Status List). Functional
+   * and licensing status are independent axes — a non-functional facility can
+   * still hold a licence, and a functional one can be unlicensed.
+   */
+  functional: boolean;
+  /** Medical (incl. veterinary) vs Non-Medical practice split. */
+  category: FacilityCategory;
   licensed: boolean;
   stage: Stage;
+  /**
+   * An earlier (pre-2026) application that never completed and has had no
+   * 2026 activity. The stage still shows how far it got.
+   */
+  stalled?: boolean;
+  /** Imported with uncertainty — an officer should confirm this record. */
+  needsReview?: boolean;
+  /** Why the record is flagged for review. */
+  reviewNote?: string;
+  /**
+   * The source line from the 2026 status-list import (latest stage · date),
+   * kept as informational provenance on the facility.
+   */
+  statusDetail?: string;
   /**
    * The granular RAIS status this facility currently shows, taken from the most
    * recent applicable email for its active application (the spreadsheet's
@@ -490,10 +523,17 @@ export interface DashboardAggregate {
   total: number;
   licensed: number;
   unlicensed: number;
+  /** Facilities currently operating (functional=true). Absent on old docs. */
+  functional?: number;
   auths: number;
   bySector: {
     Public: { total: number; licensed: number };
     Private: { total: number; licensed: number };
+  };
+  /** Medical vs Non-Medical split. Absent on aggregate docs written before it. */
+  byCategory?: {
+    Medical: { total: number; licensed: number };
+    "Non-Medical": { total: number; licensed: number };
   };
   byProvince: Record<Province, { total: number; licensed: number }>;
   byStage: Partial<Record<Stage, number>>;
@@ -536,10 +576,15 @@ export function emptyAggregate(): DashboardAggregate {
     total: 0,
     licensed: 0,
     unlicensed: 0,
+    functional: 0,
     auths: 0,
     bySector: {
       Public: { total: 0, licensed: 0 },
       Private: { total: 0, licensed: 0 },
+    },
+    byCategory: {
+      Medical: { total: 0, licensed: 0 },
+      "Non-Medical": { total: 0, licensed: 0 },
     },
     byProvince,
     byStage: {},
