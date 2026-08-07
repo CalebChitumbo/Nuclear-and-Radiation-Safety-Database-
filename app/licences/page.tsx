@@ -44,6 +44,8 @@ interface AuthRow {
   type: LicenceType;
   number: string;
   date: string;
+  /** What the licence permits, when its own wording is on record. */
+  scope: string;
 }
 
 /** Flatten every recorded authorisation across the register into one row each. */
@@ -60,6 +62,7 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
         type: a.type,
         number: a.number,
         date: a.date,
+        scope: a.scope || "",
       });
     }
   }
@@ -101,7 +104,8 @@ export default function LicencesPage() {
       return (
         r.facilityName.toLowerCase().includes(q) ||
         (r.number || "").toLowerCase().includes(q) ||
-        (r.facCode || "").toLowerCase().includes(q)
+        (r.facCode || "").toLowerCase().includes(q) ||
+        r.scope.toLowerCase().includes(q)
       );
     });
   }, [authRows, typeFilter, authSearch]);
@@ -277,6 +281,7 @@ export default function LicencesPage() {
                   <th className="px-4 py-2">Facility</th>
                   <th className="px-4 py-2">Licence type</th>
                   <th className="px-4 py-2">Number</th>
+                  <th className="px-4 py-2">Authorised scope</th>
                   <th className="px-4 py-2">Province</th>
                   <th className="px-4 py-2">Date</th>
                 </tr>
@@ -306,6 +311,9 @@ export default function LicencesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 tabular">{r.number || "—"}</td>
+                    <td className="px-4 py-3 text-[11px] text-gunmetal/70 max-w-[320px]">
+                      {r.scope || "—"}
+                    </td>
                     <td className="px-4 py-3">{r.province}</td>
                     <td className="px-4 py-3 tabular text-gunmetal/70">
                       {r.date || "—"}

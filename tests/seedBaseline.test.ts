@@ -1,42 +1,52 @@
 import { describe, expect, it } from "vitest";
 import { computeAggregate } from "../lib/rules/aggregate";
-import { mapAllSeed, type SeedFacility } from "../lib/store/seeding";
+import {
+  buildSeedRegister,
+  type SeedAuthorisation,
+  type SeedFacility,
+} from "../lib/store/seeding";
+import authorisations from "../seed/authorisations.seed.json";
 import facilities from "../seed/facilities.seed.json";
 
 /**
  * §16 — seeded baseline: the 2026 Facility Status List register
  * (458 facilities = 465 doc rows − 7 merged duplicates; 399 functional
- * includes the 22 non-functional rows annotated “NOW FUNCTIONAL”).
+ * includes the 22 non-functional rows annotated “NOW FUNCTIONAL”), plus the
+ * 20 facilities the authorisation register added — holders of an importation
+ * licence that the status list never carried.
  */
 describe("§16 — seeded baseline (2026 Facility Status List)", () => {
-  const mapped = mapAllSeed(facilities as SeedFacility[]);
+  const mapped = buildSeedRegister(
+    facilities as SeedFacility[],
+    authorisations as SeedAuthorisation[],
+  ).facilities;
   const agg = computeAggregate(mapped);
 
-  it("loads 458 facilities", () => {
-    expect(mapped.length).toBe(458);
-    expect(agg.total).toBe(458);
+  it("loads 478 facilities (458 status list + 20 import-licence holders)", () => {
+    expect(mapped.length).toBe(478);
+    expect(agg.total).toBe(478);
   });
 
-  it("214 licensed / 244 unlicensed", () => {
+  it("214 licensed / 264 unlicensed", () => {
     expect(agg.licensed).toBe(214);
-    expect(agg.unlicensed).toBe(244);
+    expect(agg.unlicensed).toBe(264);
   });
 
-  it("399 functional / 59 non-functional", () => {
-    expect(agg.functional).toBe(399);
+  it("419 functional / 59 non-functional", () => {
+    expect(agg.functional).toBe(419);
     expect(mapped.filter((f) => f.functional === false).length).toBe(59);
   });
 
-  it("Public 62/230, Private 152/228 (licensed/total)", () => {
-    expect(agg.bySector.Public.total).toBe(230);
+  it("Public 62/242, Private 152/236 (licensed/total)", () => {
+    expect(agg.bySector.Public.total).toBe(242);
     expect(agg.bySector.Public.licensed).toBe(62);
-    expect(agg.bySector.Private.total).toBe(228);
+    expect(agg.bySector.Private.total).toBe(236);
     expect(agg.bySector.Private.licensed).toBe(152);
   });
 
-  it("Medical 314 / Non-Medical 144", () => {
-    expect(agg.byCategory?.Medical.total).toBe(314);
-    expect(agg.byCategory?.["Non-Medical"].total).toBe(144);
+  it("Medical 331 / Non-Medical 147", () => {
+    expect(agg.byCategory?.Medical.total).toBe(331);
+    expect(agg.byCategory?.["Non-Medical"].total).toBe(147);
   });
 
   it("25 stalled applications, and every stalled row keeps its pipeline stage", () => {
@@ -45,14 +55,14 @@ describe("§16 — seeded baseline (2026 Facility Status List)", () => {
     for (const f of stalled) expect(f.licensed).toBe(false);
   });
 
-  it("90 records flagged for review, each with a note", () => {
+  it("110 records flagged for review, each with a note", () => {
     const flagged = mapped.filter((f) => f.needsReview);
-    expect(flagged.length).toBe(90);
+    expect(flagged.length).toBe(110);
     for (const f of flagged) expect(f.reviewNote).toBeTruthy();
   });
 
-  it("201 authorisations carried over from the previous register", () => {
-    expect(agg.auths).toBe(201);
+  it("283 authorisations — 201 carried over, 82 from the authorisation register", () => {
+    expect(agg.auths).toBe(283);
   });
 
   it("every stage maps to a known Stage value (nothing fell back silently)", () => {
@@ -61,7 +71,8 @@ describe("§16 — seeded baseline (2026 Facility Status List)", () => {
     // A mapping regression would inflate it well past that.
     expect(agg.byStage["No Application Submitted"]).toBe(131);
     expect(agg.byStage["In Final Processing"]).toBe(12);
-    expect(agg.byStage["Import Licence Only (Not yet Use/Possession)"]).toBe(13);
+    // 13 from the status list + the 20 import-licence holders it never carried.
+    expect(agg.byStage["Import Licence Only (Not yet Use/Possession)"]).toBe(33);
   });
 
   it("licensed facilities without a recorded licence number stay bounded", () => {

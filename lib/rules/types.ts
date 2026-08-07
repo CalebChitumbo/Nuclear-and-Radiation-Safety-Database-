@@ -110,6 +110,18 @@ export interface Authorisation {
   number: string;
   date: string;
   eventId?: string;
+  /**
+   * What the authorisation permits, in the licence's own wording — e.g.
+   * "IMPORT ONE (1) X-RAY MACHINE BY A HEALTH FACILITY". Carried by the
+   * authorisation register (import/transit/transfer/variation licences state
+   * their scope); absent on entries recorded from a RAIS notification, which
+   * only carries the number.
+   */
+  scope?: string;
+  /** Start of the licence's validity window, when it states one (ISO date). */
+  validFrom?: string;
+  /** End of the licence's validity window, when it states one (ISO date). */
+  validTo?: string;
 }
 
 export interface Facility {
