@@ -4,10 +4,13 @@ A production-grade, multi-user web application for the **Radiation Protection
 Authority of Zambia (RPA) — Nuclear & Radiation Safety Department**. It
 unifies the licensing register, authorisations, inspections, and daily/weekly
 sectional reporting into one system, backed by Firebase and pre-seeded with
-the real register of **458 facilities** from the *Facility Licensing Status —
-Actual Current 2026 Position* list (23 July 2026): 399 functional / 59
-non-functional, 214 licensed, each classified Medical or Non-Medical (see
-`docs/register-2026-import.md` for the full import log).
+the real register of **478 facilities** — the *Facility Licensing Status —
+Actual Current 2026 Position* list (23 July 2026) plus the holders of a
+standalone licence it never carried: 419 functional / 59 non-functional, 214
+licensed, each classified Medical or Non-Medical, and **283 authorisations**
+including 82 importation, variation, transfer, transport and transit licences
+(see `docs/register-2026-import.md` and `docs/authorisation-import.md` for the
+full import logs).
 
 **Navigation** (sidebar, in order): Overview · Facilities · **Reports**
 (`/reports` — live status × functional matrix, sector/category/province
@@ -56,7 +59,7 @@ and is exercised by `tests/recordLicence.test.ts`. Do not bypass them.
 | Tests | Vitest |
 
 The Firestore SDK is loaded only when running in **Firebase mode**. The app
-also ships with an in-memory **mock data store** that loads the 458-facility
+also ships with an in-memory **mock data store** that loads the 478-facility
 seed at startup, so the system can be demoed and developed without Firebase
 credentials.
 
@@ -99,7 +102,7 @@ to the seed.
 4. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
-   # verify the dashboard reads 458 / 214 / 244 / 399 functional
+   # verify the dashboard reads 478 / 214 / 264 / 419 functional
    ```
    **Replacing an existing register** (e.g. applying the 2026 Facility Status
    List over a previously seeded project):
@@ -423,7 +426,10 @@ npm test
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
-- `seedBaseline` — verifies the register baseline (458 / 214 / 244 / 399 functional / Medical 314)
+- `seedBaseline` — verifies the register baseline (478 / 214 / 264 / 419 functional / Medical 331)
+- `seedAuthorisations` — verifies the standalone authorisation register: all 82
+  rows land on exactly one facility, the merge licenses nobody, and re-seeding
+  is idempotent
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
 
 Add Firestore rules tests with the emulator in a follow-up.
@@ -458,7 +464,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   └── weekContext.tsx     Global reporting-week selector
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
-├── seed/                   facilities.seed.json (458), weeks-2026.seed.json (52)
+├── seed/                   facilities.seed.json (478), authorisations.seed.json (82),
+│                           weeks-2026.seed.json (52)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json
@@ -485,9 +492,10 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
 
 ## Acceptance criteria (from §16 of the spec)
 
-- [x] Seeded dashboard shows **458 total, 214 licensed, 244 unlicensed,
-      399 functional, Public 62/230, Private 152/228, 201 authorisations** —
-      verified by `tests/seedBaseline.test.ts` (2026 Facility Status List).
+- [x] Seeded dashboard shows **478 total, 214 licensed, 264 unlicensed,
+      419 functional, Public 62/242, Private 152/236, 283 authorisations** —
+      verified by `tests/seedBaseline.test.ts` (2026 Facility Status List +
+      the standalone authorisation register).
 - [x] The §6 worked expectation passes — `tests/recordLicence.test.ts`.
 - [x] Authorisations-on-Record increments on every recorded licence with or
       without an AUTH number.

@@ -29,7 +29,11 @@ import { getFirestore } from "firebase-admin/firestore";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { mapAllSeed, type SeedFacility } from "../lib/store/seeding";
+import {
+  buildSeedRegister,
+  type SeedAuthorisation,
+  type SeedFacility,
+} from "../lib/store/seeding";
 import { computeAggregate } from "../lib/rules/aggregate";
 import {
   CATEGORIES,
@@ -99,6 +103,9 @@ async function main() {
   const facilitiesRaw = JSON.parse(
     readFileSync(join(SEED_DIR, "facilities.seed.json"), "utf-8"),
   ) as SeedFacility[];
+  const authorisationsRaw = JSON.parse(
+    readFileSync(join(SEED_DIR, "authorisations.seed.json"), "utf-8"),
+  ) as SeedAuthorisation[];
   const weeks = JSON.parse(
     readFileSync(join(SEED_DIR, "weeks-2026.seed.json"), "utf-8"),
   );
@@ -110,7 +117,21 @@ async function main() {
     for (const c of FRESH_WIPE_COLLECTIONS) await wipeCollection(c);
   }
 
-  const facilities = mapAllSeed(facilitiesRaw);
+  const register = buildSeedRegister(facilitiesRaw, authorisationsRaw);
+  const facilities = register.facilities;
+  console.log(
+    `Merged ${register.attached}/${authorisationsRaw.length} standalone ` +
+      `authorisations onto the register (${register.facCodesFilled} facilities ` +
+      `gained a FAC code).`,
+  );
+  // An unmatched row means a licence nobody in the register holds — loud, not
+  // silent, so the mismatch gets fixed in the seed rather than lost.
+  for (const u of register.unmatched) {
+    console.warn(
+      `  ! authorisation #${u.n} ${u.num} (${u.fac || "no FAC code"}) — ` +
+        `no register facility matches "${u.name}"`,
+    );
+  }
   console.log(`Seeding ${facilities.length} facilities…`);
 
   await chunkedBatchWrite(facilities, 400, (f, batch) => {

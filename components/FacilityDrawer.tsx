@@ -17,6 +17,7 @@ import {
   workflowStatusLabel,
 } from "@/lib/rules/workflowNotes";
 import {
+  type Authorisation,
   type Facility,
   type Inspection,
   type InspectionPriority,
@@ -737,16 +738,29 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AuthRow({ a }: { a: { type: string; number: string; date: string } }) {
+function AuthRow({ a }: { a: Authorisation }) {
+  // Validity is only stated on some licences; show whichever end is recorded.
+  const validity =
+    a.validFrom || a.validTo
+      ? `Valid ${a.validFrom || "—"} → ${a.validTo || "—"}`
+      : "";
   return (
     <li className="flex items-baseline justify-between gap-3 text-sm">
-      <div>
+      <div className="min-w-0">
         <div className="font-bold">{a.type}</div>
         <div className="text-xs text-gunmetal/55 tabular">
           {a.number || "no number"}
         </div>
+        {a.scope ? (
+          <div className="mt-0.5 text-[11px] text-gunmetal/70">{a.scope}</div>
+        ) : null}
+        {validity ? (
+          <div className="text-[11px] text-gunmetal/55 tabular">{validity}</div>
+        ) : null}
       </div>
-      <div className="text-xs tabular text-gunmetal/55">{a.date || "—"}</div>
+      <div className="text-xs tabular text-gunmetal/55 shrink-0">
+        {a.date || "—"}
+      </div>
     </li>
   );
 }
