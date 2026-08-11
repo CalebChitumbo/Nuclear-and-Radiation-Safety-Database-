@@ -10,7 +10,9 @@ import { useStoreData } from "@/lib/storeHooks";
 import { downloadTextFile } from "@/components/downloadFile";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
+import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
+import { OpeningBalancePanel } from "@/components/weekly/OpeningBalancePanel";
 import { useWeek } from "@/lib/weekContext";
 import {
   effectiveValuesByWeek,
@@ -21,6 +23,7 @@ import { toCsv } from "@/lib/rules/exportCsv";
 import {
   buildQuarterIndex,
   deriveWorkPlan,
+  effectiveOpeningBalance,
   formatPercent,
   workPlanBrief,
   workPlanRows,
@@ -34,9 +37,12 @@ import {
 import {
   SECTIONS,
   type Activity,
+  type WorkPlanBaseline,
   type WorkPlanNote,
   type WorkPlanStatus,
 } from "@/lib/rules/types";
+
+const VIEW_STORAGE_KEY = "rpa-workplan-view";
 
 const ACTIVITY_STATUSES: Activity["status"][] = [
   "Not Started",
@@ -70,6 +76,28 @@ export default function WeeklyPage() {
   const { selected, weeks } = useWeek();
   const toast = useToast();
   const [openId, setOpenId] = useState<string | null>(null);
+  // The plan is cumulative for the year, so that is what the report opens on.
+  const [view, setView] = useState<WorkPlanView>("year");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (stored === "year" || stored === "week" || stored === "both") {
+        setView(stored);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const chooseView = (v: WorkPlanView) => {
+    setView(v);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const { data, error, reload } = useStoreData(async (s) => {
     const [
@@ -79,6 +107,7 @@ export default function WeeklyPage() {
       weekMetricsAll,
       dailyEntries,
       workPlanNotes,
+      baseline,
     ] = await Promise.all([
       s.listLicenceEvents(),
       s.listInspections(),
@@ -88,6 +117,11 @@ export default function WeeklyPage() {
       // dailyEntries rules are deployed.
       s.listDailyEntries().catch(() => []),
       s.listWorkPlanNotes().catch(() => []),
+      // No saved baseline (or no rules yet) means the approved workbook's
+      // figures at handover apply — see effectiveOpeningBalance.
+      s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanBaseline | null,
+      ),
     ]);
     return {
       events,
@@ -96,6 +130,7 @@ export default function WeeklyPage() {
       weekMetricsAll,
       dailyEntries,
       workPlanNotes,
+      baseline,
     };
   });
 
@@ -124,6 +159,7 @@ export default function WeeklyPage() {
       dailyEntries: data.dailyEntries,
       fromDaily,
       notes,
+      baseline: data.baseline?.values ?? null,
     });
     const quarter = buildQuarterIndex(weeks).get(selected.label) ?? null;
     return { reports, quarter };
@@ -245,19 +281,45 @@ export default function WeeklyPage() {
           <Figure label="Targets achieved" value={achieved} tone="green" />
           <Figure label="Not started" value={notStarted} tone="red" />
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 no-print">
+          <span className="caps text-[10px] text-gunmetal/55">Showing</span>
+          <Segmented
+            ariaLabel="What the report shows"
+            value={view}
+            onChange={chooseView}
+            options={[
+              { value: "year", label: `Year to date ${WORK_PLAN_YEAR}` },
+              { value: "week", label: "This week only" },
+              { value: "both", label: "Week + year" },
+            ]}
+          />
+        </div>
         <p className="section-note mt-3">
-          Figures marked <span className="chip green">auto</span> are counted off
-          the registers as work is logged — licences on the licensing register,
-          inspections and enforcement actions on the inspection register,
-          vehicles screened on the border log. Type a figure only where the row
-          offers a box. A reporting week counts toward the quarter it starts in.
+          The plan is <strong>cumulative for {WORK_PLAN_YEAR}</strong>: every
+          output starts from its opening balance and adds what has been recorded
+          since, so the quarter columns and Total Actual are the year&apos;s
+          position, not the week&apos;s. Figures marked{" "}
+          <span className="chip green">auto</span> are counted off the registers
+          as work is logged — licences on the licensing register, inspections
+          and enforcement actions on the inspection register, vehicles screened
+          on the border log. Type a figure only where the row offers a box; a
+          reporting week counts toward the quarter it starts in.
         </p>
       </Panel>
+
+      <OpeningBalancePanel
+        year={WORK_PLAN_YEAR}
+        baseline={data.baseline}
+        canEdit={user?.role === "admin"}
+        uid={user?.uid || ""}
+        onSaved={reload}
+      />
 
       {reports.map((sub) => (
         <SubprogrammeTable
           key={sub.id}
           sub={sub}
+          view={view}
           quarter={quarter}
           openId={openId}
           onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
@@ -326,12 +388,127 @@ function Figure({
   );
 }
 
+
 // ---------------------------------------------------------------------------
 // One subprogramme — the workbook's sheet
 // ---------------------------------------------------------------------------
 
+/**
+ * Which columns the report shows. The plan is cumulative for the year, so
+ * **Year to date** is the default and the report Management reads; **This week**
+ * narrows to what the section did in the selected week (still beside the annual
+ * target, so a figure is never read out of context); **Week + year** is the
+ * whole sheet.
+ */
+type WorkPlanView = "year" | "week" | "both";
+
+type ColKey =
+  | "id"
+  | "desc"
+  | "indicator"
+  | "target"
+  | "week"
+  | "q1"
+  | "q2"
+  | "q3"
+  | "q4"
+  | "total"
+  | "percent"
+  | "status"
+  | "comments"
+  | "actions";
+
+const VIEW_COLUMNS: Record<WorkPlanView, ColKey[]> = {
+  year: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+  week: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "week",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+  both: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "week",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+};
+
+const COLUMN_LABELS: Record<ColKey, string> = {
+  id: "Output ID",
+  desc: "Output Description",
+  indicator: "Key Indicator",
+  target: `${WORK_PLAN_YEAR} Target`,
+  week: "This week",
+  q1: "Q1",
+  q2: "Q2",
+  q3: "Q3",
+  q4: "Q4",
+  total: "Total Actual",
+  percent: "% Achieved",
+  status: "Status",
+  comments: "Comments",
+  actions: "Action Points",
+};
+
+const NUMERIC_COLUMNS = new Set<ColKey>([
+  "target",
+  "week",
+  "q1",
+  "q2",
+  "q3",
+  "q4",
+  "total",
+  "percent",
+]);
+
+const QUARTER_COLUMN: Partial<Record<ColKey, Quarter>> = {
+  q1: 1,
+  q2: 2,
+  q3: 3,
+  q4: 4,
+};
+
+/** Roughly what the column set needs before it starts scrolling. */
+const VIEW_MIN_WIDTH: Record<WorkPlanView, number> = {
+  year: 1080,
+  week: 940,
+  both: 1180,
+};
+
 function SubprogrammeTable({
   sub,
+  view,
   quarter,
   openId,
   onToggle,
@@ -340,6 +517,7 @@ function SubprogrammeTable({
   onNoteSave,
 }: {
   sub: SubprogrammeReport;
+  view: WorkPlanView;
   /** The quarter the selected week reports into — its column is highlighted. */
   quarter: Quarter | null;
   openId: string | null;
@@ -351,38 +529,37 @@ function SubprogrammeTable({
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
   ) => Promise<void>;
 }) {
-  const columns = 14;
+  const columns = VIEW_COLUMNS[view];
+  const note =
+    view === "week"
+      ? "This week's figures beside each output's annual target. Open a row (▸) for the detail behind its figure."
+      : "Cumulative for the plan year — every output starts from its opening balance and adds what has been recorded since. Scroll sideways for Status, Comments and Action Points.";
+
   return (
-    <Panel
-      title={sub.heading}
-      note="Scroll the table sideways for Total Actual, Status, Comments and Action Points. Open a row (▸) for the detail behind its figure."
-      flush
-    >
+    <Panel title={sub.heading} note={note} flush>
       <div className="table-wrap">
-        <table className="data wp-table" style={{ minWidth: 1180 }}>
+        <table
+          className="data wp-table"
+          style={{ minWidth: VIEW_MIN_WIDTH[view] }}
+        >
           <thead>
             <tr>
-              <th>Output ID</th>
-              <th>Output Description</th>
-              <th>Key Indicator</th>
-              <th className="num">{WORK_PLAN_YEAR} Target</th>
-              <th className="num">This week</th>
-              {[1, 2, 3, 4].map((q) => (
-                <th
-                  key={q}
-                  className="num"
-                  style={
-                    quarter === q ? { background: "var(--sunken)" } : undefined
-                  }
-                >
-                  Q{q}
-                </th>
-              ))}
-              <th className="num">Total Actual</th>
-              <th className="num">% Achieved</th>
-              <th>Status</th>
-              <th>Comments</th>
-              <th>Action Points</th>
+              {columns.map((key) => {
+                const q = QUARTER_COLUMN[key];
+                return (
+                  <th
+                    key={key}
+                    className={NUMERIC_COLUMNS.has(key) ? "num" : undefined}
+                    style={
+                      q && quarter === q
+                        ? { background: "var(--sunken)" }
+                        : undefined
+                    }
+                  >
+                    {COLUMN_LABELS[key]}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -390,8 +567,8 @@ function SubprogrammeTable({
               <PlanRow
                 key={row.output.id}
                 row={row}
-                quarter={quarter}
                 columns={columns}
+                quarter={quarter}
                 open={openId === row.output.id}
                 onToggle={() => onToggle(row.output.id)}
                 canEdit={canEdit(row.output.section)}
@@ -401,7 +578,7 @@ function SubprogrammeTable({
             ))}
             {sub.supporting.length ? (
               <tr>
-                <td colSpan={columns} className="bg-[var(--sunken)]">
+                <td colSpan={columns.length} className="bg-[var(--sunken)]">
                   <span
                     className="caps text-[10px] text-gunmetal/55"
                     style={{ position: "sticky", left: 0 }}
@@ -416,8 +593,8 @@ function SubprogrammeTable({
               <PlanRow
                 key={row.output.id}
                 row={row}
-                quarter={quarter}
                 columns={columns}
+                quarter={quarter}
                 open={openId === row.output.id}
                 onToggle={() => onToggle(row.output.id)}
                 canEdit={canEdit(row.output.section)}
@@ -434,8 +611,8 @@ function SubprogrammeTable({
 
 function PlanRow({
   row,
-  quarter,
   columns,
+  quarter,
   open,
   onToggle,
   canEdit,
@@ -443,8 +620,8 @@ function PlanRow({
   onNoteSave,
 }: {
   row: WorkPlanRow;
+  columns: ColKey[];
   quarter: Quarter | null;
-  columns: number;
   open: boolean;
   onToggle: () => void;
   canEdit: boolean;
@@ -457,80 +634,111 @@ function PlanRow({
   const { output } = row;
   const supporting = !!output.supporting;
   const expandable = !supporting || row.breakdown.length > 0;
+  const typeable = !row.auto && !row.fromDaily && canEdit && !!row.metricKey;
+
+  const num = (v: number) => (v ? v.toLocaleString() : "—");
+
+  const content = (key: ColKey) => {
+    switch (key) {
+      case "id":
+        return (
+          <>
+            <span className="font-bold tabular">{output.id}</span>
+            {expandable ? (
+              <button
+                className="link-action no-print ml-1.5"
+                aria-expanded={open}
+                aria-label={`${open ? "Hide" : "Show"} detail for output ${output.id}`}
+                onClick={onToggle}
+              >
+                {open ? "▾" : "▸"}
+              </button>
+            ) : null}
+          </>
+        );
+      case "desc":
+        return (
+          <>
+            <div className="font-bold">{output.description}</div>
+            {output.note ? (
+              <div className="text-xs text-gunmetal/55 mt-0.5">
+                {output.note}
+              </div>
+            ) : null}
+          </>
+        );
+      case "indicator":
+        return output.indicator;
+      case "target":
+        return output.target === null ? "—" : output.target.toLocaleString();
+      case "week":
+        return typeable ? (
+          <MetricInput
+            label={`${output.id} ${output.description} — this week`}
+            value={row.week}
+            onCommit={(v) => onWeekValueChange(row.metricKey as string, v)}
+          />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-black">{row.week.toLocaleString()}</span>
+            <SourceChip row={row} canEdit={canEdit} />
+          </div>
+        );
+      case "q1":
+      case "q2":
+      case "q3":
+      case "q4":
+        return num(row.quarters[(QUARTER_COLUMN[key] as Quarter) - 1]);
+      case "total":
+        return row.total.toLocaleString();
+      case "percent":
+        return supporting ? "—" : formatPercent(row.percent);
+      case "status":
+        return supporting ? (
+          <span className="text-gunmetal/40">—</span>
+        ) : (
+          <span className={`chip ${STATUS_TONE[row.status]}`}>{row.status}</span>
+        );
+      case "comments":
+        return row.comments || <span className="text-gunmetal/40">—</span>;
+      case "actions":
+        return row.actionPoints || <span className="text-gunmetal/40">—</span>;
+    }
+  };
+
+  const className = (key: ColKey) => {
+    if (key === "id") return "whitespace-nowrap";
+    if (key === "desc") return "min-w-[15rem]";
+    if (key === "indicator") return "text-gunmetal/70 min-w-[10rem]";
+    if (key === "target") return "num font-bold";
+    if (key === "total") return "num font-black";
+    if (key === "comments" || key === "actions")
+      return "min-w-[12rem] text-gunmetal/70";
+    return NUMERIC_COLUMNS.has(key) ? "num" : undefined;
+  };
 
   return (
     <>
       <tr className="row-hover">
-        <td className="whitespace-nowrap">
-          <span className="font-bold tabular">{output.id}</span>
-          {expandable ? (
-            <button
-              className="link-action no-print ml-1.5"
-              aria-expanded={open}
-              aria-label={`${open ? "Hide" : "Show"} detail for output ${output.id}`}
-              onClick={onToggle}
+        {columns.map((key) => {
+          const q = QUARTER_COLUMN[key];
+          return (
+            <td
+              key={key}
+              className={className(key)}
+              style={
+                q && quarter === q ? { background: "var(--sunken)" } : undefined
+              }
             >
-              {open ? "▾" : "▸"}
-            </button>
-          ) : null}
-        </td>
-        <td className="min-w-[15rem]">
-          <div className="font-bold">{output.description}</div>
-          {output.note ? (
-            <div className="text-xs text-gunmetal/55 mt-0.5">{output.note}</div>
-          ) : null}
-        </td>
-        <td className="text-gunmetal/70 min-w-[10rem]">{output.indicator}</td>
-        <td className="num font-bold">
-          {output.target === null ? "—" : output.target.toLocaleString()}
-        </td>
-        <td className="num">
-          {row.auto || row.fromDaily || !canEdit || !row.metricKey ? (
-            <div className="flex flex-col items-end gap-1">
-              <span className="font-black">{row.week.toLocaleString()}</span>
-              <SourceChip row={row} canEdit={canEdit} />
-            </div>
-          ) : (
-            <MetricInput
-              label={`${output.id} ${output.description} — this week`}
-              value={row.week}
-              onCommit={(v) => onWeekValueChange(row.metricKey as string, v)}
-            />
-          )}
-        </td>
-        {row.quarters.map((v, i) => (
-          <td
-            key={i}
-            className="num"
-            style={
-              quarter === i + 1 ? { background: "var(--sunken)" } : undefined
-            }
-          >
-            {v ? v.toLocaleString() : "—"}
-          </td>
-        ))}
-        <td className="num font-black">{row.total.toLocaleString()}</td>
-        <td className="num">{supporting ? "—" : formatPercent(row.percent)}</td>
-        <td>
-          {supporting ? (
-            <span className="text-gunmetal/40">—</span>
-          ) : (
-            <span className={`chip ${STATUS_TONE[row.status]}`}>
-              {row.status}
-            </span>
-          )}
-        </td>
-        <td className="min-w-[12rem] text-gunmetal/70">
-          {row.comments || <span className="text-gunmetal/40">—</span>}
-        </td>
-        <td className="min-w-[12rem] text-gunmetal/70">
-          {row.actionPoints || <span className="text-gunmetal/40">—</span>}
-        </td>
+              {content(key)}
+            </td>
+          );
+        })}
       </tr>
 
       {open ? (
         <tr>
-          <td colSpan={columns} className="bg-[var(--sunken)]">
+          <td colSpan={columns.length} className="bg-[var(--sunken)]">
             {/* The row spans a table far wider than the screen; pinning the
                 detail to the left edge keeps it readable wherever the table
                 happens to be scrolled to. */}
@@ -574,7 +782,7 @@ function SourceChip({ row, canEdit }: { row: WorkPlanRow; canEdit: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// The expanded row: the detail behind the figure + the narrative columns
+// The expanded row: where the figure comes from + the narrative columns
 // ---------------------------------------------------------------------------
 
 function RowDetail({
@@ -623,10 +831,34 @@ function RowDetail({
 
   return (
     <div className="space-y-4 py-1">
+      {/* How the cumulative figure splits — what was carried in against what
+          the system has counted since. Only worth saying when both exist. */}
+      {row.openingTotal > 0 ? (
+        <div className="text-sm">
+          <span className="caps text-[10px] text-gunmetal/55 mr-2">
+            Total actual
+          </span>
+          <span className="tabular font-black">
+            {row.total.toLocaleString()}
+          </span>
+          <span className="text-gunmetal/60">
+            {" "}
+            = opening balance{" "}
+            <span className="tabular font-bold">
+              {row.openingTotal.toLocaleString()}
+            </span>{" "}
+            + recorded since{" "}
+            <span className="tabular font-bold">
+              {row.recordedTotal.toLocaleString()}
+            </span>
+          </span>
+        </div>
+      ) : null}
+
       {row.breakdown.length ? (
         <div>
           <div className="caps text-[10px] text-gunmetal/55 mb-1">
-            Breakdown
+            Breakdown — recorded in the system
           </div>
           <table className="w-full text-sm" style={{ maxWidth: 460 }}>
             <thead>
@@ -733,6 +965,7 @@ function RowDetail({
     </div>
   );
 }
+
 
 /**
  * Manual figure cell with local draft state, persisted on blur / Enter.

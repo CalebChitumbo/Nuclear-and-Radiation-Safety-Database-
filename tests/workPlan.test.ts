@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   WORK_PLAN,
   WORK_PLAN_OUTPUTS,
+  WORK_PLAN_OPENING_BALANCE,
   buildQuarterIndex,
   deriveStatus,
   deriveWorkPlan,
+  effectiveOpeningBalance,
+  normaliseQuarters,
+  parseOpeningBalance,
   findOutput,
   formatPercent,
   metricKeysForOutput,
@@ -97,8 +101,13 @@ interface Input {
   values?: Array<[string, Record<string, number>]>;
   dailyEntries?: DailyEntry[];
   notes?: Record<string, WorkPlanNote>;
+  baseline?: Record<string, number[]> | null;
 }
 
+/**
+ * Most cases are about what the system counts, so they start from a zeroed
+ * opening balance; the cumulative-reporting tests pass one explicitly.
+ */
 function derive(input: Input = {}): SubprogrammeReport[] {
   return deriveWorkPlan({
     weeks: WEEKS,
@@ -108,6 +117,7 @@ function derive(input: Input = {}): SubprogrammeReport[] {
     valuesByWeek: new Map(input.values || []),
     dailyEntries: input.dailyEntries,
     notes: input.notes,
+    baseline: input.baseline === undefined ? {} : input.baseline,
   });
 }
 
@@ -418,5 +428,152 @@ describe("exports", () => {
     expect(brief).toContain("RPA Sectional Update — " + Q2);
     expect(brief).toContain("Subprogramme 1.2 — Nuclear & Radiation Safety Inspections");
     expect(brief).toContain("1.2.11");
+  });
+});
+
+describe("opening balance — the plan is cumulative for the year", () => {
+  it("ships the approved workbook's actuals at handover", () => {
+    // The figures Management's sheet showed when the section moved onto the
+    // system. Changing them silently re-states every report, so they are
+    // pinned here.
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([0, 125, 0, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 96, 0, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([0, 61, 0, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([138155, 239650, 0, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.9"]).toEqual([0, 0, 65, 0]);
+  });
+
+  it("adds what the system records on top of what was carried in", () => {
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q2,
+      events: [
+        ev("Importation Licence", Q2, "2026-05-26", 1),
+        ev("Importation Licence", Q2, "2026-05-27", 2),
+        ev("Export Licence", Q3, "2026-07-21", 3),
+      ],
+      inspections: [],
+      valuesByWeek: new Map(),
+      // No saved baseline — the workbook's figures apply.
+      baseline: null,
+    });
+    const r = row(reports, "1.1.4");
+    expect(r.opening).toEqual([0, 125, 0, 0]);
+    expect(r.recorded).toEqual([0, 2, 1, 0]);
+    expect(r.quarters).toEqual([0, 127, 1, 0]);
+    expect(r.openingTotal).toBe(125);
+    expect(r.recordedTotal).toBe(3);
+    expect(r.total).toBe(128);
+    // The week column stays the week's own work — it is not cumulative.
+    expect(r.week).toBe(2);
+  });
+
+  it("measures % achieved and status on the cumulative total", () => {
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q2,
+      events: [],
+      inspections: [],
+      valuesByWeek: new Map(),
+      baseline: null,
+    });
+    // 61 enforcement actions carried in against a target of 50.
+    const enforcement = row(reports, "1.2.11");
+    expect(enforcement.total).toBe(61);
+    expect(formatPercent(enforcement.percent)).toBe("122%");
+    expect(enforcement.status).toBe("Achieved");
+    // Nothing carried in and nothing recorded stays Not Started.
+    expect(row(reports, "1.1.8").total).toBe(0);
+    expect(row(reports, "1.1.8").status).toBe("Not Started");
+  });
+
+  it("lets a saved baseline replace the workbook figures outright", () => {
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q2,
+      events: [],
+      inspections: [],
+      valuesByWeek: new Map(),
+      baseline: { "1.1.4": [10, 20, 0, 0] },
+    });
+    expect(row(reports, "1.1.4").quarters).toEqual([10, 20, 0, 0]);
+    // Outputs the saved baseline omits are zero, not the workbook's figure —
+    // otherwise an output an officer cleared would quietly come back.
+    expect(row(reports, "1.2.4").quarters).toEqual([0, 0, 0, 0]);
+  });
+
+  it("counts only what the system holds when the baseline is cleared", () => {
+    const reports = derive({
+      week: Q2,
+      baseline: {},
+      inspections: [insp("Routine Inspection", Q2, "2026-05-26", 1)],
+    });
+    expect(row(reports, "1.2.4").total).toBe(1);
+    expect(row(reports, "1.2.4").openingTotal).toBe(0);
+  });
+
+  it("normalises whatever is stored into four whole, non-negative quarters", () => {
+    expect(normaliseQuarters([1, 2, 3, 4, 5])).toEqual([1, 2, 3, 4]);
+    expect(normaliseQuarters([2.7, -3, undefined, "8"])).toEqual([2, 0, 0, 8]);
+    expect(normaliseQuarters(undefined)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("gives every output a balance, saved or not", () => {
+    const fromWorkbook = effectiveOpeningBalance(null);
+    const cleared = effectiveOpeningBalance({});
+    for (const o of WORK_PLAN_OUTPUTS) {
+      expect(fromWorkbook[o.id]).toHaveLength(4);
+      expect(cleared[o.id]).toEqual([0, 0, 0, 0]);
+    }
+  });
+
+  it("reports the split in the exported sheet and brief", () => {
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q2,
+      events: [ev("Importation Licence", Q2, "2026-05-26", 1)],
+      inspections: [],
+      valuesByWeek: new Map(),
+      baseline: null,
+    });
+    const line = workPlanRows(reports).find((r) => r[1] === "1.1.4")!;
+    expect(line[10]).toBe("126"); // Total Actual
+    expect(line[15]).toBe("125"); // Opening Balance
+    expect(line[16]).toBe("1"); // Recorded in System
+    expect(workPlanBrief(reports, Q2)).toContain(
+      "[opening balance 125, recorded since 1]",
+    );
+  });
+});
+
+describe("pasting opening figures from the work plan spreadsheet", () => {
+  it("reads a row copied straight out of the workbook", () => {
+    const pasted = [
+      "1.2.4\tRoutine, follow-up, pre-authorization & investigative inspections\tNumber of inspections\t500\t40\t96\t\t\t136\t27.2\tPending",
+      "1.3.12\tMonitoring of illicit trafficking (ZRA Asycuda)\tNumber of screened vehicles\t350000\t138155\t239650\t\t\t377805\t107.9\tPending",
+    ].join("\n");
+    const { values, matched, skipped } = parseOpeningBalance(pasted);
+    expect(matched).toEqual(["1.2.4", "1.3.12"]);
+    expect(skipped).toEqual([]);
+    expect(values["1.2.4"]).toEqual([40, 96, 0, 0]);
+    expect(values["1.3.12"]).toEqual([138155, 239650, 0, 0]);
+  });
+
+  it("reads a loose id-then-numbers line, thousands separators and all", () => {
+    const { values, matched } = parseOpeningBalance(
+      "1.1.4 0 125 0 0\n1.3.12: 138,155 239,650",
+    );
+    expect(matched).toEqual(["1.1.4", "1.3.12"]);
+    expect(values["1.1.4"]).toEqual([0, 125, 0, 0]);
+    expect(values["1.3.12"]).toEqual([138155, 239650, 0, 0]);
+  });
+
+  it("skips lines with no output id rather than guessing", () => {
+    const { matched, skipped } = parseOpeningBalance(
+      "Output ID\tOutput Description\n1.1.1 0 3\n9.9.9 5\n\nsome prose",
+    );
+    expect(matched).toEqual(["1.1.1"]);
+    // The header, the id that is not on the plan, and the prose.
+    expect(skipped).toHaveLength(3);
   });
 });

@@ -113,8 +113,8 @@ to the seed.
    `seed:fresh` first **deletes** `facilities`, `licenceEvents`,
    `inspections`, `inspectionRequests` and `licenceWorkflows` (the old
    register and the history recorded against it), then seeds the new
-   register. Users, weeks, weekly metrics, work plan notes, daily entries,
-   borders and activities are kept. Mock/demo browsers reset themselves automatically
+   register. Users, weeks, weekly metrics, the work plan notes and opening
+   balance, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
    (the mock store's storage key was bumped).
 5. Create the first admin by manually calling the `setUserClaims` callable in
    the Firebase Console, then onboard the rest from `/admin/users`.
@@ -204,6 +204,7 @@ automatically (Production for the production branch, Preview for others).
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
+| `workPlanBaseline/{year}` | The plan year's **opening balance** — what each output had already achieved before the system started counting it. The report is cumulative, so every row counts up from here. Admin-writable only (it moves every section's figures at once) |
 | `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
 | `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
 | `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
@@ -386,6 +387,44 @@ meeting, so the week column is what the section did and the quarter columns are
 what that adds up to. The output id and its description stay pinned while the
 rest scrolls sideways.
 
+### Cumulative for the year, with a filter for the week
+
+The plan is measured over the whole year, so **Year to date** is what the report
+opens on: the quarter columns and Total Actual are the year's position, and the
+week column is not shown. A `Showing` filter switches between three column sets,
+and the choice is remembered:
+
+| View | Columns | For |
+|---|---|---|
+| **Year to date 2026** (default) | Target · Q1–Q4 · Total Actual · % · Status · Comments · Actions | the report Management reads — the workbook's own columns |
+| **This week only** | Target · This week · Total Actual · % · Status · Comments · Actions | what the section did this week, still beside where the year stands; fits a screen without scrolling, so it is also the easiest view to type figures into |
+| **Week + year** | everything | reconciling one against the other |
+
+### The opening balance — where the cumulative count starts
+
+The sections did not start the year on this system, so every output counts up
+from an **opening balance**: what it had already achieved before the system
+began recording it. A section at 125 licences when it came onto the system
+reports 126 once the next one is logged, not 1.
+
+The figures ship with the approved workbook's actuals at handover
+(`WORK_PLAN_OPENING_BALANCE` in `lib/rules/workPlan.ts`), so the report is right
+from the first day. **Opening balance — 2026** on `/weekly` shows what is in
+force and, for an admin, how to change it: paste rows straight out of the plan
+spreadsheet (`parseOpeningBalance` reads the workbook's column order, or a
+looser *id then Q1–Q4*), or type into the per-quarter grid, then save. Buttons
+reset to the workbook figures or clear the year to zero.
+
+A saved baseline **replaces** the shipped figures rather than merging with
+them, so an output an officer zeroed stays zero. Pasting a few rows only
+touches those outputs — the rest of the grid keeps what it was showing.
+
+> The opening balance covers work the registers do **not** hold. Back-importing
+> the same licences or inspections would count them twice; zero that output's
+> opening figures first if you ever do. Expanding a row shows the split —
+> *Total actual = opening balance + recorded since* — so the two are always
+> separable, and the CSV carries them as trailing columns.
+
 ### Nothing on the plan is retyped that the system already knows
 
 | Output | Filled from |
@@ -405,8 +444,9 @@ else is a figure an officer logs on Daily Updates or types into the row's
 A record counts toward the quarter its **reporting week starts in**, so a week
 that straddles a quarter boundary (W14, 30 Mar → 3 Apr) is never split or double
 counted, and an auto figure and a typed figure logged in the same week always
-land in the same column. **% Achieved** is Total Actual ÷ 2026 Target; outputs
-the workbook targets with "-" show "—" instead.
+land in the same column. **% Achieved** is Total Actual (opening balance
+included) ÷ 2026 Target; outputs the workbook targets with "-" show "—"
+instead.
 
 **Status** derives itself — *Not Started* / *In Progress* / *Achieved* — until an
 officer says otherwise; opening a row lets the owning section override it
@@ -425,11 +465,13 @@ a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**
 produces the printed report with the Zambian-flag cover.
 
-> `workPlanNotes` is a new collection — **deploy the rules before officers can
-> save a Status, Comment or Action Point** (`firebase deploy --only
-> firestore:rules`). Firestore denies writes to a collection no deployed rule
-> mentions, admin account or not. Until then the report reads fine (the figures
-> come from collections that already exist) and saving reports the failure.
+> `workPlanNotes` and `workPlanBaseline` are new collections — **deploy the
+> rules before officers can save a Status, Comment or Action Point, or an
+> admin can re-baseline the year** (`firebase deploy --only firestore:rules`).
+> Firestore denies writes to a collection no deployed rule mentions, admin
+> account or not. Until then the report reads fine — the figures come from
+> collections that already exist, and the opening balance falls back to the
+> approved workbook's — and saving reports the failure.
 
 ---
 
@@ -568,7 +610,9 @@ npm test
   a quarter boundary), the auto-filled rows (1.1.4 licences, 1.2.4 inspections
   excluding enforcement, 1.2.11 enforcement, 1.3.12 screening on the border log's
   own metric key), figures logged under pre-work-plan metric names still counting,
-  % achieved / status derivation and the officer's override, and the export
+  the **opening balance** the cumulative count starts from (the workbook's
+  handover actuals, a saved baseline replacing them outright, % and status
+  measured on the combined total), the spreadsheet paste parser, and the export
   columns
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
@@ -601,6 +645,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── weekly/             Sectional update — the 2026 work plan report
 │   ├── admin/users/
 │   └── settings/
+├── components/weekly/      OpeningBalancePanel — where the cumulative count starts
 ├── components/             UI primitives — Section (Panel/PageHeader/Field), Segmented,
 │                           Sidebar, Topbar, MobileNav, Drawer, Kpi, Bars, Gauge, Toast …
 ├── components/facility/    FacilityDetail — shared by the drawer and /facilities/[id]
@@ -691,8 +736,10 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
       correct reporting week.
 - [x] The sectional update reproduces the approved 2026 work plan's columns,
       auto-derives outputs 1.1.4, 1.2.4, 1.2.11 and 1.3.12 from the registers
-      and the border/daily logs, and totals every output by quarter; typed
-      figures and the Status / Comments / Action Points columns persist.
+      and the border/daily logs, and reports every output **cumulatively for
+      the year** from its opening balance — with a filter for the week alone;
+      typed figures, the opening balance and the Status / Comments / Action
+      Points columns persist.
 - [x] Security rules enforce that Inspectorate officers cannot flip licensed
       status, aggregates are not client-writable, and non-admins cannot
       manage users.

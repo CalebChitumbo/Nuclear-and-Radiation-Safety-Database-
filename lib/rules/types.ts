@@ -481,6 +481,24 @@ export const WORK_PLAN_STATUSES = [
 export type WorkPlanStatus = (typeof WORK_PLAN_STATUSES)[number];
 
 /**
+ * What each work plan output had already achieved before the system started
+ * counting it — one document per plan year. The report is cumulative for the
+ * year, so every output starts from its opening balance and adds what has been
+ * recorded since. Saving one REPLACES the figures the code ships with (the
+ * approved workbook's actuals at handover) rather than adding to them.
+ */
+export interface WorkPlanBaseline {
+  /** The plan year — also the document id. */
+  year: number;
+  /** Output id → [Q1, Q2, Q3, Q4] carried in. */
+  values: Record<string, number[]>;
+  /** Free-text provenance: where the figures were taken from, and when. */
+  note?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
  * The narrative an officer keeps against one work plan output — the workbook's
  * Status / Comments / Action Points columns. Figures are derived from the
  * registers and the logged metrics; only these three are typed, and they belong

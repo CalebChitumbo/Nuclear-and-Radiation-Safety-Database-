@@ -571,6 +571,145 @@ export function findOutput(id: string): WorkPlanOutput | null {
   return WORK_PLAN_OUTPUTS.find((o) => o.id === id) || null;
 }
 
+// ---------------------------------------------------------------------------
+// Opening balance
+// ---------------------------------------------------------------------------
+
+/**
+ * What an output had already achieved before the system started counting it,
+ * per quarter. The report is cumulative for the plan year, so every row starts
+ * from its opening balance and adds what has been recorded since — a section
+ * that was at 125 licences when it moved onto the system reports 126 after the
+ * next one is logged, not 1.
+ *
+ * These are the actuals carried in the approved 2026 workbook at handover. A
+ * saved `workPlanBaseline` document REPLACES them wholesale (it does not add),
+ * so an officer can correct or re-baseline the plan without touching the code.
+ *
+ * The one thing to watch: an output's opening balance covers work the registers
+ * do NOT hold. Back-importing the same licences or inspections would count them
+ * twice — re-baseline to zero for that output if you ever do.
+ */
+export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
+  // Subprogramme 1.1 — Authorisation and Standards
+  "1.1.1": [0, 3, 0, 0],
+  "1.1.2": [0, 2, 0, 0],
+  "1.1.3": [0, 1, 0, 0],
+  "1.1.4": [0, 125, 0, 0],
+  "1.1.5": [0, 1, 0, 0],
+  "1.1.6": [0, 3, 0, 0],
+  "1.1.7": [0, 0, 0, 0],
+  "1.1.8": [0, 0, 0, 0],
+  "1.1.9": [0, 1, 0, 0],
+  "1.1.10": [0, 1, 0, 0],
+  // Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
+  "1.2.1": [1, 0, 0, 0],
+  "1.2.2": [1, 0, 0, 0],
+  "1.2.3": [0, 2, 0, 0],
+  "1.2.4": [40, 96, 0, 0],
+  "1.2.5": [1, 0, 0, 0],
+  "1.2.6": [3, 1, 0, 0],
+  "1.2.7": [1, 1, 0, 0],
+  "1.2.8": [1, 0, 0, 0],
+  "1.2.9": [0, 1, 0, 0],
+  "1.2.10": [0, 1, 0, 0],
+  "1.2.11": [0, 61, 0, 0],
+  // Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
+  "1.3.1": [0, 0, 0, 0],
+  "1.3.2": [0, 0, 0, 0],
+  "1.3.3": [0, 2, 0, 0],
+  "1.3.4": [0, 0, 0, 0],
+  "1.3.5": [0, 0, 0, 0],
+  "1.3.6": [0, 0, 0, 0],
+  "1.3.7": [0, 0, 0, 0],
+  "1.3.8": [0, 0, 0, 0],
+  "1.3.9": [0, 0, 65, 0],
+  "1.3.10": [0, 0, 0, 0],
+  "1.3.11": [0, 0, 0, 0],
+  "1.3.12": [138155, 239650, 0, 0],
+  "1.3.13": [0, 0, 24, 0],
+  "1.3.14": [0, 0, 0, 0],
+};
+
+/** A quarter array that is always length 4, with whole non-negative numbers. */
+export function normaliseQuarters(input: unknown): number[] {
+  const out = [0, 0, 0, 0];
+  if (!Array.isArray(input)) return out;
+  for (let i = 0; i < 4; i++) {
+    const n = Number(input[i]);
+    out[i] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  }
+  return out;
+}
+
+/**
+ * The opening balance in force: a saved baseline if there is one, otherwise the
+ * workbook's figures at handover. Saved baselines replace rather than merge, so
+ * an output an officer zeroed stays zero.
+ */
+export function effectiveOpeningBalance(
+  saved?: Record<string, number[]> | null,
+): Record<string, number[]> {
+  const source = saved ?? WORK_PLAN_OPENING_BALANCE;
+  const out: Record<string, number[]> = {};
+  for (const o of WORK_PLAN_OUTPUTS) {
+    out[o.id] = normaliseQuarters(source[o.id]);
+  }
+  return out;
+}
+
+/**
+ * Read opening figures out of pasted text, so a section can copy its rows
+ * straight out of the work plan spreadsheet.
+ *
+ * Two shapes are understood, both keyed on the output id that starts the line:
+ *
+ * - A row copied from the workbook — tab separated, with the quarters in the
+ *   sheet's own columns (id, description, indicator, target, Q1..Q4, …).
+ * - Anything looser — the id followed by up to four numbers, read as Q1..Q4.
+ *
+ * Lines that carry no output id, or an id the plan does not have, come back as
+ * `skipped` rather than being guessed at.
+ */
+export function parseOpeningBalance(text: string): {
+  values: Record<string, number[]>;
+  matched: string[];
+  skipped: string[];
+} {
+  const values: Record<string, number[]> = {};
+  const matched: string[] = [];
+  const skipped: string[] = [];
+
+  for (const raw of (text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    const cells = line.split("\t").map((c) => c.trim());
+    const id = (cells[0].match(/\d+\.\d+\.\d+/) || [])[0];
+    if (!id || !findOutput(id)) {
+      skipped.push(line);
+      continue;
+    }
+
+    // A pasted workbook row keeps the sheet's column order; the quarters are
+    // the four cells after the target. Blank cells mean nothing achieved.
+    const quarters =
+      cells.length >= 8
+        ? cells.slice(4, 8).map((c) => Number(c.replace(/[,\s]/g, "")) || 0)
+        : (line
+            .slice(line.indexOf(id) + id.length)
+            .match(/-?[\d,]*\d/g) || []
+          )
+            .slice(0, 4)
+            .map((n) => Number(n.replace(/,/g, "")) || 0);
+
+    values[id] = normaliseQuarters(quarters);
+    matched.push(id);
+  }
+
+  return { values, matched, skipped };
+}
+
 /**
  * The outputs a section may log a figure against — its manual plan outputs and
  * supporting figures, in plan order. This is what the Daily Updates tab offers.
@@ -639,9 +778,15 @@ export interface WorkPlanRow {
   output: WorkPlanOutput;
   /** The selected reporting week's contribution. */
   week: number;
-  /** Cumulative actuals, index 0 = Q1. */
+  /** Already achieved before the system started counting, index 0 = Q1. */
+  opening: number[];
+  /** Recorded in the system, index 0 = Q1. */
+  recorded: number[];
+  /** Cumulative actuals as reported — opening + recorded, index 0 = Q1. */
   quarters: number[];
-  /** Total Actual — the sum of the four quarters. */
+  openingTotal: number;
+  recordedTotal: number;
+  /** Total Actual — the sum of the four quarters, opening balance included. */
   total: number;
   /** Total ÷ target × 100, or null where the output has no numeric target. */
   percent: number | null;
@@ -689,6 +834,12 @@ export interface WorkPlanInput {
   fromDaily?: Set<string>;
   /** The officers' status / comments / action points, keyed by output id. */
   notes?: Record<string, WorkPlanNote>;
+  /**
+   * The saved opening balance per output id. Omit to start every output from
+   * the approved workbook's figures at handover; pass `{}` for a plan that
+   * counts only what the system has recorded.
+   */
+  baseline?: Record<string, number[]> | null;
   year?: number;
 }
 
@@ -825,6 +976,7 @@ function deriveRow(
   input: WorkPlanInput,
   quarterByWeek: Map<string, Quarter>,
   year: number,
+  opening: number[],
 ): WorkPlanRow {
   const { source } = output;
   let tally: Tally;
@@ -852,16 +1004,25 @@ function deriveRow(
     );
   }
 
+  // The plan is cumulative for the year: what the output had already achieved
+  // when it came onto the system, plus everything recorded since.
+  const quarters = tally.quarters.map((v, i) => v + (opening[i] || 0));
+  const total = quarters.reduce((a, b) => a + b, 0);
+
   const note = (input.notes || {})[output.id];
-  const derivedStatus = deriveStatus(tally.total, output.target);
+  const derivedStatus = deriveStatus(total, output.target);
   const key = source.kind === "manual" ? source.key : null;
 
   return {
     output,
     week: tally.week,
-    quarters: tally.quarters,
-    total: tally.total,
-    percent: percentAchieved(tally.total, output.target),
+    opening,
+    recorded: tally.quarters,
+    quarters,
+    openingTotal: opening.reduce((a, b) => a + b, 0),
+    recordedTotal: tally.total,
+    total,
+    percent: percentAchieved(total, output.target),
     status: note?.status || derivedStatus,
     derivedStatus,
     statusOverridden: !!note?.status,
@@ -881,9 +1042,10 @@ function deriveRow(
 export function deriveWorkPlan(input: WorkPlanInput): SubprogrammeReport[] {
   const year = input.year ?? WORK_PLAN_YEAR;
   const quarterByWeek = buildQuarterIndex(input.weeks, year);
+  const opening = effectiveOpeningBalance(input.baseline);
   return WORK_PLAN.map((sub) => {
     const derived = sub.outputs.map((o) =>
-      deriveRow(o, input, quarterByWeek, year),
+      deriveRow(o, input, quarterByWeek, year, opening[o.id] || emptyQuarters()),
     );
     return {
       id: sub.id,
@@ -916,6 +1078,11 @@ export const WORK_PLAN_CSV_HEADER = [
   "Status",
   "Comments",
   "Action Points",
+  // Trailing, so the columns before them paste straight into the workbook:
+  // how the cumulative figure splits between what was carried in and what the
+  // system has counted.
+  "Opening Balance",
+  "Recorded in System",
 ];
 
 function csvRow(sub: SubprogrammeReport, row: WorkPlanRow): string[] {
@@ -932,6 +1099,8 @@ function csvRow(sub: SubprogrammeReport, row: WorkPlanRow): string[] {
     row.output.supporting ? "" : row.status,
     row.comments,
     row.actionPoints,
+    String(row.openingTotal),
+    String(row.recordedTotal),
   ];
 }
 
@@ -959,7 +1128,10 @@ export function workPlanBrief(
         `  ${row.output.id}  ${row.output.description}` +
           ` — this week ${row.week}; Q1 ${row.quarters[0]} Q2 ${row.quarters[1]}` +
           ` Q3 ${row.quarters[2]} Q4 ${row.quarters[3]};` +
-          ` total ${row.total}/${target} (${formatPercent(row.percent)}) — ${row.status}`,
+          ` total ${row.total}/${target} (${formatPercent(row.percent)}) — ${row.status}` +
+          (row.openingTotal
+            ? ` [opening balance ${row.openingTotal}, recorded since ${row.recordedTotal}]`
+            : ""),
       );
       if (row.comments) lines.push(`      Comments: ${row.comments}`);
       if (row.actionPoints) lines.push(`      Action: ${row.actionPoints}`);

@@ -18,6 +18,7 @@ import type {
   WeekDef,
   WeekMetrics,
   WorkflowNote,
+  WorkPlanBaseline,
   WorkPlanNote,
 } from "../rules/types";
 
@@ -60,6 +61,19 @@ export interface DataStore {
    * the whole plan year, not to a single reporting week.
    */
   listWorkPlanNotes(): Promise<WorkPlanNote[]>;
+  /**
+   * The opening balance the plan year starts from — what each output had
+   * already achieved before the system began counting it. Null when none has
+   * been saved, in which case the approved workbook's figures apply.
+   */
+  getWorkPlanBaseline(year: number): Promise<WorkPlanBaseline | null>;
+  /** Replace the plan year's opening balance wholesale. Admins only. */
+  setWorkPlanBaseline(
+    year: number,
+    values: Record<string, number[]>,
+    uid: string,
+    note?: string,
+  ): Promise<void>;
   setWorkPlanNote(
     id: string,
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
@@ -173,6 +187,7 @@ export interface DataStore {
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;
     workPlanNotes: WorkPlanNote[];
+    workPlanBaseline: WorkPlanBaseline | null;
     dailyEntries: DailyEntry[];
     borders: Border[];
     truckScans: TruckScan[];

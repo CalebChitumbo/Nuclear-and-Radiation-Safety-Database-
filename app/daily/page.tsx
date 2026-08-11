@@ -35,6 +35,7 @@ import {
   type Border,
   type DailyEntry,
   type Section,
+  type WorkPlanBaseline,
 } from "@/lib/rules/types";
 
 /** Short tab labels so the section switcher fits a phone screen. */
@@ -92,6 +93,7 @@ export default function DailyUpdatesPage() {
         workflows,
         borders,
         weekMetricsAll,
+        baseline,
       ] = await Promise.all([
         s.listFacilities(),
         s.listLicenceEvents(),
@@ -101,6 +103,9 @@ export default function DailyUpdatesPage() {
         s.listLicenceWorkflows().catch(() => []),
         s.listBorders().catch(() => []),
         s.listWeekMetricsAll().catch(() => []),
+        s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+          () => null as WorkPlanBaseline | null,
+        ),
       ]);
       return {
         facilities,
@@ -110,6 +115,7 @@ export default function DailyUpdatesPage() {
         workflows,
         borders,
         weekMetricsAll,
+        baseline,
       };
     },
     [],
@@ -131,6 +137,7 @@ export default function DailyUpdatesPage() {
     workflows,
     borders,
     weekMetricsAll,
+    baseline,
   } = data;
 
   const dayEvents = events.filter((e) => e.date === date);
@@ -148,6 +155,7 @@ export default function DailyUpdatesPage() {
     inspections,
     valuesByWeek: effectiveValuesByWeek(weekMetricsAll, entries),
     dailyEntries: entries,
+    baseline: baseline?.values ?? null,
   });
 
   // Licensing suggestions: issued Use/Possession certificates whose facility is

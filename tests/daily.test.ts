@@ -71,12 +71,32 @@ describe("daily metric options", () => {
       events: [],
       inspections: [],
       valuesByWeek: new Map([[W22, { [opt.key]: 5 }]]),
+      baseline: {}, // count only what was logged, not the opening balance
     });
     const row = reports
       .flatMap((s) => s.rows)
       .find((r) => r.output.id === "1.3.9")!;
     expect(row.week).toBe(5);
     expect(row.total).toBe(5);
+  });
+
+  it("adds a daily count to the output's opening balance", () => {
+    const opts = dailyMetricOptions(NSSS);
+    const opt = opts.find((o) => o.outputId === "1.3.9")!;
+    const reports = deriveWorkPlan({
+      weeks: weeksSeed as WeekDef[],
+      week: W22,
+      events: [],
+      inspections: [],
+      valuesByWeek: new Map([[W22, { [opt.key]: 5 }]]),
+      baseline: null, // the approved workbook carried 65 stakeholders in Q3
+    });
+    const row = reports
+      .flatMap((s) => s.rows)
+      .find((r) => r.output.id === "1.3.9")!;
+    expect(row.week).toBe(5);
+    expect(row.openingTotal).toBe(65);
+    expect(row.total).toBe(70);
   });
 });
 
