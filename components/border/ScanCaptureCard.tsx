@@ -35,6 +35,7 @@ import {
   lastSeenDetails,
   normaliseVehicleId,
   nowHHMM,
+  scanWriteErrorMessage,
   validateScan,
   vehicleIdKind,
   type ScanDraft,
@@ -175,10 +176,7 @@ export function ScanCaptureCard({
       reset();
       onSaved();
     } catch (err) {
-      toast.push(
-        `Could not save the scan: ${err instanceof Error ? err.message : err}`,
-        "error",
-      );
+      toast.push(`Could not save the scan. ${scanWriteErrorMessage(err)}`, "error");
     } finally {
       setBusy(false);
     }
