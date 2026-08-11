@@ -109,6 +109,13 @@ export interface Authorisation {
   type: LicenceType;
   number: string;
   date: string;
+  /**
+   * Quarter of issue ("2026-Q1") for licences the section reports by quarter
+   * rather than by date — the Licensing Status workbook records no issue date.
+   * `date` stays empty on those; everything that needs a year reads
+   * `authYear()`, which falls back to this.
+   */
+  quarter?: string;
   eventId?: string;
 }
 
@@ -122,9 +129,9 @@ export interface Facility {
   practice: string;
   sector: Sector;
   /**
-   * Whether the facility is operating (2026 Facility Status List). Functional
-   * and licensing status are independent axes — a non-functional facility can
-   * still hold a licence, and a functional one can be unlicensed.
+   * Whether the facility is operating (the register's operating status).
+   * Functional and licensing status are independent axes — a non-functional
+   * facility can still hold a licence, and a functional one can be unlicensed.
    */
   functional: boolean;
   /** Medical (incl. veterinary) vs Non-Medical practice split. */
@@ -141,8 +148,8 @@ export interface Facility {
   /** Why the record is flagged for review. */
   reviewNote?: string;
   /**
-   * The source line from the 2026 status-list import (latest stage · date),
-   * kept as informational provenance on the facility.
+   * The source line from the register import — the licensing status the
+   * import read for this facility — kept as informational provenance.
    */
   statusDetail?: string;
   /**

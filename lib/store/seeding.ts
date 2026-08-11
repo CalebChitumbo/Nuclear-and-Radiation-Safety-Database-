@@ -1,14 +1,27 @@
 import { detectType } from "../rules/detectType";
 import { norm } from "../rules/matching";
 import {
+  LICENCE_TYPES,
   STAGES,
   type Authorisation,
   type Facility,
   type FacilityCategory,
+  type LicenceType,
   type Province,
   type Sector,
   type Stage,
 } from "../rules/types";
+
+/**
+ * One licence on a seeded facility, as the Licensing Status import writes it:
+ * type, quarter of issue ("2026-Q1", blank when the source has none) and the
+ * RAIS licence number when the register knows it.
+ */
+export interface SeedLicence {
+  t: string;
+  q?: string;
+  n?: string;
+}
 
 export interface SeedFacility {
   n: number;
@@ -22,7 +35,13 @@ export interface SeedFacility {
   auth: string;
   fac: string;
   ln: string;
-  /** "Yes"/"No" — operating status from the 2026 Facility Status List. */
+  /**
+   * Every licence recorded for the facility, one entry per licence. Present on
+   * rows imported from the Licensing Status workbook; rows predating it carry
+   * their numbers in `ln` alone and are expanded by buildAuths().
+   */
+  lics?: SeedLicence[];
+  /** "Yes"/"No" — operating status from the register import. */
   func?: string;
   /** "Medical" / "Non-Medical" (veterinary counts as Medical). */
   cat?: string;
@@ -30,7 +49,7 @@ export interface SeedFacility {
   stalled?: string;
   /** Review note when the imported row needs an officer's confirmation. */
   review?: string;
-  /** Source detail line from the status list (latest stage · date). */
+  /** Source detail line from the register import (status · licences · quarter). */
   detail?: string;
 }
 
@@ -57,6 +76,31 @@ function safeStage(s: string, licensed: boolean): Stage {
   return (STAGES as readonly string[]).includes(s)
     ? (s as Stage)
     : "No Application Submitted";
+}
+
+function safeLicenceType(t: string, fallback: LicenceType): LicenceType {
+  return (LICENCE_TYPES as readonly string[]).includes(t)
+    ? (t as LicenceType)
+    : fallback;
+}
+
+/**
+ * The licences listed on a seed row. Each entry is one authorisation; the
+ * workbook dates them by quarter, so `date` stays empty and `quarter` carries
+ * the period (see Authorisation.quarter).
+ */
+function licencesToAuths(lics: SeedLicence[]): Authorisation[] {
+  return lics.map((l) => {
+    const number = l.n || "";
+    const type = safeLicenceType(
+      l.t,
+      number ? detectType(number, "Renewal of Use/Possession Licence")
+             : "Renewal of Use/Possession Licence",
+    );
+    const a: Authorisation = { type, number, date: "" };
+    if (l.q) a.quarter = l.q;
+    return a;
+  });
 }
 
 function buildAuths(ln: string, auth: string): Authorisation[] {
@@ -92,7 +136,7 @@ export function mapSeedFacility(s: SeedFacility): Facility {
     province: safeProvince(s.prov),
     practice: s.prac || "",
     sector: s.sec === "Public" ? ("Public" as Sector) : ("Private" as Sector),
-    // Rows predating the 2026 status-list import lack `func` — treat them as
+    // Rows predating the status imports lack `func` — treat them as
     // operating rather than silently shrinking the functional counts.
     functional: s.func !== "No",
     category:
@@ -102,7 +146,7 @@ export function mapSeedFacility(s: SeedFacility): Facility {
     licensed,
     stage: safeStage(s.stage, licensed),
     facCode: s.fac || "",
-    auths: buildAuths(s.ln, s.auth),
+    auths: s.lics ? licencesToAuths(s.lics) : buildAuths(s.ln, s.auth),
   };
   // Optional flags only when set — keeps Firestore docs (and JSON exports)
   // free of empty placeholder fields.

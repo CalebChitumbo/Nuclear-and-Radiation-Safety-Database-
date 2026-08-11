@@ -338,7 +338,7 @@ export default function DashboardPage() {
           </ul>
           <div className="mt-3 text-[11px] text-gunmetal/55">
             Licence year read from each facility&apos;s latest use/possession
-            licence date.
+            licence — its issue date, or the quarter it was issued in.
           </div>
         </div>
       </section>

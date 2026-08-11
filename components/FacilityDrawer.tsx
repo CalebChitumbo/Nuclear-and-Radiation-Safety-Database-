@@ -12,6 +12,7 @@ import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { detectType } from "@/lib/rules/detectType";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
+import { authWhen } from "@/lib/rules/licenceStats";
 import {
   workflowCommentCount,
   workflowStatusLabel,
@@ -323,7 +324,7 @@ export function FacilityDrawer({ facilityId, onClose, onChanged }: Props) {
               {facility.statusDetail ? (
                 <div className="col-span-2">
                   <Field
-                    label="2026 status list import"
+                    label="2026 licensing status"
                     value={facility.statusDetail}
                   />
                 </div>
@@ -737,7 +738,11 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AuthRow({ a }: { a: { type: string; number: string; date: string } }) {
+function AuthRow({
+  a,
+}: {
+  a: { type: string; number: string; date: string; quarter?: string };
+}) {
   return (
     <li className="flex items-baseline justify-between gap-3 text-sm">
       <div>
@@ -746,7 +751,10 @@ function AuthRow({ a }: { a: { type: string; number: string; date: string } }) {
           {a.number || "no number"}
         </div>
       </div>
-      <div className="text-xs tabular text-gunmetal/55">{a.date || "—"}</div>
+      {/* Licences imported by quarter show "Q1 2026" in place of a date. */}
+      <div className="text-xs tabular text-gunmetal/55">
+        {authWhen(a) || "—"}
+      </div>
     </li>
   );
 }

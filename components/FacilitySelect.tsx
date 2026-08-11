@@ -7,7 +7,7 @@ import type { Facility } from "@/lib/rules/types";
 /**
  * Native select over the FULL register, sorted by name. Replaces the ad-hoc
  * `facilities.slice(0, N)` dropdowns that silently hid every facility past the
- * cap — with 474 register rows, an officer could simply never pick some
+ * cap — with 538 register rows, an officer could simply never pick some
  * facilities. A native <option> list at this size is cheap; wrap the consumer
  * row in React.memo if it renders in a long list.
  */

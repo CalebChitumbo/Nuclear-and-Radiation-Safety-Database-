@@ -7,7 +7,7 @@ import {
 
 /**
  * Recompute the dashboard aggregate from the full facility list.
- * Cheap at 474 docs; safe to use as a refresh path or in the seed script.
+ * Cheap at 538 docs; safe to use as a refresh path or in the seed script.
  */
 export function computeAggregate(
   facilities: Facility[],

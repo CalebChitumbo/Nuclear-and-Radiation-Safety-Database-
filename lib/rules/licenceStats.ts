@@ -1,4 +1,5 @@
 import {
+  type Authorisation,
   type Facility,
   type LicenceType,
   type Stage,
@@ -14,7 +15,7 @@ import {
  *  - how many facilities hold a current Use/Possession licence *for a given
  *    year* versus those still in the renewal pipeline (and which stage).
  *
- * Pure; cheap to recompute at 474 facilities, so the pages derive it on the
+ * Pure; cheap to recompute at 538 facilities, so the pages derive it on the
  * client from the facility list they already load.
  */
 export interface LicenceStats {
@@ -48,6 +49,48 @@ export function licenceYear(date: string): number | null {
   if (iso) return Number(iso[1]);
   const t = Date.parse(date || "");
   return Number.isNaN(t) ? null : new Date(t).getUTCFullYear();
+}
+
+/**
+ * Year an authorisation belongs to: its issue date when it has one, otherwise
+ * the year of its quarter ("2026-Q1"). Licences imported from the Licensing
+ * Status workbook carry only a quarter, and they are exactly the ones the
+ * "licensed this year" figure is about.
+ */
+export function authYear(a: Pick<Authorisation, "date" | "quarter">): number | null {
+  const fromDate = licenceYear(a.date);
+  if (fromDate !== null) return fromDate;
+  const q = /^(\d{4})-Q[1-4]$/.exec(a.quarter || "");
+  return q ? Number(q[1]) : null;
+}
+
+/** "2026-Q1" -> "Q1 2026"; anything else is passed through unchanged. */
+export function formatQuarter(quarter: string): string {
+  const m = /^(\d{4})-(Q[1-4])$/.exec(quarter || "");
+  return m ? `${m[2]} ${m[1]}` : quarter || "";
+}
+
+/** What the register shows for when an authorisation was issued. */
+export function authWhen(a: Pick<Authorisation, "date" | "quarter">): string {
+  return a.date || formatQuarter(a.quarter || "");
+}
+
+const QUARTER_END_MONTH: Record<string, string> = {
+  Q1: "03",
+  Q2: "06",
+  Q3: "09",
+  Q4: "12",
+};
+
+/**
+ * Sortable key for an authorisation: its date, or its quarter placed at the
+ * quarter's last month so quarter-dated and date-dated licences interleave in
+ * the right order. Empty for an authorisation with neither, which sorts last.
+ */
+export function authSortKey(a: Pick<Authorisation, "date" | "quarter">): string {
+  if (a.date) return a.date;
+  const m = /^(\d{4})-(Q[1-4])$/.exec(a.quarter || "");
+  return m ? `${m[1]}-${QUARTER_END_MONTH[m[2]]}` : "";
 }
 
 function emptyByType(): Record<LicenceType, number> {
@@ -84,7 +127,7 @@ export function computeLicenceStats(
       // facility's licence is current for `year` (renewed) or due for renewal.
       const years = auths
         .filter((a) => isUseP(a.type))
-        .map((a) => licenceYear(a.date))
+        .map((a) => authYear(a))
         .filter((y): y is number => y !== null);
       const latest = years.length ? Math.max(...years) : null;
       if (latest !== null && latest >= year) licensedThisYear += 1;

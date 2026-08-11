@@ -1,3 +1,4 @@
+import { authWhen } from "./licenceStats";
 import type { Facility } from "./types";
 
 /** RFC-4180 escaping: quote when the value contains a comma, quote or newline. */
@@ -33,6 +34,7 @@ export function facilitiesToCsv(facilities: Facility[]): string {
     "Needs Review",
     "Review Note",
     "Licence Numbers",
+    "Licences Held",
     "Import Detail",
   ];
   const rows = facilities.map((f, i) => [
@@ -53,6 +55,14 @@ export function facilitiesToCsv(facilities: Facility[]): string {
     (f.auths || [])
       .map((a) => a.number)
       .filter(Boolean)
+      .join("; "),
+    // Every licence held, with when it was issued — a facility can hold
+    // several, and the ones imported by quarter carry no number.
+    (f.auths || [])
+      .map((a) => {
+        const when = authWhen(a);
+        return when ? `${a.type} (${when})` : a.type;
+      })
       .join("; "),
     f.statusDetail || "",
   ]);

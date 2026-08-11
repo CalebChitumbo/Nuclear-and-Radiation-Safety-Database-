@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { computeLicenceStats, licenceYear } from "../lib/rules/licenceStats";
+import {
+  authSortKey,
+  authWhen,
+  authYear,
+  computeLicenceStats,
+  formatQuarter,
+  licenceYear,
+} from "../lib/rules/licenceStats";
 import type { Facility } from "../lib/rules/types";
 
 function fac(p: Partial<Facility> & { id: string }): Facility {
@@ -90,5 +97,56 @@ describe("computeLicenceStats", () => {
     expect(s.notLicensed).toBe(2);
     expect(s.notLicensedByStage["Under Review and Assessment"]).toBe(1);
     expect(s.notLicensedByStage["No Application Submitted"]).toBe(1);
+  });
+});
+
+describe("quarter-dated authorisations (Licensing Status workbook)", () => {
+  it("reads the year from the quarter when there is no date", () => {
+    expect(authYear({ date: "", quarter: "2026-Q3" })).toBe(2026);
+    expect(authYear({ date: "2025-04-01", quarter: "2026-Q1" })).toBe(2025);
+    expect(authYear({ date: "", quarter: "" })).toBeNull();
+    expect(authYear({ date: "", quarter: "Q1" })).toBeNull();
+  });
+
+  it("shows the quarter where a date would go", () => {
+    expect(authWhen({ date: "", quarter: "2026-Q1" })).toBe("Q1 2026");
+    expect(authWhen({ date: "2026-05-16", quarter: "2026-Q2" })).toBe("2026-05-16");
+    expect(authWhen({ date: "", quarter: "" })).toBe("");
+    expect(formatQuarter("2026-Q4")).toBe("Q4 2026");
+  });
+
+  it("sorts quarters against dates by the quarter's last month", () => {
+    expect(authSortKey({ date: "", quarter: "2026-Q2" })).toBe("2026-06");
+    expect(authSortKey({ date: "2026-07-01", quarter: "" })).toBe("2026-07-01");
+    expect(authSortKey({ date: "", quarter: "" })).toBe("");
+    const order = [
+      { date: "", quarter: "2026-Q1" },
+      { date: "2026-07-01", quarter: "" },
+      { date: "", quarter: "2026-Q2" },
+    ].sort((a, b) => authSortKey(b).localeCompare(authSortKey(a)));
+    expect(order.map(authWhen)).toEqual(["2026-07-01", "Q2 2026", "Q1 2026"]);
+  });
+
+  it("counts a facility licensed for the year off its quarter alone", () => {
+    const s = computeLicenceStats(
+      [
+        fac({
+          id: "q2-renewal",
+          licensed: true,
+          stage: "Licensed",
+          auths: [
+            {
+              type: "Renewal of Use/Possession Licence",
+              number: "",
+              date: "",
+              quarter: "2026-Q2",
+            },
+          ],
+        }),
+      ],
+      2026,
+    );
+    expect(s.licensedThisYear).toBe(1);
+    expect(s.licensedYearUnconfirmed).toBe(0);
   });
 });
