@@ -7,6 +7,8 @@ import { Suspense, memo, useCallback, useMemo, useState } from "react";
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import { FacilityDrawer } from "@/components/FacilityDrawer";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { Panel } from "@/components/Section";
+import { Segmented } from "@/components/Segmented";
 import { StatusPill } from "@/components/StatusPill";
 import { downloadTextFile } from "@/components/downloadFile";
 import { useAuth } from "@/lib/auth";
@@ -83,6 +85,9 @@ function FacilitiesInner() {
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // A phone can't show eight filter controls at once and still show results;
+  // they fold away behind a toggle and open on demand.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const facilities: Facility[] = useMemo(() => data || [], [data]);
   const initialLoading = loading && !data;
@@ -146,199 +151,258 @@ function FacilitiesInner() {
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
   const openFacility = useCallback((id: string) => setOpenId(id), []);
 
+  const activeFilters =
+    (province ? 1 : 0) +
+    (sector ? 1 : 0) +
+    (category ? 1 : 0) +
+    (statusFilter !== "all" ? 1 : 0) +
+    (funcFilter !== "all" ? 1 : 0) +
+    (onlyStalled ? 1 : 0) +
+    (onlyReview ? 1 : 0);
+
+  const resetFilters = () => {
+    setProvince("");
+    setSector("");
+    setCategory("");
+    setStatusFilter("all");
+    setFuncFilter("all");
+    setOnlyStalled(false);
+    setOnlyReview(false);
+    setStageFilter("");
+    setPage(0);
+  };
+
   return (
     <div className="space-y-4 staggered">
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
-      {stageFilter ? (
-        <div className="card p-3 flex items-center gap-2 text-sm">
-          <span className="caps text-[10px] text-gunmetal/60">
-            Stage filter
-          </span>
-          <span className="chip amber">{stageFilter}</span>
-          <button
-            className="btn btn-ghost text-xs"
-            onClick={() => {
-              setStageFilter("");
-              setPage(0);
-            }}
-          >
-            ✕ Clear
-          </button>
-        </div>
-      ) : null}
-      <div className="card p-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[220px]">
-          <label htmlFor="facility-search" className="caps text-[10px] text-gunmetal/60">
-            Search ({initialLoading ? "…" : `${filtered.length} of ${facilities.length}`})
-          </label>
-          <input
-            id="facility-search"
-            className="input mt-1"
-            placeholder="name, practice, district, FAC, licence number…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-          />
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Province</label>
-          <select
-            className="input mt-1"
-            value={province}
-            onChange={(e) => {
-              setProvince(e.target.value as Province | "");
-              setPage(0);
-            }}
-          >
-            <option value="">All</option>
-            {PROVINCES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Sector</label>
-          <select
-            className="input mt-1"
-            value={sector}
-            onChange={(e) => {
-              setSector(e.target.value as Sector | "");
-              setPage(0);
-            }}
-          >
-            <option value="">All</option>
-            {SECTORS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Category</label>
-          <select
-            className="input mt-1"
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value as FacilityCategory | "");
-              setPage(0);
-            }}
-          >
-            <option value="">All</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Status</label>
-          <div className="mt-1 inline-flex rounded-lg border border-gunmetal/10 overflow-hidden">
-            {(["all", "licensed", "unlicensed"] as Filter[]).map((f) => (
-              <button
-                key={f}
-                aria-pressed={statusFilter === f}
-                onClick={() => {
-                  setStatusFilter(f);
-                  setPage(0);
-                }}
-                className="px-3 py-2 text-xs caps font-bold"
-                style={{
-                  background:
-                    statusFilter === f ? "var(--rpa-green)" : "transparent",
-                  color: statusFilter === f ? "white" : "var(--gunmetal)",
-                }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Operating</label>
-          <div className="mt-1 inline-flex rounded-lg border border-gunmetal/10 overflow-hidden">
-            {(
-              [
-                ["all", "All"],
-                ["functional", "Functional"],
-                ["non-functional", "Non-Functional"],
-              ] as [FuncFilter, string][]
-            ).map(([f, label]) => (
-              <button
-                key={f}
-                aria-pressed={funcFilter === f}
-                onClick={() => {
-                  setFuncFilter(f);
-                  setPage(0);
-                }}
-                className="px-3 py-2 text-xs caps font-bold"
-                style={{
-                  background:
-                    funcFilter === f ? "var(--rpa-green)" : "transparent",
-                  color: funcFilter === f ? "white" : "var(--gunmetal)",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-3 pb-2">
-          <label className="flex items-center gap-1.5 text-xs font-bold">
-            <input
-              type="checkbox"
-              checked={onlyStalled}
-              onChange={(e) => {
-                setOnlyStalled(e.target.checked);
-                setPage(0);
-              }}
-            />
-            Stalled
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-bold">
-            <input
-              type="checkbox"
-              checked={onlyReview}
-              onChange={(e) => {
-                setOnlyReview(e.target.checked);
-                setPage(0);
-              }}
-            />
-            Needs review
-          </label>
-        </div>
-        <button
-          className="btn btn-secondary"
-          onClick={exportCsv}
-          disabled={filtered.length === 0}
-          title="Download the current filtered view as CSV"
-        >
-          ⬇ CSV ({filtered.length})
-        </button>
-        {canEditAS ? (
-          <button className="btn btn-primary" onClick={() => setAdding(true)}>
-            + Facility
-          </button>
-        ) : null}
-      </div>
 
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm tbl-sticky">
+      <Panel>
+        {/* Search always visible — it is what the register is used for */}
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label htmlFor="facility-search" className="field-label">
+              Search{" "}
+              <span className="text-gunmetal/45">
+                (
+                {initialLoading
+                  ? "…"
+                  : `${filtered.length} of ${facilities.length}`}
+                )
+              </span>
+            </label>
+            <input
+              id="facility-search"
+              className="input"
+              placeholder="name, practice, district, FAC, licence no…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+            />
+          </div>
+          <button
+            className="btn btn-secondary sm:hidden"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            Filters{activeFilters ? ` · ${activeFilters}` : ""}
+          </button>
+          {canEditAS ? (
+            <button
+              className="btn btn-primary hidden sm:inline-flex"
+              onClick={() => setAdding(true)}
+            >
+              + Facility
+            </button>
+          ) : null}
+        </div>
+
+        <div className={`${filtersOpen ? "block" : "hidden"} sm:block mt-4`}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="field-label" htmlFor="f-province">
+                Province
+              </label>
+              <select
+                id="f-province"
+                className="input"
+                value={province}
+                onChange={(e) => {
+                  setProvince(e.target.value as Province | "");
+                  setPage(0);
+                }}
+              >
+                <option value="">All</option>
+                {PROVINCES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="f-sector">
+                Sector
+              </label>
+              <select
+                id="f-sector"
+                className="input"
+                value={sector}
+                onChange={(e) => {
+                  setSector(e.target.value as Sector | "");
+                  setPage(0);
+                }}
+              >
+                <option value="">All</option>
+                {SECTORS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="f-category">
+                Category
+              </label>
+              <select
+                id="f-category"
+                className="input"
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value as FacilityCategory | "");
+                  setPage(0);
+                }}
+              >
+                <option value="">All</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end gap-4 col-span-2 lg:col-span-1">
+              <label className="flex items-center gap-2 text-xs font-bold py-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={onlyStalled}
+                  onChange={(e) => {
+                    setOnlyStalled(e.target.checked);
+                    setPage(0);
+                  }}
+                />
+                Stalled
+              </label>
+              <label className="flex items-center gap-2 text-xs font-bold py-2">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  checked={onlyReview}
+                  onChange={(e) => {
+                    setOnlyReview(e.target.checked);
+                    setPage(0);
+                  }}
+                />
+                Needs review
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div>
+              <span className="field-label">Status</span>
+              <Segmented
+                ariaLabel="Licensing status"
+                value={statusFilter}
+                onChange={(v) => {
+                  setStatusFilter(v);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "licensed", label: "Licensed" },
+                  { value: "unlicensed", label: "Unlicensed" },
+                ]}
+              />
+            </div>
+            <div>
+              <span className="field-label">Operating</span>
+              <Segmented
+                ariaLabel="Operating state"
+                value={funcFilter}
+                onChange={(v) => {
+                  setFuncFilter(v);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "all", label: "All" },
+                  { value: "functional", label: "Functional" },
+                  { value: "non-functional", label: "Non-func." },
+                ]}
+              />
+            </div>
+          </div>
+
+          {stageFilter ? (
+            <div className="mt-3 flex items-center gap-2 flex-wrap text-sm">
+              <span className="caps text-[10px] text-gunmetal/55">
+                Stage filter
+              </span>
+              <span className="chip amber">{stageFilter}</span>
+              <button
+                className="btn btn-ghost text-xs"
+                onClick={() => {
+                  setStageFilter("");
+                  setPage(0);
+                }}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title="Download the current filtered view as CSV"
+            >
+              ⬇ CSV ({filtered.length})
+            </button>
+            {activeFilters || stageFilter ? (
+              <button className="btn btn-ghost" onClick={resetFilters}>
+                Clear filters
+              </button>
+            ) : null}
+            {canEditAS ? (
+              <button
+                className="btn btn-primary sm:hidden flex-1"
+                onClick={() => setAdding(true)}
+              >
+                + Facility
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </Panel>
+
+      <section className="card bleed overflow-hidden">
+        {/* Tablet & desktop: the full register table */}
+        <div className="hidden md:block table-wrap">
+          <table className="data tbl-sticky">
             <thead>
-              <tr className="text-left text-xs caps text-gunmetal/55">
-                <th className="px-4 py-3">Facility</th>
-                <th className="px-4 py-3">Province</th>
-                <th className="px-4 py-3">Practice</th>
-                <th className="px-4 py-3">Sector / Category</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Stage / Licence</th>
-                <th className="px-4 py-3"></th>
+              <tr>
+                <th>Facility</th>
+                <th>Province</th>
+                <th>Practice</th>
+                <th>Sector / Category</th>
+                <th>Status</th>
+                <th>Stage / Licence</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -347,10 +411,7 @@ function FacilitiesInner() {
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-10 text-center text-gunmetal/55"
-                  >
+                  <td colSpan={7} className="py-10 text-center text-gunmetal/55">
                     {initialLoading
                       ? "Loading the register…"
                       : "No facilities match these filters."}
@@ -360,20 +421,114 @@ function FacilitiesInner() {
             </tbody>
           </table>
         </div>
+
+        {/* Phone: a seven-column table is unusable, so each facility is a row */}
+        <ul className="md:hidden divide-y divide-gunmetal/8">
+          {visible.map((f) => (
+            <FacilityCard key={f.id} f={f} onOpen={openFacility} />
+          ))}
+          {visible.length === 0 ? (
+            <li className="py-10 px-4 text-center text-sm text-gunmetal/55">
+              {initialLoading
+                ? "Loading the register…"
+                : "No facilities match these filters."}
+            </li>
+          ) : null}
+        </ul>
+
         {visible.length < filtered.length ? (
-          <div className="p-3 text-center border-t border-gunmetal/10">
-            <button className="btn btn-ghost" onClick={() => setPage((p) => p + 1)}>
+          <div className="p-3 text-center border-t border-gunmetal/8">
+            <button
+              className="btn btn-ghost"
+              onClick={() => setPage((p) => p + 1)}
+            >
               Load more ({filtered.length - visible.length} remaining)
             </button>
           </div>
         ) : null}
-      </div>
+      </section>
 
       <FacilityDrawer facilityId={openId} onClose={() => setOpenId(null)} />
       <AddFacilityDialog open={adding} onClose={() => setAdding(false)} />
     </div>
   );
 }
+
+/** The flags a facility carries beyond its licensing status. */
+function Flags({ f, small }: { f: Facility; small?: boolean }) {
+  if (f.functional !== false && !f.stalled && !f.needsReview) return null;
+  const size = small ? "text-[10px]" : "";
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {f.functional === false ? (
+        <span className={`chip red ${size}`}>Non-Functional</span>
+      ) : null}
+      {f.stalled ? (
+        <span
+          className={`chip amber ${size}`}
+          title="Earlier application with no 2026 activity"
+        >
+          Stalled
+        </span>
+      ) : null}
+      {f.needsReview ? (
+        <span
+          className={`chip amber ${size} cursor-help`}
+          title={f.reviewNote || "Imported with uncertainty — confirm this record"}
+        >
+          Check
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+const FacilityCard = memo(function FacilityCard({
+  f,
+  onOpen,
+}: {
+  f: Facility;
+  onOpen: (id: string) => void;
+}) {
+  const usePAuths = (f.auths || []).filter((a) => isUseP(a.type));
+  const latestUseP = usePAuths[usePAuths.length - 1];
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(f.id)}
+        className="w-full text-left px-4 py-3 card-hover"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-bold leading-tight break-words">{f.name}</div>
+            <div className="text-xs text-gunmetal/55 tabular mt-0.5">
+              {f.facCode || "—"} · {f.district || "—"} · {f.province}
+            </div>
+          </div>
+          <StatusPill
+            licensed={f.licensed}
+            stage={f.stage}
+            className="shrink-0"
+          />
+        </div>
+        <div className="mt-1.5 text-xs text-gunmetal/70">
+          {f.licensed ? (
+            <span className="font-bold text-[var(--rpa-green-dark)] tabular">
+              {latestUseP?.number || "Licensed"}
+            </span>
+          ) : (
+            <span>{f.currentStatus || f.stage}</span>
+          )}
+          {f.practice ? (
+            <span className="text-gunmetal/50"> · {f.practice}</span>
+          ) : null}
+        </div>
+        <Flags f={f} small />
+      </button>
+    </li>
+  );
+});
 
 const FacilityRow = memo(function FacilityRow({
   f,
@@ -389,45 +544,23 @@ const FacilityRow = memo(function FacilityRow({
   const latestUseP = usePAuths[usePAuths.length - 1];
   return (
     <tr
-      className="border-t border-gunmetal/8 hover:bg-mist cursor-pointer transition-colors"
+      className="row-hover cursor-pointer"
       onClick={() => onOpen(f.id)}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen(f.id);
       }}
     >
-      <td className="px-4 py-3">
+      <td>
         <div className="font-bold">{f.name}</div>
         <div className="text-xs text-gunmetal/55 tabular">
           {f.facCode || "—"} · {f.district || "—"}
         </div>
-        {f.functional === false || f.stalled || f.needsReview ? (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {f.functional === false ? (
-              <span className="chip red text-[10px]">Non-Functional</span>
-            ) : null}
-            {f.stalled ? (
-              <span
-                className="chip amber text-[10px]"
-                title="Earlier application with no 2026 activity"
-              >
-                Stalled
-              </span>
-            ) : null}
-            {f.needsReview ? (
-              <span
-                className="chip amber text-[10px] cursor-help"
-                title={f.reviewNote || "Imported with uncertainty — confirm this record"}
-              >
-                Check
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+        <Flags f={f} small />
       </td>
-      <td className="px-4 py-3 tabular">{f.province}</td>
-      <td className="px-4 py-3">{f.practice || "—"}</td>
-      <td className="px-4 py-3">
+      <td className="tabular">{f.province}</td>
+      <td>{f.practice || "—"}</td>
+      <td>
         <div className="flex flex-wrap gap-1">
           <span className={`chip ${f.sector === "Public" ? "slate" : ""}`}>
             {f.sector}
@@ -439,10 +572,10 @@ const FacilityRow = memo(function FacilityRow({
           </span>
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td>
         <StatusPill licensed={f.licensed} stage={f.stage} />
       </td>
-      <td className="px-4 py-3">
+      <td>
         {f.licensed ? (
           <div>
             <div className="text-sm font-bold text-[var(--rpa-green-dark)]">
@@ -472,26 +605,20 @@ const FacilityRow = memo(function FacilityRow({
           </div>
         )}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="text-right">
         <Link
           href={`/facilities/${f.id}`}
-          className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
+          className="link-action"
           onClick={(e) => e.stopPropagation()}
         >
-          Permalink
+          Open
         </Link>
       </td>
     </tr>
   );
 });
 
-function AuthBadge({
-  count,
-  items,
-}: {
-  count: number;
-  items: string[];
-}) {
+function AuthBadge({ count, items }: { count: number; items: string[] }) {
   return (
     <span
       className="chip slate mt-1 cursor-help"

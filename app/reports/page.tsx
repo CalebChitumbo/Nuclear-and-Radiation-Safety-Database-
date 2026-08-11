@@ -4,14 +4,11 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { LoadErrorBanner } from "@/components/LoadError";
+import { PageHeader, Panel } from "@/components/Section";
 import { downloadTextFile } from "@/components/downloadFile";
 import { useStoreData } from "@/lib/storeHooks";
 import { facilitiesToCsv, toCsv } from "@/lib/rules/exportCsv";
-import {
-  PROVINCES,
-  STAGES,
-  type Facility,
-} from "@/lib/rules/types";
+import { PROVINCES, STAGES, type Facility } from "@/lib/rules/types";
 
 /**
  * Register reports — the on-screen equivalent of the "Facility Licensing
@@ -183,82 +180,75 @@ export default function ReportsPage() {
     <div className="space-y-4 staggered">
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
-      <div className="card p-4 flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-black">Register reports</h1>
-          <div className="text-xs text-gunmetal/60 mt-1">
-            Live counts from the facility register
-            {initialLoading ? " (loading…)" : ` — ${stats.total} facilities`}.
-            Click any number to open that filtered view of the register.
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="btn btn-secondary"
-            onClick={exportSummary}
-            disabled={initialLoading}
-          >
-            ⬇ Summary CSV
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={exportRegister}
-            disabled={initialLoading}
-          >
-            ⬇ Full register CSV
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Register reports"
+        subtitle={`Live counts from the facility register${
+          initialLoading ? " (loading…)" : ` — ${stats.total} facilities`
+        }. Tap any number to open that filtered view of the register.`}
+        actions={
+          <>
+            <button
+              className="btn btn-secondary flex-1 sm:flex-none"
+              onClick={exportSummary}
+              disabled={initialLoading}
+            >
+              ⬇ Summary CSV
+            </button>
+            <button
+              className="btn btn-primary flex-1 sm:flex-none"
+              onClick={exportRegister}
+              disabled={initialLoading}
+            >
+              ⬇ Register CSV
+            </button>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
+        <StatLink
           label="Functional"
           value={stats.functional}
           sub={`of ${stats.total}`}
           href="/facilities?func=functional"
         />
-        <KpiCard
+        <StatLink
           label="Licensed"
           value={stats.licensed}
           sub={`${stats.total - stats.licensed} unlicensed`}
           href="/facilities?lic=licensed"
         />
-        <KpiCard
+        <StatLink
           label="Stalled applications"
           value={stats.stalled}
           sub="no 2026 activity"
           href="/facilities?stalled=1"
         />
-        <KpiCard
+        <StatLink
           label="Needs review"
           value={stats.review}
           sub="confirm imported records"
           href="/facilities?review=1"
         />
-      </div>
+      </section>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 pb-0">
-          <h2 className="caps text-xs text-gunmetal/60">
-            Current status × operating state
-          </h2>
-        </div>
-        <div className="overflow-x-auto p-4">
-          <table className="w-full text-sm">
+      <Panel title="Current status × operating state" flush>
+        <div className="table-wrap">
+          <table className="data">
             <thead>
-              <tr className="text-left text-xs caps text-gunmetal/55">
-                <th className="px-3 py-2">Current status</th>
-                <th className="px-3 py-2 text-right">Functional</th>
-                <th className="px-3 py-2 text-right">Non-Functional</th>
-                <th className="px-3 py-2 text-right">Total</th>
+              <tr>
+                <th>Current status</th>
+                <th className="num">Functional</th>
+                <th className="num">Non-Func.</th>
+                <th className="num">Total</th>
               </tr>
             </thead>
             <tbody>
               {BUCKETS.map(({ key, label, link }) => {
                 const m = stats.matrix[key];
                 return (
-                  <tr key={key} className="border-t border-gunmetal/8">
-                    <td className="px-3 py-2 font-bold">{label}</td>
+                  <tr key={key}>
+                    <td className="font-bold">{label}</td>
                     <CountCell
                       n={m.func}
                       href={link ? `/facilities?${link}&func=functional` : null}
@@ -277,8 +267,10 @@ export default function ReportsPage() {
                   </tr>
                 );
               })}
-              <tr className="border-t-2 border-gunmetal/20 font-black">
-                <td className="px-3 py-2">Total facilities</td>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total facilities</td>
                 <CountCell
                   n={stats.functional}
                   href="/facilities?func=functional"
@@ -291,23 +283,20 @@ export default function ReportsPage() {
                 />
                 <CountCell n={stats.total} href="/facilities" bold />
               </tr>
-            </tbody>
+            </tfoot>
           </table>
-          <div className="text-[11px] text-gunmetal/50 mt-2 px-3">
-            “Needs review” records ({stats.review}) are counted in their status
-            row above and flagged separately —{" "}
-            <Link
-              className="font-bold text-[var(--rpa-green-dark)]"
-              href="/facilities?review=1"
-            >
-              open the review queue →
-            </Link>
-          </div>
         </div>
-      </div>
+        <p className="text-[11px] text-gunmetal/50 mt-3 px-4 sm:px-5">
+          “Needs review” records ({stats.review}) are counted in their status row
+          above and flagged separately —{" "}
+          <Link className="link-action" href="/facilities?review=1">
+            open the review queue →
+          </Link>
+        </p>
+      </Panel>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <BreakdownCard
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <BreakdownPanel
           title="By sector"
           rows={(["Public", "Private"] as const).map((s) => ({
             label: s,
@@ -315,7 +304,7 @@ export default function ReportsPage() {
             href: `/facilities?sector=${s}`,
           }))}
         />
-        <BreakdownCard
+        <BreakdownPanel
           title="By category"
           rows={(["Medical", "Non-Medical"] as const).map((c) => ({
             label: c,
@@ -325,18 +314,15 @@ export default function ReportsPage() {
         />
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 pb-0">
-          <h2 className="caps text-xs text-gunmetal/60">By province</h2>
-        </div>
-        <div className="overflow-x-auto p-4">
-          <table className="w-full text-sm">
+      <Panel title="By province" flush>
+        <div className="table-wrap">
+          <table className="data">
             <thead>
-              <tr className="text-left text-xs caps text-gunmetal/55">
-                <th className="px-3 py-2">Province</th>
-                <th className="px-3 py-2 text-right">Facilities</th>
-                <th className="px-3 py-2 text-right">Licensed</th>
-                <th className="px-3 py-2 text-right">Functional</th>
+              <tr>
+                <th>Province</th>
+                <th className="num">Facilities</th>
+                <th className="num">Licensed</th>
+                <th className="num">Functional</th>
               </tr>
             </thead>
             <tbody>
@@ -344,8 +330,8 @@ export default function ReportsPage() {
                 const row = stats.byProvince[p];
                 if (!row || row.total === 0) return null;
                 return (
-                  <tr key={p} className="border-t border-gunmetal/8">
-                    <td className="px-3 py-2 font-bold">{p}</td>
+                  <tr key={p}>
+                    <td className="font-bold">{p}</td>
                     <CountCell
                       n={row.total}
                       href={`/facilities?province=${encodeURIComponent(p)}`}
@@ -364,22 +350,17 @@ export default function ReportsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
 
-      <div className="card overflow-hidden">
-        <div className="p-4 pb-0">
-          <h2 className="caps text-xs text-gunmetal/60">
-            Pipeline detail — every stage
-          </h2>
-        </div>
-        <div className="overflow-x-auto p-4">
-          <table className="w-full text-sm">
+      <Panel title="Pipeline detail — every stage" flush>
+        <div className="table-wrap">
+          <table className="data">
             <thead>
-              <tr className="text-left text-xs caps text-gunmetal/55">
-                <th className="px-3 py-2">Stage</th>
-                <th className="px-3 py-2 text-right">Functional</th>
-                <th className="px-3 py-2 text-right">Non-Functional</th>
-                <th className="px-3 py-2 text-right">Total</th>
+              <tr>
+                <th>Stage</th>
+                <th className="num">Functional</th>
+                <th className="num">Non-Func.</th>
+                <th className="num">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -387,8 +368,8 @@ export default function ReportsPage() {
                 const row = stats.byStage[s];
                 const link = `stage=${encodeURIComponent(s)}`;
                 return (
-                  <tr key={s} className="border-t border-gunmetal/8">
-                    <td className="px-3 py-2">{s}</td>
+                  <tr key={s}>
+                    <td>{s}</td>
                     <CountCell
                       n={row.func}
                       href={`/facilities?${link}&func=functional`}
@@ -397,19 +378,23 @@ export default function ReportsPage() {
                       n={row.nonFunc}
                       href={`/facilities?${link}&func=non-functional`}
                     />
-                    <CountCell n={row.func + row.nonFunc} href={`/facilities?${link}`} bold />
+                    <CountCell
+                      n={row.func + row.nonFunc}
+                      href={`/facilities?${link}`}
+                      bold
+                    />
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
 
-function KpiCard({
+function StatLink({
   label,
   value,
   sub,
@@ -421,10 +406,10 @@ function KpiCard({
   href: string;
 }) {
   return (
-    <Link href={href} className="card p-4 hover:bg-mist transition-colors">
-      <div className="caps text-[10px] text-gunmetal/60">{label}</div>
-      <div className="text-2xl font-black tabular mt-1">{value}</div>
-      <div className="text-[11px] text-gunmetal/50">{sub}</div>
+    <Link href={href} className="stat card-hover block">
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">{value}</div>
+      <div className="stat-caption">{sub}</div>
     </Link>
   );
 }
@@ -438,7 +423,7 @@ function CountCell({
   href: string | null;
   bold?: boolean;
 }) {
-  const cls = `px-3 py-2 text-right tabular ${bold ? "font-black" : ""}`;
+  const cls = `num ${bold ? "font-black" : ""}`;
   if (!href || n === 0) return <td className={cls}>{n}</td>;
   return (
     <td className={cls}>
@@ -452,7 +437,7 @@ function CountCell({
   );
 }
 
-function BreakdownCard({
+function BreakdownPanel({
   title,
   rows,
 }: {
@@ -466,35 +451,29 @@ function BreakdownCard({
   }[];
 }) {
   return (
-    <div className="card overflow-hidden">
-      <div className="p-4 pb-0">
-        <h2 className="caps text-xs text-gunmetal/60">{title}</h2>
-      </div>
-      <div className="p-4">
-        <table className="w-full text-sm">
+    <Panel title={title} flush>
+      <div className="table-wrap">
+        <table className="data">
           <thead>
-            <tr className="text-left text-xs caps text-gunmetal/55">
-              <th className="px-3 py-2"></th>
-              <th className="px-3 py-2 text-right">Facilities</th>
-              <th className="px-3 py-2 text-right">Licensed</th>
-              <th className="px-3 py-2 text-right">Functional</th>
+            <tr>
+              <th></th>
+              <th className="num">Facilities</th>
+              <th className="num">Licensed</th>
+              <th className="num">Functional</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.label} className="border-t border-gunmetal/8">
-                <td className="px-3 py-2 font-bold">{r.label}</td>
+              <tr key={r.label}>
+                <td className="font-bold">{r.label}</td>
                 <CountCell n={r.total} href={r.href} />
                 <CountCell n={r.licensed} href={`${r.href}&lic=licensed`} />
-                <CountCell
-                  n={r.functional}
-                  href={`${r.href}&func=functional`}
-                />
+                <CountCell n={r.functional} href={`${r.href}&func=functional`} />
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </Panel>
   );
 }

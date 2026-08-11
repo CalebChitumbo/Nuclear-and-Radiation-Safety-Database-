@@ -1,17 +1,33 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   title?: string;
+  subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }
 
-export function Drawer({ open, onClose, title, children, footer }: Props) {
+export function Drawer({
+  open,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+}: Props) {
   const panelRef = useRef<HTMLElement>(null);
+  // Pages animate in behind a `transform`, which makes them the containing
+  // block for `position: fixed` and traps their stacking context. A drawer
+  // rendered inline was therefore pinned to the page rather than the viewport
+  // and painted *under* the top bar. Portalling to <body> keeps it a true
+  // overlay. Mounted-guard because document doesn't exist during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -31,48 +47,66 @@ export function Drawer({ open, onClose, title, children, footer }: Props) {
     return () => previous?.focus();
   }, [open]);
 
-  if (!open) return null;
+  // On a phone the drawer covers the screen; the page behind it must not scroll
+  // underneath the panel.
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
-  return (
+  if (!open || !mounted) return null;
+
+  return createPortal(
     <>
-      <div
-        className="drawer-overlay"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="drawer-overlay no-print" onClick={onClose} aria-hidden="true" />
       <aside
         ref={panelRef}
         tabIndex={-1}
-        className="drawer"
+        className="drawer no-print"
         role="dialog"
         aria-modal="true"
         aria-label={title || "Detail"}
       >
         <header
-          className="flex items-center justify-between px-6 py-4 border-b"
-          style={{ borderColor: "rgba(26,27,29,0.08)" }}
+          className="flex items-start justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white/95 backdrop-blur border-b shrink-0"
+          style={{ borderColor: "var(--line)" }}
         >
-          <h2 className="text-lg font-black tracking-tight">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-black tracking-tight leading-tight break-words">
+              {title}
+            </h2>
+            {subtitle ? (
+              <div className="text-xs text-gunmetal/55 mt-0.5">{subtitle}</div>
+            ) : null}
+          </div>
           <button
             onClick={onClose}
-            className="btn btn-ghost"
-            aria-label="Close drawer"
+            className="btn btn-ghost px-3 shrink-0"
+            aria-label="Close"
           >
             ✕
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 overscroll-contain">
           {children}
         </div>
         {footer ? (
           <footer
-            className="px-6 py-4 border-t bg-white"
-            style={{ borderColor: "rgba(26,27,29,0.08)" }}
+            className="px-4 sm:px-6 py-3 border-t bg-white shrink-0"
+            style={{
+              borderColor: "var(--line)",
+              paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
+            }}
           >
             {footer}
           </footer>
         ) : null}
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

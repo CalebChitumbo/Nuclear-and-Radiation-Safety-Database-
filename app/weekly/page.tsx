@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { PageHeader, Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { entriesForWeek, mergeWeekManualValues } from "@/lib/rules/daily";
@@ -65,9 +66,7 @@ export default function WeeklyPage() {
   const wkInspections = data.inspections.filter(
     (i) => i.week === selected.label,
   );
-  const wkActivities = data.activities.filter(
-    (a) => a.week === selected.label,
-  );
+  const wkActivities = data.activities.filter((a) => a.week === selected.label);
 
   // Manual metrics: the week's Daily Updates counts take precedence over a
   // value typed here, per metric — a section logging daily never gets its
@@ -126,25 +125,31 @@ export default function WeeklyPage() {
 
   return (
     <div className="space-y-4 staggered">
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3 no-print">
-        <div>
-          <div className="caps text-xs text-gunmetal/60">Reporting week</div>
-          <div className="text-xl font-black">{selected.label}</div>
-          <div className="text-xs text-gunmetal/60 tabular">
-            {selected.start} → {selected.end}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Link className="btn btn-ghost" href="/daily">
-            Daily updates
-          </Link>
-          <button className="btn btn-secondary" onClick={generateBrief}>
-            Generate brief
-          </button>
-          <button className="btn btn-primary" onClick={printPdf}>
-            Print / PDF
-          </button>
-        </div>
+      <div className="no-print">
+        <PageHeader
+          eyebrow="Reporting week"
+          title={selected.label}
+          subtitle={`${selected.start} → ${selected.end}`}
+          actions={
+            <>
+              <Link className="btn btn-ghost" href="/daily">
+                Daily updates
+              </Link>
+              <button
+                className="btn btn-secondary flex-1 sm:flex-none"
+                onClick={generateBrief}
+              >
+                Generate brief
+              </button>
+              <button
+                className="btn btn-primary flex-1 sm:flex-none"
+                onClick={printPdf}
+              >
+                Print / PDF
+              </button>
+            </>
+          }
+        />
       </div>
 
       {report.map((sec) => (
@@ -200,58 +205,57 @@ function SectionTable({
   onManualChange: (key: string, value: number) => void;
 }) {
   return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-        {section}
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs caps text-gunmetal/55">
-            <th className="px-5 py-2">Metric</th>
-            <th className="px-5 py-2 text-right">Count</th>
-            <th className="px-5 py-2 w-24">Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {metrics.map((m) => (
-            <tr key={m.key} className="border-t border-gunmetal/8">
-              <td className="px-5 py-2">{m.label}</td>
-              <td className="px-5 py-2 text-right tabular">
-                {m.auto || fromDaily.has(m.key) ? (
-                  <span className="font-black">{m.value}</span>
-                ) : (
-                  <MetricInput
-                    label={m.label}
-                    value={m.value}
-                    onCommit={(v) => onManualChange(m.key, v)}
-                  />
-                )}
-              </td>
-              <td className="px-5 py-2">
-                {m.auto ? (
-                  <span className="chip green">auto</span>
-                ) : fromDaily.has(m.key) ? (
-                  <Link href="/daily" title="Summed from Daily Updates">
-                    <span className="chip green">daily</span>
-                  </Link>
-                ) : (
-                  <span className="chip">manual</span>
-                )}
-              </td>
+    <Panel title={section} flush>
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th className="num">Count</th>
+              <th>Source</th>
             </tr>
-          ))}
+          </thead>
+          <tbody>
+            {metrics.map((m) => (
+              <tr key={m.key}>
+                <td>{m.label}</td>
+                <td className="num">
+                  {m.auto || fromDaily.has(m.key) ? (
+                    <span className="font-black">{m.value}</span>
+                  ) : (
+                    <MetricInput
+                      label={m.label}
+                      value={m.value}
+                      onCommit={(v) => onManualChange(m.key, v)}
+                    />
+                  )}
+                </td>
+                <td>
+                  {m.auto ? (
+                    <span className="chip green">auto</span>
+                  ) : fromDaily.has(m.key) ? (
+                    <Link href="/daily" title="Summed from Daily Updates">
+                      <span className="chip green">daily</span>
+                    </Link>
+                  ) : (
+                    <span className="chip">manual</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
           {total ? (
-            <tr className="border-t border-gunmetal/8 bg-mist">
-              <td className="px-5 py-2 font-black">{total.label}</td>
-              <td className="px-5 py-2 text-right tabular font-black">
-                {total.value}
-              </td>
-              <td className="px-5 py-2"></td>
-            </tr>
+            <tfoot>
+              <tr>
+                <td>{total.label}</td>
+                <td className="num">{total.value}</td>
+                <td></td>
+              </tr>
+            </tfoot>
           ) : null}
-        </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </Panel>
   );
 }
 
@@ -290,7 +294,7 @@ function MetricInput({
       type="number"
       min={0}
       className="input text-right"
-      style={{ maxWidth: 100, marginLeft: "auto" }}
+      style={{ maxWidth: 96, marginLeft: "auto" }}
       aria-label={label}
       value={draft}
       onFocus={() => setEditing(true)}
@@ -314,7 +318,7 @@ function ActivitiesPanel({
   onReload: () => void;
   uid: string;
 }) {
-  const [section, setSection] = useState<typeof SECTIONS[number]>(SECTIONS[0]);
+  const [section, setSection] = useState<(typeof SECTIONS)[number]>(SECTIONS[0]);
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Activity["status"]>("In Progress");
   const toast = useToast();
@@ -346,112 +350,118 @@ function ActivitiesPanel({
     }
   };
 
+  const remove = async (id: string) => {
+    try {
+      const s = await store();
+      await s.deleteActivity(id);
+      onReload();
+    } catch (err) {
+      toast.push(
+        `Removing failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
+
   return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-        Additional activities — {weekLabel}
-      </div>
-      <div className="p-5 flex flex-wrap gap-2 items-end no-print">
-        <div className="flex-1 min-w-[240px]">
-          <label className="caps text-[10px] text-gunmetal/60">Activity</label>
-          <input
-            className="input mt-1"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What is being done?"
-          />
+    <Panel title={`Additional activities — ${weekLabel}`} flush>
+      <div className="px-4 sm:px-5 no-print">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+          <div className="lg:col-span-2">
+            <label className="field-label" htmlFor="act-text">
+              Activity
+            </label>
+            <input
+              id="act-text"
+              className="input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="What is being done?"
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="act-section">
+              Section
+            </label>
+            <select
+              id="act-section"
+              className="input"
+              value={section}
+              onChange={(e) =>
+                setSection(e.target.value as (typeof SECTIONS)[number])
+              }
+            >
+              {SECTIONS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="act-status">
+              Status
+            </label>
+            <select
+              id="act-status"
+              className="input"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as Activity["status"])}
+            >
+              {ACTIVITY_STATUSES.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Section</label>
-          <select
-            className="input mt-1"
-            value={section}
-            onChange={(e) => setSection(e.target.value as typeof SECTIONS[number])}
-          >
-            {SECTIONS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="caps text-[10px] text-gunmetal/60">Status</label>
-          <select
-            className="input mt-1"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Activity["status"])}
-          >
-            {ACTIVITY_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <button className="btn btn-primary" onClick={add} disabled={busy}>
-          {busy ? "Adding…" : "Add"}
+        <button
+          className="btn btn-primary mt-3 w-full sm:w-auto"
+          onClick={add}
+          disabled={busy}
+        >
+          {busy ? "Adding…" : "Add activity"}
         </button>
       </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs caps text-gunmetal/55">
-            <th className="px-5 py-2">Section</th>
-            <th className="px-5 py-2">Activity</th>
-            <th className="px-5 py-2">Status</th>
-            <th className="px-5 py-2 no-print"></th>
-          </tr>
-        </thead>
-        <tbody>
+
+      {activities.length === 0 ? (
+        <p className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">
+          No additional activities logged for this week.
+        </p>
+      ) : (
+        <ul className="divide-y divide-gunmetal/8 mt-4">
           {activities.map((a) => (
-            <tr key={a.id} className="border-t border-gunmetal/8">
-              <td className="px-5 py-2 text-xs">{a.section}</td>
-              <td className="px-5 py-2">{a.text}</td>
-              <td className="px-5 py-2">
-                <span
-                  className={`chip ${
-                    a.status === "Done"
-                      ? "green"
-                      : a.status === "On Hold"
-                        ? "red"
-                        : a.status === "In Progress"
-                          ? "amber"
-                          : ""
-                  }`}
-                >
-                  {a.status}
-                </span>
-              </td>
-              <td className="px-5 py-2 text-right no-print">
-                <button
-                  className="text-xs caps font-bold text-[var(--status-stalled)]"
-                  onClick={async () => {
-                    try {
-                      const s = await store();
-                      await s.deleteActivity(a.id);
-                      onReload();
-                    } catch (err) {
-                      toast.push(
-                        `Removing failed: ${err instanceof Error ? err.message : err}`,
-                        "error",
-                      );
-                    }
-                  }}
-                >
-                  Remove
-                </button>
-              </td>
-            </tr>
-          ))}
-          {activities.length === 0 ? (
-            <tr>
-              <td
-                colSpan={4}
-                className="px-5 py-6 text-sm text-gunmetal/55 text-center"
+            <li
+              key={a.id}
+              className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="text-sm break-words">{a.text}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="chip">{a.section}</span>
+                  <span
+                    className={`chip ${
+                      a.status === "Done"
+                        ? "green"
+                        : a.status === "On Hold"
+                          ? "red"
+                          : a.status === "In Progress"
+                            ? "amber"
+                            : ""
+                    }`}
+                  >
+                    {a.status}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="link-action no-print shrink-0"
+                style={{ color: "var(--status-stalled)" }}
+                onClick={() => remove(a.id)}
               >
-                No additional activities logged for this week.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
-

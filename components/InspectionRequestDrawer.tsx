@@ -170,7 +170,7 @@ export function InspectionRequestDrawer({
 
   return (
     <Drawer open onClose={onClose} title={shown.facilityName}>
-      <section>
+      <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`chip ${statusMeta.chip}`}>{statusMeta.label}</span>
           <span className={`chip ${priorityMeta.chip}`}>
@@ -182,7 +182,7 @@ export function InspectionRequestDrawer({
           ) : null}
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Field label="Province" value={shown.province || "—"} />
           <Field label="Sector" value={shown.sector || "—"} />
           <Field
@@ -219,7 +219,7 @@ export function InspectionRequestDrawer({
         ) : null}
 
         {shown.reportRef ? (
-          <div className="mt-4 card p-3 bg-mist">
+          <div className="mt-4 inset p-3">
             <div className="caps text-[10px] text-gunmetal/60">
               Inspection report
             </div>
@@ -256,8 +256,8 @@ export function InspectionRequestDrawer({
 
       {/* Actions */}
       {actions.length > 0 && actor ? (
-        <section className="card p-4 bg-mist">
-          <div className="caps text-xs text-gunmetal/60 mb-3">Actions</div>
+        <section className="card p-4 sm:p-5">
+          <div className="section-title mb-3">Actions</div>
           <div className="flex gap-2 flex-wrap">
             {actions.map((a) => (
               <button
@@ -386,10 +386,8 @@ export function InspectionRequestDrawer({
       ) : null}
 
       {/* Timeline */}
-      <section>
-        <h3 className="caps text-xs text-gunmetal/60 mb-2">
-          History &amp; communication
-        </h3>
+      <section className="card p-4 sm:p-5">
+        <h3 className="section-title mb-3">History &amp; communication</h3>
         <ul className="space-y-3">
           {[...shown.timeline].reverse().map((e, i) => (
             <li key={i} className="flex gap-3">
@@ -442,7 +440,7 @@ function Labeled({
 }) {
   return (
     <div>
-      <label className="caps text-[10px] text-gunmetal/60">{label}</label>
+      <span className="field-label">{label}</span>
       {children}
     </div>
   );

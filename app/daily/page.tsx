@@ -9,6 +9,7 @@ import { canEditSection, useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { QuickLogWizard } from "@/components/daily/QuickLogWizard";
@@ -121,8 +122,15 @@ export default function DailyUpdatesPage() {
     );
   }
 
-  const { facilities, events, inspections, entries, workflows, borders, metrics } =
-    data;
+  const {
+    facilities,
+    events,
+    inspections,
+    entries,
+    workflows,
+    borders,
+    metrics,
+  } = data;
 
   const dayEvents = events.filter((e) => e.date === date);
   const dayInspections = inspections.filter((i) => i.date === date);
@@ -177,52 +185,49 @@ export default function DailyUpdatesPage() {
   return (
     <div className="space-y-4 staggered">
       {/* Day picker — compact, thumb-friendly */}
-      <div className="card p-4 sm:p-5">
+      <Panel>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex items-end gap-3 flex-wrap">
+          <div className="flex items-end gap-2 flex-wrap">
             <div>
-              <label className="caps text-[10px] text-gunmetal/60">Day</label>
+              <label className="field-label" htmlFor="day">
+                Day
+              </label>
               <input
+                id="day"
                 type="date"
-                className="input mt-1"
+                className="input"
                 style={{ maxWidth: 170 }}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
-            <div className="flex gap-1.5 pb-0.5">
+            <div className="seg">
               <button
-                className={`btn ${date === today ? "btn-primary" : "btn-secondary"} px-3 py-2 text-xs`}
+                className="seg-btn"
+                aria-pressed={date === today}
                 onClick={() => setDate(today)}
               >
                 Today
               </button>
               <button
-                className={`btn ${date === addDays(today, -1) ? "btn-primary" : "btn-secondary"} px-3 py-2 text-xs`}
+                className="seg-btn"
+                aria-pressed={date === addDays(today, -1)}
                 onClick={() => setDate(addDays(today, -1))}
               >
                 Yesterday
               </button>
             </div>
           </div>
-          <div className="flex items-end gap-3">
-            <div className="text-right">
-              <div className="caps text-[10px] text-gunmetal/60">
-                Counts toward
-              </div>
-              <div className="text-sm sm:text-base font-black">
-                {weekLabel || "(outside the calendar)"}
-              </div>
+          <div className="text-right">
+            <div className="caps text-[10px] text-gunmetal/55">
+              Counts toward
             </div>
-            <button
-              className="btn btn-secondary hidden sm:inline-flex"
-              onClick={openWeeklyReport}
-            >
-              Weekly report
-            </button>
+            <div className="text-sm font-black">
+              {weekLabel || "(outside the calendar)"}
+            </div>
           </div>
         </div>
-      </div>
+      </Panel>
 
       {/* Section switcher — scrolls sideways on a phone */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -234,13 +239,10 @@ export default function DailyUpdatesPage() {
               aria-pressed={active}
               title={s}
               onClick={() => setSection(s)}
-              className="shrink-0 px-4 py-2 rounded-full text-sm font-bold border transition-colors"
+              className="shrink-0 px-4 py-2.5 rounded-full text-sm font-bold transition-colors"
               style={{
-                background: active ? "var(--rpa-green)" : "var(--white)",
+                background: active ? "var(--rpa-green)" : "var(--surface)",
                 color: active ? "white" : "var(--gunmetal)",
-                borderColor: active
-                  ? "var(--rpa-green)"
-                  : "rgba(26,27,29,0.12)",
               }}
             >
               {SHORT_SECTION[s]}
@@ -250,7 +252,7 @@ export default function DailyUpdatesPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4 min-w-0">
           {/* The guided quick-log — the hero of the page */}
           {editable && weekLabel && user ? (
             <QuickLogWizard
@@ -267,19 +269,23 @@ export default function DailyUpdatesPage() {
               onLogged={reload}
             />
           ) : !weekLabel ? (
-            <div className="card p-5 text-sm text-gunmetal/60">
-              Pick a date inside the reporting calendar to log entries.
-            </div>
+            <Panel>
+              <p className="text-sm text-gunmetal/60">
+                Pick a date inside the reporting calendar to log entries.
+              </p>
+            </Panel>
           ) : (
-            <div className="card p-5 text-sm text-gunmetal/60">
-              Only {section} officers (or admins) can log entries for this
-              section. Switch to your section above.
-            </div>
+            <Panel>
+              <p className="text-sm text-gunmetal/60">
+                Only {section} officers (or admins) can log entries for this
+                section. Switch to your section above.
+              </p>
+            </Panel>
           )}
 
           {/* NSSS: live per-border screening breakdown + official confirm */}
           {section === "Nuclear Safety, Security & Safeguards" ? (
-            <BorderScreeningCard
+            <BorderScreeningPanel
               date={date}
               weekLabel={weekLabel}
               entries={daySectionEntries}
@@ -292,36 +298,34 @@ export default function DailyUpdatesPage() {
 
           {/* Section day feeds */}
           {section === "Inspectorate" ? (
-            <div className="card p-4 sm:p-5">
-              <div className="caps text-xs text-gunmetal/60 mb-2">
-                Facilities inspected on {date}
-              </div>
+            <Panel title={`Facilities inspected on ${date}`}>
               {dayInspections.length ? (
-                <ul className="space-y-2 text-sm">
+                <ul className="divide-y divide-gunmetal/8 text-sm">
                   {dayInspections.map((i) => (
                     <li
                       key={i.id}
-                      className="flex items-center justify-between gap-2 flex-wrap"
+                      className="flex items-center justify-between gap-2 flex-wrap py-2"
                     >
                       <span className="font-bold">{i.facilityName}</span>
-                      <span className="text-xs text-gunmetal/60">
-                        <span className="chip slate mr-1">{i.type}</span>
+                      <span className="flex gap-1">
+                        <span className="chip slate">{i.type}</span>
                         <span className="chip">{i.outcome}</span>
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="text-sm text-gunmetal/55">
-                  Nothing yet — log the first inspection above. Each one lands
-                  in the register and the weekly report automatically.
-                </div>
+                <p className="text-sm text-gunmetal/55">
+                  Nothing yet — log the first inspection above. Each one lands in
+                  the register and the weekly report automatically.
+                </p>
               )}
-            </div>
+            </Panel>
           ) : null}
 
           {section === "Authorisation & Standards" ? (
-            <LicensingDayCard
+            <LicensingDayPanel
+              date={date}
               dayEvents={dayEvents}
               readyCount={readyToConfirm.length}
               readyPreview={readyToConfirm.slice(0, 5)}
@@ -329,32 +333,30 @@ export default function DailyUpdatesPage() {
           ) : null}
 
           {/* The day's logged entries for this section */}
-          <div className="card overflow-hidden" id="day-log">
-            <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 font-black">
-              Logged on {date}
-              <span className="text-xs text-gunmetal/55 font-normal ml-2">
-                {SHORT_SECTION[section]}
-              </span>
-            </div>
+          <Panel
+            title={`Logged on ${date} — ${SHORT_SECTION[section]}`}
+            flush
+            className="scroll-mt-20"
+          >
             <ul className="divide-y divide-gunmetal/8">
               {daySectionEntries.map((e) => (
                 <li
                   key={e.id}
                   className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
                 >
-                  <div>
+                  <div className="min-w-0">
                     {e.kind === "count" ? (
-                      <div className="text-sm">
+                      <div className="text-sm flex flex-wrap items-center gap-1.5">
                         <span className="font-bold">{e.label}</span>
-                        <span className="chip green ml-2 tabular">
+                        <span className="chip green tabular">
                           +{e.value ?? 0}
                         </span>
                         {e.border ? (
-                          <span className="chip slate ml-1">{e.border}</span>
+                          <span className="chip slate">{e.border}</span>
                         ) : null}
                       </div>
                     ) : (
-                      <div className="text-sm whitespace-pre-line">
+                      <div className="text-sm whitespace-pre-line break-words">
                         {e.official ? (
                           <span className="chip green mr-1">official</span>
                         ) : null}
@@ -374,7 +376,8 @@ export default function DailyUpdatesPage() {
                   </div>
                   {isAdmin || (user && e.updatedBy === user.uid) ? (
                     <button
-                      className="text-xs caps font-bold text-[var(--status-stalled)] shrink-0"
+                      className="link-action shrink-0"
+                      style={{ color: "var(--status-stalled)" }}
                       onClick={() => removeEntry(e.id)}
                     >
                       Remove
@@ -388,62 +391,55 @@ export default function DailyUpdatesPage() {
                 </li>
               ) : null}
             </ul>
-          </div>
+          </Panel>
         </div>
 
-        <div className="space-y-4">
-          {/* Week so far */}
-          <div className="card overflow-hidden">
-            <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-              Week so far
-              <span className="text-xs text-gunmetal/55 font-normal ml-2">
-                {weekLabel || "—"}
-              </span>
-            </div>
-            <div className="divide-y divide-gunmetal/8">
-              {weekReport.map((sec) => {
-                const nonZero = sec.metrics.filter((m) => m.value > 0);
-                return (
-                  <div key={sec.section} className="px-5 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <div className="text-xs font-black">{sec.section}</div>
-                      {sec.total ? (
-                        <div className="text-sm tabular font-black">
-                          {sec.total.value}
-                        </div>
-                      ) : null}
-                    </div>
-                    {nonZero.length ? (
-                      <ul className="mt-1 space-y-0.5">
-                        {nonZero.map((m) => (
-                          <li
-                            key={m.key}
-                            className="flex items-center justify-between text-xs text-gunmetal/70"
-                          >
-                            <span>{m.label}</span>
-                            <span className="tabular font-bold">{m.value}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="text-xs text-gunmetal/50 mt-1">
-                        No figures yet this week.
+        {/* Week so far */}
+        <Panel
+          title={`Week so far — ${weekLabel || "—"}`}
+          flush
+          className="min-w-0"
+        >
+          <div className="divide-y divide-gunmetal/8">
+            {weekReport.map((sec) => {
+              const nonZero = sec.metrics.filter((m) => m.value > 0);
+              return (
+                <div key={sec.section} className="px-4 sm:px-5 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="text-xs font-black">{sec.section}</div>
+                    {sec.total ? (
+                      <div className="text-sm tabular font-black">
+                        {sec.total.value}
                       </div>
-                    )}
+                    ) : null}
                   </div>
-                );
-              })}
-            </div>
-            <div className="px-5 py-3 border-t border-gunmetal/8">
-              <button
-                className="btn btn-primary w-full"
-                onClick={openWeeklyReport}
-              >
-                Generate weekly report
-              </button>
-            </div>
+                  {nonZero.length ? (
+                    <ul className="mt-1 space-y-0.5">
+                      {nonZero.map((m) => (
+                        <li
+                          key={m.key}
+                          className="flex items-center justify-between gap-2 text-xs text-gunmetal/70"
+                        >
+                          <span>{m.label}</span>
+                          <span className="tabular font-bold">{m.value}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-xs text-gunmetal/50 mt-1">
+                      No figures yet this week.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
+          <div className="px-4 sm:px-5 pt-3 border-t border-gunmetal/8">
+            <button className="btn btn-primary w-full" onClick={openWeeklyReport}>
+              Generate weekly report
+            </button>
+          </div>
+        </Panel>
       </div>
     </div>
   );
@@ -455,7 +451,7 @@ export default function DailyUpdatesPage() {
  * confirmation (stored as an auditable `official` note — the numbers stay
  * single-sourced from the coordinators' entries).
  */
-function BorderScreeningCard({
+function BorderScreeningPanel({
   date,
   weekLabel,
   entries,
@@ -481,7 +477,9 @@ function BorderScreeningCard({
 
   // Every active border (0s visible so the senior sees who hasn't reported),
   // plus any border that logged today but was since deactivated/renamed.
-  const names = new Set<string>(borders.filter((b) => b.active).map((b) => b.name));
+  const names = new Set<string>(
+    borders.filter((b) => b.active).map((b) => b.name),
+  );
   for (const name of Object.keys(sums.byBorder)) names.add(name);
   const rows = [...names]
     .sort((a, b) => a.localeCompare(b))
@@ -515,23 +513,22 @@ function BorderScreeningCard({
   };
 
   return (
-    <div className="card p-4 sm:p-5">
-      <div className="flex items-baseline justify-between gap-2 flex-wrap">
-        <div className="caps text-xs text-gunmetal/60">
-          Vehicles screened on {date}
-        </div>
-        <div className="text-2xl font-black tabular">{sums.total}</div>
-      </div>
-
+    <Panel
+      title={`Vehicles screened on ${date}`}
+      action={<span className="text-2xl font-black tabular">{sums.total}</span>}
+    >
       {rows.length === 0 && sums.unspecified === 0 ? (
-        <div className="text-sm text-gunmetal/55 mt-2">
+        <p className="text-sm text-gunmetal/55">
           No border posts configured yet — add them when logging vehicles
           screened, or on the NSSS tab.
-        </div>
+        </p>
       ) : (
-        <ul className="mt-3 space-y-1.5 text-sm">
+        <ul className="divide-y divide-gunmetal/8 text-sm">
           {rows.map((r) => (
-            <li key={r.name} className="flex items-center justify-between gap-2">
+            <li
+              key={r.name}
+              className="flex items-center justify-between gap-2 py-2"
+            >
               <span className={r.value ? "font-bold" : "text-gunmetal/55"}>
                 {r.name}
               </span>
@@ -543,7 +540,7 @@ function BorderScreeningCard({
             </li>
           ))}
           {sums.unspecified > 0 ? (
-            <li className="flex items-center justify-between gap-2">
+            <li className="flex items-center justify-between gap-2 py-2">
               <span className="text-gunmetal/70">Head office / other</span>
               <span className="tabular font-black">{sums.unspecified}</span>
             </li>
@@ -553,8 +550,8 @@ function BorderScreeningCard({
 
       <div className="mt-3 pt-3 border-t border-gunmetal/8">
         {official ? (
-          <div className="text-sm">
-            <span className="chip green mr-2">Official total confirmed</span>
+          <div className="text-sm flex flex-wrap items-center gap-2">
+            <span className="chip green">Official total confirmed</span>
             <span className="text-xs text-gunmetal/60">
               by {official.updatedByName || "an officer"}
             </span>
@@ -572,22 +569,24 @@ function BorderScreeningCard({
                 : "Waiting for border figures…"}
           </button>
         ) : (
-          <div className="text-xs text-gunmetal/55">
-            The senior officer confirms the official total once all borders
-            have reported.
-          </div>
+          <p className="text-xs text-gunmetal/55">
+            The senior officer confirms the official total once all borders have
+            reported.
+          </p>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
 /** The Licensing day view: today's recorded licences + confirmations waiting. */
-function LicensingDayCard({
+function LicensingDayPanel({
+  date,
   dayEvents,
   readyCount,
   readyPreview,
 }: {
+  date: string;
   dayEvents: Array<{
     id: string;
     facilityName: string;
@@ -598,75 +597,71 @@ function LicensingDayCard({
   readyPreview: Array<{ id: string; facilityName: string; ran: string }>;
 }) {
   return (
-    <div className="card p-4 sm:p-5 space-y-4">
-      <div>
-        <div className="caps text-xs text-gunmetal/60 mb-2">
-          Licences recorded today
-        </div>
-        {dayEvents.length ? (
-          <ul className="space-y-1.5 text-sm">
-            {dayEvents.map((e) => (
-              <li
-                key={e.id}
-                className="flex items-center justify-between gap-2 flex-wrap"
-              >
-                <span>
-                  <span className="font-bold">{e.facilityName}</span>
-                  <span className="text-xs text-gunmetal/60 ml-2">
-                    {e.number || "no number"}
-                  </span>
+    <Panel title={`Licences recorded on ${date}`}>
+      {dayEvents.length ? (
+        <ul className="divide-y divide-gunmetal/8 text-sm">
+          {dayEvents.map((e) => (
+            <li
+              key={e.id}
+              className="flex items-center justify-between gap-2 flex-wrap py-2"
+            >
+              <span className="min-w-0">
+                <span className="font-bold">{e.facilityName}</span>
+                <span className="text-xs text-gunmetal/60 ml-2 tabular">
+                  {e.number || "no number"}
                 </span>
-                <span className="chip green">{e.type}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-sm text-gunmetal/55">
-            No licences recorded for this day yet — accepted RAIS emails and
-            bulk approvals appear here automatically.
-          </div>
-        )}
-      </div>
+              </span>
+              <span className="chip green">{e.type}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-gunmetal/55">
+          No licences recorded for this day yet — accepted RAIS emails and bulk
+          approvals appear here automatically.
+        </p>
+      )}
 
-      <div className="border-t border-gunmetal/8 pt-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="caps text-xs text-gunmetal/60">
+      <div className="mt-4 pt-3 border-t border-gunmetal/8">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+          <div className="caps text-[10px] text-gunmetal/55 flex items-center gap-2">
             Suggested confirmations
             {readyCount ? (
-              <span className="chip amber ml-2 tabular">{readyCount}</span>
+              <span className="chip amber tabular">{readyCount}</span>
             ) : null}
           </div>
-          <Link
-            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-            href="/licence-status"
-          >
+          <Link className="link-action" href="/licence-status">
             Confirm on Smart Status Update →
           </Link>
         </div>
         {readyCount ? (
-          <ul className="mt-2 space-y-1 text-sm">
+          <ul className="divide-y divide-gunmetal/8 text-sm">
             {readyPreview.map((r) => (
               <li
                 key={r.id}
-                className="flex items-center justify-between gap-2"
+                className="flex items-center justify-between gap-2 py-2"
               >
-                <span className="font-bold">{r.facilityName}</span>
-                <span className="text-xs tabular text-gunmetal/60">{r.ran}</span>
+                <span className="font-bold min-w-0 break-words">
+                  {r.facilityName}
+                </span>
+                <span className="text-xs tabular text-gunmetal/60 shrink-0">
+                  {r.ran}
+                </span>
               </li>
             ))}
             {readyCount > readyPreview.length ? (
-              <li className="text-xs text-gunmetal/55">
+              <li className="text-xs text-gunmetal/55 py-2">
                 …and {readyCount - readyPreview.length} more.
               </li>
             ) : null}
           </ul>
         ) : (
-          <div className="text-sm text-gunmetal/55 mt-1">
-            Nothing waiting — facilities RAIS reports as licensed appear here
-            for a one-click confirmation.
-          </div>
+          <p className="text-sm text-gunmetal/55">
+            Nothing waiting — facilities RAIS reports as licensed appear here for
+            a one-click confirmation.
+          </p>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

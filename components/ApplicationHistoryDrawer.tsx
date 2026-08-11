@@ -40,7 +40,7 @@ export function ApplicationHistoryDrawer({
       onClose={onClose}
       title={w.facilityName || "(unmatched facility)"}
     >
-      <section>
+      <section className="card p-4 sm:p-5">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="chip green">{workflowStatusLabel(w) || "—"}</span>
           <span className={`chip ${PRIORITY_CHIP[w.priority]}`}>{w.priority}</span>
@@ -51,7 +51,7 @@ export function ApplicationHistoryDrawer({
           ) : null}
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Field label="Application RAN" value={w.ran || "—"} tabular />
           <Field label="Type" value={w.ranType || "—"} />
           <Field label="Pipeline phase" value={w.phase} />
@@ -82,15 +82,19 @@ export function ApplicationHistoryDrawer({
         {w.facilityId ? (
           <Link
             href={`/facilities/${w.facilityId}`}
-            className="text-xs caps font-bold text-[var(--rpa-green-dark)] mt-3 inline-block"
+            className="link-action mt-3 inline-block"
           >
             View facility →
           </Link>
         ) : null}
       </section>
 
-      <section className="card p-4 bg-mist">
-        <WorkflowNotesPanel workflow={w} isSaved={isSaved} onChanged={onChanged} />
+      <section className="card p-4 sm:p-5">
+        <WorkflowNotesPanel
+          workflow={w}
+          isSaved={isSaved}
+          onChanged={onChanged}
+        />
       </section>
     </Drawer>
   );

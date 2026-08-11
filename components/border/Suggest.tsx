@@ -111,13 +111,13 @@ export function Suggest({
 
   return (
     <div ref={boxRef} className="relative">
-      <label className="caps text-[10px] text-gunmetal/60" htmlFor={id}>
+      <label className="field-label" htmlFor={id}>
         {label}
       </label>
       <input
         id={id}
         ref={ref}
-        className="input mt-1"
+        className="input"
         style={{
           textTransform: uppercase ? "uppercase" : undefined,
           borderColor: error ? "var(--status-stalled)" : undefined,
@@ -151,13 +151,8 @@ export function Suggest({
       {open && visible.length ? (
         <ul
           id={`${id}-list`}
-          className="absolute z-30 left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-lg"
-          style={{
-            background: "var(--white)",
-            border: "1px solid rgba(26,27,29,0.14)",
-            maxHeight: 280,
-            overflowY: "auto",
-          }}
+          className="popover absolute z-30 left-0 right-0 mt-1 overflow-hidden"
+          style={{ maxHeight: 280, overflowY: "auto" }}
           role="listbox"
         >
           {visible.map((o, i) => (
@@ -168,7 +163,7 @@ export function Suggest({
                 aria-selected={i === active}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => accept(o)}
-                className="w-full text-left px-3 py-2 flex items-center justify-between gap-2"
+                className="w-full text-left px-3 py-2.5 flex items-center justify-between gap-2"
                 style={{
                   background: i === active ? "rgba(0,160,80,0.10)" : "transparent",
                 }}

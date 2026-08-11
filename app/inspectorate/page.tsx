@@ -10,6 +10,8 @@ import { useStoreData } from "@/lib/storeHooks";
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { PageHeader, Panel } from "@/components/Section";
+import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { norm } from "@/lib/rules/matching";
@@ -36,16 +38,16 @@ import {
   type InspectionOutcome,
 } from "@/lib/rules/types";
 
-const PERIOD_OPTIONS: Array<{ key: InspectionPeriod; label: string }> = [
-  { key: "week", label: "This week" },
-  { key: "month", label: "This month" },
-  { key: "year", label: "This year" },
-  { key: "all", label: "All time" },
+const PERIOD_OPTIONS: Array<{ value: InspectionPeriod; label: string }> = [
+  { value: "week", label: "Week" },
+  { value: "month", label: "Month" },
+  { value: "year", label: "Year" },
+  { value: "all", label: "All time" },
 ];
 
 export default function InspectoratePage() {
   const { user, canEditInsp } = useAuth();
-  const { weeks, selected } = useWeek();
+  const { selected } = useWeek();
   const toast = useToast();
   const { data, error, reload } = useStoreData(async (s) => {
     const [facilities, inspections, requests] = await Promise.all([
@@ -89,36 +91,21 @@ export default function InspectoratePage() {
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
       {/* Period filter — inspected facilities in a week, a month, or a year */}
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="caps text-xs text-gunmetal/60">
-            Inspection dashboard
-          </div>
-          <div className="text-xl font-black">{periodLabel(period, ctx)}</div>
-          <div className="text-xs text-gunmetal/60">
-            Pre-authorisation · routine · investigation · follow-up ·
-            enforcement
-          </div>
-        </div>
-        <div className="inline-flex rounded-lg overflow-hidden border border-gunmetal/10">
-          {PERIOD_OPTIONS.map((p) => (
-            <button
-              key={p.key}
-              aria-pressed={period === p.key}
-              onClick={() => setPeriod(p.key)}
-              className="px-3 py-1.5 text-xs caps font-bold"
-              style={{
-                background: period === p.key ? "var(--rpa-green)" : "transparent",
-                color: period === p.key ? "white" : "var(--gunmetal)",
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Inspection dashboard"
+        title={periodLabel(period, ctx)}
+        subtitle="Pre-authorisation · routine · investigation · follow-up · enforcement"
+        actions={
+          <Segmented
+            ariaLabel="Reporting period"
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+          />
+        }
+      />
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi label="Inspections conducted" value={dash.total} />
         <Kpi
           label="Facilities inspected"
@@ -144,20 +131,17 @@ export default function InspectoratePage() {
           title={`Inspections by type — ${periodLabel(period, ctx)}`}
           rows={typeRows}
         />
-        <div className="card p-5">
-          <div className="caps text-xs text-gunmetal/60 mb-3">
-            Outcomes — {periodLabel(period, ctx)}
-          </div>
+        <Panel title={`Outcomes — ${periodLabel(period, ctx)}`}>
           {outcomeRows.length === 0 ? (
-            <div className="text-sm text-gunmetal/60">
+            <p className="text-sm text-gunmetal/60">
               No inspections in this period yet.
-            </div>
+            </p>
           ) : (
-            <ul className="space-y-2 text-sm">
+            <ul className="divide-y divide-gunmetal/8">
               {outcomeRows.map((r) => (
                 <li
                   key={r.label}
-                  className="flex items-center justify-between gap-3"
+                  className="flex items-center justify-between gap-3 py-2"
                 >
                   <OutcomeChip outcome={r.label as InspectionOutcome} />
                   <span className="tabular font-black">{r.total}</span>
@@ -165,138 +149,178 @@ export default function InspectoratePage() {
               ))}
             </ul>
           )}
-        </div>
+        </Panel>
       </section>
 
       {/* Forward schedule from the Licensing ↔ Inspectorate requests */}
-      <section className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between flex-wrap gap-2">
-          <div className="font-black">
-            Inspection schedule
-            <span className="text-xs text-gunmetal/55 font-normal ml-2">
-              {schedule.length} in the pipeline
-            </span>
-          </div>
-          <Link
-            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-            href="/inspection-requests"
-          >
-            Open inspection requests →
+      <Panel
+        title={`Inspection schedule — ${schedule.length} in the pipeline`}
+        flush
+        action={
+          <Link className="link-action" href="/inspection-requests">
+            Open requests →
           </Link>
-        </div>
+        }
+      >
         {schedule.length === 0 ? (
-          <div className="p-6 text-sm text-gunmetal/60">
+          <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
             Nothing scheduled. Requests raised by Licensing appear here and can
             be assigned an inspector and a target date on the Inspection
             Requests tab.
-          </div>
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-5 py-2">Facility</th>
-                  <th className="px-5 py-2">Type</th>
-                  <th className="px-5 py-2">Priority</th>
-                  <th className="px-5 py-2">Status</th>
-                  <th className="px-5 py-2">Inspector</th>
-                  <th className="px-5 py-2">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.map((r) => (
-                  <tr key={r.id} className="border-t border-gunmetal/8">
-                    <td className="px-5 py-2">
-                      <div className="font-bold">{r.facilityName}</div>
+          <>
+            <div className="hidden md:block table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Facility</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Inspector</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <div className="font-bold">{r.facilityName}</div>
+                        <div className="text-[11px] text-gunmetal/55 tabular">
+                          {r.facCode || "—"}
+                          {r.province ? ` · ${r.province}` : ""}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="chip slate">{r.type}</span>
+                      </td>
+                      <td>
+                        <span
+                          className={`chip ${REQUEST_PRIORITY_META[r.priority].chip}`}
+                        >
+                          {r.priority}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`chip ${REQUEST_STATUS_META[r.status].chip}`}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td>{r.assignedInspector || "—"}</td>
+                      <td className="tabular">
+                        {scheduledDate(r) || "unscheduled"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="md:hidden divide-y divide-gunmetal/8">
+              {schedule.map((r) => (
+                <li key={r.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold leading-tight break-words">
+                        {r.facilityName}
+                      </div>
                       <div className="text-[11px] text-gunmetal/55 tabular">
                         {r.facCode || "—"}
                         {r.province ? ` · ${r.province}` : ""}
                       </div>
-                    </td>
-                    <td className="px-5 py-2">
-                      <span className="chip slate">{r.type}</span>
-                    </td>
-                    <td className="px-5 py-2">
-                      <span
-                        className={`chip ${REQUEST_PRIORITY_META[r.priority].chip}`}
-                      >
-                        {r.priority}
-                      </span>
-                    </td>
-                    <td className="px-5 py-2">
-                      <span
-                        className={`chip ${REQUEST_STATUS_META[r.status].chip}`}
-                      >
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-2">{r.assignedInspector || "—"}</td>
-                    <td className="px-5 py-2 tabular">
+                    </div>
+                    <span className="text-xs tabular text-gunmetal/55 shrink-0">
                       {scheduledDate(r) || "unscheduled"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <span className="chip slate">{r.type}</span>
+                    <span
+                      className={`chip ${REQUEST_PRIORITY_META[r.priority].chip}`}
+                    >
+                      {r.priority}
+                    </span>
+                    <span
+                      className={`chip ${REQUEST_STATUS_META[r.status].chip}`}
+                    >
+                      {r.status}
+                    </span>
+                  </div>
+                  {r.assignedInspector ? (
+                    <div className="text-xs text-gunmetal/60 mt-1">
+                      Inspector: {r.assignedInspector}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-      </section>
+      </Panel>
 
       {/* Enforcement actions taken in the period */}
-      <section className="card p-5">
-        <div className="caps text-xs text-gunmetal/60 mb-3">
-          Enforcement actions — {periodLabel(period, ctx)}
-        </div>
+      <Panel title={`Enforcement actions — ${periodLabel(period, ctx)}`} flush>
         {dash.enforcement.length === 0 ? (
-          <div className="text-sm text-gunmetal/60">
+          <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
             No enforcement actions in this period.
-          </div>
+          </p>
         ) : (
           <ul className="divide-y divide-gunmetal/8">
             {dash.enforcement.map((i) => (
-              <li
-                key={i.id}
-                className="py-3 flex items-start justify-between gap-3"
-              >
-                <div>
-                  <div className="font-bold">{i.facilityName}</div>
-                  <div className="text-xs text-gunmetal/60">
-                    <OutcomeChip outcome={i.outcome} />
-                    {i.province ? (
-                      <span className="ml-2">{i.province}</span>
-                    ) : null}
-                  </div>
-                  {i.notes ? (
-                    <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
-                      {i.notes}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="text-xs tabular text-gunmetal/55 text-right">
-                  <div>{i.date}</div>
-                  <div>{i.week}</div>
-                </div>
-              </li>
+              <InspectionRow key={i.id} inspection={i} />
             ))}
           </ul>
         )}
-      </section>
+      </Panel>
 
       {canEditInsp && user ? (
-        <LogInspectionCard
+        <LogInspectionPanel
           facilities={facilities}
           onLogged={reload}
           toastPush={toast.push}
         />
       ) : null}
 
-      <RegisterCard inspections={inspections} period={period} ctx={ctx} />
+      <RegisterPanel inspections={inspections} period={period} ctx={ctx} />
     </div>
   );
 }
 
+function InspectionRow({
+  inspection: i,
+  showType,
+}: {
+  inspection: Inspection;
+  showType?: boolean;
+}) {
+  return (
+    <li className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="font-bold break-words">{i.facilityName}</div>
+        <div className="text-xs text-gunmetal/60 mt-1 flex flex-wrap gap-1 items-center">
+          {showType ? <span className="chip slate">{i.type}</span> : null}
+          <OutcomeChip outcome={i.outcome} />
+          {i.province ? <span>{i.province}</span> : null}
+        </div>
+        {i.notes ? (
+          <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
+            {i.notes}
+          </div>
+        ) : null}
+      </div>
+      <div className="text-xs tabular text-gunmetal/55 text-right shrink-0">
+        <div>{i.date}</div>
+        <div>{i.week}</div>
+      </div>
+    </li>
+  );
+}
+
 /** The Inspectorate's "log inspection" form (moved here from /inspections). */
-function LogInspectionCard({
+function LogInspectionPanel({
   facilities,
   onLogged,
   toastPush,
@@ -370,14 +394,16 @@ function LogInspectionCard({
   };
 
   return (
-    <div className="card p-5">
-      <div className="caps text-xs text-gunmetal/60 mb-3">Log inspection</div>
+    <Panel title="Log inspection">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="caps text-[10px] text-gunmetal/60">Facility</label>
+          <label className="field-label" htmlFor="insp-facility">
+            Facility
+          </label>
           <div className="relative">
             <input
-              className="input mt-1"
+              id="insp-facility"
+              className="input"
               placeholder="Search register…"
               value={selected ? selected.name : facilityQuery}
               onChange={(e) => {
@@ -387,7 +413,7 @@ function LogInspectionCard({
               }}
             />
             {suggestions.length > 0 && !selected ? (
-              <ul className="absolute left-0 right-0 mt-1 z-20 card max-h-60 overflow-y-auto">
+              <ul className="popover absolute left-0 right-0 mt-1 z-20 max-h-60 overflow-y-auto">
                 {suggestions.map((f) => (
                   <li
                     key={f.id}
@@ -395,7 +421,7 @@ function LogInspectionCard({
                       setFacilityId(f.id);
                       setFacilityQuery(f.name);
                     }}
-                    className="px-3 py-2 text-sm hover:bg-mist cursor-pointer"
+                    className="px-3 py-2.5 text-sm hover:bg-mist cursor-pointer"
                   >
                     <div className="font-bold">{f.name}</div>
                     <div className="text-xs text-gunmetal/60">
@@ -406,26 +432,32 @@ function LogInspectionCard({
               </ul>
             ) : null}
           </div>
-          <div className="text-[11px] text-gunmetal/55 mt-1">
+          <p className="text-[11px] text-gunmetal/55 mt-1">
             Free-text is fine if the facility isn&apos;t in the register yet.
-          </div>
+          </p>
         </div>
         <div>
-          <label className="caps text-[10px] text-gunmetal/60">Date</label>
+          <label className="field-label" htmlFor="insp-date">
+            Date
+          </label>
           <input
+            id="insp-date"
             type="date"
-            className="input mt-1"
+            className="input"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
-          <div className="text-[11px] text-gunmetal/55 mt-1">
+          <p className="text-[11px] text-gunmetal/55 mt-1">
             Lands in: <strong>{targetWeek || "(no week match)"}</strong>
-          </div>
+          </p>
         </div>
         <div>
-          <label className="caps text-[10px] text-gunmetal/60">Type</label>
+          <label className="field-label" htmlFor="insp-type">
+            Type
+          </label>
           <select
-            className="input mt-1"
+            id="insp-type"
+            className="input"
             value={type}
             onChange={(e) => setType(e.target.value as InspectionType)}
           >
@@ -435,9 +467,12 @@ function LogInspectionCard({
           </select>
         </div>
         <div>
-          <label className="caps text-[10px] text-gunmetal/60">Outcome</label>
+          <label className="field-label" htmlFor="insp-outcome">
+            Outcome
+          </label>
           <select
-            className="input mt-1"
+            id="insp-outcome"
+            className="input"
             value={outcome}
             onChange={(e) => setOutcome(e.target.value as InspectionOutcome)}
           >
@@ -447,9 +482,12 @@ function LogInspectionCard({
           </select>
         </div>
         <div className="md:col-span-2">
-          <label className="caps text-[10px] text-gunmetal/60">Notes</label>
+          <label className="field-label" htmlFor="insp-notes">
+            Notes
+          </label>
           <textarea
-            className="input mt-1"
+            id="insp-notes"
+            className="input"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -457,17 +495,19 @@ function LogInspectionCard({
           />
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
-        <button disabled={busy} className="btn btn-primary" onClick={submit}>
-          {busy ? "Saving…" : "Log inspection"}
-        </button>
-      </div>
-    </div>
+      <button
+        disabled={busy}
+        className="btn btn-primary mt-3 w-full sm:w-auto"
+        onClick={submit}
+      >
+        {busy ? "Saving…" : "Log inspection"}
+      </button>
+    </Panel>
   );
 }
 
 /** The inspections-conducted register, filtered by the dashboard period. */
-function RegisterCard({
+function RegisterPanel({
   inspections,
   period,
   ctx,
@@ -488,61 +528,35 @@ function RegisterCard({
   );
 
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="caps text-xs text-gunmetal/60">
-          {filtered.length} inspections · {periodLabel(period, ctx)}
-        </div>
-        <div className="inline-flex rounded-lg overflow-hidden border border-gunmetal/10">
-          {(["", ...INSPECTION_TYPES] as Array<"" | InspectionType>).map(
-            (t) => (
-              <button
-                key={t || "all"}
-                aria-pressed={filter === t}
-                onClick={() => setFilter(t)}
-                className="px-3 py-1.5 text-xs caps font-bold"
-                style={{
-                  background: filter === t ? "var(--rpa-green)" : "transparent",
-                  color: filter === t ? "white" : "var(--gunmetal)",
-                }}
-              >
-                {t || "All"}
-              </button>
-            ),
-          )}
-        </div>
+    <Panel
+      title={`${filtered.length} inspections · ${periodLabel(period, ctx)}`}
+      flush
+    >
+      <div className="px-4 sm:px-5">
+        <Segmented
+          ariaLabel="Inspection type"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "" as InspectionType | "", label: "All" },
+            ...INSPECTION_TYPES.map((t) => ({
+              value: t as InspectionType | "",
+              label: t.replace(" Inspection", ""),
+            })),
+          ]}
+        />
       </div>
-      <ul className="mt-4 divide-y divide-gunmetal/8">
+      <ul className="divide-y divide-gunmetal/8 mt-3">
         {filtered.map((i) => (
-          <li
-            key={i.id}
-            className="py-3 flex items-start justify-between gap-3"
-          >
-            <div>
-              <div className="font-bold">{i.facilityName}</div>
-              <div className="text-xs text-gunmetal/60">
-                <span className="chip slate mr-1">{i.type}</span>
-                <OutcomeChip outcome={i.outcome} />
-              </div>
-              {i.notes ? (
-                <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
-                  {i.notes}
-                </div>
-              ) : null}
-            </div>
-            <div className="text-xs tabular text-gunmetal/55 text-right">
-              <div>{i.date}</div>
-              <div>{i.week}</div>
-            </div>
-          </li>
+          <InspectionRow key={i.id} inspection={i} showType />
         ))}
         {filtered.length === 0 ? (
-          <li className="py-6 text-sm text-gunmetal/55">
+          <li className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">
             No inspections recorded for this period.
           </li>
         ) : null}
       </ul>
-    </div>
+    </Panel>
   );
 }
 

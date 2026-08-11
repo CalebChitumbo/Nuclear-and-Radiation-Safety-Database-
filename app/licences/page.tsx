@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { PageHeader, Panel } from "@/components/Section";
 import { useStoreData } from "@/lib/storeHooks";
 import {
   authSortKey,
@@ -75,7 +76,7 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
 }
 
 export default function LicencesPage() {
-  const { data, loading, error, reload } = useStoreData(
+  const { data, error, reload } = useStoreData(
     async (s) => s.listFacilities(),
     [],
   );
@@ -130,7 +131,11 @@ export default function LicencesPage() {
     { key: "standalone", label: "All standalone", count: stats.otherTotal },
     ...LICENCE_TYPES.filter(
       (t) => !isUseP(t) && (stats.issuedByType[t] || 0) > 0,
-    ).map((t) => ({ key: t, label: SHORT_TYPE[t] || t, count: stats.issuedByType[t] || 0 })),
+    ).map((t) => ({
+      key: t,
+      label: SHORT_TYPE[t] || t,
+      count: stats.issuedByType[t] || 0,
+    })),
     { key: "use", label: "Use/Possession", count: stats.useTotal },
     { key: "all", label: "All types", count: stats.totalIssued },
   ];
@@ -155,42 +160,42 @@ export default function LicencesPage() {
     : 0;
 
   return (
-    <div className="space-y-6 staggered">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-black">Authorisations</h1>
-          <p className="text-sm text-gunmetal/60">
-            Authorisation statistics built from the facilities register — every
-            licence issued (renewals, new use/possession, standalone
-            authorisations) and who holds a current use licence.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="caps text-[10px] text-gunmetal/60">Licence year</span>
-          <div className="inline-flex items-center rounded-lg border border-gunmetal/10 overflow-hidden">
-            <button
-              className="px-3 py-2 text-sm font-bold disabled:opacity-30"
-              onClick={() => setYear((y) => y - 1)}
-              disabled={year <= MIN_YEAR}
-              aria-label="Previous year"
-            >
-              ‹
-            </button>
-            <span className="px-3 py-2 text-sm font-black tabular">{year}</span>
-            <button
-              className="px-3 py-2 text-sm font-bold disabled:opacity-30"
-              onClick={() => setYear((y) => y + 1)}
-              disabled={year >= CURRENT_YEAR + 1}
-              aria-label="Next year"
-            >
-              ›
-            </button>
+    <div className="space-y-4 staggered">
+      <PageHeader
+        title="Authorisations"
+        subtitle="Every licence issued — renewals, new use/possession and standalone authorisations — and who holds a current use licence."
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="caps text-[10px] text-gunmetal/55">
+              Licence year
+            </span>
+            <div className="seg">
+              <button
+                className="seg-btn"
+                onClick={() => setYear((y) => y - 1)}
+                disabled={year <= MIN_YEAR}
+                aria-label="Previous year"
+              >
+                ‹
+              </button>
+              <span className="px-2 py-1 text-sm font-black tabular self-center">
+                {year}
+              </span>
+              <button
+                className="seg-btn"
+                onClick={() => setYear((y) => y + 1)}
+                disabled={year >= CURRENT_YEAR + 1}
+                aria-label="Next year"
+              >
+                ›
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Totals — renewal + import + transit + every other type */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Licences issued (all types)"
           value={stats.totalIssued.toLocaleString()}
@@ -223,17 +228,14 @@ export default function LicencesPage() {
       </section>
 
       {/* Itemized authorisations — which facility holds which licence */}
-      <section className="card overflow-hidden">
-        <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex flex-wrap items-center justify-between gap-3">
-          <div className="font-black">
-            Authorisations on record
-            <span className="text-xs text-gunmetal/55 font-normal ml-2">
-              {filteredAuthRows.length} shown
-            </span>
-          </div>
+      <Panel
+        title={`Authorisations on record — ${filteredAuthRows.length} shown`}
+        flush
+      >
+        <div className="px-4 sm:px-5 space-y-3">
           <input
-            className="input max-w-[260px]"
-            placeholder="facility, number, FAC…"
+            className="input"
+            placeholder="Search facility, number, FAC…"
             aria-label="Search authorisations"
             value={authSearch}
             onChange={(e) => {
@@ -241,88 +243,112 @@ export default function LicencesPage() {
               setPage(0);
             }}
           />
-        </div>
-
-        <div className="px-4 sm:px-5 py-3 flex flex-wrap gap-2 border-b border-gunmetal/8">
-          {typeChips.map((c) => {
-            const active = typeFilter === c.key;
-            return (
+          <div className="seg w-full">
+            {typeChips.map((c) => (
               <button
                 key={c.key}
-                aria-pressed={active}
+                className="seg-btn"
+                aria-pressed={typeFilter === c.key}
                 onClick={() => {
                   setTypeFilter(c.key);
                   setPage(0);
                 }}
-                className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors"
-                style={{
-                  background: active ? "var(--rpa-green)" : "transparent",
-                  color: active ? "white" : "var(--gunmetal)",
-                  borderColor: active
-                    ? "var(--rpa-green)"
-                    : "rgba(26,27,29,0.12)",
-                }}
               >
-                {c.label}{" "}
-                <span className="tabular opacity-70">{c.count}</span>
+                {c.label} <span className="tabular opacity-70">{c.count}</span>
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
         {filteredAuthRows.length === 0 ? (
-          <div className="p-6 text-sm text-gunmetal/60">
+          <p className="px-4 sm:px-5 pt-4 text-sm text-gunmetal/60">
             {typeFilter === "standalone"
               ? "No standalone authorisations recorded yet. Import, transfer, variation and other non-use licences appear here once their RAIS email is accepted."
               : "No authorisations match this filter."}
-          </div>
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm tbl-sticky">
-              <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-4 py-2">Facility</th>
-                  <th className="px-4 py-2">Licence type</th>
-                  <th className="px-4 py-2">Number</th>
-                  <th className="px-4 py-2">Province</th>
-                  <th className="px-4 py-2">Issued</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleAuthRows.map((r, i) => (
-                  <tr
-                    key={`${r.facilityId}-${r.number || "x"}-${i}`}
-                    className="border-t border-gunmetal/8 align-top"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/facilities/${r.facilityId}`}
-                        className="font-bold text-[var(--rpa-green-dark)] hover:underline"
-                      >
-                        {r.facilityName}
-                      </Link>
-                      <div className="text-[11px] text-gunmetal/55 tabular">
-                        {r.facCode || "—"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
-                      >
-                        {SHORT_TYPE[r.type] || r.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 tabular">{r.number || "—"}</td>
-                    <td className="px-4 py-3">{r.province}</td>
-                    <td className="px-4 py-3 tabular text-gunmetal/70">
-                      {r.when || "—"}
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block table-wrap mt-4">
+              <table className="data tbl-sticky">
+                <thead>
+                  <tr>
+                    <th>Facility</th>
+                    <th>Licence type</th>
+                    <th>Number</th>
+                    <th>Province</th>
+                    <th>Issued</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visibleAuthRows.map((r, i) => (
+                    <tr key={`${r.facilityId}-${r.number || "x"}-${i}`}>
+                      <td>
+                        <Link
+                          href={`/facilities/${r.facilityId}`}
+                          className="font-bold text-[var(--rpa-green-dark)] hover:underline"
+                        >
+                          {r.facilityName}
+                        </Link>
+                        <div className="text-[11px] text-gunmetal/55 tabular">
+                          {r.facCode || "—"}
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
+                        >
+                          {SHORT_TYPE[r.type] || r.type}
+                        </span>
+                      </td>
+                      <td className="tabular">{r.number || "—"}</td>
+                      <td>{r.province}</td>
+                      <td className="tabular text-gunmetal/70">
+                        {r.when || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Phone list */}
+            <ul className="md:hidden divide-y divide-gunmetal/8 mt-4">
+              {visibleAuthRows.map((r, i) => (
+                <li
+                  key={`${r.facilityId}-${r.number || "x"}-${i}`}
+                  className="px-4 py-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/facilities/${r.facilityId}`}
+                      className="font-bold text-[var(--rpa-green-dark)] leading-tight break-words min-w-0"
+                    >
+                      {r.facilityName}
+                    </Link>
+                    <span className="text-xs tabular text-gunmetal/55 shrink-0">
+                      {r.when || "—"}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
+                    >
+                      {SHORT_TYPE[r.type] || r.type}
+                    </span>
+                    <span className="text-xs tabular text-gunmetal/70">
+                      {r.number || "no number"}
+                    </span>
+                    <span className="text-xs text-gunmetal/55">
+                      {r.province}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
             {visibleAuthRows.length < filteredAuthRows.length ? (
-              <div className="p-3 text-center border-t border-gunmetal/10">
+              <div className="p-3 text-center border-t border-gunmetal/8 mt-0">
                 <button
                   className="btn btn-ghost"
                   onClick={() => setPage((p) => p + 1)}
@@ -332,93 +358,56 @@ export default function LicencesPage() {
                 </button>
               </div>
             ) : null}
-          </div>
+          </>
         )}
-      </section>
+      </Panel>
 
       {/* Who holds a current use licence this year */}
-      <section className="card p-5">
-        <div className="caps text-xs text-gunmetal/60 mb-3">
-          Use licence held — {year}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <BreakdownCard
+      <Panel
+        title={`Use licence held — ${year}`}
+        note="The licence year is read from each facility's most recent use/possession licence date. Facilities seeded before date tracking show under “renewal not yet confirmed” until their next dated renewal is recorded."
+      >
+        <div className="stat-grid grid-cols-1 sm:grid-cols-3">
+          <Kpi
             label={`Licensed (${year})`}
-            value={stats.licensedThisYear}
-            tone="green"
-            note="Use/possession licence dated this year"
+            value={stats.licensedThisYear.toLocaleString()}
+            accent="green"
+            caption="Use/possession licence dated this year"
           />
-          <BreakdownCard
+          <Kpi
             label="Renewal not yet confirmed"
-            value={stats.licensedYearUnconfirmed}
-            tone="amber"
-            note="Licensed, but newest use licence predates the year or is undated"
+            value={stats.licensedYearUnconfirmed.toLocaleString()}
+            accent="amber"
+            caption="Licensed, but newest use licence predates the year or is undated"
           />
-          <BreakdownCard
+          <Kpi
             label="Not licensed"
-            value={stats.notLicensed}
-            tone="red"
-            note="No current use licence — see pipeline below"
+            value={stats.notLicensed.toLocaleString()}
+            accent="red"
+            caption="No current use licence — see pipeline below"
           />
         </div>
-        <p className="mt-3 text-[11px] text-gunmetal/55">
-          The licence year is read from each facility&apos;s most recent
-          use/possession licence date. Facilities seeded before date tracking
-          show under &ldquo;renewal not yet confirmed&rdquo; until their next
-          dated renewal is recorded.
-        </p>
-      </section>
+      </Panel>
 
       {/* Renewal pipeline for the unlicensed */}
       {stageRows.length === 0 ? (
-        <section className="card p-5">
-          <div className="caps text-xs text-gunmetal/60 mb-3">Renewal pipeline</div>
-          <div className="text-sm text-gunmetal/60">
+        <Panel title="Renewal pipeline">
+          <p className="text-sm text-gunmetal/60">
             Every facility holds a use licence.
-          </div>
-        </section>
+          </p>
+        </Panel>
       ) : (
-        <section>
-          <Bars
-            title="Renewal pipeline — where the unlicensed facilities are"
-            rows={stageRows}
-            showCounts
-          />
-          <div className="mt-3">
-            <Link className="btn btn-ghost" href="/facilities">
-              View facilities
+        <Panel
+          title="Renewal pipeline — where the unlicensed facilities are"
+          action={
+            <Link className="link-action" href="/facilities">
+              View facilities →
             </Link>
-          </div>
-        </section>
+          }
+        >
+          <Bars title="" rows={stageRows} showCounts bare />
+        </Panel>
       )}
-    </div>
-  );
-}
-
-function BreakdownCard({
-  label,
-  value,
-  note,
-  tone,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  tone: "green" | "amber" | "red";
-}) {
-  const color =
-    tone === "green"
-      ? "var(--rpa-green-dark)"
-      : tone === "amber"
-        ? "#7a5b07"
-        : "var(--status-stalled)";
-  return (
-    <div className="card p-4">
-      <div className="caps text-[10px] text-gunmetal/60">{label}</div>
-      <div className="mt-1 text-3xl font-black tabular" style={{ color }}>
-        {value.toLocaleString()}
-      </div>
-      <div className="mt-1 text-[11px] text-gunmetal/55">{note}</div>
     </div>
   );
 }

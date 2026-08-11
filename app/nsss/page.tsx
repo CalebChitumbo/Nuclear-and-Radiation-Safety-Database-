@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { PageHeader, Panel } from "@/components/Section";
 import { canEditSection, useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
@@ -87,7 +88,10 @@ export default function NsssPage() {
       .map(([label, total]) => ({ label, total }))
       .sort((a, b) => b.total - a.total);
     if (byBorder.unspecified > 0) {
-      borderRows.push({ label: "Head office / other", total: byBorder.unspecified });
+      borderRows.push({
+        label: "Head office / other",
+        total: byBorder.unspecified,
+      });
     }
 
     return { totals, trend, sectionEntries, borderRows };
@@ -111,28 +115,26 @@ export default function NsssPage() {
 
   return (
     <div className="space-y-4 staggered">
-      <div className="card p-5 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="caps text-xs text-gunmetal/60">
-            Nuclear Safety, Security &amp; Safeguards
-          </div>
-          <div className="text-xl font-black">Section dashboard</div>
-          <div className="text-xs text-gunmetal/60">
-            Figures come from the section&apos;s Daily Updates log; weeks
-            without daily entries fall back to the weekly report figure.
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link className="btn btn-primary" href="/border">
-            Border scan log
-          </Link>
-          <Link className="btn btn-secondary" href="/daily">
-            Log today&apos;s numbers
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Nuclear Safety, Security &amp; Safeguards"
+        title="Section dashboard"
+        subtitle="Figures come from the section's Daily Updates log; weeks without daily entries fall back to the weekly report figure."
+        actions={
+          <>
+            <Link className="btn btn-primary flex-1 sm:flex-none" href="/border">
+              Border scan log
+            </Link>
+            <Link
+              className="btn btn-secondary flex-1 sm:flex-none"
+              href="/daily"
+            >
+              Log today&apos;s numbers
+            </Link>
+          </>
+        }
+      />
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Vehicles screened — this week"
           value={screening ? screening.week : 0}
@@ -157,66 +159,55 @@ export default function NsssPage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Bars title="Vehicle screening — last 8 weeks" rows={trend} />
-        <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-            Section metrics
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <Panel
+          title="Section metrics"
+          note="A reporting week counts toward the month it starts in."
+          flush
+        >
+          <div className="table-wrap">
+            <table className="data">
               <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-5 py-2">Metric</th>
-                  <th className="px-5 py-2 text-right">Week</th>
-                  <th className="px-5 py-2 text-right">Month</th>
-                  <th className="px-5 py-2 text-right">{year}</th>
-                  <th className="px-5 py-2 text-right">All time</th>
+                <tr>
+                  <th>Metric</th>
+                  <th className="num">Week</th>
+                  <th className="num">Month</th>
+                  <th className="num">{year}</th>
+                  <th className="num">All</th>
                 </tr>
               </thead>
               <tbody>
                 {totals.map((m) => (
-                  <tr key={m.key} className="border-t border-gunmetal/8">
-                    <td className="px-5 py-2">{m.label}</td>
-                    <td className="px-5 py-2 text-right tabular">{m.week}</td>
-                    <td className="px-5 py-2 text-right tabular">{m.month}</td>
-                    <td className="px-5 py-2 text-right tabular font-black">
-                      {m.year}
-                    </td>
-                    <td className="px-5 py-2 text-right tabular">{m.all}</td>
+                  <tr key={m.key}>
+                    <td>{m.label}</td>
+                    <td className="num">{m.week}</td>
+                    <td className="num">{m.month}</td>
+                    <td className="num font-black">{m.year}</td>
+                    <td className="num">{m.all}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="px-5 py-2 text-[11px] text-gunmetal/55">
-            A reporting week counts toward the month it starts in.
-          </div>
-        </div>
+        </Panel>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {borderRows.length ? (
           <Bars title={`Screening by border post — ${year}`} rows={borderRows} />
         ) : (
-          <div className="card p-5">
-            <div className="caps text-xs text-gunmetal/60 mb-2">
-              Screening by border post — {year}
-            </div>
-            <div className="text-sm text-gunmetal/55">
-              No border figures yet this year. Posts either log truck by truck
-              on the{" "}
-              <Link
-                className="font-bold"
-                style={{ color: "var(--rpa-green-dark)" }}
-                href="/border"
-              >
+          <Panel title={`Screening by border post — ${year}`}>
+            <p className="text-sm text-gunmetal/55">
+              No border figures yet this year. Posts either log truck by truck on
+              the{" "}
+              <Link className="link-action" href="/border">
                 Border Scan Log
               </Link>{" "}
               and post the day&apos;s total, or enter the figure directly on
               Daily Updates.
-            </div>
-          </div>
+            </p>
+          </Panel>
         )}
-        <ManageBordersCard
+        <ManageBordersPanel
           borders={data?.borders || []}
           canManage={canManage}
           uid={user?.uid || ""}
@@ -224,27 +215,21 @@ export default function NsssPage() {
         />
       </section>
 
-      <section className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between flex-wrap gap-2">
-          <div className="font-black">
-            Recent daily log
-            <span className="text-xs text-gunmetal/55 font-normal ml-2">
-              latest {sectionEntries.length}
-            </span>
-          </div>
-          <Link
-            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-            href="/daily"
-          >
+      <Panel
+        title={`Recent daily log — latest ${sectionEntries.length}`}
+        flush
+        action={
+          <Link className="link-action" href="/daily">
             Open Daily Updates →
           </Link>
-        </div>
+        }
+      >
         {sectionEntries.length === 0 ? (
-          <div className="p-6 text-sm text-gunmetal/60">
+          <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
             Nothing logged yet. Use Daily Updates to record vehicles screened,
             meetings and engagements as they happen — the weekly report totals
             itself from those entries.
-          </div>
+          </p>
         ) : (
           <ul className="divide-y divide-gunmetal/8">
             {sectionEntries.map((e) => (
@@ -252,21 +237,21 @@ export default function NsssPage() {
             ))}
           </ul>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
 
 function EntryRow({ entry }: { entry: DailyEntry }) {
   return (
-    <li className="px-5 py-3 flex items-start justify-between gap-3">
-      <div>
+    <li className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3">
+      <div className="min-w-0">
         {entry.kind === "count" ? (
-          <div className="text-sm">
+          <div className="text-sm flex flex-wrap items-center gap-1.5">
             <span className="font-bold">{entry.label}</span>
-            <span className="chip green ml-2 tabular">+{entry.value ?? 0}</span>
+            <span className="chip green tabular">+{entry.value ?? 0}</span>
             {entry.border ? (
-              <span className="chip slate ml-1">{entry.border}</span>
+              <span className="chip slate">{entry.border}</span>
             ) : null}
           </div>
         ) : (
@@ -286,7 +271,7 @@ function EntryRow({ entry }: { entry: DailyEntry }) {
           </div>
         ) : null}
       </div>
-      <div className="text-xs tabular text-gunmetal/55 text-right">
+      <div className="text-xs tabular text-gunmetal/55 text-right shrink-0">
         <div>{entry.date}</div>
         <div>{entry.week}</div>
       </div>
@@ -298,7 +283,7 @@ function EntryRow({ entry }: { entry: DailyEntry }) {
  * The border-post register: NSSS (and admins) add the posts coordinators
  * report from, and can deactivate one without losing its logged history.
  */
-function ManageBordersCard({
+function ManageBordersPanel({
   borders,
   canManage,
   uid,
@@ -350,28 +335,31 @@ function ManageBordersCard({
   };
 
   return (
-    <div className="card p-5">
-      <div className="caps text-xs text-gunmetal/60 mb-2">Border posts</div>
+    <Panel
+      title="Border posts"
+      note="Coordinators pick their post when logging vehicles screened; the daily official total sums across posts. Deactivating keeps history."
+    >
       {borders.length === 0 ? (
-        <div className="text-sm text-gunmetal/55 mb-2">
+        <p className="text-sm text-gunmetal/55">
           No border posts yet.{" "}
           {canManage
             ? "Add the posts your coordinators report from."
             : "The NSSS section adds them here."}
-        </div>
+        </p>
       ) : (
-        <ul className="space-y-1.5 text-sm mb-2">
+        <ul className="divide-y divide-gunmetal/8 text-sm">
           {borders.map((b) => (
-            <li key={b.id} className="flex items-center justify-between gap-2">
+            <li
+              key={b.id}
+              className="flex items-center justify-between gap-2 py-2"
+            >
               <span className={b.active ? "font-bold" : "text-gunmetal/45"}>
                 {b.name}
-                {!b.active ? (
-                  <span className="chip ml-2">inactive</span>
-                ) : null}
+                {!b.active ? <span className="chip ml-2">inactive</span> : null}
               </span>
               {canManage ? (
                 <button
-                  className="text-xs caps font-bold"
+                  className="link-action"
                   style={{
                     color: b.active
                       ? "var(--status-stalled)"
@@ -388,9 +376,10 @@ function ManageBordersCard({
         </ul>
       )}
       {canManage ? (
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2 pt-3">
           <input
             className="input"
+            aria-label="New border post name"
             placeholder="e.g. Chirundu"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -407,10 +396,6 @@ function ManageBordersCard({
           </button>
         </div>
       ) : null}
-      <div className="text-[11px] text-gunmetal/55 mt-2">
-        Coordinators pick their post when logging vehicles screened; the daily
-        official total sums across posts. Deactivating keeps history.
-      </div>
-    </div>
+    </Panel>
   );
 }

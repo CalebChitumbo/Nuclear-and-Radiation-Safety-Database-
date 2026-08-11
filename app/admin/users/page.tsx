@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { isMockMode } from "@/lib/firebase";
 import {
@@ -36,11 +37,27 @@ export default function AdminUsersPage() {
 
   if (!isAdmin) {
     return (
-      <div className="card p-6 text-sm">
-        Only administrators can manage user accounts.
-      </div>
+      <Panel>
+        <p className="text-sm">Only administrators can manage user accounts.</p>
+      </Panel>
     );
   }
+
+  const toggleUser = async (uid: string, disabled: boolean) => {
+    setTogglingUid(uid);
+    try {
+      const s = await store();
+      await s.setUserDisabled(uid, disabled);
+      reload();
+    } catch (err) {
+      toast.push(
+        err instanceof Error ? err.message : "Failed to update the account.",
+        "error",
+      );
+    } finally {
+      setTogglingUid(null);
+    }
+  };
 
   const add = async () => {
     if (!email.trim() || !displayName.trim()) return;
@@ -78,13 +95,22 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4 staggered">
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60 mb-3">Add staff account</div>
+      <Panel
+        title="Add staff account"
+        note={
+          isMockMode
+            ? "Demo mode: the account is stored locally — no real sign-in is created."
+            : "Creates the Firebase Auth account and sets the role + section custom claims via the setUserClaims Cloud Function. Share the temporary password securely; the user can change it after first sign-in."
+        }
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">Email</label>
+            <label className="field-label" htmlFor="u-email">
+              Email
+            </label>
             <input
-              className="input mt-1"
+              id="u-email"
+              className="input"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -92,19 +118,23 @@ export default function AdminUsersPage() {
             />
           </div>
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">
+            <label className="field-label" htmlFor="u-name">
               Display name
             </label>
             <input
-              className="input mt-1"
+              id="u-name"
+              className="input"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
           </div>
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">Role</label>
+            <label className="field-label" htmlFor="u-role">
+              Role
+            </label>
             <select
-              className="input mt-1"
+              id="u-role"
+              className="input"
               value={role}
               onChange={(e) => setRole(e.target.value as Role)}
             >
@@ -114,13 +144,14 @@ export default function AdminUsersPage() {
             </select>
           </div>
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">Section</label>
+            <label className="field-label" htmlFor="u-section">
+              Section
+            </label>
             <select
-              className="input mt-1"
+              id="u-section"
+              className="input"
               value={section}
-              onChange={(e) =>
-                setSection(e.target.value as Section | "All")
-              }
+              onChange={(e) => setSection(e.target.value as Section | "All")}
             >
               <option value="All">All</option>
               {SECTIONS.map((s) => (
@@ -131,13 +162,14 @@ export default function AdminUsersPage() {
             </select>
           </div>
           <div className="md:col-span-2">
-            <label className="caps text-[10px] text-gunmetal/60">
+            <label className="field-label" htmlFor="u-password">
               {isMockMode
                 ? "Temporary password (ignored in demo mode)"
                 : "Temporary password"}
             </label>
             <input
-              className="input mt-1"
+              id="u-password"
+              className="input"
               type="password"
               value={password}
               autoComplete="new-password"
@@ -148,98 +180,125 @@ export default function AdminUsersPage() {
             />
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            disabled={
-              busy ||
-              !email.trim() ||
-              !displayName.trim() ||
-              (!isMockMode && password.length < 6)
-            }
-            className="btn btn-primary"
-            onClick={add}
-          >
-            {busy ? "Adding…" : "Provision account"}
-          </button>
-          <div className="text-xs text-gunmetal/55">
-            {isMockMode
-              ? "Demo mode: the account is stored locally — no real sign-in is created."
-              : "Creates the Firebase Auth account and sets the role + section custom claims via the setUserClaims Cloud Function. Share the temporary password securely; the user can change it after first sign-in."}
-          </div>
-        </div>
-      </div>
+        <button
+          disabled={
+            busy ||
+            !email.trim() ||
+            !displayName.trim() ||
+            (!isMockMode && password.length < 6)
+          }
+          className="btn btn-primary mt-3 w-full sm:w-auto"
+          onClick={add}
+        >
+          {busy ? "Adding…" : "Provision account"}
+        </button>
+      </Panel>
 
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
-      <div className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-          Staff accounts ({loading && !data ? "…" : data?.length || 0})
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs caps text-gunmetal/55">
-              <th className="px-5 py-2">Name</th>
-              <th className="px-5 py-2">Email</th>
-              <th className="px-5 py-2">Role</th>
-              <th className="px-5 py-2">Section</th>
-              <th className="px-5 py-2">Status</th>
-              <th className="px-5 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data || []).map((u) => (
-              <tr key={u.uid} className="border-t border-gunmetal/8">
-                <td className="px-5 py-2 font-bold">{u.displayName}</td>
-                <td className="px-5 py-2 tabular">{u.email}</td>
-                <td className="px-5 py-2">
-                  <span
-                    className={`chip ${u.role === "admin" ? "yellow" : ""}`}
-                  >
-                    {u.role}
-                  </span>
-                </td>
-                <td className="px-5 py-2 text-xs">{u.section}</td>
-                <td className="px-5 py-2">
-                  {u.disabled ? (
-                    <span className="chip red">Disabled</span>
-                  ) : (
-                    <span className="chip green">Active</span>
-                  )}
-                </td>
-                <td className="px-5 py-2 text-right">
-                  <button
-                    disabled={togglingUid === u.uid}
-                    onClick={async () => {
-                      setTogglingUid(u.uid);
-                      try {
-                        const s = await store();
-                        await s.setUserDisabled(u.uid, !u.disabled);
-                        reload();
-                      } catch (err) {
-                        toast.push(
-                          err instanceof Error
-                            ? err.message
-                            : "Failed to update the account.",
-                          "error",
-                        );
-                      } finally {
-                        setTogglingUid(null);
-                      }
-                    }}
-                    className="text-xs caps font-bold"
-                    style={{
-                      color: u.disabled
-                        ? "var(--rpa-green-dark)"
-                        : "var(--status-stalled)",
-                    }}
-                  >
-                    {u.disabled ? "Enable" : "Disable"}
-                  </button>
-                </td>
+
+      <Panel
+        title={`Staff accounts (${loading && !data ? "…" : data?.length || 0})`}
+        flush
+      >
+        <div className="hidden md:block table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Section</th>
+                <th>Status</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {(data || []).map((u) => (
+                <tr key={u.uid}>
+                  <td className="font-bold">{u.displayName}</td>
+                  <td className="tabular">{u.email}</td>
+                  <td>
+                    <span className={`chip ${u.role === "admin" ? "yellow" : ""}`}>
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="text-xs">{u.section}</td>
+                  <td>
+                    {u.disabled ? (
+                      <span className="chip red">Disabled</span>
+                    ) : (
+                      <span className="chip green">Active</span>
+                    )}
+                  </td>
+                  <td className="text-right">
+                    <ToggleButton
+                      disabled={togglingUid === u.uid}
+                      isDisabledAccount={!!u.disabled}
+                      onClick={() => toggleUser(u.uid, !u.disabled)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <ul className="md:hidden divide-y divide-gunmetal/8">
+          {(data || []).map((u) => (
+            <li key={u.uid} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold break-words">{u.displayName}</div>
+                  <div className="text-xs text-gunmetal/60 break-all">
+                    {u.email}
+                  </div>
+                </div>
+                <ToggleButton
+                  disabled={togglingUid === u.uid}
+                  isDisabledAccount={!!u.disabled}
+                  onClick={() => toggleUser(u.uid, !u.disabled)}
+                />
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <span className={`chip ${u.role === "admin" ? "yellow" : ""}`}>
+                  {u.role}
+                </span>
+                <span className="chip">{u.section}</span>
+                {u.disabled ? (
+                  <span className="chip red">Disabled</span>
+                ) : (
+                  <span className="chip green">Active</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Panel>
     </div>
+  );
+}
+
+function ToggleButton({
+  disabled,
+  isDisabledAccount,
+  onClick,
+}: {
+  disabled: boolean;
+  isDisabledAccount: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className="link-action shrink-0"
+      style={{
+        color: isDisabledAccount
+          ? "var(--rpa-green-dark)"
+          : "var(--status-stalled)",
+      }}
+    >
+      {isDisabledAccount ? "Enable" : "Disable"}
+    </button>
   );
 }

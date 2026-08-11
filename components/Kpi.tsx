@@ -16,19 +16,16 @@ const accentStyle: Record<NonNullable<Props["accent"]>, string> = {
   neutral: "text-[var(--gunmetal)]",
 };
 
+/**
+ * A single figure in a stat strip. Wrap a row of these in `.stat-grid` — the
+ * strip is one sheet divided by hairlines, rather than a row of floating cards.
+ */
 export function Kpi({ label, value, caption, accent = "neutral" }: Props) {
   return (
-    <div className="card p-5">
-      <div className="caps text-xs text-gunmetal/60">{label}</div>
-      <div
-        className={`mt-2 text-4xl font-black tabular ${accentStyle[accent]}`}
-        style={accent === "yellow" ? { textShadow: "0 1px 0 #F0F000" } : undefined}
-      >
-        {value}
-      </div>
-      {caption ? (
-        <div className="mt-1 text-sm text-gunmetal/70">{caption}</div>
-      ) : null}
+    <div className="stat">
+      <div className="stat-label">{label}</div>
+      <div className={`stat-value ${accentStyle[accent]}`}>{value}</div>
+      {caption ? <div className="stat-caption">{caption}</div> : null}
     </div>
   );
 }

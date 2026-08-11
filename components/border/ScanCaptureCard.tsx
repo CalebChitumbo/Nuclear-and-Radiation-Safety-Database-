@@ -310,7 +310,7 @@ export function ScanCaptureCard({
 
         {/* 4 — the reading */}
         <div className="sm:col-span-2">
-          <label className="caps text-[10px] text-gunmetal/60" htmlFor="dose">
+          <label className="field-label" htmlFor="dose">
             Dose rate (nSv/h)
           </label>
           <div className="flex gap-2 mt-1 items-start">
@@ -387,7 +387,7 @@ export function ScanCaptureCard({
         {/* 5 — only when the reading is above background */}
         {needsAction ? (
           <div className="sm:col-span-2">
-            <label className="caps text-[10px] text-gunmetal/60" htmlFor="action">
+            <label className="field-label" htmlFor="action">
               Action taken
             </label>
             <select
@@ -424,7 +424,7 @@ export function ScanCaptureCard({
         <div className="sm:col-span-2">
           {showRemarks || draft.remarks ? (
             <>
-              <label className="caps text-[10px] text-gunmetal/60" htmlFor="remarks">
+              <label className="field-label" htmlFor="remarks">
                 Remarks (optional)
               </label>
               <input

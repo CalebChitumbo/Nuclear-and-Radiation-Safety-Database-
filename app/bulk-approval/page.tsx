@@ -7,6 +7,8 @@ import { isMockMode } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { FacilitySelect } from "@/components/FacilitySelect";
+import { Kpi } from "@/components/Kpi";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { detectType } from "@/lib/rules/detectType";
@@ -72,10 +74,10 @@ export default function BulkApprovalPage() {
     skipped: number;
   } | null>(null);
 
-  const targetWeek = useMemo(() => weekLabelForDate(date, weeks, ""), [
-    date,
-    weeks,
-  ]);
+  const targetWeek = useMemo(
+    () => weekLabelForDate(date, weeks, ""),
+    [date, weeks],
+  );
 
   const parseAndMatch = () => {
     if (!facilities) return;
@@ -88,9 +90,7 @@ export default function BulkApprovalPage() {
       const m = matchOne(parsed, facilities);
       const detected = detectType(parsed.number, defaultType);
       const decision: RowDecision =
-        m.classification === "none"
-          ? "create"
-          : "include";
+        m.classification === "none" ? "create" : "include";
       return {
         index: i,
         name: parsed.name,
@@ -117,9 +117,7 @@ export default function BulkApprovalPage() {
   };
 
   const updateRow = useCallback((idx: number, patch: Partial<ReviewRow>) => {
-    setRows((r) =>
-      r.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
-    );
+    setRows((r) => r.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }, []);
 
   const commit = async () => {
@@ -131,8 +129,7 @@ export default function BulkApprovalPage() {
       const inputs = rows
         .filter(
           (r) =>
-            r.decision === "create" ||
-            (r.decision === "include" && r.matchId),
+            r.decision === "create" || (r.decision === "include" && r.matchId),
         )
         .map((r) => ({
           facilityId: r.decision === "create" ? null : r.matchId,
@@ -173,91 +170,101 @@ export default function BulkApprovalPage() {
 
   if (!canEditAS) {
     return (
-      <div className="card p-6 text-sm">
-        Only Authorisation &amp; Standards officers (or admins) can record
-        licences.
-      </div>
+      <Panel>
+        <p className="text-sm">
+          Only Authorisation &amp; Standards officers (or admins) can record
+          licences.
+        </p>
+      </Panel>
     );
   }
 
+  const toCommit = rows.filter((r) => r.decision !== "skip").length;
+
   return (
     <div className="space-y-4 staggered">
-      <div className="card p-5">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[280px]">
-            <label className="caps text-[10px] text-gunmetal/60">
-              Paste approved licences (one per line)
+      <Panel title="Paste approved licences">
+        <div className="space-y-3">
+          <div>
+            <label className="field-label" htmlFor="bulk-text">
+              One licence per line
             </label>
             <textarea
-              className="input mt-1 font-mono-nums"
+              id="bulk-text"
+              className="input font-mono-nums"
               rows={6}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`Friends Care Medical Centre | AUTH/USE.REN/0781\nHitachi Construction ... | AUTH/IMP/0150\nNew Importer | AUTH/IMP/0200`}
             />
-            <div className="text-[11px] text-gunmetal/55 mt-1">
+            <p className="text-[11px] text-gunmetal/55 mt-1">
               A pipe (<code>|</code>) always splits the number. A comma only
               splits when the tail looks like an AUTH/FAC code (commas in
               facility names are safe).
-            </div>
+            </p>
           </div>
-          <div>
-            <label className="caps text-[10px] text-gunmetal/60">
-              Date issued
-            </label>
-            <input
-              type="date"
-              className="input mt-1"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-            <div className="text-[11px] text-gunmetal/55 mt-1">
-              Lands in: <strong>{targetWeek || "(no week match)"}</strong>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="field-label" htmlFor="bulk-date">
+                Date issued
+              </label>
+              <input
+                id="bulk-date"
+                type="date"
+                className="input"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <p className="text-[11px] text-gunmetal/55 mt-1">
+                Lands in: <strong>{targetWeek || "(no week match)"}</strong>
+              </p>
             </div>
-          </div>
-          <div>
-            <label className="caps text-[10px] text-gunmetal/60">
-              Default type
-            </label>
-            <select
-              className="input mt-1"
-              value={defaultType}
-              onChange={(e) => setDefaultType(e.target.value as LicenceType)}
-            >
-              {LICENCE_TYPES.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
+            <div>
+              <label className="field-label" htmlFor="bulk-type">
+                Default type
+              </label>
+              <select
+                id="bulk-type"
+                className="input"
+                value={defaultType}
+                onChange={(e) => setDefaultType(e.target.value as LicenceType)}
+              >
+                {LICENCE_TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto"
             onClick={parseAndMatch}
             disabled={!facilities}
           >
-            Match
+            Match against the register
           </button>
         </div>
-      </div>
+      </Panel>
 
       {rows.length > 0 ? (
-        <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between">
-            <div className="font-black">Review</div>
-            <div className="text-xs text-gunmetal/60">
-              {rows.length} lines · {rows.filter((r) => r.decision !== "skip").length} to
-              commit · {rows.filter((r) => r.decision === "create").length} new
-              facilities · {rows.filter((r) => r.decision === "skip").length} skipped
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <Panel
+          title="Review"
+          note={`${rows.length} lines · ${toCommit} to commit · ${
+            rows.filter((r) => r.decision === "create").length
+          } new facilities · ${
+            rows.filter((r) => r.decision === "skip").length
+          } skipped`}
+          flush
+        >
+          {/* Desktop: the full review grid */}
+          <div className="hidden lg:block table-wrap">
+            <table className="data">
               <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-4 py-2">Pasted line</th>
-                  <th className="px-4 py-2">Matched facility</th>
-                  <th className="px-4 py-2">Type</th>
-                  <th className="px-4 py-2">Effect</th>
-                  <th className="px-4 py-2">Decision</th>
+                <tr>
+                  <th>Pasted line</th>
+                  <th>Matched facility</th>
+                  <th>Type</th>
+                  <th>Effect</th>
+                  <th>Decision</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,51 +280,62 @@ export default function BulkApprovalPage() {
               </tbody>
             </table>
           </div>
-          <div className="p-5 flex flex-wrap items-center gap-3 border-t border-gunmetal/8">
+
+          {/* Phone & tablet: one stacked block per pasted line */}
+          <ul className="lg:hidden divide-y divide-gunmetal/8">
+            {rows.map((r, i) => (
+              <ReviewCardEditor
+                key={i}
+                index={i}
+                row={r}
+                facilities={facilities || []}
+                onChangeRow={updateRow}
+              />
+            ))}
+          </ul>
+
+          <div className="px-4 sm:px-5 pt-4 flex flex-wrap items-center gap-2 border-t border-gunmetal/8 mt-4">
             <button
-              className="btn btn-primary"
+              className="btn btn-primary flex-1 sm:flex-none"
               disabled={committing || rows.every((r) => r.decision === "skip")}
               onClick={commit}
             >
-              {committing
-                ? "Committing…"
-                : `Commit ${rows.filter((r) => r.decision !== "skip").length} licences`}
+              {committing ? "Committing…" : `Commit ${toCommit} licences`}
             </button>
             <button className="btn btn-ghost" onClick={() => setRows([])}>
               Clear
             </button>
           </div>
-        </div>
+        </Panel>
       ) : null}
 
       {summary ? (
-        <div className="card p-5 bg-mist">
-          <div className="caps text-xs text-gunmetal/60">Commit summary</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-            <SummaryCell
+        <Panel title="Commit summary">
+          <div className="stat-grid grid-cols-2 lg:grid-cols-4">
+            <Kpi
               label="Newly licensed"
               value={summary.newLicensed}
               accent="green"
             />
-            <SummaryCell label="Renewals" value={summary.renewals} />
-            <SummaryCell
+            <Kpi label="Renewals" value={summary.renewals} />
+            <Kpi
               label="Other authorisations"
               value={summary.otherAuths}
               accent="slate"
             />
-            <SummaryCell
-              label="Skipped"
-              value={summary.skipped}
-              accent="red"
-            />
+            <Kpi label="Skipped" value={summary.skipped} accent="red" />
           </div>
-        </div>
+        </Panel>
       ) : null}
     </div>
   );
 }
 
-function effectFor(type: LicenceType, fac: Facility | null, isCreate: boolean): {
+function effectFor(
+  type: LicenceType,
+  fac: Facility | null,
+  isCreate: boolean,
+): {
   label: string;
   variant: "green" | "amber" | "slate" | "red";
 } {
@@ -338,17 +356,15 @@ function effectFor(type: LicenceType, fac: Facility | null, isCreate: boolean): 
   return { label: "→ authorisation only", variant: "slate" };
 }
 
-const ReviewRowEditor = memo(function ReviewRowEditor({
-  index,
-  row,
-  facilities,
-  onChangeRow,
-}: {
+interface EditorProps {
   index: number;
   row: ReviewRow;
   facilities: Facility[];
   onChangeRow: (idx: number, p: Partial<ReviewRow>) => void;
-}) {
+}
+
+/** The controls shared by the desktop table row and the mobile block. */
+function useRowParts({ index, row, facilities, onChangeRow }: EditorProps) {
   const onChange = (p: Partial<ReviewRow>) => onChangeRow(index, p);
   const fac = row.matchId
     ? facilities.find((f) => f.id === row.matchId) || null
@@ -358,199 +374,188 @@ const ReviewRowEditor = memo(function ReviewRowEditor({
   const confidenceLabel =
     classifyMatch(row.score) === "auto" ? "Auto" : "Likely";
 
+  const setDraft = (patch: Partial<NonNullable<ReviewRow["createDraft"]>>) =>
+    onChange({
+      createDraft: {
+        ...(row.createDraft as NonNullable<ReviewRow["createDraft"]>),
+        ...patch,
+      },
+    });
+
+  const match =
+    row.decision === "create" ? (
+      <div className="space-y-2">
+        <div className="chip yellow">Create new facility</div>
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            className="input"
+            aria-label="Province"
+            value={row.createDraft?.province}
+            onChange={(e) => setDraft({ province: e.target.value as Province })}
+          >
+            {PROVINCES.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+          <select
+            className="input"
+            aria-label="Sector"
+            value={row.createDraft?.sector}
+            onChange={(e) => setDraft({ sector: e.target.value as Sector })}
+          >
+            {SECTORS.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <input
+            className="input"
+            placeholder="Practice"
+            aria-label="Practice"
+            value={row.createDraft?.practice}
+            onChange={(e) => setDraft({ practice: e.target.value })}
+          />
+          <input
+            className="input"
+            placeholder="District"
+            aria-label="District"
+            value={row.createDraft?.district}
+            onChange={(e) => setDraft({ district: e.target.value })}
+          />
+        </div>
+      </div>
+    ) : (
+      <div>
+        <FacilitySelect
+          facilities={facilities}
+          value={row.matchId}
+          onChange={(id) => {
+            const m = id ? facilities.find((f) => f.id === id) : undefined;
+            onChange({
+              matchId: id,
+              matchName: m ? m.name : "",
+              score: 1,
+              // An include-row stripped of its match must not stay
+              // committable — it would create a blank facility.
+              decision:
+                !id && row.decision === "include" ? "skip" : row.decision,
+            });
+          }}
+        />
+        <div className="text-xs text-gunmetal/60 mt-1">
+          {row.matchName ? (
+            <>
+              {confidenceLabel} ·{" "}
+              <span className="tabular">{confidencePct}%</span>
+              {fac?.licensed ? " · already licensed" : ""}
+            </>
+          ) : (
+            "—"
+          )}
+        </div>
+      </div>
+    );
+
+  const typePicker = (
+    <>
+      <select
+        className="input"
+        aria-label="Licence type"
+        value={row.type}
+        onChange={(e) => onChange({ type: e.target.value as LicenceType })}
+      >
+        {LICENCE_TYPES.map((t) => (
+          <option key={t}>{t}</option>
+        ))}
+      </select>
+      {row.detected !== row.type ? (
+        <div className="text-[11px] text-gunmetal/55 mt-1">
+          (auto-detected: {row.detected})
+        </div>
+      ) : null}
+    </>
+  );
+
+  const effect = <span className={`chip ${eff.variant}`}>{eff.label}</span>;
+
+  const decision = (
+    <div className="seg">
+      {(["include", "create", "skip"] as RowDecision[]).map((d) => (
+        <button
+          key={d}
+          className="seg-btn"
+          disabled={d === "include" && !row.matchId}
+          aria-pressed={row.decision === d}
+          onClick={() =>
+            onChange({
+              decision: d,
+              createDraft:
+                d === "create"
+                  ? row.createDraft || {
+                      sector: "Private",
+                      province: "Lusaka",
+                      practice: "",
+                      district: "",
+                    }
+                  : row.createDraft,
+            })
+          }
+        >
+          {d}
+        </button>
+      ))}
+    </div>
+  );
+
+  return { match, typePicker, effect, decision };
+}
+
+const ReviewRowEditor = memo(function ReviewRowEditor(props: EditorProps) {
+  const { row } = props;
+  const { match, typePicker, effect, decision } = useRowParts(props);
   return (
-    <tr className="border-t border-gunmetal/8 align-top">
-      <td className="px-4 py-3">
+    <tr>
+      <td>
         <div className="font-bold">{row.name || <em>(blank)</em>}</div>
         <div className="text-xs tabular text-gunmetal/60">
           {row.number || "no number"}
         </div>
       </td>
-      <td className="px-4 py-3">
-        {row.decision === "create" ? (
-          <div className="space-y-2">
-            <div className="chip yellow">Create new facility</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <select
-                className="input"
-                value={row.createDraft?.province}
-                onChange={(e) =>
-                  onChange({
-                    createDraft: {
-                      ...(row.createDraft as ReviewRow["createDraft"])!,
-                      province: e.target.value as Province,
-                    },
-                  })
-                }
-              >
-                {PROVINCES.map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-              <select
-                className="input"
-                value={row.createDraft?.sector}
-                onChange={(e) =>
-                  onChange({
-                    createDraft: {
-                      ...(row.createDraft as ReviewRow["createDraft"])!,
-                      sector: e.target.value as Sector,
-                    },
-                  })
-                }
-              >
-                {SECTORS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-              <input
-                className="input"
-                placeholder="Practice"
-                aria-label="Practice"
-                value={row.createDraft?.practice}
-                onChange={(e) =>
-                  onChange({
-                    createDraft: {
-                      ...(row.createDraft as ReviewRow["createDraft"])!,
-                      practice: e.target.value,
-                    },
-                  })
-                }
-              />
-              <input
-                className="input"
-                placeholder="District"
-                aria-label="District"
-                value={row.createDraft?.district}
-                onChange={(e) =>
-                  onChange({
-                    createDraft: {
-                      ...(row.createDraft as ReviewRow["createDraft"])!,
-                      district: e.target.value,
-                    },
-                  })
-                }
-              />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <FacilitySelect
-              facilities={facilities}
-              value={row.matchId}
-              onChange={(id) => {
-                const m = id ? facilities.find((f) => f.id === id) : undefined;
-                onChange({
-                  matchId: id,
-                  matchName: m ? m.name : "",
-                  score: 1,
-                  // An include-row stripped of its match must not stay
-                  // committable — it would create a blank facility.
-                  decision:
-                    !id && row.decision === "include" ? "skip" : row.decision,
-                });
-              }}
-            />
-            <div className="text-xs text-gunmetal/60 mt-1">
-              {row.matchName ? (
-                <>
-                  {confidenceLabel} ·{" "}
-                  <span className="tabular">{confidencePct}%</span>
-                  {fac?.licensed ? " · already licensed" : ""}
-                </>
-              ) : (
-                "—"
-              )}
-            </div>
-          </div>
-        )}
-      </td>
-      <td className="px-4 py-3">
-        <select
-          className="input"
-          value={row.type}
-          onChange={(e) => onChange({ type: e.target.value as LicenceType })}
-        >
-          {LICENCE_TYPES.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-        {row.detected !== row.type ? (
-          <div className="text-[11px] text-gunmetal/55 mt-1">
-            (auto-detected: {row.detected})
-          </div>
-        ) : null}
-      </td>
-      <td className="px-4 py-3">
-        <span className={`chip ${eff.variant}`}>{eff.label}</span>
-      </td>
-      <td className="px-4 py-3">
-        <div className="inline-flex rounded-lg overflow-hidden border border-gunmetal/10">
-          {(["include", "create", "skip"] as RowDecision[]).map((d) => {
-            const disabled =
-              d === "include" && !row.matchId;
-            return (
-              <button
-                key={d}
-                disabled={disabled}
-                onClick={() =>
-                  onChange({
-                    decision: d,
-                    createDraft:
-                      d === "create"
-                        ? row.createDraft || {
-                            sector: "Private",
-                            province: "Lusaka",
-                            practice: "",
-                            district: "",
-                          }
-                        : row.createDraft,
-                  })
-                }
-                className="px-3 py-1.5 text-xs caps font-bold"
-                style={{
-                  background:
-                    row.decision === d ? "var(--rpa-green)" : "transparent",
-                  color:
-                    row.decision === d ? "white" : "var(--gunmetal)",
-                  opacity: disabled ? 0.4 : 1,
-                }}
-              >
-                {d}
-              </button>
-            );
-          })}
-        </div>
-      </td>
+      <td style={{ minWidth: 220 }}>{match}</td>
+      <td style={{ minWidth: 180 }}>{typePicker}</td>
+      <td>{effect}</td>
+      <td>{decision}</td>
     </tr>
   );
 });
 
-function SummaryCell({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: "green" | "slate" | "red";
-}) {
+const ReviewCardEditor = memo(function ReviewCardEditor(props: EditorProps) {
+  const { row } = props;
+  const { match, typePicker, effect, decision } = useRowParts(props);
   return (
-    <div>
-      <div className="caps text-[10px] text-gunmetal/60">{label}</div>
-      <div
-        className={`text-3xl font-black tabular ${
-          accent === "green"
-            ? "text-[var(--rpa-green-dark)]"
-            : accent === "slate"
-              ? "text-[var(--status-info)]"
-              : accent === "red"
-                ? "text-[var(--status-stalled)]"
-                : ""
-        }`}
-      >
-        {value}
+    <li className="px-4 sm:px-5 py-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-bold break-words">
+            {row.name || <em>(blank)</em>}
+          </div>
+          <div className="text-xs tabular text-gunmetal/60">
+            {row.number || "no number"}
+          </div>
+        </div>
+        {effect}
       </div>
-    </div>
+      <div>
+        <div className="field-label">Matched facility</div>
+        {match}
+      </div>
+      <div>
+        <div className="field-label">Licence type</div>
+        {typePicker}
+      </div>
+      <div>
+        <div className="field-label">Decision</div>
+        {decision}
+      </div>
+    </li>
   );
-}
+});

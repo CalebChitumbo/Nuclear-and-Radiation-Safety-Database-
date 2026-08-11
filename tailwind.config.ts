@@ -16,6 +16,8 @@ const config: Config = {
         },
         gunmetal: "#1A1B1D",
         mist: "#F7F4EC",
+        canvas: "#F3F0E8",
+        sunken: "#F7F4EC",
         status: {
           licensed: "#00A050",
           progress: "#B8860B",
@@ -27,20 +29,8 @@ const config: Config = {
         sans: ["Arial", '"Helvetica Neue"', "Helvetica", "sans-serif"],
       },
       borderRadius: {
-        card: "14px",
+        card: "16px",
         chip: "999px",
-      },
-      boxShadow: {
-        card: "0 1px 2px rgba(26,27,29,0.04), 0 4px 16px rgba(26,27,29,0.06)",
-        "card-hover":
-          "0 2px 4px rgba(26,27,29,0.06), 0 8px 24px rgba(26,27,29,0.10)",
-      },
-      backgroundImage: {
-        "dot-grid":
-          "radial-gradient(rgba(26,27,29,0.06) 1px, transparent 1px)",
-      },
-      backgroundSize: {
-        "dot-grid": "18px 18px",
       },
       letterSpacing: {
         caps: "0.06em",

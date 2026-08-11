@@ -1,6 +1,16 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities;
+/* Utilities are pulled in at the bottom of this file so a one-off Tailwind
+   class (`bg-mist`, `p-0`, …) always wins over the component styles below. */
+
+/* ---------------------------------------------------------------------------
+   RPA design system
+   ---------------------------------------------------------------------------
+   Three surfaces do all the work: a warm canvas, a white sheet that sits on it,
+   and a sunken tint for blocks nested inside a sheet. Drop shadows and outlines
+   are deliberately absent — hairlines and space separate content instead, so a
+   page reads as one document rather than a pile of floating boxes.
+--------------------------------------------------------------------------- */
 
 :root {
   --rpa-green: #00a050;
@@ -9,21 +19,36 @@
   --gunmetal: #1a1b1d;
   --mist: #f7f4ec;
   --white: #ffffff;
+
+  --canvas: #f3f0e8;
+  --surface: #ffffff;
+  --sunken: #f7f4ec;
+
+  --line: rgba(26, 27, 29, 0.09);
+  --line-strong: rgba(26, 27, 29, 0.16);
+
   --status-licensed: #00a050;
   --status-progress: #b8860b;
   --status-stalled: #a8362b;
   --status-info: #2c5d7a;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  /* Height of the phone tab bar; pages reserve it so nothing hides beneath. */
+  --mobile-nav: 60px;
 }
 
 html,
 body {
   height: 100%;
-  background: var(--mist);
+  background: var(--canvas);
   color: var(--gunmetal);
   font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-variant-numeric: tabular-nums;
+  /* Long facility names and licence numbers must never widen a phone screen. */
+  overflow-wrap: break-word;
 }
 
 .font-mono-nums,
@@ -37,41 +62,195 @@ body {
   font-weight: 700;
 }
 
-/* Dot-grid texture on the page canvas */
 .bg-canvas {
-  background-color: var(--mist);
-  background-image: radial-gradient(rgba(26, 27, 29, 0.06) 1px, transparent 1px);
-  background-size: 18px 18px;
-  background-position: -1px -1px;
+  background-color: var(--canvas);
 }
 
+/* ---------------------------------------------------------------------------
+   Sheets
+--------------------------------------------------------------------------- */
+
+/* The one container primitive. No border, no shadow: the canvas behind it is
+   what makes it read as a surface. */
 .card {
-  background: var(--white);
-  border: 1px solid rgba(26, 27, 29, 0.06);
-  border-radius: 14px;
-  box-shadow:
-    0 1px 2px rgba(26, 27, 29, 0.04),
-    0 4px 16px rgba(26, 27, 29, 0.06);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+/* An overlay genuinely floats, so it is the one place a shadow earns its keep. */
+.popover {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 32px rgba(26, 27, 29, 0.16);
+}
+
+/* Opt a full-width sheet out of the page gutter on phones, where 2 × 16px of
+   margin around a rounded card is width the content needs more. */
+@media (max-width: 639px) {
+  .bleed {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+}
+
+/* The page canvas. Reserves room for the phone tab bar (and the home indicator
+   beneath it) so nothing is ever stuck under it. */
+.app-main {
+  padding-bottom: calc(var(--mobile-nav) + 1.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .app-main {
+    padding-bottom: 2.5rem;
+  }
+}
+
+/* A sunken block: forms, callouts and summaries that belong to their parent. */
+.inset {
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
 }
 
 .card-hover {
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease;
 }
 .card-hover:hover {
-  box-shadow:
-    0 2px 4px rgba(26, 27, 29, 0.06),
-    0 8px 24px rgba(26, 27, 29, 0.1);
+  background: var(--sunken);
 }
+
+/* ---------------------------------------------------------------------------
+   Section headings — the replacement for wrapping everything in a box
+--------------------------------------------------------------------------- */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: rgba(26, 27, 29, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The short green tick that anchors a section title to the left margin. */
+.section-title::before {
+  content: "";
+  width: 3px;
+  height: 0.85rem;
+  border-radius: 2px;
+  background: var(--rpa-green);
+  flex: none;
+}
+
+.section-note {
+  font-size: 0.75rem;
+  color: rgba(26, 27, 29, 0.55);
+  margin-top: -0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.divider {
+  border-top: 1px solid var(--line);
+}
+
+.rule {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Stat strip — one sheet split by hairlines, instead of N floating KPI cards.
+   The 1px grid gap shows the container colour through as a divider, so no
+   extra markup is needed.
+--------------------------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  gap: 1px;
+  background-color: var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.stat-grid > * {
+  background: var(--surface);
+}
+
+/* An odd number of stats in a two-column strip would leave a hairline-coloured
+   hole in the last row; the final stat takes the full width instead. */
+@media (max-width: 1023px) {
+  .stat-grid.grid-cols-2 > :last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+}
+
+.stat {
+  padding: 0.9rem 1rem;
+}
+
+.stat-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 0.65rem;
+  color: rgba(26, 27, 29, 0.6);
+  line-height: 1.3;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-top: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-caption {
+  font-size: 0.72rem;
+  color: rgba(26, 27, 29, 0.6);
+  margin-top: 0.2rem;
+  line-height: 1.35;
+}
+
+@media (min-width: 640px) {
+  .stat {
+    padding: 1.1rem 1.25rem;
+  }
+  .stat-value {
+    font-size: 2.1rem;
+  }
+  .stat-label {
+    font-size: 0.68rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Controls
+--------------------------------------------------------------------------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 40px;
   padding: 0.5rem 1rem;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: 0.875rem;
+  line-height: 1.2;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   border: 1px solid transparent;
   cursor: pointer;
@@ -88,13 +267,11 @@ body {
   background: var(--rpa-green-dark);
 }
 .btn-secondary {
-  background: var(--white);
+  background: var(--sunken);
   color: var(--gunmetal);
-  border-color: rgba(26, 27, 29, 0.16);
 }
 .btn-secondary:hover:not([disabled]) {
-  background: var(--mist);
-  border-color: rgba(26, 27, 29, 0.28);
+  background: rgba(26, 27, 29, 0.08);
 }
 .btn-ghost {
   background: transparent;
@@ -111,10 +288,12 @@ body {
 .input {
   width: 100%;
   background: var(--white);
-  border: 1px solid rgba(26, 27, 29, 0.16);
-  border-radius: 10px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+  /* 16px keeps iOS Safari from zooming the page when a field is focused. */
+  font-size: 16px;
+  min-height: 42px;
   color: var(--gunmetal);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -122,6 +301,84 @@ body {
 .input:focus {
   border-color: var(--rpa-green);
   box-shadow: 0 0 0 3px rgba(0, 160, 80, 0.15);
+}
+textarea.input {
+  min-height: 0;
+  line-height: 1.5;
+}
+
+@media (min-width: 640px) {
+  .input {
+    font-size: 0.9rem;
+  }
+}
+
+/* Inside a white sheet, a filled field reads better than another outlined box:
+   the tint is the affordance, and the outline only appears on focus. */
+.card .input {
+  background: var(--sunken);
+  border-color: transparent;
+}
+.card .input:focus {
+  background: var(--white);
+  border-color: var(--rpa-green);
+}
+/* …and back to white when the field sits on a tinted block. */
+.inset .input,
+.card .inset .input {
+  background: var(--white);
+  border-color: var(--line-strong);
+}
+
+.field-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 0.62rem;
+  color: rgba(26, 27, 29, 0.6);
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+/* Segmented control — the repeated "row of pill buttons" pattern, made to wrap
+   instead of overflowing a phone screen. */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
+}
+.card .seg {
+  background: var(--canvas);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--gunmetal);
+  padding: 0.4rem 0.75rem;
+  min-height: 36px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg-btn:hover:not([disabled]):not([aria-pressed="true"]) {
+  background: rgba(26, 27, 29, 0.06);
+}
+.seg-btn[aria-pressed="true"] {
+  background: var(--rpa-green);
+  color: var(--white);
+}
+.seg-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .chip {
@@ -136,6 +393,7 @@ body {
   letter-spacing: 0.04em;
   background: rgba(26, 27, 29, 0.06);
   color: var(--gunmetal);
+  max-width: 100%;
 }
 .chip.green {
   background: rgba(0, 160, 80, 0.1);
@@ -158,9 +416,95 @@ body {
   color: #645e00;
 }
 
-.divider {
-  border-top: 1px solid rgba(26, 27, 29, 0.08);
+.link-action {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--rpa-green-dark);
+  white-space: nowrap;
 }
+.link-action:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   Tables — no surrounding box; a hairline under the head and between rows.
+--------------------------------------------------------------------------- */
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+table.data thead th {
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 0.66rem;
+  color: rgba(26, 27, 29, 0.55);
+  padding: 0.6rem 0.75rem;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+table.data tbody td {
+  padding: 0.7rem 0.75rem;
+  vertical-align: top;
+}
+table.data tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+table.data tbody tr.row-hover:hover {
+  background: var(--sunken);
+}
+/* Edge cells line up with the panel's own gutter. */
+table.data th:first-child,
+table.data td:first-child {
+  padding-left: 1rem;
+}
+table.data th:last-child,
+table.data td:last-child {
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  table.data th:first-child,
+  table.data td:first-child {
+    padding-left: 1.25rem;
+  }
+  table.data th:last-child,
+  table.data td:last-child {
+    padding-right: 1.25rem;
+  }
+}
+table.data tfoot td {
+  padding: 0.7rem 0.75rem;
+  border-top: 1px solid var(--line-strong);
+  font-weight: 900;
+}
+table.data .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Sticky header for the long registers. */
+.tbl-sticky thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion, toast, drawer
+--------------------------------------------------------------------------- */
 
 .staggered {
   opacity: 0;
@@ -174,33 +518,35 @@ body {
   }
 }
 
-/* Table sticky header */
-.tbl-sticky thead th {
-  position: sticky;
-  top: 0;
-  background: var(--white);
-  z-index: 1;
-}
-
-/* Toast */
 .toast {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 50;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--mobile-nav) + 16px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  align-items: stretch;
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .toast {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    align-items: flex-end;
+  }
 }
 .toast-item {
   background: var(--gunmetal);
   color: var(--mist);
   padding: 0.75rem 1rem;
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
-  min-width: 240px;
-  max-width: 380px;
+  border-radius: var(--radius-sm);
+  min-width: 0;
+  max-width: 420px;
   font-size: 0.875rem;
+  pointer-events: auto;
 }
 .toast-item.success {
   background: var(--rpa-green-dark);
@@ -211,12 +557,11 @@ body {
   color: var(--white);
 }
 
-/* Drawer */
 .drawer-overlay {
   position: fixed;
   inset: 0;
   background: rgba(26, 27, 29, 0.4);
-  z-index: 40;
+  z-index: 60;
   animation: fadeIn 0.15s ease;
 }
 .drawer {
@@ -224,10 +569,9 @@ body {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(100%, 720px);
-  background: var(--mist);
-  z-index: 50;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
+  width: min(100%, 760px);
+  background: var(--canvas);
+  z-index: 61;
   animation: slideIn 0.22s ease;
   display: flex;
   flex-direction: column;
@@ -251,6 +595,10 @@ body {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Print
+--------------------------------------------------------------------------- */
+
 .print-only {
   display: none;
 }
@@ -264,4 +612,9 @@ body {
   body {
     background: white;
   }
+  .card {
+    background: white;
+  }
 }
+
+@tailwind utilities;

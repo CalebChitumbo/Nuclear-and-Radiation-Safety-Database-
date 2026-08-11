@@ -9,6 +9,7 @@
  * plus the two things a tally cannot tell you: what the readings looked like,
  * and which rows need a human to look at them again.
  */
+import { Panel } from "@/components/Section";
 import { CARGO_CLASSES, type CargoClass } from "@/lib/rules/borderCargo";
 import type { ScanSummary, Tally } from "@/lib/rules/borderScans";
 import { SCAN_RESULTS, type ScanResult } from "@/lib/rules/types";
@@ -30,45 +31,43 @@ export function ScanTallies({
 }) {
   if (!summary.total) {
     return (
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60 mb-1">{title}</div>
-        <div className="text-sm text-gunmetal/55">
+      <Panel title={title}>
+        <p className="text-sm text-gunmetal/55">
           Nothing logged yet. The tallies build themselves as scans are saved —
           there is nothing to add up at the end of the shift.
-        </div>
-      </div>
+        </p>
+      </Panel>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="card p-5">
-        <div className="flex items-baseline justify-between flex-wrap gap-2">
-          <div>
-            <div className="caps text-xs text-gunmetal/60">{title}</div>
-            <div className="text-3xl font-black tabular">
-              {summary.total.toLocaleString()}
-              <span className="text-sm font-normal text-gunmetal/60 ml-2">
-                trucks scanned
-              </span>
-            </div>
+      <Panel title={title} note={caption}>
+        <div className="flex items-baseline justify-between flex-wrap gap-3">
+          <div className="text-3xl font-black tabular">
+            {summary.total.toLocaleString()}
+            <span className="text-sm font-normal text-gunmetal/60 ml-2">
+              trucks scanned
+            </span>
           </div>
           <div className="flex gap-4 text-sm">
             {CARGO_CLASSES.map((c) => (
               <div key={c} className="text-right">
                 <div className="caps text-[10px] text-gunmetal/55">{c}</div>
-                <div className="text-lg font-black tabular">{summary.byClass[c]}</div>
+                <div className="text-lg font-black tabular">
+                  {summary.byClass[c]}
+                </div>
               </div>
             ))}
           </div>
         </div>
-        {caption ? (
-          <div className="text-xs text-gunmetal/55 mt-2">{caption}</div>
-        ) : null}
 
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label="Highest reading" value={`${summary.dose.max} nSv/h`} />
-          <Stat label="Typical (median)" value={`${summary.dose.median} nSv/h`} />
+          <Stat
+            label="Typical (median)"
+            value={`${summary.dose.median} nSv/h`}
+          />
           <Stat
             label="Above background"
             value={String(summary.byResult.Elevated + summary.byResult.Alarm)}
@@ -98,63 +97,96 @@ export function ScanTallies({
             ) : null,
           )}
         </div>
-      </div>
+      </Panel>
 
       {/* Above background — the part the weekly report is actually about. */}
       {summary.aboveBackground.length ? (
-        <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-gunmetal/8 font-black">
-            Readings above background
-            <span className="text-xs font-normal text-gunmetal/55 ml-2">
-              {summary.aboveBackground.length} of {summary.total}
-              {summary.aboveBackgroundOnNorm
-                ? ` · ${summary.aboveBackgroundOnNorm} on NORM-bearing cargo`
-                : ""}
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <Panel
+          title={`Readings above background — ${summary.aboveBackground.length} of ${summary.total}${
+            summary.aboveBackgroundOnNorm
+              ? ` · ${summary.aboveBackgroundOnNorm} on NORM-bearing cargo`
+              : ""
+          }`}
+          flush
+        >
+          <div className="hidden sm:block table-wrap">
+            <table className="data">
               <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-5 py-2">Unit</th>
-                  <th className="px-5 py-2">Cargo</th>
-                  <th className="px-5 py-2 text-right">Dose</th>
-                  <th className="px-5 py-2">Action taken</th>
+                <tr>
+                  <th>Unit</th>
+                  <th>Cargo</th>
+                  <th className="num">Dose</th>
+                  <th>Action taken</th>
                 </tr>
               </thead>
               <tbody>
                 {summary.aboveBackground.map((s) => (
-                  <tr key={s.id} className="border-t border-gunmetal/8">
-                    <td className="px-5 py-2 font-bold">
+                  <tr key={s.id}>
+                    <td className="font-bold">
                       {s.vehicleId}
                       <span className="block text-[11px] font-normal text-gunmetal/55">
                         {s.date}
                         {s.time ? ` ${s.time}` : ""} · {s.border}
                       </span>
                     </td>
-                    <td className="px-5 py-2">
+                    <td>
                       {s.commodity}
                       {s.norm ? <span className="chip ml-1">NORM</span> : null}
                     </td>
                     <td
-                      className="px-5 py-2 text-right tabular font-black"
+                      className="num font-black"
                       style={{ color: RESULT_COLOUR[s.result] }}
                     >
                       {s.doseNSvH}
                     </td>
-                    <td className="px-5 py-2">{s.action || "—"}</td>
+                    <td>{s.action || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+
+          <ul className="sm:hidden divide-y divide-gunmetal/8">
+            {summary.aboveBackground.map((s) => (
+              <li key={s.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold break-words">{s.vehicleId}</div>
+                    <div className="text-[11px] text-gunmetal/55">
+                      {s.date}
+                      {s.time ? ` ${s.time}` : ""} · {s.border}
+                    </div>
+                  </div>
+                  <div
+                    className="tabular font-black shrink-0"
+                    style={{ color: RESULT_COLOUR[s.result] }}
+                  >
+                    {s.doseNSvH}
+                    <span className="text-[10px] font-normal text-gunmetal/50">
+                      {" "}
+                      nSv/h
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-gunmetal/70 break-words">
+                  {s.commodity}
+                  {s.norm ? <span className="chip ml-1">NORM</span> : null}
+                </div>
+                {s.action ? (
+                  <div className="text-[11px] text-gunmetal/55 mt-0.5">
+                    {s.action}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Panel>
       ) : null}
 
       {/* The three tally blocks. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {CARGO_CLASSES.map((c) => (
-          <TallyCard
+          <TallyPanel
             key={c}
             title={c}
             rows={summary.commodities[c]}
@@ -164,13 +196,13 @@ export function ScanTallies({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <TallyCard
+        <TallyPanel
           title="Transporters / declarants"
           rows={summary.transporters}
           total={summary.total}
           limit={15}
         />
-        <ReviewCard summary={summary} />
+        <ReviewPanel summary={summary} />
       </div>
     </div>
   );
@@ -188,14 +220,17 @@ function Stat({
   return (
     <div>
       <div className="caps text-[10px] text-gunmetal/55">{label}</div>
-      <div className="text-lg font-black tabular" style={colour ? { color: colour } : undefined}>
+      <div
+        className="text-lg font-black tabular"
+        style={colour ? { color: colour } : undefined}
+      >
         {value}
       </div>
     </div>
   );
 }
 
-function TallyCard({
+function TallyPanel({
   title,
   rows,
   total,
@@ -208,29 +243,29 @@ function TallyCard({
 }) {
   const shown = rows.slice(0, limit);
   return (
-    <div className="card p-5">
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="caps text-xs text-gunmetal/60">{title}</div>
-        <div className="text-sm font-black tabular">{total}</div>
-      </div>
+    <Panel
+      title={title}
+      action={<span className="text-sm font-black tabular">{total}</span>}
+    >
       {shown.length === 0 ? (
-        <div className="text-sm text-gunmetal/55">None</div>
+        <p className="text-sm text-gunmetal/55">None</p>
       ) : (
         <ul className="text-sm divide-y divide-gunmetal/8">
           {shown.map((t) => (
-            <li key={t.name} className="flex justify-between gap-3 py-1.5">
-              <span>{t.name}</span>
-              <span className="tabular font-bold">{t.count}</span>
+            <li key={t.name} className="flex justify-between gap-3 py-2">
+              <span className="min-w-0 break-words">{t.name}</span>
+              <span className="tabular font-bold shrink-0">{t.count}</span>
             </li>
           ))}
         </ul>
       )}
       {rows.length > shown.length ? (
-        <div className="text-[11px] text-gunmetal/55 mt-2">
-          + {rows.length - shown.length} more — the full list is in the CSV export.
-        </div>
+        <p className="text-[11px] text-gunmetal/55 mt-2">
+          + {rows.length - shown.length} more — the full list is in the CSV
+          export.
+        </p>
       ) : null}
-    </div>
+    </Panel>
   );
 }
 
@@ -240,20 +275,19 @@ function TallyCard({
  * like the same firm typed two ways. The spreadsheet could not raise any of
  * these, which is why a month of it carried six spellings of "sulphur".
  */
-function ReviewCard({ summary }: { summary: ScanSummary }) {
+function ReviewPanel({ summary }: { summary: ScanSummary }) {
   const nothing =
     !summary.newCommodities.length &&
     !summary.repeatedVehicles.length &&
     !summary.possibleDuplicateTransporters.length;
 
   return (
-    <div className="card p-5">
-      <div className="caps text-xs text-gunmetal/60 mb-2">Worth a look</div>
+    <Panel title="Worth a look">
       {nothing ? (
-        <div className="text-sm text-gunmetal/55">
+        <p className="text-sm text-gunmetal/55">
           Nothing to query — every commodity was from the standard list, no unit
           was logged twice, and no transporter name looks like a duplicate.
-        </div>
+        </p>
       ) : (
         <div className="space-y-3 text-sm">
           {summary.newCommodities.length ? (
@@ -295,11 +329,13 @@ function ReviewCard({ summary }: { summary: ScanSummary }) {
                 Transporter names that may be the same firm
               </div>
               <ul className="text-gunmetal/70">
-                {summary.possibleDuplicateTransporters.slice(0, 8).map(([a, b]) => (
-                  <li key={`${a}|${b}`}>
-                    {a} · {b}
-                  </li>
-                ))}
+                {summary.possibleDuplicateTransporters
+                  .slice(0, 8)
+                  .map(([a, b]) => (
+                    <li key={`${a}|${b}`}>
+                      {a} · {b}
+                    </li>
+                  ))}
               </ul>
               <div className="text-[11px] text-gunmetal/55 mt-0.5">
                 Listed, not merged — two real companies can look alike.
@@ -308,6 +344,6 @@ function ReviewCard({ summary }: { summary: ScanSummary }) {
           ) : null}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
