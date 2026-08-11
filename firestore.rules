@@ -147,6 +147,39 @@ service cloud.firestore {
         if isAdmin() || (signedIn() && resource.data.updatedBy == request.auth.uid);
     }
 
+    // Border scan log: one document per truck scanned at a post. The border
+    // offices belong to NSSS, so NSSS officers (and admins) write them; every
+    // signed-in officer may read, because the weekly report is assembled from
+    // these rows. An officer may remove a scan they logged (the shift's own
+    // mistakes) — officerUid is the audit trail and may never be reassigned.
+    function validTruckScan(d) {
+      return d.date is string && d.date.matches('\\d{4}-\\d{2}-\\d{2}')
+        && d.week is string && d.week.size() > 0
+        && d.border is string && d.border.size() > 0
+        && d.vehicleId is string && d.vehicleId.size() > 0
+        && d.cargoClass in ['Goods of Interest','Food','Other']
+        && d.commodity is string && d.commodity.size() > 0
+        && d.transporter is string
+        && d.doseNSvH is number && d.doseNSvH >= 0
+        && d.result in ['Normal','Elevated','Alarm']
+        // Anything above background must say what was done about it.
+        && (d.result == 'Normal' || ('action' in d && d.action is string));
+    }
+
+    match /truckScans/{id} {
+      allow read:   if signedIn();
+      allow create: if isNSSS()
+        && validTruckScan(request.resource.data)
+        && request.resource.data.officerUid == request.auth.uid;
+      // No client edits a scan — correcting one is remove-and-relog — but the
+      // shape is still enforced for anything written out of band.
+      allow update: if isAdmin()
+        && validTruckScan(request.resource.data)
+        && request.resource.data.officerUid == resource.data.officerUid;
+      allow delete: if isAdmin()
+        || (isNSSS() && resource.data.officerUid == request.auth.uid);
+    }
+
     // Border posts the NSSS section screens vehicles at. The border list is
     // managed by NSSS (and admins): coordinators pick their border when
     // logging a daily screening count. Deactivating (active=false) hides a

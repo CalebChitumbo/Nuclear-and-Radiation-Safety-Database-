@@ -30,6 +30,56 @@ export function vehicleScreeningKey(): string {
   return metricKey(NSSS_SECTION, VEHICLE_SCREENING_LABEL);
 }
 
+/**
+ * A post that logs truck by truck does not type a daily figure — it posts the
+ * count of what it scanned. That count is one `count` entry per border per day,
+ * marked `source: "scan-log"` so posting again REPLACES it (see
+ * `scanLogEntriesFor`): the same day can never be added to the week twice, and
+ * the weekly report keeps reading the same metric it always has.
+ */
+export function scanLogCountEntry(input: {
+  date: string;
+  week: string;
+  border: string;
+  total: number;
+  uid?: string;
+  name?: string;
+}): Omit<DailyEntry, "id"> {
+  return {
+    date: input.date,
+    week: input.week,
+    section: NSSS_SECTION,
+    kind: "count",
+    metricKey: vehicleScreeningKey(),
+    label: VEHICLE_SCREENING_LABEL,
+    value: input.total,
+    border: input.border,
+    source: "scan-log",
+    text: `From the border scan log — ${input.total} truck${
+      input.total === 1 ? "" : "s"
+    } recorded individually.`,
+    updatedBy: input.uid,
+    updatedByName: input.name,
+  };
+}
+
+/** The scan-log counts already posted for one post on one day, if any. */
+export function scanLogEntriesFor(
+  entries: DailyEntry[],
+  border: string,
+  date: string,
+): DailyEntry[] {
+  const key = vehicleScreeningKey();
+  return entries.filter(
+    (e) =>
+      e.source === "scan-log" &&
+      e.kind === "count" &&
+      e.metricKey === key &&
+      e.border === border &&
+      e.date === date,
+  );
+}
+
 export interface BorderSums {
   /** Sum per named border post (only borders that appear in the entries). */
   byBorder: Record<string, number>;

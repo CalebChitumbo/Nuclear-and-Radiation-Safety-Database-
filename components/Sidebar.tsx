@@ -20,6 +20,7 @@ const NAV = [
     label: "Nuclear Safety, Security & Safeguards",
     icon: "⬢",
   },
+  { href: "/border", label: "Border Scan Log", icon: "☢" },
   { href: "/licence-status", label: "Smart Status Update", icon: "◑" },
   { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
   { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },

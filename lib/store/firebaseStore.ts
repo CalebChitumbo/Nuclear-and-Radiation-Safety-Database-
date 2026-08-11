@@ -8,6 +8,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   orderBy,
   query,
   setDoc,
@@ -50,6 +51,7 @@ import {
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type TruckScan,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -65,6 +67,14 @@ function requireDb(): Firestore {
   if (!db) throw new Error("Firestore is not configured.");
   return db;
 }
+
+/**
+ * How far back the cross-post scan feed reads. A busy post logs 200–400 scans
+ * a day, so the whole collection is not something to pull into a browser: this
+ * window is what the pickers and "last seen this unit" lookups need, and the
+ * exact figures come from the per-shift and per-week queries instead.
+ */
+const RECENT_SCAN_LIMIT = 4000;
 
 /**
  * Drop keys whose value is `undefined`. The web Firestore SDK rejects undefined
@@ -251,6 +261,63 @@ class FirebaseStore implements DataStore {
   async deleteDailyEntry(id: string): Promise<void> {
     const db = requireDb();
     await deleteDoc(doc(db, "dailyEntries", id));
+  }
+
+  async listTruckScans(): Promise<TruckScan[]> {
+    const db = requireDb();
+    const snap = await getDocs(
+      query(
+        collection(db, "truckScans"),
+        orderBy("date", "desc"),
+        limit(RECENT_SCAN_LIMIT),
+      ),
+    );
+    return snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<TruckScan, "id">),
+    }));
+  }
+
+  async listTruckScansFor(border: string, date: string): Promise<TruckScan[]> {
+    const db = requireDb();
+    const snap = await getDocs(
+      query(
+        collection(db, "truckScans"),
+        where("border", "==", border),
+        where("date", "==", date),
+      ),
+    );
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<TruckScan, "id">) }))
+      .sort((a, b) => (b.time || "").localeCompare(a.time || ""));
+  }
+
+  async listTruckScansForWeek(week: string): Promise<TruckScan[]> {
+    const db = requireDb();
+    const snap = await getDocs(
+      query(collection(db, "truckScans"), where("week", "==", week)),
+    );
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<TruckScan, "id">) }))
+      .sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""),
+      );
+  }
+
+  async addTruckScan(scan: Omit<TruckScan, "id">): Promise<TruckScan> {
+    const db = requireDb();
+    const createdAt = new Date().toISOString();
+    const ref = await addDoc(
+      collection(db, "truckScans"),
+      stripUndefined({ ...scan, createdAt }),
+    );
+    return { ...scan, id: ref.id, createdAt };
+  }
+
+  async deleteTruckScan(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "truckScans", id));
   }
 
   async listBorders(): Promise<Border[]> {
@@ -755,6 +822,7 @@ class FirebaseStore implements DataStore {
       licenceWorkflows,
       dailyEntries,
       borders,
+      truckScans,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -765,6 +833,7 @@ class FirebaseStore implements DataStore {
       // Degrade gracefully until the dailyEntries/borders rules are deployed.
       this.listDailyEntries().catch(() => [] as DailyEntry[]),
       this.listBorders().catch(() => [] as Border[]),
+      this.listTruckScans().catch(() => [] as TruckScan[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -782,6 +851,7 @@ class FirebaseStore implements DataStore {
       weekMetrics,
       dailyEntries,
       borders,
+      truckScans,
     };
   }
 }

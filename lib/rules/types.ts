@@ -1,10 +1,13 @@
 import type { NewApplicationStatus } from "./raisTemplates";
+import type { CargoClass } from "./borderCargo";
 
 // The canonical RAIS status taxonomy lives in raisTemplates.ts (co-located with
 // the email-template table it is derived from). Re-exported here so callers can
 // keep importing status types from the central types module. This is a
 // type-only import/re-export, so there is no runtime import cycle.
 export type { NewApplicationStatus };
+// Same for the cargo vocabulary, which lives beside the commodity table.
+export type { CargoClass };
 
 export const PROVINCES = [
   "Lusaka",
@@ -497,6 +500,13 @@ export interface DailyEntry {
    * coordinators' count entries — the numbers stay single-sourced.
    */
   official?: boolean;
+  /**
+   * Set on the count a border post posts from its scan log rather than typing.
+   * The figure is the number of scans recorded that day, so re-posting replaces
+   * the previous one instead of adding to it — the weekly total can never
+   * double count a post that logs truck by truck.
+   */
+  source?: "scan-log";
   createdAt?: string;
   updatedBy?: string;
   updatedByName?: string;
@@ -514,6 +524,83 @@ export interface Border {
   active: boolean;
   createdAt?: string;
   updatedBy?: string;
+}
+
+/**
+ * How a scanned unit was identified. Derived from the shape of what the
+ * officer typed, so it is never a question on the form: Tanzanian and Zambian
+ * plates look like plates, an imported vehicle carries a chassis number, and a
+ * 17-character VIN is a VIN.
+ */
+export const VEHICLE_ID_KINDS = ["Plate", "Chassis", "VIN", "Other"] as const;
+export type VehicleIdKind = (typeof VEHICLE_ID_KINDS)[number];
+
+/** Which way the unit was moving through the post. */
+export const SCAN_DIRECTIONS = ["Inbound", "Outbound", "Transit"] as const;
+export type ScanDirection = (typeof SCAN_DIRECTIONS)[number];
+
+/**
+ * The radiological outcome of a scan, derived from the dose rate against the
+ * post's review thresholds (see borderScans.ts). Not a regulatory
+ * classification — a working triage that decides whether the truck moves on or
+ * gets a second look.
+ */
+export const SCAN_RESULTS = ["Normal", "Elevated", "Alarm"] as const;
+export type ScanResult = (typeof SCAN_RESULTS)[number];
+
+/** What the officer did with the unit. Required once a reading is elevated. */
+export const SCAN_ACTIONS = [
+  "Released",
+  "Re-scanned & released",
+  "Referred for secondary inspection",
+  "Held pending investigation",
+  "Denied entry",
+  "Escalated to RPA Head Office",
+] as const;
+export type ScanAction = (typeof SCAN_ACTIONS)[number];
+
+/**
+ * One scanned truck at a border post — the unit of the border scan log, and
+ * the record the monthly workbook kept as a spreadsheet row.
+ *
+ * A post logs a few hundred of these a day, so every field is either picked
+ * from a controlled list, derived, or carried over from the shift header. The
+ * day's tallies (what used to be typed into the summary block beside each
+ * sheet) are computed from these rows — see summariseScans in borderScans.ts.
+ */
+export interface TruckScan {
+  id: string;
+  /** YYYY-MM-DD — the shift's date, set once in the header. */
+  date: string;
+  /** Reporting week the date lands in (weekLabelForDate). */
+  week: string;
+  /** Border post name — set once in the header, from the Border register. */
+  border: string;
+  /** HH:MM local, stamped on save. Shows the post's peak hours. */
+  time?: string;
+  /** Registration or chassis number, normalised (upper case, no spaces). */
+  vehicleId: string;
+  /** Derived from the shape of vehicleId — never typed. */
+  vehicleIdKind: VehicleIdKind;
+  /** Carried over from the shift header unless changed on the scan. */
+  direction?: ScanDirection;
+  /** Derived from the commodity, or picked when the commodity is new. */
+  cargoClass: CargoClass;
+  /** Canonical commodity name (resolveCommodity). */
+  commodity: string;
+  /** Commodity commonly carries NORM — copied so old rows keep their meaning. */
+  norm?: boolean;
+  transporter: string;
+  /** Dose rate at the vehicle, nSv/h — as read off the monitor. */
+  doseNSvH: number;
+  /** Derived from doseNSvH against the review thresholds. */
+  result: ScanResult;
+  /** What the officer did. Required once the reading is above background. */
+  action?: ScanAction;
+  remarks?: string;
+  officerUid?: string;
+  officerName?: string;
+  createdAt?: string;
 }
 
 export interface Activity {

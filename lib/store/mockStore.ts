@@ -30,6 +30,7 @@ import {
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type TruckScan,
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
@@ -58,6 +59,7 @@ interface State {
   weekMetrics: Record<string, WeekMetrics>;
   dailyEntries: DailyEntry[];
   borders: Border[];
+  truckScans: TruckScan[];
   users: UserDoc[];
 }
 
@@ -88,6 +90,7 @@ function freshState(): State {
     weekMetrics: {},
     dailyEntries: [],
     borders: defaultBorders(),
+    truckScans: [],
     users: [
       {
         uid: "demo-admin",
@@ -141,6 +144,7 @@ function load(): State {
     if (!parsed.dailyEntries) parsed.dailyEntries = [];
     // Back-compat: stores saved before border posts existed.
     if (!parsed.borders) parsed.borders = defaultBorders();
+    if (!parsed.truckScans) parsed.truckScans = [];
     // Back-compat: add the NSSS demo account to older saved stores.
     if (!parsed.users.some((u) => u.uid === "demo-nsss")) {
       parsed.users.push({
@@ -319,6 +323,42 @@ class MockStore implements DataStore {
   async deleteDailyEntry(id: string): Promise<void> {
     const s = ensure();
     s.dailyEntries = s.dailyEntries.filter((e) => e.id !== id);
+    save(s);
+    dispatchChange();
+  }
+
+  async listTruckScans(): Promise<TruckScan[]> {
+    return [...ensure().truckScans].sort(
+      (a, b) => b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""),
+    );
+  }
+
+  async listTruckScansFor(border: string, date: string): Promise<TruckScan[]> {
+    return (await this.listTruckScans()).filter(
+      (s) => s.border === border && s.date === date,
+    );
+  }
+
+  async listTruckScansForWeek(week: string): Promise<TruckScan[]> {
+    return (await this.listTruckScans()).filter((s) => s.week === week);
+  }
+
+  async addTruckScan(scan: Omit<TruckScan, "id">): Promise<TruckScan> {
+    const s = ensure();
+    const record: TruckScan = {
+      ...scan,
+      id: newId("scan"),
+      createdAt: new Date().toISOString(),
+    };
+    s.truckScans.push(record);
+    save(s);
+    dispatchChange();
+    return record;
+  }
+
+  async deleteTruckScan(id: string): Promise<void> {
+    const s = ensure();
+    s.truckScans = s.truckScans.filter((r) => r.id !== id);
     save(s);
     dispatchChange();
   }
@@ -806,6 +846,7 @@ class MockStore implements DataStore {
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
       dailyEntries: s.dailyEntries,
+      truckScans: s.truckScans,
       borders: s.borders,
     };
   }

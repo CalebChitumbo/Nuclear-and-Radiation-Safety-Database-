@@ -41,6 +41,14 @@
       ]
     },
     {
+      "collectionGroup": "truckScans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "border", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "facilities",
       "queryScope": "COLLECTION",
       "fields": [
