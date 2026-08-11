@@ -15,6 +15,7 @@ const TITLES: Record<string, string> = {
   "/inspectorate": "Inspectorate",
   "/inspections": "Inspectorate",
   "/nsss": "Nuclear Safety, Security & Safeguards",
+  "/border": "Border Scan Log",
   "/daily": "Daily Updates",
   "/weekly": "Weekly Sectional Report",
   "/admin/users": "User Management",

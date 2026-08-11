@@ -204,6 +204,7 @@ automatically (Production for the production branch, Preview for others).
 | `weekMetrics/{week}` | Manual per-week metric inputs (engagements, TWG meetings, NSSS, NSI) |
 | `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the weekly metric keys, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
 | `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
+| `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`), carrying the application's append-only officer **notes & history** trail (`notes`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
@@ -392,6 +393,9 @@ the admin under Users), and each account lands directly on its own flow.
   collection, managed by NSSS/admins on the NSSS tab (deactivating keeps
   history); the NSSS dashboard adds a screening-by-border breakdown.
 - **NSI** logs numbers against its metrics and free-text notes the same way.
+- A border post that logs **truck by truck** on the Border Scan Log (below)
+  does not type its daily figure at all — it posts the count of what it
+  scanned.
 
 Count entries are stored in `dailyEntries` on the **same metric keys** the
 weekly report uses (`lib/rules/daily.ts` + `MANUAL_METRICS_BY_SECTION`), so the
@@ -402,13 +406,63 @@ week, where the brief/PDF export works exactly as before.
 
 ---
 
+## Border Scan Log
+
+The **Border Scan Log** tab (`/border`) is the border offices' capture screen:
+one record per scanned truck, replacing the monthly Excel workbook the posts
+kept (a sheet per day, a row per truck, and a tally block retyped by hand at
+the end of every shift).
+
+The shift header — post, date, direction — is answered once. Each truck is
+five short answers:
+
+1. **Registration / chassis number** — normalised on save, so `T 361 DVG` and
+   `T361DVG` are one truck.
+2. **Cargo** — one type-ahead over a controlled commodity list
+   (`lib/rules/borderCargo.ts`). The workbook's three cargo columns (goods of
+   interest / food / other) collapse into this single question: the **class is
+   derived from the commodity**. A commodity the list has never seen is still
+   accepted, classed once, and reported as new so the list grows on purpose.
+3. **Transporter / declarant** — type-ahead over what the post has logged
+   before, seeded with the names the northern posts see most.
+4. **Dose rate (nSv/h)** — number plus one-tap chips for the common readings.
+5. **Action taken** — asked **only** when the reading is above background.
+
+Everything else derives: identifier type (plate / chassis / VIN), cargo class,
+NORM-bearing, result (Normal / Elevated / Alarm from the thresholds in
+`lib/rules/borderScans.ts`), the time, and every tally.
+
+Validation comes from what actually went wrong in the workbooks — doses typed
+as `4O`, `8-` or `90]` are rejected; a reading at or above 100,000 nSv/h is
+queried but can be confirmed (a real detection must stay recordable); a unit
+already scanned at the post that day is flagged with the earlier reading before
+it can be saved again.
+
+The day view computes the workbook's three tally blocks, the dose spread, the
+readings above background with their actions, and a **Worth a look** panel (new
+commodities, repeated units, transporter names that look like duplicates). The
+week view adds scans by day, a per-post table and a ready-to-paste weekly
+paragraph. Rows and summary both export as CSV.
+
+**Post day total to Daily Updates** writes the day's count as a single
+`dailyEntries` count marked `source: "scan-log"`; posting again replaces it
+rather than adding, so the weekly report's *Vehicle Screening (units)* figure
+can never be double counted.
+
+`scripts/check-border-vocabulary.py` replays a monthly workbook through the
+vocabulary and reports coverage — 99.7% of the June 2026 Nakonde book's 9,198
+scans resolve to the standard list, folding 43 commodities' worth of spelling
+variants. Full mapping in [`docs/border-scan-log.md`](docs/border-scan-log.md).
+
+---
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-241 tests across `lib/rules/*` and the seed baseline, including:
+296 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -423,6 +477,11 @@ npm test
 - `daily` — daily-entry sums, the daily-over-weekly precedence rule, that
   daily metric keys match the weekly report's exactly, and the per-border
   screening sums + official-total text
+- `borderScans` — the border capture rules: the workbook's spelling variants
+  folding onto canonical commodities, cargo class derived from the commodity,
+  the dose typos it rejects and the high reading it lets an officer confirm,
+  the day/week tallies, and that a posted day total replaces rather than
+  duplicates
 - `weeklyDerivation` — A&S 1–9 and Inspectorate 1–5 roll-ups
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
@@ -447,6 +506,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── inspectorate/       Inspectorate dashboard, schedule, log + register
 │   ├── inspections/        (moved) redirects to /inspectorate
 │   ├── nsss/               Nuclear Safety, Security & Safeguards dashboard
+│   ├── border/             Border Scan Log — one record per scanned truck
 │   ├── licence-status/     Smart Status Update — RAIS workflow tracker
 │   ├── bulk-approval/      Paste → match → review → commit
 │   ├── inspection-requests/ Licensing ↔ Inspectorate pre-auth handoff board
@@ -463,6 +523,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   └── weekContext.tsx     Global reporting-week selector
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
+├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend

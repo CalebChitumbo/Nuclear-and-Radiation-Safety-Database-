@@ -122,9 +122,14 @@ export default function NsssPage() {
             without daily entries fall back to the weekly report figure.
           </div>
         </div>
-        <Link className="btn btn-primary" href="/daily">
-          Log today&apos;s numbers
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link className="btn btn-primary" href="/border">
+            Border scan log
+          </Link>
+          <Link className="btn btn-secondary" href="/daily">
+            Log today&apos;s numbers
+          </Link>
+        </div>
       </div>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -197,8 +202,17 @@ export default function NsssPage() {
               Screening by border post — {year}
             </div>
             <div className="text-sm text-gunmetal/55">
-              No border figures yet this year. Coordinators pick their border
-              post when logging vehicles screened on Daily Updates.
+              No border figures yet this year. Posts either log truck by truck
+              on the{" "}
+              <Link
+                className="font-bold"
+                style={{ color: "var(--rpa-green-dark)" }}
+                href="/border"
+              >
+                Border Scan Log
+              </Link>{" "}
+              and post the day&apos;s total, or enter the figure directly on
+              Daily Updates.
             </div>
           </div>
         )}

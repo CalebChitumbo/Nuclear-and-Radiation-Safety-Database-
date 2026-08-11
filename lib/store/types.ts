@@ -13,6 +13,7 @@ import type {
   InspectionRequest,
   LicenceEvent,
   LicenceWorkflow,
+  TruckScan,
   UserDoc,
   WeekDef,
   WeekMetrics,
@@ -56,6 +57,27 @@ export interface DataStore {
   listDailyEntries(): Promise<DailyEntry[]>;
   addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
   deleteDailyEntry(id: string): Promise<void>;
+  /**
+   * Recent truck scans across the border posts, newest date first. One record
+   * per scanned unit — the daily and weekly tallies are derived from these.
+   *
+   * A busy post logs a few hundred a day, so this is a bounded recent window
+   * (see RECENT_SCAN_LIMIT), not the whole history: it backs the pickers and
+   * the "last seen" lookups. Anything that must be exact reads a slice —
+   * `listTruckScansFor` for a shift, `listTruckScansForWeek` for a report.
+   */
+  listTruckScans(): Promise<TruckScan[]>;
+  /** One post's scans for one day — the shift list on the capture screen. */
+  listTruckScansFor(border: string, date: string): Promise<TruckScan[]>;
+  /** Every post's scans for one reporting week — the weekly rollup. */
+  listTruckScansForWeek(week: string): Promise<TruckScan[]>;
+  addTruckScan(s: Omit<TruckScan, "id">): Promise<TruckScan>;
+  /**
+   * Remove a scan. Correcting one is a remove-and-relog on the capture screen:
+   * a scan is a handful of fields typed in seconds, so an edit path would be
+   * more UI than the mistake is worth.
+   */
+  deleteTruckScan(id: string): Promise<void>;
   /** Border posts (active and inactive), name order. */
   listBorders(): Promise<Border[]>;
   /** Add a border post (idempotent on name). NSSS + admin. */
@@ -140,5 +162,6 @@ export interface DataStore {
     weekMetrics: Record<string, WeekMetrics>;
     dailyEntries: DailyEntry[];
     borders: Border[];
+    truckScans: TruckScan[];
   }>;
 }
