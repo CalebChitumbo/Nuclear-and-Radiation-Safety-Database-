@@ -29,6 +29,14 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+/**
+ * Which Firebase project the app is actually talking to. Surfaced in the
+ * permission-denied diagnostics so "I deployed the rules" can be checked
+ * against the project the browser is really pointed at — deploying to a
+ * different project than the one in `.env.local` looks identical from here.
+ */
+export const firebaseProjectId = firebaseConfig.projectId || "";
+
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;

@@ -417,16 +417,42 @@ describe("capture-screen helpers", () => {
 });
 
 describe("write failures", () => {
-  it("explains a permission denial instead of blaming the account", () => {
-    // truckScans is a new collection: Firestore denies every write to one no
-    // deployed rule mentions, admin or not. The raw SDK text sends people to
-    // the Users tab; the command is what they actually need.
-    const message = scanWriteErrorMessage(
-      new Error("Missing or insufficient permissions."),
-    );
+  const denied = new Error("Missing or insufficient permissions.");
+
+  it("blames the undeployed rule when the sign-in clearly permits the write", () => {
+    const message = scanWriteErrorMessage(denied, {
+      role: "admin",
+      section: "All",
+      projectId: "nrsd-example",
+    });
+    expect(message).toContain("truckScans rule is not live");
+    expect(message).toContain("nrsd-example");
     expect(message).toContain("firebase deploy --only firestore:rules");
-    expect(message).toContain("not deployed yet");
-    expect(message).not.toContain("Missing or insufficient permissions");
+    // Never sends an admin to the Users tab.
+    expect(message).not.toContain("re-provision");
+  });
+
+  it("blames missing claims on the officer/All fallback signature", () => {
+    // auth.tsx substitutes exactly this pair when the token carries no custom
+    // claims — the rules then see nothing and refuse, whatever the users doc says.
+    const message = scanWriteErrorMessage(denied, { role: "officer", section: "All" });
+    expect(message).toContain("carries no section or role claim");
+    expect(message).toContain("Sign out and back in");
+    expect(message).not.toContain("firebase deploy");
+  });
+
+  it("keeps a real section officer on the deployment answer", () => {
+    const message = scanWriteErrorMessage(denied, {
+      role: "officer",
+      section: "Nuclear Safety, Security & Safeguards",
+    });
+    expect(message).toContain("truckScans rule is not live");
+  });
+
+  it("covers both causes when it has no sign-in to read", () => {
+    const message = scanWriteErrorMessage(denied);
+    expect(message).toContain("firebase deploy --only firestore:rules");
+    expect(message).toContain("Nuclear Safety, Security & Safeguards");
   });
 
   it("passes any other failure through unchanged", () => {

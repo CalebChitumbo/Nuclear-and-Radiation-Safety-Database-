@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Suggest, type SuggestOption } from "./Suggest";
+import { firebaseProjectId } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import {
@@ -62,7 +63,7 @@ export function ScanCaptureCard({
   date: string;
   week: string;
   direction: ScanDirection;
-  officer: { uid: string; name: string };
+  officer: { uid: string; name: string; role: string; section: string };
   /** This post's scans for this date — duplicate detection and quick picks. */
   todaysScans: TruckScan[];
   /** The wider recent window — transporter list and "last seen" lookups. */
@@ -176,7 +177,14 @@ export function ScanCaptureCard({
       reset();
       onSaved();
     } catch (err) {
-      toast.push(`Could not save the scan. ${scanWriteErrorMessage(err)}`, "error");
+      toast.push(
+        `Could not save the scan. ${scanWriteErrorMessage(err, {
+          role: officer.role,
+          section: officer.section,
+          projectId: firebaseProjectId,
+        })}`,
+        "error",
+      );
     } finally {
       setBusy(false);
     }

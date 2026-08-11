@@ -303,7 +303,12 @@ export default function BorderScanPage() {
           date={date}
           week={weekLabel}
           direction={direction}
-          officer={{ uid: user.uid, name: user.displayName }}
+          officer={{
+            uid: user.uid,
+            name: user.displayName,
+            role: user.role,
+            section: user.section,
+          }}
           todaysScans={data.shiftScans}
           recentScans={data.recentScans}
           onSaved={reload}

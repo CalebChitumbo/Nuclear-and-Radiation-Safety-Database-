@@ -277,24 +277,62 @@ export function buildScan(
 /**
  * Turn a failed scan write into something the officer can act on.
  *
- * `truckScans` is a collection this feature introduces, and Firestore denies
- * every write to a collection no deployed rule mentions — whatever the account.
- * The raw SDK message ("Missing or insufficient permissions") reads as "your
- * account is wrong", which sends people to the Users tab instead of to the one
- * command that fixes it. Rules are deployed by hand in this project (nothing in
- * CI does it), so this is the expected state of a fresh deployment, not a bug.
+ * A permission denial here has exactly two causes, and they need opposite
+ * fixes — so rather than list both every time, this reads the caller's own
+ * sign-in and says which one it is:
+ *
+ * 1. THE RULE IS NOT LIVE. `truckScans` is a collection this feature
+ *    introduces, and Firestore denies every write to a collection no deployed
+ *    rule mentions — whatever the account. Rules are deployed by hand in this
+ *    project (nothing in CI does it), and deploying to a different project than
+ *    the browser is pointed at looks identical from here, hence the project id.
+ *
+ * 2. THE TOKEN CARRIES NO CLAIMS. The rules read `role` and `section` as Auth
+ *    custom claims. `lib/auth.tsx` falls back to officer/All when they are
+ *    missing, so the UI still renders the form and the account *looks* fine —
+ *    but the rules see nothing and refuse. That exact pair is the signature.
+ *
+ * Firestore's own text ("Missing or insufficient permissions") points at the
+ * Users tab, which is the right answer only in case 2 and the wrong one in
+ * case 1.
  */
-export function scanWriteErrorMessage(err: unknown): string {
+export function scanWriteErrorMessage(
+  err: unknown,
+  context?: { role?: string; section?: string; projectId?: string },
+): string {
   const raw = err instanceof Error ? err.message : String(err);
-  if (/permission|insufficient|PERMISSION_DENIED/i.test(raw)) {
+  if (!/permission|insufficient|PERMISSION_DENIED/i.test(raw)) return raw;
+
+  const project = context?.projectId ? ` (project ${context.projectId})` : "";
+
+  // officer + All is what auth.tsx substitutes when the token has no claims. A
+  // genuinely provisioned officer carries their own section, not "All".
+  if (context?.role === "officer" && context?.section === "All") {
     return (
-      "Firestore rejected the write. The border scan rules are most likely not " +
-      "deployed yet — an admin runs: firebase deploy --only " +
-      "firestore:rules,firestore:indexes. If they are deployed, check that your " +
-      "account's section is Nuclear Safety, Security & Safeguards (or admin)."
+      "Firestore rejected the write, and your sign-in carries no section or role " +
+      "claim — which is what an account looks like when its custom claims never " +
+      "reached the token. The rules see no claims and refuse. Sign out and back " +
+      "in to mint a fresh token; if it persists, an admin must re-provision the " +
+      "account on the Users tab."
     );
   }
-  return raw;
+
+  if (context?.role) {
+    return (
+      `Firestore rejected the write even though your sign-in (role "${context.role}", ` +
+      `section "${context.section}") permits it — so the truckScans rule is not live ` +
+      `on the project the app is pointed at${project}. Check Firebase console → ` +
+      "Firestore → Rules for \"truckScans\", then deploy from a checkout that has " +
+      "it: firebase deploy --only firestore:rules,firestore:indexes."
+    );
+  }
+
+  return (
+    "Firestore rejected the write. Either the truckScans rule is not deployed on " +
+    `the project the app is pointed at${project} — firebase deploy --only ` +
+    "firestore:rules,firestore:indexes — or your account's section is not Nuclear " +
+    "Safety, Security & Safeguards (or admin)."
+  );
 }
 
 /** HH:MM in the local (Zambia) clock — stamped on each scan as it is saved. */
