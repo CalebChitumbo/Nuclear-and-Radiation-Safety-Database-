@@ -14,6 +14,7 @@ import {
   knownTransporters,
   lastSeenDetails,
   normaliseVehicleId,
+  scanWriteErrorMessage,
   scansToCsv,
   summariseScans,
   summariseWeek,
@@ -412,6 +413,26 @@ describe("capture-screen helpers", () => {
     expect(list).toContain("Busokelo");
     // Seeded duplicates of a used name are not listed twice.
     expect(list.filter((t) => t === "Kalulu Haulage")).toHaveLength(1);
+  });
+});
+
+describe("write failures", () => {
+  it("explains a permission denial instead of blaming the account", () => {
+    // truckScans is a new collection: Firestore denies every write to one no
+    // deployed rule mentions, admin or not. The raw SDK text sends people to
+    // the Users tab; the command is what they actually need.
+    const message = scanWriteErrorMessage(
+      new Error("Missing or insufficient permissions."),
+    );
+    expect(message).toContain("firebase deploy --only firestore:rules");
+    expect(message).toContain("not deployed yet");
+    expect(message).not.toContain("Missing or insufficient permissions");
+  });
+
+  it("passes any other failure through unchanged", () => {
+    expect(scanWriteErrorMessage(new Error("Network request failed"))).toBe(
+      "Network request failed",
+    );
   });
 });
 

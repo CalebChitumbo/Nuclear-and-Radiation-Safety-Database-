@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
+import { scanWriteErrorMessage } from "@/lib/rules/borderScans";
 import type { TruckScan } from "@/lib/rules/types";
 
 const RESULT_COLOUR: Record<string, string> = {
@@ -42,10 +43,7 @@ export function ShiftLog({
       toast.push(`${s.vehicleId} removed from the log.`, "success");
       onChanged();
     } catch (err) {
-      toast.push(
-        `Could not remove it: ${err instanceof Error ? err.message : err}`,
-        "error",
-      );
+      toast.push(`Could not remove it. ${scanWriteErrorMessage(err)}`, "error");
     } finally {
       setBusy("");
     }

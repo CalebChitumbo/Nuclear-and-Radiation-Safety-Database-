@@ -274,6 +274,29 @@ export function buildScan(
   return scan;
 }
 
+/**
+ * Turn a failed scan write into something the officer can act on.
+ *
+ * `truckScans` is a collection this feature introduces, and Firestore denies
+ * every write to a collection no deployed rule mentions — whatever the account.
+ * The raw SDK message ("Missing or insufficient permissions") reads as "your
+ * account is wrong", which sends people to the Users tab instead of to the one
+ * command that fixes it. Rules are deployed by hand in this project (nothing in
+ * CI does it), so this is the expected state of a fresh deployment, not a bug.
+ */
+export function scanWriteErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/permission|insufficient|PERMISSION_DENIED/i.test(raw)) {
+    return (
+      "Firestore rejected the write. The border scan rules are most likely not " +
+      "deployed yet — an admin runs: firebase deploy --only " +
+      "firestore:rules,firestore:indexes. If they are deployed, check that your " +
+      "account's section is Nuclear Safety, Security & Safeguards (or admin)."
+    );
+  }
+  return raw;
+}
+
 /** HH:MM in the local (Zambia) clock — stamped on each scan as it is saved. */
 export function nowHHMM(now: Date = new Date()): string {
   return `${String(now.getHours()).padStart(2, "0")}:${String(

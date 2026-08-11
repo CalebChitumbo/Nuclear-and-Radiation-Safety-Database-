@@ -449,6 +449,11 @@ paragraph. Rows and summary both export as CSV.
 rather than adding, so the weekly report's *Vehicle Screening (units)* figure
 can never be double counted.
 
+`truckScans` is a new collection, so **deploy the rules and indexes before the
+posts can log** (`firebase deploy --only firestore:rules,firestore:indexes`) —
+Firestore denies writes to a collection no deployed rule mentions, admin
+account or not. Until then the tab reads fine and saving reports the command.
+
 `scripts/check-border-vocabulary.py` replays a monthly workbook through the
 vocabulary and reports coverage — 99.7% of the June 2026 Nakonde book's 9,198
 scans resolve to the standard list, folding 43 commodities' worth of spelling

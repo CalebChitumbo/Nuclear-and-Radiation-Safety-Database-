@@ -167,6 +167,24 @@ has.
 
 ---
 
+## Before the posts can use it: deploy the rules
+
+`truckScans` is a **new Firestore collection**. Firestore denies every write to
+a collection no deployed rule mentions — regardless of the account, because the
+`admin` role in this app is a custom claim the rules read, not a bypass. Nothing
+in CI deploys rules, so after merging:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Until that runs, the tab loads and reads fine (every read degrades to empty) but
+saving a scan fails. The capture screen says so and gives the command rather
+than repeating Firestore's "Missing or insufficient permissions", which reads as
+an account problem and is not one.
+
+---
+
 ## Keeping the vocabulary honest
 
 `lib/rules/borderCargo.ts` holds the commodity list, the alias table and the
