@@ -220,19 +220,38 @@ export const ingestRaisEmail = onRequest(
 
     const { subject, text, from } = pickEmailText(inbound.body);
 
-    // Optional second gate: the provider forwards EVERY email delivered to the
-    // ingest address, so restrict which senders may feed the register queue.
+    // Optional second gate: an inbound-email provider forwards EVERY email
+    // delivered to the ingest address, so restrict which senders may feed the
+    // register queue.
+    //
+    // Only enforce it when the payload actually carries a sender. The Apps
+    // Script path (docs/gmail-apps-script.gs) selects messages by Gmail query
+    // inside the officer's own mailbox and older copies of it post no `from` at
+    // all — enforcing the list against an absent sender silently dropped EVERY
+    // email with a 200, leaving the review inbox permanently empty with nothing
+    // to show for it. The request is already authenticated by the shared
+    // secret, and the threat this list addresses (a provider relaying whatever
+    // is mailed to the public ingest address) always supplies a sender, so an
+    // absent one is logged loudly and allowed through instead.
     const allowedSenders = (process.env.RAIS_ALLOWED_SENDERS || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    if (!senderAllowed(from, allowedSenders)) {
+    if (allowedSenders.length && !from) {
+      logger.warn(
+        "ingestRaisEmail: RAIS_ALLOWED_SENDERS is set but the payload carried " +
+          "no sender — ingesting anyway. Post a `from` field (update " +
+          "docs/gmail-apps-script.gs) to have the allowlist enforced.",
+        { subject },
+      );
+    } else if (!senderAllowed(from, allowedSenders)) {
       logger.warn("ingestRaisEmail: sender not on RAIS_ALLOWED_SENDERS", {
         from,
         subject,
+        allowedSenders,
       });
       // 200 so the provider marks it delivered and does not retry forever.
-      res.status(200).json({ ok: true, ignored: "sender not allowed" });
+      res.status(200).json({ ok: true, ignored: "sender not allowed", from });
       return;
     }
 

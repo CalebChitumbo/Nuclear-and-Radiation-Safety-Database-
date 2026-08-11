@@ -71,10 +71,18 @@ export function pickEmailText(body: Record<string, unknown>): ParsedEmail {
     ? (body.headers as Record<string, unknown>)
     : {}) as Record<string, unknown>;
 
+  // CloudMailin also reports the SMTP envelope sender separately from the header.
+  const envelope = (body.envelope && typeof body.envelope === "object"
+    ? (body.envelope as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+
   const subject =
     firstField(body, ["subject", "Subject"]) || str(headers.subject).trim();
   const from =
-    firstField(body, ["from", "sender", "From"]) || str(headers.from).trim();
+    firstField(body, ["from", "sender", "From", "Sender", "from_email"]) ||
+    str(headers.from).trim() ||
+    str(headers.From).trim() ||
+    str(envelope.from).trim();
 
   let text = firstField(body, [
     "stripped-text", // Mailgun, signature/quote removed

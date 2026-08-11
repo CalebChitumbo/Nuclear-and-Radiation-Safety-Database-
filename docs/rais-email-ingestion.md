@@ -118,12 +118,24 @@ and/or domains (a domain also admits its subdomains):
 
 ```bash
 # functions/.env or the Functions console:
-RAIS_ALLOWED_SENDERS=rais.rpa.gov.zm,noreply@rpa.gov.zm
+RAIS_ALLOWED_SENDERS=rpa.gov.zm
 ```
 
+> **Match it to the real sender.** RAIS notifications come from
+> `eLicensing@rpa.gov.zm`, and internal "… data form assigned" mail from other
+> `rpa.gov.zm` addresses — so `rpa.gov.zm` is the entry that works. A domain
+> entry admits **subdomains, not parents**: listing `rais.rpa.gov.zm` does *not*
+> admit `eLicensing@rpa.gov.zm`, and silently rejects every real notification.
+
 Mail from any other sender is acknowledged (HTTP 200, so the provider doesn't
-retry) but ignored, and the rejection is logged. Leave it unset to accept all
-senders (the previous behaviour).
+retry) but ignored, and the rejection is logged with the address that was
+rejected. Leave it unset to accept all senders (the previous behaviour).
+
+The list can only be enforced against a payload that **carries** a sender. If
+one arrives without a `from` field while the list is set, it is ingested anyway
+and a warning is logged — dropping it instead would silently empty the review
+inbox with no visible error. Keep `from` in whatever posts to the endpoint (the
+Apps Script sends `msg.getFrom()`) so the list actually applies.
 
 ## 3. Point an inbound-email provider at it
 

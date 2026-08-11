@@ -57,9 +57,12 @@ function forwardRaisEmails() {
         method: "post",
         contentType: "application/json",
         headers: { "X-Webhook-Secret": SECRET },
+        // `from` MUST be sent: when RAIS_ALLOWED_SENDERS is configured on the
+        // function, a payload without a sender cannot be checked against it.
         payload: JSON.stringify({
           subject: msg.getSubject(),
           plain: msg.getPlainBody(),
+          from: msg.getFrom(),
         }),
         muteHttpExceptions: true,
       });

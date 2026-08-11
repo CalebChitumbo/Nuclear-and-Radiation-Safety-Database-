@@ -2,6 +2,7 @@ import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  pickEmailText,
   senderAllowed,
   verifyMailgunSignature,
 } from "../functions/src/rais/email";
@@ -34,6 +35,50 @@ describe("senderAllowed", () => {
   it("rejects when a sender cannot be parsed but a list is configured", () => {
     expect(senderAllowed("", ["rais.rpa.gov.zm"])).toBe(false);
     expect(senderAllowed("not-an-email", ["rais.rpa.gov.zm"])).toBe(false);
+  });
+
+  // The allowlist that shipped in the docs blocked every real notification:
+  // a domain entry admits SUBdomains, not parents, so "rais.rpa.gov.zm" never
+  // matches the address RAIS actually sends from.
+  it("admits the address RAIS really sends from via the rpa.gov.zm domain", () => {
+    expect(senderAllowed("eLicensing@rpa.gov.zm", ["rpa.gov.zm"])).toBe(true);
+    expect(senderAllowed("Melody.Mwewa@rpa.gov.zm", ["rpa.gov.zm"])).toBe(true);
+    expect(senderAllowed("eLicensing@rpa.gov.zm", ["rais.rpa.gov.zm"])).toBe(
+      false,
+    );
+  });
+});
+
+describe("pickEmailText sender extraction", () => {
+  // Regression: the Apps Script used to post {subject, plain} with no sender.
+  // With RAIS_ALLOWED_SENDERS configured that made senderAllowed("") reject
+  // every email at a 200, so the review inbox stayed permanently empty.
+  it("reads the sender the Apps Script now posts", () => {
+    const { subject, text, from } = pickEmailText({
+      subject: "Ionising Radiation Licence Application Approved",
+      plain: "Hello,\nWorkflow RAN - RPA/LIC/0593",
+      from: "RAIS eLicensing <eLicensing@rpa.gov.zm>",
+    });
+    expect(subject).toBe("Ionising Radiation Licence Application Approved");
+    expect(text).toContain("RPA/LIC/0593");
+    expect(from).toBe("RAIS eLicensing <eLicensing@rpa.gov.zm>");
+    expect(senderAllowed(from, ["rpa.gov.zm"])).toBe(true);
+  });
+
+  it("falls back to header and SMTP-envelope senders", () => {
+    expect(pickEmailText({ headers: { from: "a@rpa.gov.zm" } }).from).toBe(
+      "a@rpa.gov.zm",
+    );
+    expect(pickEmailText({ headers: { From: "b@rpa.gov.zm" } }).from).toBe(
+      "b@rpa.gov.zm",
+    );
+    expect(pickEmailText({ envelope: { from: "c@rpa.gov.zm" } }).from).toBe(
+      "c@rpa.gov.zm",
+    );
+  });
+
+  it("still reports no sender when the payload genuinely carries none", () => {
+    expect(pickEmailText({ subject: "s", plain: "b" }).from).toBe("");
   });
 });
 
