@@ -1,5 +1,5 @@
 /**
- * Seed script — writes the facility register (2026 Facility Status List), the
+ * Seed script — writes the facility register (2026 Licensing Status), the
  * 2026 reporting-week calendar, and the initial aggregates/dashboard document
  * to Firestore.
  *
@@ -18,7 +18,7 @@
  * FRESH START (`npm run seed:fresh`, i.e. `--fresh`): first DELETES the whole
  * register and its linked history — facilities, licenceEvents, inspections,
  * inspectionRequests, licenceWorkflows — then seeds the new register. Use for
- * a register replacement like the 2026 Facility Status List import, where the
+ * a register replacement like the 2026 Licensing Status import, where the
  * old facility list (and the history recorded against it) must not linger.
  * Users, weeks, weekly metrics, daily entries, borders and activities are
  * kept.

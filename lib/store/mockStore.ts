@@ -42,11 +42,11 @@ import weeksSeed from "../../seed/weeks-2026.seed.json";
 import { mapAllSeed, type SeedFacility } from "./seeding";
 import type { DataStore } from "./types";
 
-// v2: the 2026 Facility Status List register replacement. Bumping the key
+// v3: the 2026 Licensing Status workbook register replacement. Bumping the key
 // makes every mock/demo browser start fresh from the new seed (the old
 // register AND the history recorded against it are gone by design).
-const STORAGE_KEY = "rpa-mock-store-v2";
-const OLD_STORAGE_KEYS = ["rpa-mock-store-v1"];
+const STORAGE_KEY = "rpa-mock-store-v3";
+const OLD_STORAGE_KEYS = ["rpa-mock-store-v1", "rpa-mock-store-v2"];
 
 interface State {
   facilities: Facility[];

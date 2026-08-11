@@ -7,7 +7,11 @@ import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { useStoreData } from "@/lib/storeHooks";
-import { computeLicenceStats } from "@/lib/rules/licenceStats";
+import {
+  authSortKey,
+  authWhen,
+  computeLicenceStats,
+} from "@/lib/rules/licenceStats";
 import {
   LICENCE_TYPES,
   isUseP,
@@ -43,7 +47,9 @@ interface AuthRow {
   sector: string;
   type: LicenceType;
   number: string;
-  date: string;
+  /** Issue date, or the quarter it was issued in ("Q1 2026"). */
+  when: string;
+  sortKey: string;
 }
 
 /** Flatten every recorded authorisation across the register into one row each. */
@@ -59,12 +65,13 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
         sector: f.sector,
         type: a.type,
         number: a.number,
-        date: a.date,
+        when: authWhen(a),
+        sortKey: authSortKey(a),
       });
     }
   }
-  // Newest first; undated entries (the seed) sink to the bottom.
-  return rows.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  // Newest first; entries with neither date nor quarter sink to the bottom.
+  return rows.sort((a, b) => (b.sortKey || "").localeCompare(a.sortKey || ""));
 }
 
 export default function LicencesPage() {
@@ -278,7 +285,7 @@ export default function LicencesPage() {
                   <th className="px-4 py-2">Licence type</th>
                   <th className="px-4 py-2">Number</th>
                   <th className="px-4 py-2">Province</th>
-                  <th className="px-4 py-2">Date</th>
+                  <th className="px-4 py-2">Issued</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,7 +315,7 @@ export default function LicencesPage() {
                     <td className="px-4 py-3 tabular">{r.number || "—"}</td>
                     <td className="px-4 py-3">{r.province}</td>
                     <td className="px-4 py-3 tabular text-gunmetal/70">
-                      {r.date || "—"}
+                      {r.when || "—"}
                     </td>
                   </tr>
                 ))}

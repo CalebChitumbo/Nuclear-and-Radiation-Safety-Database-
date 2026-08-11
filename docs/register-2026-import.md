@@ -1,5 +1,10 @@
 # Register import — 2026 Facility Status List
 
+> **Superseded** by the 2026 Licensing Status workbook import — see
+> `docs/licensing-status-2026-import.md`. This log is kept because the current
+> register's practice, sector, category and licence numbers are carried over
+> from the register described here.
+
 Imported 2026-07-24 from “Facility Licensing Status — Actual Current 2026 Position” (prepared 23 July 2026), replacing the previous seeded register.
 
 ## Result

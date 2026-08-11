@@ -102,12 +102,24 @@ describe("facilitiesToCsv", () => {
       ln: "AUTH/USE.REN/0001",
       func: "Yes",
       cat: "Medical",
+      lics: [
+        {
+          t: "Renewal of Use/Possession Licence",
+          q: "2026-Q1",
+          n: "AUTH/USE.REN/0001",
+        },
+        { t: "Importation Licence", q: "2026-Q2" },
+      ],
     });
     const csv = facilitiesToCsv([f]);
     const [header, row] = csv.split("\r\n");
     expect(header).toContain("Functional");
     expect(header).toContain("Category");
+    expect(header).toContain("Licences Held");
     expect(row).toContain('"Clinic ""A"", Lusaka"');
     expect(row).toContain("AUTH/USE.REN/0001");
+    expect(row).toContain(
+      "Renewal of Use/Possession Licence (Q1 2026); Importation Licence (Q2 2026)",
+    );
   });
 });

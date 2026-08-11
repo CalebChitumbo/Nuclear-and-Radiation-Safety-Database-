@@ -141,7 +141,7 @@ export default function SettingsPage() {
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gunmetal/70">
-                  Confirm reset (re-seeds 474 facilities, clears events &amp;
+                  Confirm reset (re-seeds 538 facilities, clears events &amp;
                   inspections)?
                 </span>
                 <button
