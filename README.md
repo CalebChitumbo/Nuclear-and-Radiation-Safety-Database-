@@ -465,13 +465,13 @@ a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**
 produces the printed report with the Zambian-flag cover.
 
-> `workPlanNotes` and `workPlanBaseline` are new collections — **deploy the
-> rules before officers can save a Status, Comment or Action Point, or an
-> admin can re-baseline the year** (`firebase deploy --only firestore:rules`).
-> Firestore denies writes to a collection no deployed rule mentions, admin
-> account or not. Until then the report reads fine — the figures come from
-> collections that already exist, and the opening balance falls back to the
-> approved workbook's — and saving reports the failure.
+> `workPlanNotes` and `workPlanBaseline` are new collections — **the rules
+> must be deployed** before officers can save a Status, Comment or Action
+> Point, or an admin can re-baseline the year. Firestore denies writes to a
+> collection no deployed rule mentions, admin account or not. Until then the
+> report reads fine — the figures come from collections that already exist,
+> and the opening balance falls back to the approved workbook's — and saving
+> reports the failure. See [Deploying the security rules](#deploying-the-security-rules).
 
 ---
 
@@ -521,6 +521,39 @@ changing it would orphan every figure the border posts have recorded.
 "Open the sectional update" on the daily tab jumps to `/weekly` for the selected
 week; the "Week so far" panel beside the flow already shows the week's
 contribution per output and where that leaves it against the annual target.
+
+---
+
+## Deploying the security rules
+
+Firestore denies every write to a collection **no deployed rule mentions**,
+admin account or not. So any release that adds one — `workPlanNotes` and
+`workPlanBaseline` for the sectional update, `dailyEntries` and `borders` for
+Daily Updates, `truckScans` for the border log — reads fine but cannot save
+until `firestore.rules` is published. Three ways, pick one:
+
+**From GitHub (nothing to install).** The `Deploy Firestore Rules` workflow
+publishes `firestore.rules` and `firestore.indexes.json` automatically when
+either changes on the production branch. To run it now: repo → **Actions** →
+*Deploy Firestore Rules* → **Run workflow**. It uses the same `FIREBASE_TOKEN`
+secret as *Deploy Functions*.
+
+**From the Firebase Console (no CLI, no secret).** Open
+[Firestore → Rules](https://console.firebase.google.com/project/nrsd-imformation-management/firestore/rules),
+paste the whole of `firestore.rules` over what is there, and press
+**Publish**. Fastest one-off, but it is a copy-paste — the repo stays the
+source of truth, so re-paste after every rules change.
+
+**From your own machine.**
+
+```bash
+npm install -g firebase-tools
+firebase login
+npm run deploy:rules        # firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Check it worked by saving a Comment on any output of the sectional update: it
+either saves, or the toast names the permission error.
 
 ---
 
