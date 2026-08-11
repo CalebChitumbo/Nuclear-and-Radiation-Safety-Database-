@@ -307,9 +307,10 @@ panels carry a 💬 *Notes & history* control — the inbox and approval rows al
 show the latest comment inline, so the background is read *before* Accept /
 Approve. The drawer shows the full trail (newest first), the raw RAIS
 notifications seen for the application, and the composer. Cross-section, the
-**facility drawer** (register + `/facilities/[id]`) lists each facility's
-applications with the same expandable trail, so an inspector or NSSS officer
-sees what Licensing knows without leaving their view.
+**facility view** — the register's slide-in drawer and its permalink page
+`/facilities/[id]`, both rendered from `components/facility/FacilityDetail.tsx`
+— lists each facility's applications with the same expandable trail, so an
+inspector or NSSS officer sees what Licensing knows without leaving their view.
 
 Storage is clobber-proof by construction: imports never write the `notes`
 array wholesale — new entries append via `arrayUnion`, so a re-paste or a
@@ -519,7 +520,9 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── weekly/             Weekly sectional report (fed by Daily Updates)
 │   ├── admin/users/
 │   └── settings/
-├── components/             UI primitives — Logo, Sidebar, Topbar, Drawer, Kpi, Bars, Gauge, Toast …
+├── components/             UI primitives — Section (Panel/PageHeader/Field), Segmented,
+│                           Sidebar, Topbar, MobileNav, Drawer, Kpi, Bars, Gauge, Toast …
+├── components/facility/    FacilityDetail — shared by the drawer and /facilities/[id]
 ├── lib/
 │   ├── rules/              PURE business logic — fully unit-tested
 │   ├── store/              DataStore interface + mockStore + firebaseStore
@@ -541,12 +544,50 @@ Add Firestore rules tests with the emulator in a follow-up.
 ## Brand discipline
 
 The Tailwind theme and CSS variables encode the official RPA palette and
-typography (Arial, varied by weight/case; warm Mist canvas with a subtle
-dot-grid; gunmetal sidebar; quiet status pills). **Yellow appears at most
-once per view as an accent.** Never on white, never as body text.
+typography (Arial, varied by weight/case; warm canvas; gunmetal sidebar;
+quiet status pills). **Yellow appears at most once per view as an accent.**
+Never on white, never as body text.
 
 The Zambian-flag footer band only renders on the printed weekly report
 cover — never in the app chrome.
+
+### Layout system
+
+Three surfaces do all the work, defined in `app/globals.css`: a warm
+`--canvas`, a white `--surface` sheet that sits on it, and a `--sunken` tint
+for blocks nested inside a sheet. There are no drop shadows or outlines on
+content — hairlines and space separate things instead, so a page reads as one
+document rather than a pile of floating boxes. Shadows are reserved for things
+that genuinely float (`.popover`, drawers).
+
+The primitives live in `components/Section.tsx`:
+
+- `Panel` — one white sheet with a titled head. Related figures and lists live
+  *inside* one panel, separated by hairlines, instead of each getting a card.
+  `flush` drops the padding for a table or an edge-to-edge divided list.
+- `PageHeader`, `SectionTitle`, `Field`, `DataRow` for the content inside.
+- `.stat-grid` + `<Kpi>` — a row of figures as one strip divided by hairlines
+  (the 1px grid gap shows the container colour through), not N separate cards.
+- `.bleed` runs a full-width sheet edge to edge on phones.
+- `Segmented` (`components/Segmented.tsx`) is the shared filter control; it
+  wraps instead of overflowing a narrow screen.
+
+`@tailwind utilities` is imported at the *bottom* of `globals.css`, so a
+one-off utility class always overrides these component styles.
+
+### Mobile
+
+Every page is built for a phone as well as a desk:
+
+- A bottom tab bar (`components/MobileNav.tsx`) carries the four screens
+  officers live in, with "More" opening the full navigation drawer. `.app-main`
+  reserves its height (plus the home indicator) so nothing hides beneath it.
+- Wide registers render as a table from `md` up and as a list of rows below it
+  — a seven-column table is unusable at 390px.
+- `.input` is 16px on small screens so iOS Safari does not zoom on focus, and
+  buttons carry a 40px minimum height.
+- Drawers portal to `<body>`: pages animate in behind a `transform`, which
+  would otherwise make them the containing block for `position: fixed`.
 
 If you receive the official PNG logo assets (`rpa-logo.png`,
 `apple-touch-icon.png`, PWA `icon-*.png`), drop them into `public/` and they
@@ -563,8 +604,8 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
 - [x] Authorisations-on-Record increments on every recorded licence with or
       without an AUTH number.
 - [x] Importation and other non-Use/Possession authorisations show on the
-      facility (drawer "Other authorisations" group + register "N auth."
-      badge) without changing licensed status.
+      facility ("Authorisations held → Other authorisations" group + register
+      "N auth." badge) without changing licensed status.
 - [x] Bulk approval commits atomically and updates both the register and the
       correct reporting week.
 - [x] Weekly report auto-derives Authorisation & Standards 1–9 and

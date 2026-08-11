@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 
+import { Panel } from "@/components/Section";
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { scanWriteErrorMessage } from "@/lib/rules/borderScans";
@@ -49,60 +50,55 @@ export function ShiftLog({
     }
   };
 
-  return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2 flex-wrap">
-        <div className="font-black">
-          Today&apos;s log
-          <span className="text-xs font-normal text-gunmetal/55 ml-2">
-            {scans.length} scan{scans.length === 1 ? "" : "s"}
-          </span>
-        </div>
-      </div>
+  const visible = scans.slice(0, shown);
 
+  return (
+    <Panel
+      title={`Today's log — ${scans.length} scan${scans.length === 1 ? "" : "s"}`}
+      flush
+    >
       {scans.length === 0 ? (
-        <div className="p-6 text-sm text-gunmetal/60">
+        <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
           No trucks logged at this post today yet.
-        </div>
+        </p>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          {/* Desktop: the full row, as the workbook had it */}
+          <div className="hidden md:block table-wrap">
+            <table className="data">
               <thead>
-                <tr className="text-left text-xs caps text-gunmetal/55">
-                  <th className="px-4 py-2">Time</th>
-                  <th className="px-4 py-2">Unit</th>
-                  <th className="px-4 py-2">Cargo</th>
-                  <th className="px-4 py-2">Transporter</th>
-                  <th className="px-4 py-2 text-right">nSv/h</th>
-                  <th className="px-4 py-2">Result</th>
-                  <th className="px-4 py-2" />
+                <tr>
+                  <th>Time</th>
+                  <th>Unit</th>
+                  <th>Cargo</th>
+                  <th>Transporter</th>
+                  <th className="num">nSv/h</th>
+                  <th>Result</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
-                {scans.slice(0, shown).map((s) => (
-                  <tr key={s.id} className="border-t border-gunmetal/8">
-                    <td className="px-4 py-2 tabular text-gunmetal/70">
-                      {s.time || "—"}
-                    </td>
-                    <td className="px-4 py-2 font-bold">
+                {visible.map((s) => (
+                  <tr key={s.id}>
+                    <td className="tabular text-gunmetal/70">{s.time || "—"}</td>
+                    <td className="font-bold">
                       {s.vehicleId}
                       <span className="block text-[11px] font-normal text-gunmetal/50">
                         {s.vehicleIdKind}
                         {s.direction ? ` · ${s.direction}` : ""}
                       </span>
                     </td>
-                    <td className="px-4 py-2">
+                    <td>
                       {s.commodity}
                       <span className="block text-[11px] text-gunmetal/50">
                         {s.cargoClass}
                       </span>
                     </td>
-                    <td className="px-4 py-2">{s.transporter}</td>
-                    <td className="px-4 py-2 text-right tabular font-bold">
+                    <td>{s.transporter}</td>
+                    <td className="num font-bold">
                       {Number.isFinite(s.doseNSvH) ? s.doseNSvH : "—"}
                     </td>
-                    <td className="px-4 py-2">
+                    <td>
                       <span
                         className="text-xs font-black"
                         style={{ color: RESULT_COLOUR[s.result] }}
@@ -115,10 +111,10 @@ export function ShiftLog({
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="text-right">
                       {canRemove(s) ? (
                         <button
-                          className="text-xs caps font-bold"
+                          className="link-action"
                           style={{ color: "var(--status-stalled)" }}
                           disabled={busy === s.id}
                           onClick={() => remove(s)}
@@ -132,10 +128,65 @@ export function ShiftLog({
               </tbody>
             </table>
           </div>
+
+          {/* Phone: one block per truck — this screen is used at the barrier */}
+          <ul className="md:hidden divide-y divide-gunmetal/8">
+            {visible.map((s) => (
+              <li key={s.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold break-words">{s.vehicleId}</div>
+                    <div className="text-[11px] text-gunmetal/50">
+                      {s.time || "—"} · {s.vehicleIdKind}
+                      {s.direction ? ` · ${s.direction}` : ""}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="tabular font-black">
+                      {Number.isFinite(s.doseNSvH) ? s.doseNSvH : "—"}
+                      <span className="text-[10px] font-normal text-gunmetal/50">
+                        {" "}
+                        nSv/h
+                      </span>
+                    </div>
+                    <div
+                      className="text-xs font-black"
+                      style={{ color: RESULT_COLOUR[s.result] }}
+                    >
+                      {s.result}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-gunmetal/70 break-words">
+                  {s.commodity}
+                  <span className="text-gunmetal/50"> · {s.cargoClass}</span>
+                  {s.transporter ? (
+                    <span className="text-gunmetal/50"> · {s.transporter}</span>
+                  ) : null}
+                </div>
+                {s.action ? (
+                  <div className="text-[11px] text-gunmetal/55 mt-0.5">
+                    {s.action}
+                  </div>
+                ) : null}
+                {canRemove(s) ? (
+                  <button
+                    className="link-action mt-1"
+                    style={{ color: "var(--status-stalled)" }}
+                    disabled={busy === s.id}
+                    onClick={() => remove(s)}
+                  >
+                    {busy === s.id ? "…" : "Remove"}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+
           {scans.length > shown ? (
-            <div className="px-5 py-3 border-t border-gunmetal/8">
+            <div className="px-4 sm:px-5 pt-3 mt-3 border-t border-gunmetal/8">
               <button
-                className="btn btn-secondary text-xs"
+                className="btn btn-secondary w-full sm:w-auto"
                 onClick={() => setShown((n) => n + PAGE)}
               >
                 Show {Math.min(PAGE, scans.length - shown)} more
@@ -144,6 +195,6 @@ export function ShiftLog({
           ) : null}
         </>
       )}
-    </div>
+    </Panel>
   );
 }

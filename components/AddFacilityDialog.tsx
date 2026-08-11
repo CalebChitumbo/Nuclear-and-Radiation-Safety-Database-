@@ -1,7 +1,8 @@
 "use client";
 
-import { cloneElement, useEffect, useId, useState } from "react";
+import { cloneElement, useId, useState } from "react";
 
+import { Drawer } from "./Drawer";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
@@ -51,16 +52,6 @@ export function AddFacilityDialog({
   const [facCode, setFacCode] = useState(initialFacCode ?? "");
   const [busy, setBusy] = useState(false);
 
-  // Escape closes the dialog, matching the Drawer this modal is styled after.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   const submit = async () => {
@@ -109,24 +100,26 @@ export function AddFacilityDialog({
   };
 
   return (
-    <>
-      <div className="drawer-overlay" onClick={onClose} aria-hidden="true" />
-      <div
-        className="drawer p-6 space-y-4"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add facility"
-      >
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-black">Add facility</h2>
+    <Drawer
+      open
+      onClose={onClose}
+      title="Add facility"
+      footer={
+        <div className="flex gap-2">
           <button
-            className="btn btn-ghost"
-            onClick={onClose}
-            aria-label="Close dialog"
+            disabled={busy || !name.trim()}
+            className="btn btn-primary flex-1 sm:flex-none"
+            onClick={submit}
           >
-            ✕
+            {busy ? "Saving…" : "Add facility"}
           </button>
-        </header>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      }
+    >
+      <section className="card p-4 sm:p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FormField label="Name" required>
             <input
@@ -201,27 +194,32 @@ export function AddFacilityDialog({
             </select>
           </FormField>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-2 text-sm font-bold">
+        <div className="flex items-center gap-5 flex-wrap">
+          <label className="flex items-center gap-2 text-sm font-bold py-1">
             <input
               type="checkbox"
+              className="w-4 h-4"
               checked={functional}
               onChange={(e) => setFunctional(e.target.checked)}
             />
             Functional
           </label>
-          <label className="flex items-center gap-2 text-sm font-bold">
+          <label className="flex items-center gap-2 text-sm font-bold py-1">
             <input
               type="checkbox"
+              className="w-4 h-4"
               checked={licensed}
               onChange={(e) => setLicensed(e.target.checked)}
             />
             Licensed
           </label>
-          {!licensed ? (
+        </div>
+        {!licensed ? (
+          <div>
+            <span className="field-label">Stage</span>
             <select
               className="input"
-              style={{ maxWidth: 320 }}
+              aria-label="Stage"
               value={stage}
               onChange={(e) => setStage(e.target.value as Stage)}
             >
@@ -229,27 +227,15 @@ export function AddFacilityDialog({
                 <option key={s}>{s}</option>
               ))}
             </select>
-          ) : null}
-        </div>
-        <div className="text-xs text-gunmetal/55">
+          </div>
+        ) : null}
+        <p className="text-xs text-gunmetal/55">
           Tip: to add a facility together with its licence, use the{" "}
           <strong>Bulk Approval</strong> page — that will create both the
           facility and the dated licence event, applying R2/R5.
-        </div>
-        <div className="flex gap-2">
-          <button
-            disabled={busy || !name.trim()}
-            className="btn btn-primary"
-            onClick={submit}
-          >
-            {busy ? "Saving…" : "Add facility"}
-          </button>
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </>
+        </p>
+      </section>
+    </Drawer>
   );
 }
 

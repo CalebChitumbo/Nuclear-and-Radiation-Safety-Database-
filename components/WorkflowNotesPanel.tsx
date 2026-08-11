@@ -71,11 +71,12 @@ export function WorkflowNotesPanel({
       {/* Composer first — leaving the note is the action this panel exists for. */}
       {user ? (
         <div>
-          <label className="caps text-[10px] text-gunmetal/60">
+          <label className="field-label" htmlFor="workflow-note">
             Leave a note for the next officer
           </label>
           <textarea
-            className="input mt-1"
+            id="workflow-note"
+            className="input"
             rows={2}
             value={text}
             disabled={!isSaved}
@@ -106,9 +107,7 @@ export function WorkflowNotesPanel({
 
       {/* Timeline — newest first */}
       <div>
-        <div className="caps text-[10px] text-gunmetal/60 mb-2">
-          Notes &amp; history
-        </div>
+        <div className="section-title mb-2">Notes &amp; history</div>
         {notes.length === 0 ? (
           <div className="text-sm text-gunmetal/55">
             No notes yet. Status changes and officer comments will build this

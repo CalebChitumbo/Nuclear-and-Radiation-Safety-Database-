@@ -6,6 +6,7 @@ import { Bars } from "@/components/Bars";
 import { Gauge } from "@/components/Gauge";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { DataRow, Panel } from "@/components/Section";
 import { useAuth } from "@/lib/auth";
 import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
@@ -120,9 +121,9 @@ export default function DashboardPage() {
     .sort((a, b) => b.total - a.total);
 
   return (
-    <div className="space-y-6 staggered">
-      {/* KPI grid */}
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="space-y-4 staggered">
+      {/* The register at a glance — one strip, divided, not five cards */}
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-5">
         <Kpi label="Total facilities" value={agg.total.toLocaleString()} />
         <Kpi
           label="Licensed"
@@ -152,47 +153,42 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Gauge value={coverage} />
         <Bars title="Public vs Private" rows={sectorRows} showCounts />
-        <div className="card p-5">
-          <div className="caps text-xs text-gunmetal/60 mb-2">
-            This week — {selected.label}
-          </div>
-          <ul className="space-y-2 text-sm">
-            <FlowRow label="Licences logged" value={wkEvents.length} />
-            <FlowRow label="Inspections logged" value={wkInspections.length} />
-            <FlowRow label="Renewals" value={renewals} />
-            <FlowRow
+        <Panel
+          title={`This week — ${selected.label}`}
+          action={
+            <Link className="link-action" href="/weekly">
+              Weekly report →
+            </Link>
+          }
+        >
+          <ul className="divide-y divide-gunmetal/8">
+            <DataRow label="Licences logged" value={wkEvents.length} />
+            <DataRow label="Inspections logged" value={wkInspections.length} />
+            <DataRow label="Renewals" value={renewals} />
+            <DataRow
               label="Enforcement actions"
               value={enforcement}
               accent="red"
             />
           </ul>
-          <div className="mt-4 flex gap-2">
-            <Link className="btn btn-secondary" href="/daily">
-              Daily updates
-            </Link>
-            <Link className="btn btn-ghost" href="/weekly">
-              Weekly report
-            </Link>
-          </div>
-        </div>
+          <Link className="btn btn-secondary w-full mt-3" href="/daily">
+            Log today&apos;s updates
+          </Link>
+        </Panel>
       </section>
 
       {/* Licensing ↔ Inspectorate handoff */}
-      <section className="card p-5">
-        <div className="flex items-baseline justify-between mb-3">
-          <div className="caps text-xs text-gunmetal/60">
-            Inspectorate ↔ Licensing workflow
-          </div>
-          <Link
-            className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-            href="/inspection-requests"
-          >
-            Open requests
+      <Panel
+        title="Inspectorate ↔ Licensing workflow"
+        action={
+          <Link className="link-action" href="/inspection-requests">
+            Open requests →
           </Link>
-        </div>
+        }
+      >
         {inspectionInbox.count > 0 ? (
-          <div className="text-sm mb-3">
-            <span className="chip amber mr-2">{inspectionInbox.count}</span>
+          <div className="text-sm mb-3 flex items-center gap-2 flex-wrap">
+            <span className="chip amber">{inspectionInbox.count}</span>
             <span className="text-gunmetal/75">
               {canEditInsp && inspectionInbox.incoming.length > 0
                 ? `${inspectionInbox.incoming.length} new request${
@@ -213,223 +209,156 @@ export default function DashboardPage() {
             </span>
           </div>
         ) : null}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MiniStat label="Open requests" value={requestStats.open} />
-          <MiniStat
+        <div className="stat-grid grid-cols-2 md:grid-cols-4">
+          <Kpi label="Open requests" value={requestStats.open} />
+          <Kpi
             label="Awaiting Inspectorate"
             value={inspectionInbox.incoming.length}
           />
-          <MiniStat
-            label="In progress"
-            value={inspectionInbox.inProgress.length}
-          />
-          <MiniStat
+          <Kpi label="In progress" value={inspectionInbox.inProgress.length} />
+          <Kpi
             label="Reports ready"
             value={requestStats.reportsReady}
-            accent
+            accent="green"
           />
         </div>
-      </section>
+      </Panel>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Bars title="Facilities by province (licensed / total)" rows={provinceRows} />
-        <div className="card p-5">
-          <div className="caps text-xs text-gunmetal/60 mb-3">
-            Unlicensed pipeline
-          </div>
-          <div className="space-y-2">
-            {stageRows.length === 0 ? (
-              <div className="text-sm text-gunmetal/60">
-                Every facility is licensed. (You won't see this often.)
-              </div>
-            ) : (
-              stageRows.map((r) => (
-                <div
-                  key={r.label}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span>{r.label}</span>
-                  <span className="tabular font-bold">{r.total}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <Bars
+          title="Facilities by province (licensed / total)"
+          rows={provinceRows}
+        />
+        <Panel title="Unlicensed pipeline">
+          {stageRows.length === 0 ? (
+            <p className="text-sm text-gunmetal/60">
+              Every facility is licensed. (You won&apos;t see this often.)
+            </p>
+          ) : (
+            <ul className="divide-y divide-gunmetal/8">
+              {stageRows.map((r) => (
+                <DataRow key={r.label} label={r.label} value={r.total} />
+              ))}
+            </ul>
+          )}
+        </Panel>
       </section>
 
       {/* Licences issued (all types) + who holds a current use licence */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <div className="flex items-baseline justify-between mb-2">
-            <div className="caps text-xs text-gunmetal/60">
-              Licences issued (all types)
-            </div>
-            <Link
-              className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-              href="/licences"
-            >
-              Open authorisations
+        <Panel
+          title="Licences issued (all types)"
+          action={
+            <Link className="link-action" href="/licences">
+              Authorisations →
             </Link>
-          </div>
-          <div className="text-4xl font-black tabular">
+          }
+        >
+          <div className="text-3xl sm:text-4xl font-black tabular">
             {licence.totalIssued.toLocaleString()}
           </div>
-          <div className="mt-1 text-sm text-gunmetal/70">
+          <p className="mt-1 text-sm text-gunmetal/70">
             <span className="text-[var(--rpa-green-dark)] font-bold">
               {licence.useTotal}
             </span>{" "}
             use/possession ·{" "}
             <span className="font-bold">{licence.otherTotal}</span> standalone
             authorisation{licence.otherTotal === 1 ? "" : "s"}
-          </div>
+          </p>
           {issuedTypeRows.length ? (
-            <ul className="mt-3 space-y-1.5 text-sm">
+            <ul className="mt-3 divide-y divide-gunmetal/8">
               {issuedTypeRows.map((r) => (
                 <li
                   key={r.type}
-                  className="flex items-center justify-between gap-3"
+                  className="flex items-center justify-between gap-3 py-2"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 min-w-0">
                     <span
-                      className={`chip ${isUseP(r.type) ? "green" : "slate"}`}
+                      className={`chip ${isUseP(r.type) ? "green" : "slate"} shrink-0`}
                     >
                       {isUseP(r.type) ? "Use" : "Standalone"}
                     </span>
-                    <span>{r.type}</span>
+                    <span className="text-sm min-w-0">{r.type}</span>
                   </span>
-                  <span className="tabular font-bold">{r.count}</span>
+                  <span className="tabular font-bold shrink-0">{r.count}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="mt-3 text-sm text-gunmetal/60">
+            <p className="mt-3 text-sm text-gunmetal/60">
               No licences recorded yet.
-            </div>
+            </p>
           )}
-        </div>
+        </Panel>
 
-        <div className="card p-5">
-          <div className="flex items-baseline justify-between mb-2">
-            <div className="caps text-xs text-gunmetal/60">
-              Use licence held — {CURRENT_YEAR}
-            </div>
-            <Link
-              className="text-xs caps font-bold text-[var(--rpa-green-dark)]"
-              href="/licences"
-            >
-              Breakdown
+        <Panel
+          title={`Use licence held — ${CURRENT_YEAR}`}
+          action={
+            <Link className="link-action" href="/licences">
+              Breakdown →
             </Link>
-          </div>
-          <ul className="space-y-2 text-sm">
-            <FlowRow
+          }
+        >
+          <ul className="divide-y divide-gunmetal/8">
+            <DataRow
               label={`Licensed for ${CURRENT_YEAR}`}
               value={licence.licensedThisYear}
               accent="green"
             />
-            <FlowRow
+            <DataRow
               label="Renewal not yet confirmed"
               value={licence.licensedYearUnconfirmed}
             />
-            <FlowRow
+            <DataRow
               label="Not licensed"
               value={licence.notLicensed}
               accent="red"
             />
           </ul>
-          <div className="mt-3 text-[11px] text-gunmetal/55">
+          <p className="mt-3 text-[11px] text-gunmetal/55">
             Licence year read from each facility&apos;s latest use/possession
             licence — its issue date, or the quarter it was issued in.
-          </div>
-        </div>
+          </p>
+        </Panel>
       </section>
 
-      <section className="card p-5">
-        <div className="caps text-xs text-gunmetal/60 mb-3">
-          Recent activity
-        </div>
+      <Panel title="Recent activity" flush>
         {feed.length === 0 ? (
-          <div className="text-sm text-gunmetal/60">
+          <p className="text-sm text-gunmetal/60 px-4 sm:px-5">
             No events or inspections yet. Try the{" "}
             <Link className="underline" href="/bulk-approval">
               Bulk Approval
             </Link>{" "}
-            page to log this week's licences.
-          </div>
+            page to log this week&apos;s licences.
+          </p>
         ) : (
           <ul className="divide-y divide-gunmetal/8">
             {feed.map((f) => (
               <li
                 key={`${f.kind}-${f.id}`}
-                className="py-2 flex items-start justify-between gap-3"
+                className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                   <span
-                    className={`chip ${f.kind === "licence" ? "green" : "slate"}`}
+                    className={`chip ${f.kind === "licence" ? "green" : "slate"} shrink-0`}
                   >
                     {f.kind === "licence" ? "Licence" : "Inspection"}
                   </span>
-                  <div>
-                    <div className="text-sm font-bold">{f.title}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold break-words">
+                      {f.title}
+                    </div>
                     <div className="text-xs text-gunmetal/60">{f.subtitle}</div>
                   </div>
                 </div>
-                <div className="text-xs tabular text-gunmetal/55">{f.date}</div>
+                <div className="text-xs tabular text-gunmetal/55 shrink-0">
+                  {f.date}
+                </div>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
-
-function MiniStat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-gunmetal/10 p-3">
-      <div
-        className={`text-2xl font-black tabular ${
-          accent ? "text-[var(--rpa-green-dark)]" : ""
-        }`}
-      >
-        {value}
-      </div>
-      <div className="caps text-[10px] text-gunmetal/60 mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-function FlowRow({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: "red" | "green";
-}) {
-  return (
-    <li className="flex items-center justify-between">
-      <span>{label}</span>
-      <span
-        className={`tabular font-black ${
-          accent === "red"
-            ? "text-[var(--status-stalled)]"
-            : accent === "green"
-              ? "text-[var(--rpa-green-dark)]"
-              : ""
-        }`}
-      >
-        {value}
-      </span>
-    </li>
-  );
-}
-

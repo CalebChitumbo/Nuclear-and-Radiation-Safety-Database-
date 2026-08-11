@@ -9,6 +9,8 @@ import { useStoreData } from "@/lib/storeHooks";
 import { ApplicationHistoryDrawer } from "@/components/ApplicationHistoryDrawer";
 import { FacilitySelect } from "@/components/FacilitySelect";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { Kpi } from "@/components/Kpi";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
 import {
@@ -420,10 +422,12 @@ export default function LicenceStatusPage() {
 
   if (!canEditAS) {
     return (
-      <div className="card p-6 text-sm">
-        Only Authorisation &amp; Standards officers (or admins) can import RAIS
-        licensing status.
-      </div>
+      <Panel>
+        <p className="text-sm">
+          Only Authorisation &amp; Standards officers (or admins) can import RAIS
+          licensing status.
+        </p>
+      </Panel>
     );
   }
 
@@ -483,34 +487,35 @@ export default function LicenceStatusPage() {
       ) : null}
 
       {/* Manual paste + full pipeline board — secondary, tucked behind a disclosure */}
-      <details className="card p-4">
-        <summary className="font-black cursor-pointer select-none">
+      <details className="card bleed p-4 sm:p-5">
+        <summary className="font-black cursor-pointer select-none py-1">
           Manual paste &amp; pipeline board
-          <span className="text-xs text-gunmetal/55 font-normal ml-2">
+          <span className="block sm:inline text-xs text-gunmetal/55 font-normal sm:ml-2">
             paste a RAIS dashboard feed, or review the full tracked pipeline
           </span>
         </summary>
 
         <div className="mt-4 space-y-4">
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">
+            <label className="field-label" htmlFor="rais-paste">
               Paste the RAIS dashboard notifications
             </label>
             <textarea
-              className="input mt-1 font-mono-nums"
+              id="rais-paste"
+              className="input font-mono-nums"
               rows={7}
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Copy the whole RAIS 'assigned data forms' feed and paste it here…"
             />
-            <div className="text-[11px] text-gunmetal/55 mt-1">
+            <p className="text-[11px] text-gunmetal/55 mt-1">
               Each notification (separated by <code>+ Show More</code>) is read,
               grouped per application RAN, and placed in the pipeline. Nothing is
               saved until you press <strong>Save to database</strong>.
-            </div>
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
-                className="btn btn-primary"
+                className="btn btn-primary flex-1 sm:flex-none"
                 onClick={analyze}
                 disabled={!facilities}
               >
@@ -541,7 +546,7 @@ export default function LicenceStatusPage() {
                 commentCountFor={commentCountFor}
               />
               {isDirty ? (
-                <div className="card p-5 flex flex-wrap items-center gap-3">
+                <div className="inset p-4 flex flex-wrap items-center gap-3">
                   <button
                     className="btn btn-primary"
                     disabled={committing}
@@ -588,23 +593,21 @@ function ReportPanel({
 }) {
   const order: WorkflowPriority[] = ["CRITICAL", "HIGH", "NORMAL", "APPLICANT"];
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="font-black">Latest update</div>
+    <Panel
+      title="Latest update"
+      action={
         <button className="btn btn-secondary" onClick={onCopy}>
           Copy report
         </button>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      }
+    >
+      <div className="stat-grid grid-cols-2 md:grid-cols-4">
         {order.map((p) => (
-          <div key={p} className="card p-3">
-            <div className="caps text-[10px] text-gunmetal/60">
-              {PRIORITY_META[p].label}
-            </div>
-            <div className="text-3xl font-black tabular">
-              {report.byPriority[p].length}
-            </div>
-          </div>
+          <Kpi
+            key={p}
+            label={PRIORITY_META[p].label}
+            value={report.byPriority[p].length}
+          />
         ))}
       </div>
 
@@ -655,7 +658,7 @@ function ReportPanel({
           ) : null,
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -676,13 +679,11 @@ function KanbanBoard({
     (ph) => ph !== "Other" || records.some((r) => r.phase === "Other"),
   );
   return (
-    <div className="card p-5 overflow-x-auto">
-      <div className="font-black mb-3">
-        Licensing pipeline
-        <span className="text-xs text-gunmetal/55 font-normal ml-2">
-          click an application for its notes &amp; history
-        </span>
-      </div>
+    <Panel
+      title="Licensing pipeline"
+      note="Tap an application for its notes &amp; history. The board scrolls sideways."
+      className="overflow-x-auto"
+    >
       <div className="flex gap-3" style={{ minWidth: "min-content" }}>
         {columns.map((phase) => {
           const items = records.filter((r) => r.phase === phase);
@@ -715,7 +716,7 @@ function KanbanBoard({
           );
         })}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -733,7 +734,7 @@ function WorkflowCard({
     <button
       type="button"
       onClick={onOpen}
-      className="card card-hover p-2.5 w-full text-left block"
+      className="inset p-2.5 w-full text-left block transition-colors hover:brightness-[0.98]"
       style={{ borderLeft: `3px solid ${meta.dot}` }}
       title="Open notes & history"
     >
@@ -820,39 +821,35 @@ function ReviewTable({
   };
 
   return (
-    <div className="card overflow-hidden">
-      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 font-black">
-        {editable ? "Review & correct" : "Tracked applications"}
-        <span className="text-xs text-gunmetal/55 font-normal ml-2">
-          {records.length} applications
-        </span>
-      </div>
-
+    <Panel
+      title={`${editable ? "Review & correct" : "Tracked applications"} — ${records.length} applications`}
+      flush
+    >
       {/* Tablet & desktop: full table */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm tbl-sticky">
+      <div className="hidden md:block table-wrap">
+        <table className="data tbl-sticky">
           <thead>
-            <tr className="text-left text-xs caps text-gunmetal/55">
-              <th className="px-4 py-2">Facility</th>
-              <th className="px-4 py-2">RAN</th>
-              <th className="px-4 py-2">Stage</th>
-              <th className="px-4 py-2">Responsible</th>
-              <th className="px-4 py-2">Priority</th>
-              <th className="px-4 py-2">Register match</th>
-              <th className="px-4 py-2">Notes</th>
+            <tr>
+              <th>Facility</th>
+              <th>RAN</th>
+              <th>Stage</th>
+              <th>Responsible</th>
+              <th>Priority</th>
+              <th>Register match</th>
+              <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             {records.map((r) => (
-              <tr key={r.id} className="border-t border-gunmetal/8 align-top">
-                <td className="px-4 py-3">
+              <tr key={r.id}>
+                <td>
                   <div className="font-bold">
                     {r.facilityName || <em>(unmatched)</em>}
                   </div>
                   <div className="text-[11px] text-gunmetal/55">{r.ranType}</div>
                 </td>
-                <td className="px-4 py-3 tabular">{r.ran || "—"}</td>
-                <td className="px-4 py-3">
+                <td className="tabular">{r.ran || "—"}</td>
+                <td>
                   <div>{r.stage}</div>
                   <div className="mt-1 flex gap-1">
                     {r.outstandingPayment ? (
@@ -863,14 +860,14 @@ function ReviewTable({
                     ) : null}
                   </div>
                 </td>
-                <td className="px-4 py-3">{r.responsibleParty}</td>
-                <td className="px-4 py-3">
+                <td>{r.responsibleParty}</td>
+                <td>
                   <span className={`chip ${PRIORITY_META[r.priority].chip}`}>
                     {r.priority}
                   </span>
                 </td>
-                <td className="px-4 py-3">{renderMatch(r)}</td>
-                <td className="px-4 py-3">{renderNotes(r)}</td>
+                <td style={{ minWidth: 200 }}>{renderMatch(r)}</td>
+                <td>{renderNotes(r)}</td>
               </tr>
             ))}
           </tbody>
@@ -933,7 +930,7 @@ function ReviewTable({
           </div>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -1011,9 +1008,9 @@ function IncomingInbox({
 
   if (!items.length) {
     return (
-      <div className="card p-5 flex items-center gap-3">
+      <div className="card bleed p-4 sm:p-5 flex items-center gap-3 flex-wrap">
         <span className="chip green shrink-0">✓ inbox clear</span>
-        <div className="text-sm text-gunmetal/70">
+        <div className="text-sm text-gunmetal/70 min-w-0">
           No incoming RAIS updates to review. New notification emails appear here
           automatically.
         </div>
@@ -1077,7 +1074,7 @@ function IncomingInbox({
 
   return (
     <div
-      className="card overflow-hidden"
+      className="card bleed overflow-hidden"
       style={{ borderLeft: "3px solid var(--rpa-green-dark, #00A050)" }}
     >
       <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2 flex-wrap">
@@ -1345,12 +1342,12 @@ function ReadyToLicense({
       useP: r.special === "form-i-prompt" ? true : undefined,
     };
 
-  return (
+    return (
     <div
-      className="card overflow-hidden"
-      style={{ borderLeft: "3px solid var(--status-ok, #00A050)" }}
+      className="card bleed overflow-hidden"
+      style={{ borderLeft: "3px solid var(--rpa-green, #00A050)" }}
     >
-      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2">
+      <div className="px-4 sm:px-5 py-3 border-b border-gunmetal/8 flex items-center justify-between gap-2 flex-wrap">
         <div className="font-black">
           Ready to license
           <span className="text-xs text-gunmetal/55 font-normal ml-2">

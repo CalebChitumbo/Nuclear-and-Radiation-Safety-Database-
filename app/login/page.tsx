@@ -34,15 +34,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-canvas px-4 py-10"
-      style={{ backgroundColor: "#F7F4EC" }}
-    >
-      <div className="w-full max-w-md card p-8">
+    <div className="min-h-screen flex items-center justify-center bg-canvas px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md card p-6 sm:p-8">
         <div className="flex items-center gap-3">
-          <Logo size={64} />
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">
+          <Logo size={56} />
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">
               RPA Regulatory System
             </h1>
             <p className="caps text-[10px] text-gunmetal/60">
@@ -51,29 +48,35 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <form onSubmit={submit} className="mt-8 space-y-4">
+        <form onSubmit={submit} className="mt-6 sm:mt-8 space-y-4">
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">Email</label>
+            <label className="field-label" htmlFor="login-email">
+              Email
+            </label>
             <input
+              id="login-email"
               type="email"
               required
               autoFocus
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="input mt-1"
+              className="input"
               placeholder="your.name@rpa.gov.zm"
             />
           </div>
           <div>
-            <label className="caps text-[10px] text-gunmetal/60">Password</label>
+            <label className="field-label" htmlFor="login-password">
+              Password
+            </label>
             <input
+              id="login-password"
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="input mt-1"
+              className="input"
               placeholder="••••••••"
             />
           </div>
@@ -92,11 +95,11 @@ export default function LoginPage() {
         </form>
 
         {isMockMode ? (
-          <div className="mt-6 p-4 rounded-lg bg-mist border border-gunmetal/10">
+          <div className="mt-6 inset p-4">
             <div className="caps text-[10px] text-gunmetal/60 mb-2">
               Demo accounts (any password)
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {DEMO_ACCOUNTS.map((a) => (
                 <button
                   key={a.email}
@@ -105,10 +108,12 @@ export default function LoginPage() {
                     setEmail(a.email);
                     setPassword("demo");
                   }}
-                  className="block w-full text-left text-sm hover:underline"
+                  className="block w-full text-left text-sm hover:underline py-1.5"
                 >
-                  <span className="font-bold">{a.email}</span>
-                  <span className="text-gunmetal/60 ml-2 text-xs">{a.role}</span>
+                  <span className="font-bold break-all">{a.email}</span>
+                  <span className="text-gunmetal/60 block text-xs">
+                    {a.role}
+                  </span>
                 </button>
               ))}
             </div>

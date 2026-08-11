@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { store, resetMockStore } from "@/lib/store";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { isMockMode } from "@/lib/firebase";
 import { PROVINCES, type Facility } from "@/lib/rules/types";
@@ -82,48 +83,47 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4 staggered">
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60">Profile</div>
-        <div className="mt-2">
-          <div className="font-bold">{user?.displayName || "—"}</div>
-          <div className="text-sm text-gunmetal/65">{user?.email}</div>
-          <div className="text-xs text-gunmetal/55 mt-1">
-            {user?.role} · {user?.section}
-          </div>
+      <Panel title="Profile">
+        <div className="font-bold">{user?.displayName || "—"}</div>
+        <div className="text-sm text-gunmetal/65 break-words">
+          {user?.email}
         </div>
-      </div>
+        <div className="text-xs text-gunmetal/55 mt-1">
+          {user?.role} · {user?.section}
+        </div>
+      </Panel>
 
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60">Export &amp; backup</div>
-        <p className="text-sm text-gunmetal/70 mt-1">
-          The dated event log is the source of truth. Exports capture the
-          register and the events that produced it, so the database can always
-          be rebuilt.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button disabled={busy} className="btn btn-primary" onClick={exportJson}>
-            Export full data (JSON)
+      <Panel
+        title="Export &amp; backup"
+        note="The dated event log is the source of truth. Exports capture the register and the events that produced it, so the database can always be rebuilt."
+      >
+        <div className="flex flex-wrap gap-2">
+          <button
+            disabled={busy}
+            className="btn btn-primary flex-1 sm:flex-none"
+            onClick={exportJson}
+          >
+            Full data (JSON)
           </button>
           <button
             disabled={busy}
-            className="btn btn-secondary"
+            className="btn btn-secondary flex-1 sm:flex-none"
             onClick={exportRegisterCsv}
           >
-            Export register (CSV)
+            Register (CSV)
           </button>
           <button
             disabled={busy}
-            className="btn btn-secondary"
+            className="btn btn-secondary flex-1 sm:flex-none"
             onClick={exportRegisterXlsx}
           >
-            Export register (XLS)
+            Register (XLS)
           </button>
         </div>
-      </div>
+      </Panel>
 
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60">Environment</div>
-        <div className="text-sm mt-1">
+      <Panel title="Environment">
+        <div className="text-sm">
           Mode:{" "}
           <strong>
             {isMockMode ? "Mock (in-memory + localStorage)" : "Firebase"}
@@ -139,41 +139,42 @@ export default function SettingsPage() {
                 Reset mock data
               </button>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gunmetal/70">
+              <div className="inset p-3 space-y-3">
+                <p className="text-sm text-gunmetal/70">
                   Confirm reset (re-seeds 538 facilities, clears events &amp;
                   inspections)?
-                </span>
-                <button
-                  className="btn btn-danger"
-                  onClick={async () => {
-                    await resetMockStore();
-                    toast.push("Mock data reset to seed.", "success");
-                    setConfirmReset(false);
-                  }}
-                >
-                  Yes, reset
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setConfirmReset(false)}
-                >
-                  Cancel
-                </button>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-danger"
+                    onClick={async () => {
+                      await resetMockStore();
+                      toast.push("Mock data reset to seed.", "success");
+                      setConfirmReset(false);
+                    }}
+                  >
+                    Yes, reset
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setConfirmReset(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
         ) : null}
-      </div>
+      </Panel>
 
-      <div className="card p-5">
-        <div className="caps text-xs text-gunmetal/60">Reference data</div>
-        <div className="text-sm text-gunmetal/70 mt-1">
+      <Panel title="Reference data">
+        <p className="text-sm text-gunmetal/70">
           Provinces and licence types are sourced from{" "}
           <code>config/referenceLists</code> in Firestore (read-only here). The
           ten provinces are: {PROVINCES.join(", ")}.
-        </div>
-      </div>
+        </p>
+      </Panel>
     </div>
   );
 }

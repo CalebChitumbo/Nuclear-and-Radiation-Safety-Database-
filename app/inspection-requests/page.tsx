@@ -8,6 +8,7 @@ import { useStoreData } from "@/lib/storeHooks";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { InspectionRequestDrawer } from "@/components/InspectionRequestDrawer";
+import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { norm } from "@/lib/rules/matching";
 import {
@@ -126,7 +127,10 @@ export default function InspectionRequestsPage() {
       return;
     }
     if (!reason.trim()) {
-      toast.push("Add a reason so the Inspectorate knows what is needed.", "error");
+      toast.push(
+        "Add a reason so the Inspectorate knows what is needed.",
+        "error",
+      );
       return;
     }
     setBusy(true);
@@ -186,18 +190,14 @@ export default function InspectionRequestsPage() {
       ) : null}
 
       {/* Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi label="Open requests" value={stats.open} />
         <Kpi
           label="Awaiting Inspectorate"
           value={inbox.incoming.length}
           accent="amber"
         />
-        <Kpi
-          label="Reports ready"
-          value={stats.reportsReady}
-          accent="green"
-        />
+        <Kpi label="Reports ready" value={stats.reportsReady} accent="green" />
         <Kpi
           label={`Facilities inspected (${CURRENT_YEAR})`}
           value={stats.completedThisYear}
@@ -208,16 +208,10 @@ export default function InspectionRequestsPage() {
 
       {/* Raise a request (Licensing / admin) */}
       {canEditAS ? (
-        <div className="card p-5">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <div className="caps text-xs text-gunmetal/60">
-                Request a pre-authorisation inspection
-              </div>
-              <div className="text-xs text-gunmetal/60 mt-1">
-                Sends the request to the Inspectorate and tracks it to the report.
-              </div>
-            </div>
+        <Panel
+          title="Request a pre-authorisation inspection"
+          note="Sends the request to the Inspectorate and tracks it to the report."
+          action={
             <button
               className="btn btn-primary"
               aria-pressed={showForm}
@@ -225,17 +219,18 @@ export default function InspectionRequestsPage() {
             >
               {showForm ? "Close" : "+ New request"}
             </button>
-          </div>
-
+          }
+        >
           {showForm ? (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="caps text-[10px] text-gunmetal/60">
+                <label className="field-label" htmlFor="req-facility">
                   Facility
                 </label>
                 <div className="relative">
                   <input
-                    className="input mt-1"
+                    id="req-facility"
+                    className="input"
                     placeholder="Search register…"
                     value={selected ? selected.name : facilityQuery}
                     onChange={(e) => {
@@ -245,7 +240,7 @@ export default function InspectionRequestsPage() {
                     }}
                   />
                   {suggestions.length > 0 && !selected ? (
-                    <ul className="absolute left-0 right-0 mt-1 z-20 card max-h-60 overflow-y-auto">
+                    <ul className="popover absolute left-0 right-0 mt-1 z-20 max-h-60 overflow-y-auto">
                       {suggestions.map((f) => (
                         <li
                           key={f.id}
@@ -253,28 +248,31 @@ export default function InspectionRequestsPage() {
                             setFacilityId(f.id);
                             setFacilityQuery(f.name);
                           }}
-                          className="px-3 py-2 text-sm hover:bg-mist cursor-pointer"
+                          className="px-3 py-2.5 text-sm hover:bg-mist cursor-pointer"
                         >
                           <div className="font-bold">{f.name}</div>
                           <div className="text-xs text-gunmetal/60">
-                            {f.facCode || "—"} · {f.district || "—"} · {f.province}
+                            {f.facCode || "—"} · {f.district || "—"} ·{" "}
+                            {f.province}
                           </div>
                         </li>
                       ))}
                     </ul>
                   ) : null}
                 </div>
-                <div className="text-[11px] text-gunmetal/55 mt-1">
-                  Free-text is fine if the facility isn&apos;t in the register yet.
-                </div>
+                <p className="text-[11px] text-gunmetal/55 mt-1">
+                  Free-text is fine if the facility isn&apos;t in the register
+                  yet.
+                </p>
               </div>
 
               <div>
-                <label className="caps text-[10px] text-gunmetal/60">
+                <label className="field-label" htmlFor="req-ran">
                   Linked application (RAN, optional)
                 </label>
                 <input
-                  className="input mt-1"
+                  id="req-ran"
+                  className="input"
                   placeholder="AUTH/USE.NEW/0203"
                   value={workflowRan}
                   onChange={(e) => setWorkflowRan(e.target.value)}
@@ -282,9 +280,12 @@ export default function InspectionRequestsPage() {
               </div>
 
               <div>
-                <label className="caps text-[10px] text-gunmetal/60">Type</label>
+                <label className="field-label" htmlFor="req-type">
+                  Type
+                </label>
                 <select
-                  className="input mt-1"
+                  id="req-type"
+                  className="input"
                   value={type}
                   onChange={(e) => setType(e.target.value as InspectionType)}
                 >
@@ -296,11 +297,12 @@ export default function InspectionRequestsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="caps text-[10px] text-gunmetal/60">
+                  <label className="field-label" htmlFor="req-priority">
                     Priority
                   </label>
                   <select
-                    className="input mt-1"
+                    id="req-priority"
+                    className="input"
                     value={priority}
                     onChange={(e) =>
                       setPriority(e.target.value as InspectionPriority)
@@ -312,12 +314,13 @@ export default function InspectionRequestsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="caps text-[10px] text-gunmetal/60">
+                  <label className="field-label" htmlFor="req-needed-by">
                     Needed by
                   </label>
                   <input
+                    id="req-needed-by"
                     type="date"
-                    className="input mt-1"
+                    className="input"
                     value={neededBy}
                     onChange={(e) => setNeededBy(e.target.value)}
                   />
@@ -325,11 +328,12 @@ export default function InspectionRequestsPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="caps text-[10px] text-gunmetal/60">
+                <label className="field-label" htmlFor="req-scope">
                   Reason / scope
                 </label>
                 <textarea
-                  className="input mt-1"
+                  id="req-scope"
+                  className="input"
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -337,7 +341,7 @@ export default function InspectionRequestsPage() {
                 />
               </div>
 
-              <div className="md:col-span-2 flex gap-2">
+              <div className="md:col-span-2 flex flex-wrap gap-2">
                 <button
                   className="btn btn-primary"
                   disabled={busy}
@@ -357,41 +361,47 @@ export default function InspectionRequestsPage() {
               </div>
             </div>
           ) : null}
-        </div>
+        </Panel>
       ) : null}
 
       {/* Filter + board */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="caps text-xs text-gunmetal/60">
-            {filtered.length} {filtered.length === 1 ? "request" : "requests"}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            <FilterChip active={filter === ""} onClick={() => setFilter("")}>
-              All
-            </FilterChip>
-            {INSPECTION_REQUEST_STATUSES.map((sName) => (
-              <FilterChip
-                key={sName}
-                active={filter === sName}
-                onClick={() => setFilter(sName)}
-                count={stats.byStatus[sName]}
-              >
-                {REQUEST_STATUS_META[sName].label}
-              </FilterChip>
-            ))}
-          </div>
+      <Panel
+        title={`${filtered.length} ${filtered.length === 1 ? "request" : "requests"}`}
+      >
+        <div className="seg w-full">
+          <button
+            className="seg-btn"
+            aria-pressed={filter === ""}
+            onClick={() => setFilter("")}
+          >
+            All
+          </button>
+          {INSPECTION_REQUEST_STATUSES.map((sName) => (
+            <button
+              key={sName}
+              className="seg-btn"
+              aria-pressed={filter === sName}
+              onClick={() => setFilter(sName)}
+            >
+              {REQUEST_STATUS_META[sName].label}
+              {stats.byStatus[sName] ? (
+                <span className="ml-1 opacity-70 tabular">
+                  {stats.byStatus[sName]}
+                </span>
+              ) : null}
+            </button>
+          ))}
         </div>
 
         {requests.length === 0 ? (
-          <div className="py-10 text-center text-sm text-gunmetal/55">
+          <p className="py-10 text-center text-sm text-gunmetal/55">
             No inspection requests yet.
             {canEditAS
               ? " Use “New request” above to ask the Inspectorate to inspect a facility."
               : " Licensing officers raise these when a facility needs a pre-authorisation inspection."}
-          </div>
+          </p>
         ) : (
-          <div className="mt-4 space-y-6">
+          <div className="mt-4 space-y-5">
             {[...PIPELINE, ...TERMINAL]
               .filter((sName) => (filter ? sName === filter : true))
               .map((sName) => {
@@ -407,7 +417,7 @@ export default function InspectionRequestsPage() {
                         {items.length}
                       </span>
                     </div>
-                    <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <ul className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                       {items.map((r) => (
                         <RequestCard
                           key={r.id}
@@ -421,7 +431,7 @@ export default function InspectionRequestsPage() {
               })}
           </div>
         )}
-      </div>
+      </Panel>
 
       <InspectionRequestDrawer
         request={openRequest}
@@ -444,13 +454,15 @@ function RequestCard({
     <li>
       <button
         onClick={onOpen}
-        className="w-full text-left card p-4 hover:shadow-md transition-shadow"
+        className="inset w-full text-left p-3 transition-colors hover:brightness-[0.98]"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-bold truncate">{r.facilityName}</div>
-            <div className="text-xs text-gunmetal/60 mt-0.5">
-              <span className="chip slate mr-1">{r.type}</span>
+            <div className="font-bold break-words leading-tight">
+              {r.facilityName}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              <span className="chip slate">{r.type}</span>
               <span className={`chip ${priority.chip}`}>{priority.label}</span>
             </div>
           </div>
@@ -479,36 +491,6 @@ function RequestCard({
   );
 }
 
-function FilterChip({
-  active,
-  onClick,
-  count,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className="px-2.5 py-1 text-xs caps font-bold rounded-lg border"
-      style={{
-        background: active ? "var(--rpa-green)" : "transparent",
-        color: active ? "white" : "var(--gunmetal)",
-        borderColor: active ? "var(--rpa-green)" : "rgba(26,27,29,0.12)",
-      }}
-    >
-      {children}
-      {typeof count === "number" && count > 0 ? (
-        <span className="ml-1 opacity-80">{count}</span>
-      ) : null}
-    </button>
-  );
-}
-
 function Banner({
   tone,
   title,
@@ -518,14 +500,11 @@ function Banner({
   title: string;
   body: string;
 }) {
-  const bg =
-    tone === "green" ? "rgba(0,160,80,0.10)" : "rgba(184,134,11,0.12)";
-  const border =
-    tone === "green" ? "rgba(0,160,80,0.35)" : "rgba(184,134,11,0.35)";
+  const accent = tone === "green" ? "var(--rpa-green)" : "#B8860B";
   return (
     <div
-      className="card p-4"
-      style={{ background: bg, borderColor: border }}
+      className="card bleed p-4"
+      style={{ borderLeft: `3px solid ${accent}` }}
       role="status"
     >
       <div className="font-bold text-sm">{title}</div>

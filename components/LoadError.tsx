@@ -15,9 +15,10 @@ export function LoadErrorBanner({
   return (
     <div
       role="alert"
-      className="card p-4 text-sm flex items-center justify-between gap-3"
+      className="card bleed p-4 text-sm flex flex-wrap items-center justify-between gap-3"
+      style={{ borderLeft: "3px solid var(--status-stalled)" }}
     >
-      <span>
+      <span className="min-w-0">
         <span className="chip red mr-2">Load failed</span>
         {error}
       </span>

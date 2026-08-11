@@ -145,10 +145,10 @@ function BigOption({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-4 py-4 rounded-xl border transition-transform active:scale-[0.99]"
+      className="w-full text-left px-4 py-4 rounded-xl transition-transform active:scale-[0.99]"
       style={{
-        borderColor: "rgba(26,27,29,0.14)",
-        background: muted ? "transparent" : "var(--white)",
+        background: muted ? "transparent" : "var(--sunken)",
+        border: muted ? "1px solid var(--line)" : "1px solid transparent",
       }}
     >
       <span className="block text-base font-bold">{label}</span>

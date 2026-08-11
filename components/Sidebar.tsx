@@ -6,61 +6,64 @@ import { useEffect, useState } from "react";
 
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/auth";
-import { useStoreData } from "@/lib/storeHooks";
-import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 
-const NAV = [
-  { href: "/", label: "Overview", icon: "▣" },
-  { href: "/facilities", label: "Facilities", icon: "▤" },
-  { href: "/reports", label: "Reports", icon: "▥" },
-  { href: "/licences", label: "Authorisations", icon: "▦" },
-  { href: "/inspectorate", label: "Inspectorate", icon: "✶" },
+/** Grouped so the eleven destinations read as four short lists, not one wall. */
+const NAV_GROUPS: {
+  heading: string;
+  items: { href: string; label: string; short?: string; icon: string }[];
+}[] = [
   {
-    href: "/nsss",
-    label: "Nuclear Safety, Security & Safeguards",
-    icon: "⬢",
+    heading: "Register",
+    items: [
+      { href: "/", label: "Overview", icon: "▣" },
+      { href: "/facilities", label: "Facilities", icon: "▤" },
+      { href: "/reports", label: "Reports", icon: "▥" },
+      { href: "/licences", label: "Authorisations", icon: "▦" },
+    ],
   },
-  { href: "/border", label: "Border Scan Log", icon: "☢" },
-  { href: "/licence-status", label: "Smart Status Update", icon: "◑" },
-  { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
-  { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },
-  { href: "/daily", label: "Daily Updates", icon: "✎" },
+  {
+    heading: "Sections",
+    items: [
+      { href: "/inspectorate", label: "Inspectorate", icon: "✶" },
+      {
+        href: "/nsss",
+        label: "Nuclear Safety, Security & Safeguards",
+        short: "Nuclear Safety (NSSS)",
+        icon: "⬢",
+      },
+      { href: "/border", label: "Border Scan Log", icon: "☢" },
+    ],
+  },
+  {
+    heading: "Workflow",
+    items: [
+      { href: "/licence-status", label: "Smart Status Update", icon: "◑" },
+      { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
+      { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },
+      { href: "/daily", label: "Daily Updates", icon: "✎" },
+    ],
+  },
 ];
 
-const ADMIN_NAV = [
-  { href: "/admin/users", label: "Users", icon: "◉" },
-];
+const ADMIN_NAV = [{ href: "/admin/users", label: "Users", icon: "◉" }];
 
-const BOTTOM_NAV = [
-  { href: "/settings", label: "Settings", icon: "⚙" },
-];
+const BOTTOM_NAV = [{ href: "/settings", label: "Settings", icon: "⚙" }];
 
 export function Sidebar({
   collapsed,
   onToggleCollapse,
   mobileOpen,
   onMobileClose,
+  inspectionBadge = 0,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  inspectionBadge?: number;
 }) {
   const pathname = usePathname();
-  const { isAdmin, signOut, user, canEditAS, canEditInsp } = useAuth();
-
-  // A small badge on the Inspection Requests link surfaces the cross-section
-  // handoff: new requests for the Inspectorate, reports ready for Licensing.
-  const { data: inbox } = useStoreData(
-    async (s) => {
-      // Never let the badge read break the shell: if the collection isn't
-      // readable yet (rules not deployed), just show no badge.
-      const requests = await s.listInspectionRequests().catch(() => []);
-      return deriveInspectionInbox(requests, { canEditAS, canEditInsp });
-    },
-    [canEditAS, canEditInsp],
-  );
-  const inspectionBadge = inbox?.count || 0;
+  const { isAdmin, signOut, user } = useAuth();
 
   // Collapsing to the icon rail is a desktop-only affordance. On phones and
   // tablets the drawer always shows the full navigation, so the narrow rail
@@ -116,6 +119,7 @@ export function Sidebar({
         style={{
           background: "#1A1B1D",
           width: showCollapsed ? 72 : 248,
+          maxWidth: "85vw",
           // visibility transitions discretely at the end, so the slide-out
           // animation still plays before the drawer is hidden.
           transition: "width 0.18s ease, transform 0.24s ease, visibility 0.24s",
@@ -123,66 +127,95 @@ export function Sidebar({
           visibility: offCanvas ? "hidden" : "visible",
         }}
       >
-        <div className="px-4 py-5 flex items-center gap-3">
-          <Logo size={showCollapsed ? 36 : 44} />
+        <div className="px-4 py-4 flex items-center gap-3 shrink-0">
+          <Logo size={showCollapsed ? 36 : 40} />
           {!showCollapsed ? (
-            <div>
+            <div className="min-w-0">
               <div
                 className="font-black text-base leading-tight"
                 style={{ color: "#F7F4EC" }}
               >
                 RPA
               </div>
-              <div
-                className="caps text-[10px]"
-                style={{ color: "#00A050" }}
-              >
+              <div className="caps text-[10px]" style={{ color: "#00A050" }}>
                 Nuclear &amp; Radiation Safety
               </div>
             </div>
           ) : null}
+          {/* Closing from inside the panel beats reaching for the backdrop. */}
+          <button
+            onClick={onMobileClose}
+            className="lg:hidden ml-auto text-lg px-2 py-1 rounded-lg shrink-0"
+            style={{ color: "rgba(247,244,236,0.7)" }}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
         </div>
 
-        <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
-          {NAV.map((n) => (
-            <NavLink
-              key={n.href}
-              href={n.href}
-              active={isActive(n.href)}
-              collapsed={showCollapsed}
-              icon={n.icon}
-              label={n.label}
-              badge={
-                n.href === "/inspection-requests" ? inspectionBadge : undefined
-              }
-              onNavigate={onMobileClose}
-            />
+        <nav className="flex-1 px-2 pb-2 overflow-y-auto overscroll-contain">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.heading} className="mb-3">
+              <div
+                className="caps text-[10px] mb-1 px-3"
+                style={{ color: "rgba(247,244,236,0.38)" }}
+              >
+                {showCollapsed ? "·" : group.heading}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((n) => (
+                  <NavLink
+                    key={n.href}
+                    href={n.href}
+                    active={isActive(n.href)}
+                    collapsed={showCollapsed}
+                    icon={n.icon}
+                    label={n.short || n.label}
+                    title={n.label}
+                    badge={
+                      n.href === "/inspection-requests"
+                        ? inspectionBadge
+                        : undefined
+                    }
+                    onNavigate={onMobileClose}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
 
           {isAdmin ? (
-            <>
+            <div className="mb-3">
               <div
-                className="caps text-[10px] mt-6 mb-1 px-3"
-                style={{ color: "rgba(247,244,236,0.5)" }}
+                className="caps text-[10px] mb-1 px-3"
+                style={{ color: "rgba(247,244,236,0.38)" }}
               >
                 {showCollapsed ? "·" : "Admin"}
               </div>
-              {ADMIN_NAV.map((n) => (
-                <NavLink
-                  key={n.href}
-                  href={n.href}
-                  active={isActive(n.href)}
-                  collapsed={showCollapsed}
-                  icon={n.icon}
-                  label={n.label}
-                  onNavigate={onMobileClose}
-                />
-              ))}
-            </>
+              <div className="space-y-0.5">
+                {ADMIN_NAV.map((n) => (
+                  <NavLink
+                    key={n.href}
+                    href={n.href}
+                    active={isActive(n.href)}
+                    collapsed={showCollapsed}
+                    icon={n.icon}
+                    label={n.label}
+                    onNavigate={onMobileClose}
+                  />
+                ))}
+              </div>
+            </div>
           ) : null}
         </nav>
 
-        <div className="px-2 py-3 space-y-1">
+        <div
+          className="px-2 py-3 space-y-1 shrink-0 border-t"
+          style={{
+            borderColor: "rgba(247,244,236,0.08)",
+            paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
           {BOTTOM_NAV.map((n) => (
             <NavLink
               key={n.href}
@@ -195,19 +228,15 @@ export function Sidebar({
             />
           ))}
           {user ? (
-            <div
-              className="px-3 py-2 mt-2 rounded-lg"
-              style={{ background: "rgba(247,244,236,0.05)" }}
-            >
+            <div className="px-3 py-2 mt-1">
               {!showCollapsed ? (
                 <>
-                  <div className="text-xs caps" style={{ color: "#00A050" }}>
-                    Signed in
+                  <div className="text-sm font-bold truncate">
+                    {user.displayName}
                   </div>
-                  <div className="text-sm font-bold truncate">{user.displayName}</div>
                   <div
                     className="text-[10px] truncate"
-                    style={{ color: "rgba(247,244,236,0.65)" }}
+                    style={{ color: "rgba(247,244,236,0.55)" }}
                   >
                     {user.section} · {user.role}
                   </div>
@@ -219,18 +248,18 @@ export function Sidebar({
               )}
               <button
                 onClick={() => signOut()}
-                className="mt-2 w-full text-xs font-bold caps tracking-caps"
+                className="mt-2 w-full text-xs font-bold caps tracking-caps text-left py-2"
                 style={{ color: "#F0F000" }}
               >
                 {showCollapsed ? "↩" : "Sign out"}
               </button>
             </div>
           ) : null}
-          {/* Collapse toggle is desktop-only; the drawer closes via the backdrop */}
+          {/* Collapse toggle is desktop-only; the drawer closes via its own ✕ */}
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:block w-full text-xs caps mt-2"
-            style={{ color: "rgba(247,244,236,0.6)" }}
+            className="hidden lg:block w-full text-xs caps py-1"
+            style={{ color: "rgba(247,244,236,0.5)" }}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? "›" : "‹ collapse"}
@@ -246,6 +275,7 @@ function NavLink({
   active,
   icon,
   label,
+  title,
   collapsed,
   badge,
   onNavigate,
@@ -254,6 +284,7 @@ function NavLink({
   active: boolean;
   icon: string;
   label: string;
+  title?: string;
   collapsed: boolean;
   badge?: number;
   onNavigate?: () => void;
@@ -263,15 +294,16 @@ function NavLink({
     <Link
       href={href}
       onClick={onNavigate}
-      className="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-colors"
+      aria-current={active ? "page" : undefined}
+      className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors"
       style={{
         background: active ? "rgba(0,160,80,0.18)" : "transparent",
         color: active ? "#FFFFFF" : "rgba(247,244,236,0.78)",
         borderLeft: active ? "3px solid #00A050" : "3px solid transparent",
       }}
-      title={collapsed ? label : undefined}
+      title={collapsed ? title || label : undefined}
     >
-      <span className="relative text-base" aria-hidden="true">
+      <span className="relative text-base shrink-0" aria-hidden="true">
         {icon}
         {collapsed && hasBadge ? (
           <span
@@ -280,10 +312,10 @@ function NavLink({
           />
         ) : null}
       </span>
-      {!collapsed ? <span className="flex-1">{label}</span> : null}
+      {!collapsed ? <span className="flex-1 leading-tight">{label}</span> : null}
       {!collapsed && hasBadge ? (
         <span
-          className="text-[10px] font-black tabular rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
+          className="text-[10px] font-black tabular rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0"
           style={{ background: "#E0A32E", color: "#1A1B1D" }}
           aria-label={`${badge} needing attention`}
         >
