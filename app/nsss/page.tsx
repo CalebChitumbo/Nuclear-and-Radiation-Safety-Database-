@@ -17,7 +17,7 @@ import {
   borderSums,
   dailyMetricOptions,
   effectiveValuesByWeek,
-  sumMetricAcrossWeeks,
+  sumMetricsAcrossWeeks,
   vehicleScreeningKey,
 } from "@/lib/rules/daily";
 import { todayISO } from "@/lib/rules/week";
@@ -27,9 +27,10 @@ const NSSS: Section = "Nuclear Safety, Security & Safeguards";
 
 /**
  * The Nuclear Safety, Security & Safeguards section's own dashboard — the
- * metrics the section reports (vehicle/truck screening, IAEA meetings,
- * stakeholder engagements, TWG meetings) rolled up from its daily log and the
- * weekly report figures, with week / month / year totals and a screening trend.
+ * outputs the section owns in the approved 2026 work plan (screening, regional
+ * workshops, stakeholder engagement, coordinator/TWG meetings …) rolled up from
+ * its daily log and the sectional update's figures, with week / month / year
+ * totals and a screening trend.
  */
 export default function NsssPage() {
   const { weeks, selected } = useWeek();
@@ -60,10 +61,10 @@ export default function NsssPage() {
 
     const totals = metrics.map((m) => ({
       ...m,
-      week: sumMetricAcrossWeeks(byWeek, m.key, (w) => w === selected.label),
-      month: sumMetricAcrossWeeks(byWeek, m.key, inMonth),
-      year: sumMetricAcrossWeeks(byWeek, m.key, inYear),
-      all: sumMetricAcrossWeeks(byWeek, m.key),
+      week: sumMetricsAcrossWeeks(byWeek, m.keys, (w) => w === selected.label),
+      month: sumMetricsAcrossWeeks(byWeek, m.keys, inMonth),
+      year: sumMetricsAcrossWeeks(byWeek, m.keys, inYear),
+      all: sumMetricsAcrossWeeks(byWeek, m.keys),
     }));
 
     // Screening trend: the last 8 reporting weeks up to today.
@@ -106,10 +107,12 @@ export default function NsssPage() {
   }
 
   const { totals, trend, sectionEntries, borderRows } = derived;
-  const byLabel = (label: string) => totals.find((t) => t.label === label);
-  const screening = byLabel("Vehicle Screening (units)");
-  const iaea = byLabel("IAEA Meetings attended");
-  const stakeholder = byLabel("Stakeholder Engagements");
+  // By work plan output id, not label — the wording on a row can change, the
+  // output it reports against cannot.
+  const byOutput = (id: string) => totals.find((t) => t.outputId === id);
+  const screening = byOutput("1.3.12");
+  const iaea = byOutput("1.3.8");
+  const stakeholder = byOutput("1.3.9");
   const year = today.slice(0, 4);
   const canManage = canEditSection(user, NSSS);
 
@@ -118,7 +121,7 @@ export default function NsssPage() {
       <PageHeader
         eyebrow="Nuclear Safety, Security &amp; Safeguards"
         title="Section dashboard"
-        subtitle="Figures come from the section's Daily Updates log; weeks without daily entries fall back to the weekly report figure."
+        subtitle="Figures come from the section's Daily Updates log, against the section's 2026 work plan outputs; weeks without daily entries fall back to the figure typed on the sectional update."
         actions={
           <>
             <Link className="btn btn-primary flex-1 sm:flex-none" href="/border">
@@ -146,7 +149,7 @@ export default function NsssPage() {
           value={screening ? screening.year : 0}
         />
         <Kpi
-          label={`IAEA meetings — ${year}`}
+          label={`Regional / IAEA meetings — ${year}`}
           value={iaea ? iaea.year : 0}
           accent="slate"
         />
@@ -168,6 +171,7 @@ export default function NsssPage() {
             <table className="data">
               <thead>
                 <tr>
+                  <th>Output</th>
                   <th>Metric</th>
                   <th className="num">Week</th>
                   <th className="num">Month</th>
@@ -178,6 +182,9 @@ export default function NsssPage() {
               <tbody>
                 {totals.map((m) => (
                   <tr key={m.key}>
+                    <td className="tabular font-bold whitespace-nowrap">
+                      {m.supporting ? "—" : m.outputId}
+                    </td>
                     <td>{m.label}</td>
                     <td className="num">{m.week}</td>
                     <td className="num">{m.month}</td>
@@ -227,7 +234,7 @@ export default function NsssPage() {
         {sectionEntries.length === 0 ? (
           <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
             Nothing logged yet. Use Daily Updates to record vehicles screened,
-            meetings and engagements as they happen — the weekly report totals
+            meetings and engagements as they happen — the sectional update totals
             itself from those entries.
           </p>
         ) : (

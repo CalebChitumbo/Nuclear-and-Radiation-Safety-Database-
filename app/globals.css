@@ -502,6 +502,30 @@ table.data .num {
   z-index: 1;
 }
 
+/* The sectional update reproduces the work plan's fourteen columns, which is
+   wider than any screen. The output id and its description stay pinned to the
+   left so the quarter, status and comment columns scroll under a row you can
+   still identify. Cells that span the table (the expanded detail, the
+   supporting-figures divider) are exempt — they are their own full-width row. */
+.wp-table th:first-child,
+.wp-table td:first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  width: 7rem;
+  min-width: 7rem;
+  max-width: 7rem;
+  background: var(--surface);
+  z-index: 2;
+}
+.wp-table th:nth-child(2),
+.wp-table td:nth-child(2) {
+  position: sticky;
+  left: 7rem;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--line);
+  z-index: 1;
+}
+
 /* ---------------------------------------------------------------------------
    Motion, toast, drawer
 --------------------------------------------------------------------------- */

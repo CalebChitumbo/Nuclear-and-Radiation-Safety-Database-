@@ -11,8 +11,14 @@ import {
   sumMetricAcrossWeeks,
   vehicleScreeningKey,
 } from "../lib/rules/daily";
-import { deriveWeekly, metricKey } from "../lib/rules/weeklyDerivation";
-import type { DailyEntry, WeekMetrics } from "../lib/rules/types";
+import { metricKey } from "../lib/rules/weeklyDerivation";
+import {
+  deriveWorkPlan,
+  metricKeysForOutput,
+  findOutput,
+} from "../lib/rules/workPlan";
+import weeksSeed from "../seed/weeks-2026.seed.json";
+import type { DailyEntry, WeekDef, WeekMetrics } from "../lib/rules/types";
 
 const NSSS = "Nuclear Safety, Security & Safeguards" as const;
 const SCREEN = metricKey(NSSS, "Vehicle Screening (units)");
@@ -45,16 +51,32 @@ const note = (over: Partial<DailyEntry> = {}): DailyEntry => ({
 });
 
 describe("daily metric options", () => {
-  it("uses exactly the weekly report's metric keys, for every section", () => {
+  it("offers the section's work plan outputs, on the report's own keys", () => {
     const opts = dailyMetricOptions(NSSS);
-    expect(opts.map((o) => o.label)).toContain("Vehicle Screening (units)");
+    // Vehicles screened is output 1.3.12, still on its original metric key.
+    const screening = opts.find((o) => o.outputId === "1.3.12")!;
+    expect(screening.key).toBe(SCREEN);
     for (const o of opts) {
-      expect(o.key).toBe(metricKey(NSSS, o.label));
+      expect(o.keys).toEqual(metricKeysForOutput(findOutput(o.outputId)!));
+      expect(o.key).toBe(o.keys[0]);
     }
-    // A daily count logged against an option key lands on the weekly table.
-    const rep = deriveWeekly([], [], { [opts[0].key]: 5 });
-    const nsss = rep.find((s) => s.section === NSSS)!;
-    expect(nsss.metrics.find((m) => m.key === opts[0].key)?.value).toBe(5);
+  });
+
+  it("lands a daily count on the work plan row it was logged against", () => {
+    const opts = dailyMetricOptions(NSSS);
+    const opt = opts.find((o) => o.outputId === "1.3.9")!;
+    const reports = deriveWorkPlan({
+      weeks: weeksSeed as WeekDef[],
+      week: W22,
+      events: [],
+      inspections: [],
+      valuesByWeek: new Map([[W22, { [opt.key]: 5 }]]),
+    });
+    const row = reports
+      .flatMap((s) => s.rows)
+      .find((r) => r.output.id === "1.3.9")!;
+    expect(row.week).toBe(5);
+    expect(row.total).toBe(5);
   });
 });
 

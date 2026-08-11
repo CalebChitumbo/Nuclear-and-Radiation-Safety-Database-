@@ -17,7 +17,7 @@ const TITLES: Record<string, string> = {
   "/nsss": "Nuclear Safety, Security & Safeguards",
   "/border": "Border Scan Log",
   "/daily": "Daily Updates",
-  "/weekly": "Weekly Sectional Report",
+  "/weekly": "Sectional Update — 2026 Work Plan",
   "/admin/users": "User Management",
   "/settings": "Settings",
 };
@@ -28,7 +28,7 @@ const SHORT_TITLES: Record<string, string> = {
   "/facilities": "Facilities",
   "/reports": "Reports",
   "/inspection-requests": "Requests",
-  "/weekly": "Weekly Report",
+  "/weekly": "Sectional Update",
   "/admin/users": "Users",
 };
 

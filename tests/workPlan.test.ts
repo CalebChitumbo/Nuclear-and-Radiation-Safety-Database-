@@ -1,0 +1,422 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  WORK_PLAN,
+  WORK_PLAN_OUTPUTS,
+  buildQuarterIndex,
+  deriveStatus,
+  deriveWorkPlan,
+  findOutput,
+  formatPercent,
+  metricKeysForOutput,
+  outputMetricKey,
+  percentAchieved,
+  quarterOfISO,
+  workPlanBrief,
+  workPlanRows,
+  type SubprogrammeReport,
+  type WorkPlanRow,
+} from "../lib/rules/workPlan";
+import { vehicleScreeningKey } from "../lib/rules/daily";
+import { metricKey } from "../lib/rules/weeklyDerivation";
+import type {
+  DailyEntry,
+  Inspection,
+  LicenceEvent,
+  WeekDef,
+  WorkPlanNote,
+} from "../lib/rules/types";
+import weeksSeed from "../seed/weeks-2026.seed.json";
+
+const WEEKS = weeksSeed as WeekDef[];
+const week = (prefix: string): string =>
+  WEEKS.find((w) => w.label.startsWith(prefix))!.label;
+
+const Q1 = week("W02"); // wk of 05 Jan 2026
+const Q1_EDGE = week("W14"); // 30 Mar → 3 Apr — straddles into April
+const Q2 = week("W22"); // wk of 25 May 2026
+const Q3 = week("W30"); // wk of 20 Jul 2026
+
+const ev = (
+  type: LicenceEvent["type"],
+  weekLabel: string,
+  date: string,
+  i = 1,
+): LicenceEvent => ({
+  id: `e${i}-${weekLabel}-${type}`,
+  date,
+  week: weekLabel,
+  facilityId: "f",
+  facilityName: "F",
+  sector: "Private",
+  province: "Lusaka",
+  type,
+  number: "",
+  facCode: "",
+});
+
+const insp = (
+  type: Inspection["type"],
+  weekLabel: string,
+  date: string,
+  i = 1,
+): Inspection => ({
+  id: `i${i}-${weekLabel}-${type}`,
+  date,
+  week: weekLabel,
+  facilityId: "f",
+  facilityName: "F",
+  type,
+  outcome: "Compliant",
+  province: "Lusaka",
+  sector: "Private",
+  notes: "",
+});
+
+const screening = (
+  value: number,
+  weekLabel: string,
+  date: string,
+  border?: string,
+): DailyEntry => ({
+  id: `d-${weekLabel}-${border || "none"}-${value}`,
+  date,
+  week: weekLabel,
+  section: "Nuclear Safety, Security & Safeguards",
+  kind: "count",
+  metricKey: vehicleScreeningKey(),
+  label: "Vehicles screened",
+  value,
+  border,
+});
+
+interface Input {
+  week?: string;
+  events?: LicenceEvent[];
+  inspections?: Inspection[];
+  values?: Array<[string, Record<string, number>]>;
+  dailyEntries?: DailyEntry[];
+  notes?: Record<string, WorkPlanNote>;
+}
+
+function derive(input: Input = {}): SubprogrammeReport[] {
+  return deriveWorkPlan({
+    weeks: WEEKS,
+    week: input.week ?? Q2,
+    events: input.events || [],
+    inspections: input.inspections || [],
+    valuesByWeek: new Map(input.values || []),
+    dailyEntries: input.dailyEntries,
+    notes: input.notes,
+  });
+}
+
+function row(reports: SubprogrammeReport[], id: string): WorkPlanRow {
+  for (const sub of reports) {
+    const found = [...sub.rows, ...sub.supporting].find(
+      (r) => r.output.id === id,
+    );
+    if (found) return found;
+  }
+  throw new Error(`no row for output ${id}`);
+}
+
+describe("the plan itself", () => {
+  it("carries all three subprogrammes and their workbook outputs", () => {
+    expect(WORK_PLAN.map((s) => s.id)).toEqual(["1.1", "1.2", "1.3"]);
+    const planOutputs = WORK_PLAN_OUTPUTS.filter((o) => !o.supporting);
+    expect(planOutputs.filter((o) => o.id.startsWith("1.1."))).toHaveLength(10);
+    expect(planOutputs.filter((o) => o.id.startsWith("1.2."))).toHaveLength(11);
+    expect(planOutputs.filter((o) => o.id.startsWith("1.3."))).toHaveLength(14);
+  });
+
+  it("keeps the workbook's targets", () => {
+    expect(findOutput("1.1.4")?.target).toBe(500);
+    expect(findOutput("1.2.4")?.target).toBe(500);
+    expect(findOutput("1.2.6")?.target).toBe(36);
+    expect(findOutput("1.2.11")?.target).toBe(50);
+    expect(findOutput("1.3.12")?.target).toBe(350000);
+    // "-" in the sheet — no numeric target to measure against.
+    expect(findOutput("1.3.11")?.target).toBeNull();
+  });
+
+  it("gives every output a unique id", () => {
+    const ids = WORK_PLAN_OUTPUTS.map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("logs vehicle screening on the key the border scan log already writes", () => {
+    // Changing this orphans every figure the border posts have ever recorded.
+    expect(metricKeysForOutput(findOutput("1.3.12")!)).toEqual([
+      vehicleScreeningKey(),
+    ]);
+  });
+
+  it("still counts figures logged under the pre-work-plan metric names", () => {
+    expect(metricKeysForOutput(findOutput("1.3.13")!)).toEqual([
+      outputMetricKey("1.3.13"),
+      metricKey("Nuclear Safety, Security & Safeguards", "TWG Meetings"),
+    ]);
+  });
+});
+
+describe("quarters", () => {
+  it("maps a month to its quarter", () => {
+    expect(quarterOfISO("2026-01-05")).toBe(1);
+    expect(quarterOfISO("2026-06-30")).toBe(2);
+    expect(quarterOfISO("2026-07-01")).toBe(3);
+    expect(quarterOfISO("2026-12-31")).toBe(4);
+  });
+
+  it("counts a straddling week to the quarter it starts in", () => {
+    const index = buildQuarterIndex(WEEKS);
+    expect(index.get(Q1_EDGE)).toBe(1); // 30 Mar → 3 Apr
+    expect(index.get(week("W15"))).toBe(2);
+    expect(index.get(week("W40"))).toBe(3); // 28 Sep → 2 Oct
+    expect(index.get(week("W53"))).toBe(4); // 28 Dec → 1 Jan 2027
+  });
+});
+
+describe("output 1.1.4 — licences issued", () => {
+  it("counts every recorded licence into its week and quarter", () => {
+    const reports = derive({
+      week: Q2,
+      events: [
+        ev("New Use/Possession Licence", Q1, "2026-01-06", 1),
+        ev("Importation Licence", Q2, "2026-05-26", 2),
+        ev("Importation Licence", Q2, "2026-05-27", 3),
+        ev("Transport Licence", Q3, "2026-07-21", 4),
+      ],
+    });
+    const r = row(reports, "1.1.4");
+    expect(r.auto).toBe(true);
+    expect(r.week).toBe(2);
+    expect(r.quarters).toEqual([1, 2, 1, 0]);
+    expect(r.total).toBe(4);
+    expect(r.percent).toBeCloseTo((4 / 500) * 100);
+  });
+
+  it("breaks the total down by licence type", () => {
+    const reports = derive({
+      week: Q2,
+      events: [
+        ev("New Use/Possession Licence", Q2, "2026-05-26", 1),
+        ev("Renewal of Use/Possession Licence", Q2, "2026-05-27", 2),
+        ev("Export Licence", Q1, "2026-01-06", 3),
+      ],
+    });
+    const r = row(reports, "1.1.4");
+    const possession = r.breakdown.find(
+      (b) => b.label === "Possession Licences issued",
+    );
+    expect(possession).toEqual({
+      label: "Possession Licences issued",
+      week: 2,
+      total: 2,
+    });
+    expect(r.breakdown.find((b) => b.label === "Export Licences")?.total).toBe(1);
+    // Types with nothing on record stay off the breakdown.
+    expect(r.breakdown.some((b) => b.label === "Transit Licences")).toBe(false);
+  });
+});
+
+describe("outputs 1.2.4 and 1.2.11 — inspections and enforcement", () => {
+  const inspections = [
+    insp("Routine Inspection", Q2, "2026-05-26", 1),
+    insp("Routine Inspection", Q2, "2026-05-27", 2),
+    insp("Pre-Authorisation", Q2, "2026-05-28", 3),
+    insp("Follow-up", Q1, "2026-01-06", 4),
+    insp("Investigation", Q3, "2026-07-21", 5),
+    insp("Enforcement Action", Q2, "2026-05-29", 6),
+    insp("Enforcement Action", Q1, "2026-01-07", 7),
+  ];
+
+  it("reports inspection visits as one figure, enforcement separately", () => {
+    const reports = derive({ week: Q2, inspections });
+    const visits = row(reports, "1.2.4");
+    expect(visits.week).toBe(3); // 2 routine + 1 pre-auth
+    expect(visits.quarters).toEqual([1, 3, 1, 0]);
+    expect(visits.total).toBe(5);
+
+    const enforcement = row(reports, "1.2.11");
+    expect(enforcement.week).toBe(1);
+    expect(enforcement.total).toBe(2);
+  });
+
+  it("keeps the per-type breakdown behind the 1.2.4 figure", () => {
+    const reports = derive({ week: Q2, inspections });
+    const breakdown = row(reports, "1.2.4").breakdown;
+    expect(breakdown.map((b) => [b.label, b.week, b.total])).toEqual([
+      ["Routine Inspections", 2, 2],
+      ["Follow-ups", 0, 1],
+      ["Pre-Authorisation Inspections", 1, 1],
+      ["Investigations", 0, 1],
+    ]);
+    // Enforcement actions are their own output, never folded into 1.2.4.
+    expect(breakdown.some((b) => b.label === "Enforcement Actions")).toBe(false);
+  });
+});
+
+describe("manual outputs", () => {
+  it("puts a week's figure in its week, its quarter and the total", () => {
+    const key = outputMetricKey("1.1.1");
+    const reports = derive({
+      week: Q2,
+      values: [
+        [Q1, { [key]: 2 }],
+        [Q2, { [key]: 3 }],
+      ],
+    });
+    const r = row(reports, "1.1.1");
+    expect(r.auto).toBe(false);
+    expect(r.metricKey).toBe(key);
+    expect(r.week).toBe(3);
+    expect(r.quarters).toEqual([2, 3, 0, 0]);
+    expect(r.total).toBe(5);
+  });
+
+  it("adds figures logged under the section's earlier metric name", () => {
+    const legacy = metricKey("Inspectorate", "TWG Meetings attended");
+    const reports = derive({
+      week: Q2,
+      values: [
+        [Q1, { [legacy]: 4 }],
+        [Q2, { [outputMetricKey("1.2.6")]: 1, [legacy]: 2 }],
+      ],
+    });
+    const r = row(reports, "1.2.6");
+    expect(r.week).toBe(3);
+    expect(r.total).toBe(7);
+  });
+
+  it("marks a week whose figure came from Daily Updates as read-only", () => {
+    const key = outputMetricKey("1.1.1");
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q2,
+      events: [],
+      inspections: [],
+      valuesByWeek: new Map([[Q2, { [key]: 3 }]]),
+      fromDaily: new Set([key]),
+    });
+    expect(row(reports, "1.1.1").fromDaily).toBe(true);
+    expect(row(reports, "1.1.2").fromDaily).toBe(false);
+  });
+});
+
+describe("output 1.3.12 — vehicles screened", () => {
+  const entries = [
+    screening(60, Q2, "2026-05-26", "Chirundu"),
+    screening(40, Q2, "2026-05-27", "Chirundu"),
+    screening(50, Q2, "2026-05-27", "Kasumbalesa"),
+    screening(33, Q1, "2026-01-06"),
+  ];
+
+  it("reads the border posts' figures without any re-entry", () => {
+    const key = vehicleScreeningKey();
+    const reports = derive({
+      week: Q2,
+      values: [
+        [Q1, { [key]: 33 }],
+        [Q2, { [key]: 150 }],
+      ],
+      dailyEntries: entries,
+    });
+    const r = row(reports, "1.3.12");
+    expect(r.week).toBe(150);
+    expect(r.quarters).toEqual([33, 150, 0, 0]);
+    expect(r.total).toBe(183);
+  });
+
+  it("breaks the figure down by border post", () => {
+    const reports = derive({ week: Q2, dailyEntries: entries });
+    expect(row(reports, "1.3.12").breakdown).toEqual([
+      { label: "Chirundu", week: 100, total: 100 },
+      { label: "Kasumbalesa", week: 50, total: 50 },
+      { label: "Head office / other", week: 0, total: 33 },
+    ]);
+  });
+});
+
+describe("% achieved and status", () => {
+  it("measures the total against the target", () => {
+    expect(percentAchieved(136, 500)).toBeCloseTo(27.2);
+    expect(formatPercent(percentAchieved(136, 500))).toBe("27.2%");
+    expect(formatPercent(percentAchieved(61, 50))).toBe("122%");
+    // No numeric target — nothing to measure against.
+    expect(percentAchieved(4, null)).toBeNull();
+    expect(formatPercent(null)).toBe("—");
+  });
+
+  it("derives a status from the figures", () => {
+    expect(deriveStatus(0, 12)).toBe("Not Started");
+    expect(deriveStatus(3, 12)).toBe("In Progress");
+    expect(deriveStatus(12, 12)).toBe("Achieved");
+    expect(deriveStatus(61, 50)).toBe("Achieved");
+    expect(deriveStatus(2, null)).toBe("In Progress");
+  });
+
+  it("lets an officer override the status, comments and action points", () => {
+    const reports = derive({
+      week: Q2,
+      notes: {
+        "1.1.8": {
+          id: "1.1.8",
+          status: "On Hold",
+          comments: "Awaiting procurement.",
+          actionPoints: "Follow up with ICT by month end.",
+        },
+      },
+    });
+    const r = row(reports, "1.1.8");
+    expect(r.derivedStatus).toBe("Not Started");
+    expect(r.status).toBe("On Hold");
+    expect(r.statusOverridden).toBe(true);
+    expect(r.comments).toBe("Awaiting procurement.");
+    expect(r.actionPoints).toBe("Follow up with ICT by month end.");
+
+    // Untouched outputs stay on the derived status.
+    expect(row(reports, "1.1.7").statusOverridden).toBe(false);
+  });
+});
+
+describe("exports", () => {
+  it("emits the workbook's columns, one line per output", () => {
+    const reports = derive({
+      week: Q2,
+      events: [ev("Importation Licence", Q2, "2026-05-26", 1)],
+    });
+    const rows = workPlanRows(reports);
+    expect(rows).toHaveLength(WORK_PLAN_OUTPUTS.length);
+    const licences = rows.find((r) => r[1] === "1.1.4")!;
+    expect(licences.slice(0, 6)).toEqual([
+      "Subprogramme 1.1 — Authorisation and Standards",
+      "1.1.4",
+      "Issuance of Ionising Radiation Licences",
+      "Number Licenses issued",
+      "500",
+      "1",
+    ]);
+    // Q1..Q4, total, %, status
+    expect(licences.slice(6, 13)).toEqual([
+      "0",
+      "1",
+      "0",
+      "0",
+      "1",
+      "0.2",
+      "In Progress",
+    ]);
+    // A "-" target exports as the workbook writes it, with no percentage.
+    const noTarget = rows.find((r) => r[1] === "1.3.11")!;
+    expect(noTarget[4]).toBe("-");
+    expect(noTarget[11]).toBe("");
+  });
+
+  it("writes a brief the meeting can read", () => {
+    const brief = workPlanBrief(derive({ week: Q2 }), Q2);
+    expect(brief).toContain("RPA Sectional Update — " + Q2);
+    expect(brief).toContain("Subprogramme 1.2 — Nuclear & Radiation Safety Inspections");
+    expect(brief).toContain("1.2.11");
+  });
+});

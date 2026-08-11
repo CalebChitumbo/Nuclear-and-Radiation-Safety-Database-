@@ -55,6 +55,7 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkPlanNote,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
@@ -372,6 +373,33 @@ class FirebaseStore implements DataStore {
       : { week, values: {}, status: {}, submittedBy: {} };
     wm.values[key] = value;
     await setDoc(ref, wm, { merge: true });
+  }
+
+  async listWorkPlanNotes(): Promise<WorkPlanNote[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "workPlanNotes"));
+    return snap.docs.map((d) => ({
+      ...(d.data() as Omit<WorkPlanNote, "id">),
+      id: d.id,
+    }));
+  }
+
+  async setWorkPlanNote(
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(
+      doc(db, "workPlanNotes", id),
+      stripUndefined({
+        ...patch,
+        id,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      }),
+      { merge: true },
+    );
   }
 
   async addActivity(a: Omit<Activity, "id">): Promise<Activity> {
@@ -823,6 +851,7 @@ class FirebaseStore implements DataStore {
       dailyEntries,
       borders,
       truckScans,
+      workPlanNotes,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -834,6 +863,7 @@ class FirebaseStore implements DataStore {
       this.listDailyEntries().catch(() => [] as DailyEntry[]),
       this.listBorders().catch(() => [] as Border[]),
       this.listTruckScans().catch(() => [] as TruckScan[]),
+      this.listWorkPlanNotes().catch(() => [] as WorkPlanNote[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -849,6 +879,7 @@ class FirebaseStore implements DataStore {
       activities,
       licenceWorkflows,
       weekMetrics,
+      workPlanNotes,
       dailyEntries,
       borders,
       truckScans,

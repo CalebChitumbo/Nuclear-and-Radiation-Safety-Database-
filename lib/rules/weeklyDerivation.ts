@@ -1,25 +1,23 @@
-import type {
-  Inspection,
-  InspectionType,
-  LicenceEvent,
-  LicenceType,
-  Section,
-} from "./types";
+/**
+ * Metric-key derivation and the register breakdowns the weekly report shows
+ * behind its auto-filled work plan rows.
+ *
+ * The report itself is assembled in `workPlan.ts` — the approved 2026 work plan
+ * is the reporting frame. This module stays the single owner of how a metric
+ * key is spelled, because those keys are written into stored documents
+ * (`weekMetrics.values`, `dailyEntries.metricKey`) and must never drift.
+ */
+import type { InspectionType, LicenceType } from "./types";
 
-export interface MetricRow {
-  key: string;
+/**
+ * The licence-type split shown behind work plan output 1.1.4 (Issuance of
+ * Ionising Radiation Licences). Every recorded licence counts toward 1.1.4; this
+ * is how the section reads that figure back.
+ */
+export const LICENCE_BREAKDOWN: {
   label: string;
-  auto: boolean;
-  value: number;
-}
-
-export interface SectionReport {
-  section: string;
-  metrics: MetricRow[];
-  total: { label: string; value: number } | null;
-}
-
-const AS_AUTO_METRICS: { label: string; match: (t: LicenceType) => boolean }[] = [
+  match: (t: LicenceType) => boolean;
+}[] = [
   {
     label: "Possession Licences issued",
     match: (t) =>
@@ -45,50 +43,21 @@ const AS_AUTO_METRICS: { label: string; match: (t: LicenceType) => boolean }[] =
   },
 ];
 
-const AS_MANUAL_METRICS = [
-  "Stakeholder Engagements",
-  "TWG Meetings attended",
-];
-
-const INSP_AUTO_METRICS: { label: string; type: InspectionType }[] = [
+/**
+ * The inspection-type split behind outputs 1.2.4 and 1.2.11. Logging an
+ * inspection still records its type — the work plan reports the total, the
+ * breakdown says what the total was made of.
+ */
+export const INSPECTION_BREAKDOWN: {
+  label: string;
+  type: InspectionType;
+}[] = [
   { label: "Routine Inspections", type: "Routine Inspection" },
   { label: "Follow-ups", type: "Follow-up" },
   { label: "Pre-Authorisation Inspections", type: "Pre-Authorisation" },
   { label: "Investigations", type: "Investigation" },
   { label: "Enforcement Actions", type: "Enforcement Action" },
 ];
-
-const INSP_MANUAL_METRICS = [
-  "Stakeholder Engagements",
-  "TWG Meetings attended",
-];
-
-const NSSS_MANUAL_METRICS = [
-  "Vehicle Screening (units)",
-  "IAEA Meetings attended",
-  "Stakeholder Engagements",
-  "TWG Meetings",
-];
-
-const NSI_MANUAL_METRICS = [
-  "Facilities visited",
-  "Sources inventoried",
-  "Sources verified",
-  "Discrepancies identified",
-  "Team meetings held",
-];
-
-/**
- * The manual (typed-in) metrics each section reports, keyed by section. This is
- * the single list the weekly report AND the Daily Updates tab draw from, so a
- * daily count entry lands on exactly the metric key the weekly table sums.
- */
-export const MANUAL_METRICS_BY_SECTION: Record<Section, readonly string[]> = {
-  "Authorisation & Standards": AS_MANUAL_METRICS,
-  Inspectorate: INSP_MANUAL_METRICS,
-  "Nuclear Safety, Security & Safeguards": NSSS_MANUAL_METRICS,
-  "National Source Inventory": NSI_MANUAL_METRICS,
-};
 
 export function sectionKey(section: string): string {
   return section
@@ -97,85 +66,11 @@ export function sectionKey(section: string): string {
     .toUpperCase();
 }
 
+/**
+ * The stored key for one section's metric. Stable by contract: it is written
+ * into `weekMetrics.values` and `dailyEntries.metricKey`, so changing how a key
+ * is spelled orphans figures that are already on record.
+ */
 export function metricKey(section: string, label: string): string {
   return `${sectionKey(section)}::${label}`;
-}
-
-export function deriveWeekly(
-  events: LicenceEvent[],
-  inspections: Inspection[],
-  manual: Record<string, number>,
-): SectionReport[] {
-  // Authorisation & Standards
-  const asMetrics: MetricRow[] = AS_AUTO_METRICS.map((m) => ({
-    key: metricKey("Authorisation & Standards", m.label),
-    label: m.label,
-    auto: true,
-    value: events.filter((e) => m.match(e.type)).length,
-  }));
-  for (const label of AS_MANUAL_METRICS) {
-    const key = metricKey("Authorisation & Standards", label);
-    asMetrics.push({
-      key,
-      label,
-      auto: false,
-      value: manual[key] || 0,
-    });
-  }
-  const asTotal = asMetrics
-    .filter((m) => m.auto)
-    .reduce((s, m) => s + m.value, 0);
-
-  // Inspectorate
-  const inspMetrics: MetricRow[] = INSP_AUTO_METRICS.map((m) => ({
-    key: metricKey("Inspectorate", m.label),
-    label: m.label,
-    auto: true,
-    value: inspections.filter((i) => i.type === m.type).length,
-  }));
-  for (const label of INSP_MANUAL_METRICS) {
-    const key = metricKey("Inspectorate", label);
-    inspMetrics.push({
-      key,
-      label,
-      auto: false,
-      value: manual[key] || 0,
-    });
-  }
-  const inspTotal = inspMetrics
-    .filter((m) => m.auto)
-    .reduce((s, m) => s + m.value, 0);
-
-  // Manual-only sections
-  const nsssMetrics: MetricRow[] = NSSS_MANUAL_METRICS.map((label) => {
-    const key = metricKey("Nuclear Safety, Security & Safeguards", label);
-    return { key, label, auto: false, value: manual[key] || 0 };
-  });
-  const nsiMetrics: MetricRow[] = NSI_MANUAL_METRICS.map((label) => {
-    const key = metricKey("National Source Inventory", label);
-    return { key, label, auto: false, value: manual[key] || 0 };
-  });
-
-  return [
-    {
-      section: "Authorisation & Standards",
-      metrics: asMetrics,
-      total: { label: "Total Licences Issued", value: asTotal },
-    },
-    {
-      section: "Inspectorate",
-      metrics: inspMetrics,
-      total: { label: "Total Inspections", value: inspTotal },
-    },
-    {
-      section: "Nuclear Safety, Security & Safeguards",
-      metrics: nsssMetrics,
-      total: null,
-    },
-    {
-      section: "National Source Inventory",
-      metrics: nsiMetrics,
-      total: null,
-    },
-  ];
 }

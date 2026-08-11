@@ -15,10 +15,7 @@ import { useMemo, useState } from "react";
 
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import {
-  VEHICLE_SCREENING_LABEL,
-  dailyMetricOptions,
-} from "@/lib/rules/daily";
+import { dailyMetricOptions, vehicleScreeningKey } from "@/lib/rules/daily";
 import { norm } from "@/lib/rules/matching";
 import {
   INSPECTION_OUTCOMES,
@@ -462,8 +459,11 @@ function CountFlow({
   const [busy, setBusy] = useState(false);
   const [doneMessage, setDoneMessage] = useState("");
 
+  // Keyed, not labelled: the screening figure keeps its original metric key
+  // (it is what the border scan log posts to) whatever the work plan calls it.
+  const screeningKey = vehicleScreeningKey();
   const isScreening =
-    pick !== null && pick !== "note" && pick.label === VEHICLE_SCREENING_LABEL;
+    pick !== null && pick !== "note" && pick.key === screeningKey;
   const needsBorder = isScreening;
   const activeBorders = borders.filter((b) => b.active);
   const steps = needsBorder ? 3 : 2;
@@ -477,9 +477,6 @@ function CountFlow({
     setShowRemark(false);
     setNoteText("");
   };
-
-  const friendly = (label: string) =>
-    label === VEHICLE_SCREENING_LABEL ? "Vehicles screened" : label;
 
   const saveCount = async () => {
     if (pick === null || pick === "note" || busy) return;
@@ -505,7 +502,7 @@ function CountFlow({
         updatedByName: user.name,
       });
       setDoneMessage(
-        `${border ? `${border}: ` : ""}${Math.floor(n)} — ${friendly(pick.label).toLowerCase()}`,
+        `${border ? `${border}: ` : ""}${Math.floor(n)} — ${pick.label.toLowerCase()}`,
       );
       setStep("done");
       onLogged();
@@ -587,12 +584,15 @@ function CountFlow({
         {options.map((o) => (
           <BigOption
             key={o.key}
-            label={friendly(o.label)}
+            label={o.label}
+            sub={
+              o.supporting
+                ? "Supporting figure"
+                : `Work plan output ${o.outputId}`
+            }
             onClick={() => {
               setPick(o);
-              setStep(
-                o.label === VEHICLE_SCREENING_LABEL ? "border" : "amount",
-              );
+              setStep(o.key === screeningKey ? "border" : "amount");
             }}
           />
         ))}
@@ -691,7 +691,7 @@ function CountFlow({
     const base = Number.isFinite(cur) ? cur : 0;
     setAmount(String(Math.max(0, Math.floor(base + d))));
   };
-  const label = pick !== null && pick !== "note" ? friendly(pick.label) : "";
+  const label = pick !== null && pick !== "note" ? pick.label : "";
 
   return (
     <StepShell

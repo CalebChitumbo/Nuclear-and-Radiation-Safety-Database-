@@ -18,6 +18,7 @@ import type {
   WeekDef,
   WeekMetrics,
   WorkflowNote,
+  WorkPlanNote,
 } from "../rules/types";
 
 export interface DataStore {
@@ -53,6 +54,17 @@ export interface DataStore {
   /** Every stored week's manual metrics — for cross-week dashboards (NSSS). */
   listWeekMetricsAll(): Promise<WeekMetrics[]>;
   setWeekMetricValue(week: string, key: string, value: number): Promise<void>;
+  /**
+   * The Status / Comments / Action Points an officer keeps against each work
+   * plan output. One document per output id — these belong to the output for
+   * the whole plan year, not to a single reporting week.
+   */
+  listWorkPlanNotes(): Promise<WorkPlanNote[]>;
+  setWorkPlanNote(
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+    uid: string,
+  ): Promise<void>;
   /** Every daily log entry (Daily Updates tab), newest date first. */
   listDailyEntries(): Promise<DailyEntry[]>;
   addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
@@ -160,6 +172,7 @@ export interface DataStore {
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
     weekMetrics: Record<string, WeekMetrics>;
+    workPlanNotes: WorkPlanNote[];
     dailyEntries: DailyEntry[];
     borders: Border[];
     truckScans: TruckScan[];

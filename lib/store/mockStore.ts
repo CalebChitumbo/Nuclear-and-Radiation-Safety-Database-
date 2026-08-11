@@ -34,6 +34,7 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkPlanNote,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
@@ -57,6 +58,7 @@ interface State {
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
+  workPlanNotes: Record<string, WorkPlanNote>;
   dailyEntries: DailyEntry[];
   borders: Border[];
   truckScans: TruckScan[];
@@ -88,6 +90,7 @@ function freshState(): State {
     activities: [],
     licenceWorkflows: [],
     weekMetrics: {},
+    workPlanNotes: {},
     dailyEntries: [],
     borders: defaultBorders(),
     truckScans: [],
@@ -142,6 +145,8 @@ function load(): State {
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
     // Back-compat: stores saved before the Daily Updates tab existed.
     if (!parsed.dailyEntries) parsed.dailyEntries = [];
+    // Back-compat: stores saved before the work plan report existed.
+    if (!parsed.workPlanNotes) parsed.workPlanNotes = {};
     // Back-compat: stores saved before border posts existed.
     if (!parsed.borders) parsed.borders = defaultBorders();
     if (!parsed.truckScans) parsed.truckScans = [];
@@ -423,6 +428,27 @@ class MockStore implements DataStore {
     };
     wm.values[key] = value;
     s.weekMetrics[week] = wm;
+    save(s);
+    dispatchChange();
+  }
+
+  async listWorkPlanNotes(): Promise<WorkPlanNote[]> {
+    return Object.values(ensure().workPlanNotes);
+  }
+
+  async setWorkPlanNote(
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    s.workPlanNotes[id] = {
+      ...(s.workPlanNotes[id] || { id }),
+      ...patch,
+      id,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
     save(s);
     dispatchChange();
   }
@@ -845,6 +871,7 @@ class MockStore implements DataStore {
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
+      workPlanNotes: Object.values(s.workPlanNotes),
       dailyEntries: s.dailyEntries,
       truckScans: s.truckScans,
       borders: s.borders,
