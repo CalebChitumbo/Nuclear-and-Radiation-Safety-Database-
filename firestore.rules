@@ -205,6 +205,40 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Work plan narrative: the Status / Comments / Action Points columns an
+    // officer keeps against one output of the approved 2026 work plan, one
+    // document per output id. The figures are never stored here — they are
+    // derived from the registers and the weekly metrics — so a write may only
+    // carry the three typed columns, and the document id must be the output id.
+    function validWorkPlanNote(d, id) {
+      return d.id == id
+        && (!('status' in d) || d.status in ['Not Started','In Progress','Pending',
+                                             'On Hold','Achieved','Cancelled'])
+        && (!('comments' in d) || d.comments is string)
+        && (!('actionPoints' in d) || d.actionPoints is string);
+    }
+
+    // The opening balance the plan year starts from — one document per year,
+    // holding what each output had already achieved before the system began
+    // counting it. It shifts every section's reported figures at once, so only
+    // an admin may set it; everyone reads it because every figure on the
+    // sectional update is measured from it.
+    match /workPlanBaseline/{year} {
+      allow read:   if signedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.values is map
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /workPlanNotes/{id} {
+      allow read:   if signedIn();
+      allow create, update: if signedIn()
+        && validWorkPlanNote(request.resource.data, id)
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     match /activities/{id} {
       allow read:   if signedIn();
       allow create: if signedIn() && request.resource.data.updatedBy == request.auth.uid;

@@ -466,6 +466,56 @@ export interface WeekMetrics {
 }
 
 /**
+ * The Status column of the approved work plan. "Pending" is the workbook's own
+ * wording for an output that is under way but not yet delivered; the other
+ * values let an officer say what the figures alone cannot.
+ */
+export const WORK_PLAN_STATUSES = [
+  "Not Started",
+  "In Progress",
+  "Pending",
+  "On Hold",
+  "Achieved",
+  "Cancelled",
+] as const;
+export type WorkPlanStatus = (typeof WORK_PLAN_STATUSES)[number];
+
+/**
+ * What each work plan output had already achieved before the system started
+ * counting it — one document per plan year. The report is cumulative for the
+ * year, so every output starts from its opening balance and adds what has been
+ * recorded since. Saving one REPLACES the figures the code ships with (the
+ * approved workbook's actuals at handover) rather than adding to them.
+ */
+export interface WorkPlanBaseline {
+  /** The plan year — also the document id. */
+  year: number;
+  /** Output id → [Q1, Q2, Q3, Q4] carried in. */
+  values: Record<string, number[]>;
+  /** Free-text provenance: where the figures were taken from, and when. */
+  note?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * The narrative an officer keeps against one work plan output — the workbook's
+ * Status / Comments / Action Points columns. Figures are derived from the
+ * registers and the logged metrics; only these three are typed, and they belong
+ * to the output for the whole plan year rather than to a single week.
+ */
+export interface WorkPlanNote {
+  /** The work plan output id, e.g. "1.2.4" — also the document id. */
+  id: string;
+  /** Overrides the status derived from the figures when set. */
+  status?: WorkPlanStatus;
+  comments?: string;
+  actionPoints?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
  * One daily log line from a section — the unit of the Daily Updates tab.
  * `count` entries carry a number against a metric (keyed with the SAME
  * metricKey the weekly report uses, so daily figures sum straight into the

@@ -55,10 +55,13 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkPlanBaseline,
+  type WorkPlanNote,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
 import { weekLabelForDate } from "../rules/week";
+import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import type { DataStore } from "./types";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 
@@ -372,6 +375,60 @@ class FirebaseStore implements DataStore {
       : { week, values: {}, status: {}, submittedBy: {} };
     wm.values[key] = value;
     await setDoc(ref, wm, { merge: true });
+  }
+
+  async listWorkPlanNotes(): Promise<WorkPlanNote[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "workPlanNotes"));
+    return snap.docs.map((d) => ({
+      ...(d.data() as Omit<WorkPlanNote, "id">),
+      id: d.id,
+    }));
+  }
+
+  async getWorkPlanBaseline(year: number): Promise<WorkPlanBaseline | null> {
+    const db = requireDb();
+    const snap = await getDoc(doc(db, "workPlanBaseline", String(year)));
+    return snap.exists() ? (snap.data() as WorkPlanBaseline) : null;
+  }
+
+  async setWorkPlanBaseline(
+    year: number,
+    values: Record<string, number[]>,
+    uid: string,
+    note?: string,
+  ): Promise<void> {
+    const db = requireDb();
+    // Not merged: a re-baseline replaces the year's opening figures outright,
+    // so an output an officer zeroed does not keep its old carry-in.
+    await setDoc(
+      doc(db, "workPlanBaseline", String(year)),
+      stripUndefined({
+        year,
+        values,
+        note,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      }),
+    );
+  }
+
+  async setWorkPlanNote(
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(
+      doc(db, "workPlanNotes", id),
+      stripUndefined({
+        ...patch,
+        id,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      }),
+      { merge: true },
+    );
   }
 
   async addActivity(a: Omit<Activity, "id">): Promise<Activity> {
@@ -823,6 +880,8 @@ class FirebaseStore implements DataStore {
       dailyEntries,
       borders,
       truckScans,
+      workPlanNotes,
+      workPlanBaseline,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -834,6 +893,8 @@ class FirebaseStore implements DataStore {
       this.listDailyEntries().catch(() => [] as DailyEntry[]),
       this.listBorders().catch(() => [] as Border[]),
       this.listTruckScans().catch(() => [] as TruckScan[]),
+      this.listWorkPlanNotes().catch(() => [] as WorkPlanNote[]),
+      this.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(() => null),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -849,6 +910,8 @@ class FirebaseStore implements DataStore {
       activities,
       licenceWorkflows,
       weekMetrics,
+      workPlanNotes,
+      workPlanBaseline,
       dailyEntries,
       borders,
       truckScans,

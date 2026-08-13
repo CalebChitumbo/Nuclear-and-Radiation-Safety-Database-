@@ -16,9 +16,8 @@ import { QuickLogWizard } from "@/components/daily/QuickLogWizard";
 import {
   borderSums,
   buildOfficialScreeningText,
+  effectiveValuesByWeek,
   entriesForDate,
-  entriesForWeek,
-  mergeWeekManualValues,
   vehicleScreeningKey,
 } from "@/lib/rules/daily";
 import {
@@ -26,12 +25,17 @@ import {
   needsTypeClassification,
 } from "@/lib/rules/licenceFamily";
 import { parseISO, toISO, todayISO, weekLabelForDate } from "@/lib/rules/week";
-import { deriveWeekly } from "@/lib/rules/weeklyDerivation";
+import {
+  deriveWorkPlan,
+  formatPercent,
+  WORK_PLAN_YEAR,
+} from "@/lib/rules/workPlan";
 import {
   SECTIONS,
   type Border,
   type DailyEntry,
   type Section,
+  type WorkPlanBaseline,
 } from "@/lib/rules/types";
 
 /** Short tab labels so the section switcher fits a phone screen. */
@@ -88,7 +92,8 @@ export default function DailyUpdatesPage() {
         entries,
         workflows,
         borders,
-        metrics,
+        weekMetricsAll,
+        baseline,
       ] = await Promise.all([
         s.listFacilities(),
         s.listLicenceEvents(),
@@ -97,9 +102,10 @@ export default function DailyUpdatesPage() {
         s.listDailyEntries().catch(() => []),
         s.listLicenceWorkflows().catch(() => []),
         s.listBorders().catch(() => []),
-        weekLabel
-          ? s.getWeekMetrics(weekLabel)
-          : Promise.resolve({ week: "", values: {} }),
+        s.listWeekMetricsAll().catch(() => []),
+        s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+          () => null as WorkPlanBaseline | null,
+        ),
       ]);
       return {
         facilities,
@@ -108,10 +114,11 @@ export default function DailyUpdatesPage() {
         entries,
         workflows,
         borders,
-        metrics,
+        weekMetricsAll,
+        baseline,
       };
     },
-    [weekLabel],
+    [],
   );
 
   if (!data) {
@@ -129,7 +136,8 @@ export default function DailyUpdatesPage() {
     entries,
     workflows,
     borders,
-    metrics,
+    weekMetricsAll,
+    baseline,
   } = data;
 
   const dayEvents = events.filter((e) => e.date === date);
@@ -137,13 +145,18 @@ export default function DailyUpdatesPage() {
   const dayEntries = entriesForDate(entries, date);
   const daySectionEntries = dayEntries.filter((e) => e.section === section);
 
-  // Week-so-far rollup: auto figures from the dated registers + manual metrics
-  // with the week's daily counts taking precedence over typed weekly values.
-  const wkEvents = events.filter((e) => e.week === weekLabel);
-  const wkInspections = inspections.filter((i) => i.week === weekLabel);
-  const weekEntries = entriesForWeek(entries, weekLabel);
-  const merged = mergeWeekManualValues(metrics.values || {}, weekEntries);
-  const weekReport = deriveWeekly(wkEvents, wkInspections, merged.values);
+  // Week-so-far rollup, in the shape the Monday meeting reports: the week's
+  // contribution to each 2026 work plan output, and where that leaves the
+  // output against its annual target.
+  const weekReport = deriveWorkPlan({
+    weeks,
+    week: weekLabel,
+    events,
+    inspections,
+    valuesByWeek: effectiveValuesByWeek(weekMetricsAll, entries),
+    dailyEntries: entries,
+    baseline: baseline?.values ?? null,
+  });
 
   // Licensing suggestions: issued Use/Possession certificates whose facility is
   // still not marked Licensed — confirmed on Smart Status Update (same
@@ -401,27 +414,44 @@ export default function DailyUpdatesPage() {
           className="min-w-0"
         >
           <div className="divide-y divide-gunmetal/8">
-            {weekReport.map((sec) => {
-              const nonZero = sec.metrics.filter((m) => m.value > 0);
+            {weekReport.map((sub) => {
+              const logged = [...sub.rows, ...sub.supporting].filter(
+                (r) => r.week > 0,
+              );
+              const subtotal = logged.reduce((s, r) => s + r.week, 0);
               return (
-                <div key={sec.section} className="px-4 sm:px-5 py-3">
+                <div key={sub.id} className="px-4 sm:px-5 py-3">
                   <div className="flex items-baseline justify-between gap-2">
-                    <div className="text-xs font-black">{sec.section}</div>
-                    {sec.total ? (
-                      <div className="text-sm tabular font-black">
-                        {sec.total.value}
-                      </div>
-                    ) : null}
+                    <div className="text-xs font-black">
+                      {sub.id} {sub.title}
+                    </div>
+                    <div className="text-sm tabular font-black">
+                      {subtotal.toLocaleString()}
+                    </div>
                   </div>
-                  {nonZero.length ? (
-                    <ul className="mt-1 space-y-0.5">
-                      {nonZero.map((m) => (
-                        <li
-                          key={m.key}
-                          className="flex items-center justify-between gap-2 text-xs text-gunmetal/70"
-                        >
-                          <span>{m.label}</span>
-                          <span className="tabular font-bold">{m.value}</span>
+                  {logged.length ? (
+                    <ul className="mt-1 space-y-1">
+                      {logged.map((r) => (
+                        <li key={r.output.id} className="text-xs">
+                          <div className="flex items-center justify-between gap-2 text-gunmetal/70">
+                            <span className="min-w-0 break-words">
+                              <span className="tabular font-bold">
+                                {r.output.id}
+                              </span>{" "}
+                              {r.output.description}
+                            </span>
+                            <span className="tabular font-bold shrink-0">
+                              +{r.week.toLocaleString()}
+                            </span>
+                          </div>
+                          {r.output.target !== null ? (
+                            <div className="text-[11px] text-gunmetal/45">
+                              {r.total.toLocaleString()} of{" "}
+                              {r.output.target.toLocaleString()} —{" "}
+                              {formatPercent(r.percent)} of the {WORK_PLAN_YEAR}{" "}
+                              target
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -436,7 +466,7 @@ export default function DailyUpdatesPage() {
           </div>
           <div className="px-4 sm:px-5 pt-3 border-t border-gunmetal/8">
             <button className="btn btn-primary w-full" onClick={openWeeklyReport}>
-              Generate weekly report
+              Open the sectional update
             </button>
           </div>
         </Panel>

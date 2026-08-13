@@ -34,10 +34,13 @@ import {
   type UserDoc,
   type WeekDef,
   type WeekMetrics,
+  type WorkPlanBaseline,
+  type WorkPlanNote,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
 import { weekLabelForDate } from "../rules/week";
+import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import facilitiesSeed from "../../seed/facilities.seed.json";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 import { mapAllSeed, type SeedFacility } from "./seeding";
@@ -57,6 +60,8 @@ interface State {
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
   weekMetrics: Record<string, WeekMetrics>;
+  workPlanNotes: Record<string, WorkPlanNote>;
+  workPlanBaseline: Record<string, WorkPlanBaseline>;
   dailyEntries: DailyEntry[];
   borders: Border[];
   truckScans: TruckScan[];
@@ -88,6 +93,8 @@ function freshState(): State {
     activities: [],
     licenceWorkflows: [],
     weekMetrics: {},
+    workPlanNotes: {},
+    workPlanBaseline: {},
     dailyEntries: [],
     borders: defaultBorders(),
     truckScans: [],
@@ -142,6 +149,9 @@ function load(): State {
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
     // Back-compat: stores saved before the Daily Updates tab existed.
     if (!parsed.dailyEntries) parsed.dailyEntries = [];
+    // Back-compat: stores saved before the work plan report existed.
+    if (!parsed.workPlanNotes) parsed.workPlanNotes = {};
+    if (!parsed.workPlanBaseline) parsed.workPlanBaseline = {};
     // Back-compat: stores saved before border posts existed.
     if (!parsed.borders) parsed.borders = defaultBorders();
     if (!parsed.truckScans) parsed.truckScans = [];
@@ -423,6 +433,49 @@ class MockStore implements DataStore {
     };
     wm.values[key] = value;
     s.weekMetrics[week] = wm;
+    save(s);
+    dispatchChange();
+  }
+
+  async listWorkPlanNotes(): Promise<WorkPlanNote[]> {
+    return Object.values(ensure().workPlanNotes);
+  }
+
+  async getWorkPlanBaseline(year: number): Promise<WorkPlanBaseline | null> {
+    return ensure().workPlanBaseline[String(year)] || null;
+  }
+
+  async setWorkPlanBaseline(
+    year: number,
+    values: Record<string, number[]>,
+    uid: string,
+    note?: string,
+  ): Promise<void> {
+    const s = ensure();
+    s.workPlanBaseline[String(year)] = {
+      year,
+      values,
+      note,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    save(s);
+    dispatchChange();
+  }
+
+  async setWorkPlanNote(
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    s.workPlanNotes[id] = {
+      ...(s.workPlanNotes[id] || { id }),
+      ...patch,
+      id,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
     save(s);
     dispatchChange();
   }
@@ -845,6 +898,9 @@ class MockStore implements DataStore {
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,
       weekMetrics: s.weekMetrics,
+      workPlanNotes: Object.values(s.workPlanNotes),
+      workPlanBaseline:
+        s.workPlanBaseline[String(WORK_PLAN_YEAR)] || null,
       dailyEntries: s.dailyEntries,
       truckScans: s.truckScans,
       borders: s.borders,

@@ -157,7 +157,7 @@ export default function DashboardPage() {
           title={`This week — ${selected.label}`}
           action={
             <Link className="link-action" href="/weekly">
-              Weekly report →
+              Sectional update →
             </Link>
           }
         >

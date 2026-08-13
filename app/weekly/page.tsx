@@ -1,19 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 
-import { useAuth } from "@/lib/auth";
+import { canEditSection, useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
+import { downloadTextFile } from "@/components/downloadFile";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
+import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
+import { OpeningBalancePanel } from "@/components/weekly/OpeningBalancePanel";
 import { useWeek } from "@/lib/weekContext";
-import { entriesForWeek, mergeWeekManualValues } from "@/lib/rules/daily";
-import { deriveWeekly } from "@/lib/rules/weeklyDerivation";
-import type { Activity } from "@/lib/rules/types";
+import {
+  effectiveValuesByWeek,
+  entriesForWeek,
+  mergeWeekManualValues,
+} from "@/lib/rules/daily";
+import { toCsv } from "@/lib/rules/exportCsv";
+import {
+  buildQuarterIndex,
+  deriveWorkPlan,
+  effectiveOpeningBalance,
+  formatPercent,
+  workPlanBrief,
+  workPlanRows,
+  WORK_PLAN_CSV_HEADER,
+  WORK_PLAN_STATUSES,
+  WORK_PLAN_YEAR,
+  type Quarter,
+  type SubprogrammeReport,
+  type WorkPlanRow,
+} from "@/lib/rules/workPlan";
+import {
+  SECTIONS,
+  type Activity,
+  type WorkPlanBaseline,
+  type WorkPlanNote,
+  type WorkPlanStatus,
+} from "@/lib/rules/types";
+
+const VIEW_STORAGE_KEY = "rpa-workplan-view";
 
 const ACTIVITY_STATUSES: Activity["status"][] = [
   "Not Started",
@@ -22,39 +51,121 @@ const ACTIVITY_STATUSES: Activity["status"][] = [
   "Done",
 ];
 
-const SECTIONS = [
-  "Authorisation & Standards",
-  "Inspectorate",
-  "Nuclear Safety, Security & Safeguards",
-  "National Source Inventory",
-] as const;
+const STATUS_TONE: Record<WorkPlanStatus, string> = {
+  "Not Started": "",
+  "In Progress": "amber",
+  Pending: "amber",
+  "On Hold": "red",
+  Achieved: "green",
+  Cancelled: "red",
+};
 
+/**
+ * The sectional update, in the format of the approved 2026 RPA work plan — one
+ * row per output, the workbook's own columns, and a leading **this week**
+ * figure because the report is still produced for the Monday meeting.
+ *
+ * Nothing here is retyped: licences issued, inspections conducted, enforcement
+ * actions and vehicles screened come off the dated registers and the daily /
+ * border logs. What an officer types is the figure for outputs the system
+ * cannot see (guides written, SOPs revised, trainings held) plus the Status,
+ * Comments and Action Points columns.
+ */
 export default function WeeklyPage() {
   const { user } = useAuth();
-  const { selected } = useWeek();
+  const { selected, weeks } = useWeek();
   const toast = useToast();
+  const [openId, setOpenId] = useState<string | null>(null);
+  // The plan is cumulative for the year, so that is what the report opens on.
+  const [view, setView] = useState<WorkPlanView>("year");
 
-  const { data, error, reload } = useStoreData(
-    async (s) => {
-      const [events, inspections, activities, metrics, dailyEntries] =
-        await Promise.all([
-          s.listLicenceEvents(),
-          s.listInspections(),
-          s.listActivities(),
-          s.getWeekMetrics(selected.label),
-          // Daily Updates roll up into this report; degrade to empty until the
-          // dailyEntries rules are deployed.
-          s.listDailyEntries().catch(() => []),
-        ]);
-      return { events, inspections, activities, metrics, dailyEntries };
-    },
-    [selected.label],
-  );
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (stored === "year" || stored === "week" || stored === "both") {
+        setView(stored);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  // Gate on the metrics payload actually belonging to the selected week —
-  // otherwise switching weeks briefly shows the old week's figures under the
-  // new week's heading while the refetch is in flight.
-  if (!data || (data.metrics.week ?? selected.label) !== selected.label) {
+  const chooseView = (v: WorkPlanView) => {
+    setView(v);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const { data, error, reload } = useStoreData(async (s) => {
+    const [
+      events,
+      inspections,
+      activities,
+      weekMetricsAll,
+      dailyEntries,
+      workPlanNotes,
+      baseline,
+    ] = await Promise.all([
+      s.listLicenceEvents(),
+      s.listInspections(),
+      s.listActivities(),
+      s.listWeekMetricsAll().catch(() => []),
+      // Daily Updates roll up into this report; degrade to empty until the
+      // dailyEntries rules are deployed.
+      s.listDailyEntries().catch(() => []),
+      s.listWorkPlanNotes().catch(() => []),
+      // No saved baseline (or no rules yet) means the approved workbook's
+      // figures at handover apply — see effectiveOpeningBalance.
+      s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanBaseline | null,
+      ),
+    ]);
+    return {
+      events,
+      inspections,
+      activities,
+      weekMetricsAll,
+      dailyEntries,
+      workPlanNotes,
+      baseline,
+    };
+  });
+
+  const derived = useMemo(() => {
+    if (!data) return null;
+    // Manual figures: the week's Daily Updates counts take precedence over a
+    // value typed here, per metric — a section logging daily never gets its
+    // numbers overwritten or double counted.
+    const wkDaily = entriesForWeek(data.dailyEntries, selected.label);
+    const stored =
+      data.weekMetricsAll.find((w) => w.week === selected.label)?.values || {};
+    const { fromDaily } = mergeWeekManualValues(stored, wkDaily);
+    const valuesByWeek = effectiveValuesByWeek(
+      data.weekMetricsAll,
+      data.dailyEntries,
+    );
+    const notes: Record<string, WorkPlanNote> = {};
+    for (const n of data.workPlanNotes) notes[n.id] = n;
+
+    const reports = deriveWorkPlan({
+      weeks,
+      week: selected.label,
+      events: data.events,
+      inspections: data.inspections,
+      valuesByWeek,
+      dailyEntries: data.dailyEntries,
+      fromDaily,
+      notes,
+      baseline: data.baseline?.values ?? null,
+    });
+    const quarter = buildQuarterIndex(weeks).get(selected.label) ?? null;
+    return { reports, quarter };
+  }, [data, weeks, selected.label]);
+
+  if (!data || !derived) {
     return error ? (
       <LoadErrorBanner error={error} onRetry={reload} />
     ) : (
@@ -62,79 +173,90 @@ export default function WeeklyPage() {
     );
   }
 
-  const wkEvents = data.events.filter((e) => e.week === selected.label);
-  const wkInspections = data.inspections.filter(
-    (i) => i.week === selected.label,
-  );
+  const { reports, quarter } = derived;
   const wkActivities = data.activities.filter((a) => a.week === selected.label);
+  const planRows = reports.flatMap((r) => r.rows);
+  const achieved = planRows.filter((r) => r.status === "Achieved").length;
+  const notStarted = planRows.filter((r) => r.status === "Not Started").length;
+  // Outputs moved this week, not a sum of the figures — adding vehicles
+  // screened to safety guides written would be a number about nothing.
+  const movedThisWeek = planRows.filter((r) => r.week > 0).length;
 
-  // Manual metrics: the week's Daily Updates counts take precedence over a
-  // value typed here, per metric — a section logging daily never gets its
-  // numbers overwritten or double counted.
-  const wkDaily = entriesForWeek(data.dailyEntries, selected.label);
-  const merged = mergeWeekManualValues(data.metrics.values || {}, wkDaily);
-
-  const report = deriveWeekly(wkEvents, wkInspections, merged.values);
-
-  const onManualChange = async (key: string, value: number) => {
+  const onWeekValueChange = async (key: string, value: number) => {
     try {
       const s = await store();
       await s.setWeekMetricValue(selected.label, key, value);
       reload();
     } catch (err) {
       toast.push(
-        `Saving the metric failed: ${err instanceof Error ? err.message : err}`,
+        `Saving the figure failed: ${err instanceof Error ? err.message : err}`,
         "error",
       );
     }
   };
 
-  const generateBrief = () => {
-    const lines: string[] = [];
-    lines.push(`RPA Weekly Sectional Report — ${selected.label}`);
-    lines.push("");
-    for (const sec of report) {
-      lines.push(sec.section);
-      for (const m of sec.metrics) {
-        lines.push(`  ${m.label}: ${m.value}${m.auto ? "  (auto)" : ""}`);
-      }
-      if (sec.total) {
-        lines.push(`  ${sec.total.label}: ${sec.total.value}`);
-      }
-      lines.push("");
+  const onNoteSave = async (
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+  ) => {
+    try {
+      const s = await store();
+      await s.setWorkPlanNote(id, patch, user?.uid || "");
+      toast.push("Saved.", "success");
+      reload();
+    } catch (err) {
+      toast.push(
+        `Saving failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
     }
+  };
+
+  const shortWeek = selected.label.split(" ")[0];
+
+  const exportSheet = () => {
+    const rows = workPlanRows(reports).map((r) => [selected.label, ...r]);
+    downloadTextFile(
+      `RPA-work-plan-${WORK_PLAN_YEAR}-${shortWeek}.csv`,
+      toCsv(["Reporting Week", ...WORK_PLAN_CSV_HEADER], rows),
+    );
+    toast.push("Work plan sheet exported.", "success");
+  };
+
+  const generateBrief = () => {
+    const lines = [workPlanBrief(reports, selected.label)];
     if (wkActivities.length) {
-      lines.push("Additional Activities");
+      lines.push("Additional activities");
       for (const a of wkActivities) {
         lines.push(`  [${a.status}] ${a.section}: ${a.text}`);
       }
+      lines.push("");
     }
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `RPA-weekly-${selected.label.split(" ")[0]}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadTextFile(
+      `RPA-sectional-update-${shortWeek}.txt`,
+      lines.join("\n"),
+      "text/plain;charset=utf-8",
+    );
     toast.push("Briefing exported.", "success");
-  };
-
-  const printPdf = () => {
-    window.print();
   };
 
   return (
     <div className="space-y-4 staggered">
       <div className="no-print">
         <PageHeader
-          eyebrow="Reporting week"
+          eyebrow={`Sectional update — approved ${WORK_PLAN_YEAR} RPA work plan`}
           title={selected.label}
-          subtitle={`${selected.start} → ${selected.end}`}
+          subtitle={`${selected.start} → ${selected.end}${
+            quarter ? ` · reports into Q${quarter} ${WORK_PLAN_YEAR}` : ""
+          }`}
           actions={
             <>
               <Link className="btn btn-ghost" href="/daily">
                 Daily updates
               </Link>
+              <button className="btn btn-ghost" onClick={exportSheet}>
+                Export sheet
+              </button>
               <button
                 className="btn btn-secondary flex-1 sm:flex-none"
                 onClick={generateBrief}
@@ -152,14 +274,58 @@ export default function WeeklyPage() {
         />
       </div>
 
-      {report.map((sec) => (
-        <SectionTable
-          key={sec.section}
-          section={sec.section}
-          metrics={sec.metrics}
-          total={sec.total}
-          fromDaily={merged.fromDaily}
-          onManualChange={onManualChange}
+      <Panel>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Figure label="Outputs on the plan" value={planRows.length} />
+          <Figure label="Moved this week" value={movedThisWeek} />
+          <Figure label="Targets achieved" value={achieved} tone="green" />
+          <Figure label="Not started" value={notStarted} tone="red" />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 no-print">
+          <span className="caps text-[10px] text-gunmetal/55">Showing</span>
+          <Segmented
+            ariaLabel="What the report shows"
+            value={view}
+            onChange={chooseView}
+            options={[
+              { value: "year", label: `Year to date ${WORK_PLAN_YEAR}` },
+              { value: "week", label: "This week only" },
+              { value: "both", label: "Week + year" },
+            ]}
+          />
+        </div>
+        <p className="section-note mt-3">
+          The plan is <strong>cumulative for {WORK_PLAN_YEAR}</strong>: every
+          output starts from its opening balance and adds what has been recorded
+          since, so the quarter columns and Total Actual are the year&apos;s
+          position, not the week&apos;s. Figures marked{" "}
+          <span className="chip green">auto</span> are counted off the registers
+          as work is logged — licences on the licensing register, inspections
+          and enforcement actions on the inspection register, vehicles screened
+          on the border log. Type a figure only where the row offers a box; a
+          reporting week counts toward the quarter it starts in.
+        </p>
+      </Panel>
+
+      <OpeningBalancePanel
+        year={WORK_PLAN_YEAR}
+        baseline={data.baseline}
+        canEdit={user?.role === "admin"}
+        uid={user?.uid || ""}
+        onSaved={reload}
+      />
+
+      {reports.map((sub) => (
+        <SubprogrammeTable
+          key={sub.id}
+          sub={sub}
+          view={view}
+          quarter={quarter}
+          openId={openId}
+          onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
+          canEdit={(section) => canEditSection(user, section)}
+          onWeekValueChange={onWeekValueChange}
+          onNoteSave={onNoteSave}
         />
       ))}
 
@@ -173,8 +339,11 @@ export default function WeeklyPage() {
       {/* Printable cover with the Zambian flag rule */}
       <div className="print-only p-8">
         <div className="text-center mt-12">
-          <div className="text-3xl font-black">RPA Weekly Sectional Report</div>
+          <div className="text-3xl font-black">RPA Sectional Update</div>
           <div className="text-xl mt-2">{selected.label}</div>
+          <div className="text-sm mt-1">
+            Against the approved {WORK_PLAN_YEAR} RPA work plan
+          </div>
           <div className="caps text-sm mt-1">
             Radiation Protection Authority of Zambia
           </div>
@@ -190,77 +359,616 @@ export default function WeeklyPage() {
   );
 }
 
-function SectionTable({
-  section,
-  metrics,
-  total,
-  fromDaily,
-  onManualChange,
+function printPdf() {
+  window.print();
+}
+
+function Figure({
+  label,
+  value,
+  tone,
 }: {
-  section: string;
-  metrics: Array<{ key: string; label: string; auto: boolean; value: number }>;
-  total: { label: string; value: number } | null;
-  /** Metric keys whose value is summed from Daily Updates (read-only here). */
-  fromDaily: Set<string>;
-  onManualChange: (key: string, value: number) => void;
+  label: string;
+  value: number;
+  tone?: "green" | "red";
 }) {
+  const color =
+    tone === "green"
+      ? "var(--rpa-green-dark)"
+      : tone === "red"
+        ? "var(--status-stalled)"
+        : undefined;
   return (
-    <Panel title={section} flush>
+    <div>
+      <div className="caps text-[10px] text-gunmetal/55">{label}</div>
+      <div className="text-2xl font-black tabular mt-0.5" style={{ color }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// One subprogramme — the workbook's sheet
+// ---------------------------------------------------------------------------
+
+/**
+ * Which columns the report shows. The plan is cumulative for the year, so
+ * **Year to date** is the default and the report Management reads; **This week**
+ * narrows to what the section did in the selected week (still beside the annual
+ * target, so a figure is never read out of context); **Week + year** is the
+ * whole sheet.
+ */
+type WorkPlanView = "year" | "week" | "both";
+
+type ColKey =
+  | "id"
+  | "desc"
+  | "indicator"
+  | "target"
+  | "week"
+  | "q1"
+  | "q2"
+  | "q3"
+  | "q4"
+  | "total"
+  | "percent"
+  | "status"
+  | "comments"
+  | "actions";
+
+const VIEW_COLUMNS: Record<WorkPlanView, ColKey[]> = {
+  year: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+  week: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "week",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+  both: [
+    "id",
+    "desc",
+    "indicator",
+    "target",
+    "week",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "total",
+    "percent",
+    "status",
+    "comments",
+    "actions",
+  ],
+};
+
+const COLUMN_LABELS: Record<ColKey, string> = {
+  id: "Output ID",
+  desc: "Output Description",
+  indicator: "Key Indicator",
+  target: `${WORK_PLAN_YEAR} Target`,
+  week: "This week",
+  q1: "Q1",
+  q2: "Q2",
+  q3: "Q3",
+  q4: "Q4",
+  total: "Total Actual",
+  percent: "% Achieved",
+  status: "Status",
+  comments: "Comments",
+  actions: "Action Points",
+};
+
+const NUMERIC_COLUMNS = new Set<ColKey>([
+  "target",
+  "week",
+  "q1",
+  "q2",
+  "q3",
+  "q4",
+  "total",
+  "percent",
+]);
+
+const QUARTER_COLUMN: Partial<Record<ColKey, Quarter>> = {
+  q1: 1,
+  q2: 2,
+  q3: 3,
+  q4: 4,
+};
+
+/** Roughly what the column set needs before it starts scrolling. */
+const VIEW_MIN_WIDTH: Record<WorkPlanView, number> = {
+  year: 1080,
+  week: 940,
+  both: 1180,
+};
+
+function SubprogrammeTable({
+  sub,
+  view,
+  quarter,
+  openId,
+  onToggle,
+  canEdit,
+  onWeekValueChange,
+  onNoteSave,
+}: {
+  sub: SubprogrammeReport;
+  view: WorkPlanView;
+  /** The quarter the selected week reports into — its column is highlighted. */
+  quarter: Quarter | null;
+  openId: string | null;
+  onToggle: (id: string) => void;
+  canEdit: (section: WorkPlanRow["output"]["section"]) => boolean;
+  onWeekValueChange: (key: string, value: number) => void;
+  onNoteSave: (
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+  ) => Promise<void>;
+}) {
+  const columns = VIEW_COLUMNS[view];
+  const note =
+    view === "week"
+      ? "This week's figures beside each output's annual target. Open a row (▸) for the detail behind its figure."
+      : "Cumulative for the plan year — every output starts from its opening balance and adds what has been recorded since. Scroll sideways for Status, Comments and Action Points.";
+
+  return (
+    <Panel title={sub.heading} note={note} flush>
       <div className="table-wrap">
-        <table className="data">
+        <table
+          className="data wp-table"
+          style={{ minWidth: VIEW_MIN_WIDTH[view] }}
+        >
           <thead>
             <tr>
-              <th>Metric</th>
-              <th className="num">Count</th>
-              <th>Source</th>
+              {columns.map((key) => {
+                const q = QUARTER_COLUMN[key];
+                return (
+                  <th
+                    key={key}
+                    className={NUMERIC_COLUMNS.has(key) ? "num" : undefined}
+                    style={
+                      q && quarter === q
+                        ? { background: "var(--sunken)" }
+                        : undefined
+                    }
+                  >
+                    {COLUMN_LABELS[key]}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {metrics.map((m) => (
-              <tr key={m.key}>
-                <td>{m.label}</td>
-                <td className="num">
-                  {m.auto || fromDaily.has(m.key) ? (
-                    <span className="font-black">{m.value}</span>
-                  ) : (
-                    <MetricInput
-                      label={m.label}
-                      value={m.value}
-                      onCommit={(v) => onManualChange(m.key, v)}
-                    />
-                  )}
-                </td>
-                <td>
-                  {m.auto ? (
-                    <span className="chip green">auto</span>
-                  ) : fromDaily.has(m.key) ? (
-                    <Link href="/daily" title="Summed from Daily Updates">
-                      <span className="chip green">daily</span>
-                    </Link>
-                  ) : (
-                    <span className="chip">manual</span>
-                  )}
+            {sub.rows.map((row) => (
+              <PlanRow
+                key={row.output.id}
+                row={row}
+                columns={columns}
+                quarter={quarter}
+                open={openId === row.output.id}
+                onToggle={() => onToggle(row.output.id)}
+                canEdit={canEdit(row.output.section)}
+                onWeekValueChange={onWeekValueChange}
+                onNoteSave={onNoteSave}
+              />
+            ))}
+            {sub.supporting.length ? (
+              <tr>
+                <td colSpan={columns.length} className="bg-[var(--sunken)]">
+                  <span
+                    className="caps text-[10px] text-gunmetal/55"
+                    style={{ position: "sticky", left: 0 }}
+                  >
+                    Supporting figures — tracked by the section, not work plan
+                    outputs
+                  </span>
                 </td>
               </tr>
+            ) : null}
+            {sub.supporting.map((row) => (
+              <PlanRow
+                key={row.output.id}
+                row={row}
+                columns={columns}
+                quarter={quarter}
+                open={openId === row.output.id}
+                onToggle={() => onToggle(row.output.id)}
+                canEdit={canEdit(row.output.section)}
+                onWeekValueChange={onWeekValueChange}
+                onNoteSave={onNoteSave}
+              />
             ))}
           </tbody>
-          {total ? (
-            <tfoot>
-              <tr>
-                <td>{total.label}</td>
-                <td className="num">{total.value}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          ) : null}
         </table>
       </div>
     </Panel>
   );
 }
 
+function PlanRow({
+  row,
+  columns,
+  quarter,
+  open,
+  onToggle,
+  canEdit,
+  onWeekValueChange,
+  onNoteSave,
+}: {
+  row: WorkPlanRow;
+  columns: ColKey[];
+  quarter: Quarter | null;
+  open: boolean;
+  onToggle: () => void;
+  canEdit: boolean;
+  onWeekValueChange: (key: string, value: number) => void;
+  onNoteSave: (
+    id: string,
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+  ) => Promise<void>;
+}) {
+  const { output } = row;
+  const supporting = !!output.supporting;
+  const expandable = !supporting || row.breakdown.length > 0;
+  const typeable = !row.auto && !row.fromDaily && canEdit && !!row.metricKey;
+
+  const num = (v: number) => (v ? v.toLocaleString() : "—");
+
+  const content = (key: ColKey) => {
+    switch (key) {
+      case "id":
+        return (
+          <>
+            <span className="font-bold tabular">{output.id}</span>
+            {expandable ? (
+              <button
+                className="link-action no-print ml-1.5"
+                aria-expanded={open}
+                aria-label={`${open ? "Hide" : "Show"} detail for output ${output.id}`}
+                onClick={onToggle}
+              >
+                {open ? "▾" : "▸"}
+              </button>
+            ) : null}
+          </>
+        );
+      case "desc":
+        return (
+          <>
+            <div className="font-bold">{output.description}</div>
+            {output.note ? (
+              <div className="text-xs text-gunmetal/55 mt-0.5">
+                {output.note}
+              </div>
+            ) : null}
+          </>
+        );
+      case "indicator":
+        return output.indicator;
+      case "target":
+        return output.target === null ? "—" : output.target.toLocaleString();
+      case "week":
+        return typeable ? (
+          <MetricInput
+            label={`${output.id} ${output.description} — this week`}
+            value={row.week}
+            onCommit={(v) => onWeekValueChange(row.metricKey as string, v)}
+          />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <span className="font-black">{row.week.toLocaleString()}</span>
+            <SourceChip row={row} canEdit={canEdit} />
+          </div>
+        );
+      case "q1":
+      case "q2":
+      case "q3":
+      case "q4":
+        return num(row.quarters[(QUARTER_COLUMN[key] as Quarter) - 1]);
+      case "total":
+        return row.total.toLocaleString();
+      case "percent":
+        return supporting ? "—" : formatPercent(row.percent);
+      case "status":
+        return supporting ? (
+          <span className="text-gunmetal/40">—</span>
+        ) : (
+          <span className={`chip ${STATUS_TONE[row.status]}`}>{row.status}</span>
+        );
+      case "comments":
+        return row.comments || <span className="text-gunmetal/40">—</span>;
+      case "actions":
+        return row.actionPoints || <span className="text-gunmetal/40">—</span>;
+    }
+  };
+
+  const className = (key: ColKey) => {
+    if (key === "id") return "whitespace-nowrap";
+    if (key === "desc") return "min-w-[15rem]";
+    if (key === "indicator") return "text-gunmetal/70 min-w-[10rem]";
+    if (key === "target") return "num font-bold";
+    if (key === "total") return "num font-black";
+    if (key === "comments" || key === "actions")
+      return "min-w-[12rem] text-gunmetal/70";
+    return NUMERIC_COLUMNS.has(key) ? "num" : undefined;
+  };
+
+  return (
+    <>
+      <tr className="row-hover">
+        {columns.map((key) => {
+          const q = QUARTER_COLUMN[key];
+          return (
+            <td
+              key={key}
+              className={className(key)}
+              style={
+                q && quarter === q ? { background: "var(--sunken)" } : undefined
+              }
+            >
+              {content(key)}
+            </td>
+          );
+        })}
+      </tr>
+
+      {open ? (
+        <tr>
+          <td colSpan={columns.length} className="bg-[var(--sunken)]">
+            {/* The row spans a table far wider than the screen; pinning the
+                detail to the left edge keeps it readable wherever the table
+                happens to be scrolled to. */}
+            <div style={{ position: "sticky", left: 0, width: "min(56rem, 84vw)" }}>
+              <RowDetail
+                row={row}
+                canEdit={canEdit}
+                onSave={(patch) => onNoteSave(output.id, patch)}
+              />
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
+function SourceChip({ row, canEdit }: { row: WorkPlanRow; canEdit: boolean }) {
+  if (row.auto) return <span className="chip green">auto</span>;
+  if (row.fromDaily) {
+    return (
+      <Link href="/daily" title="Summed from Daily Updates">
+        <span className="chip green">daily</span>
+      </Link>
+    );
+  }
+  if (!canEdit) {
+    return (
+      <span className="chip" title={`Reported by ${row.output.section}`}>
+        {row.output.section === "Nuclear Safety, Security & Safeguards"
+          ? "NSSS"
+          : row.output.section === "Authorisation & Standards"
+            ? "A&S"
+            : row.output.section === "National Source Inventory"
+              ? "NSI"
+              : "Inspectorate"}
+      </span>
+    );
+  }
+  return <span className="chip">manual</span>;
+}
+
+// ---------------------------------------------------------------------------
+// The expanded row: where the figure comes from + the narrative columns
+// ---------------------------------------------------------------------------
+
+function RowDetail({
+  row,
+  canEdit,
+  onSave,
+}: {
+  row: WorkPlanRow;
+  canEdit: boolean;
+  onSave: (
+    patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
+  ) => Promise<void>;
+}) {
+  const [status, setStatus] = useState<WorkPlanStatus | "">(
+    row.statusOverridden ? row.status : "",
+  );
+  const [comments, setComments] = useState(row.comments);
+  const [actionPoints, setActionPoints] = useState(row.actionPoints);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setStatus(row.statusOverridden ? row.status : "");
+    setComments(row.comments);
+    setActionPoints(row.actionPoints);
+  }, [row.statusOverridden, row.status, row.comments, row.actionPoints]);
+
+  const dirty =
+    (row.statusOverridden ? row.status : "") !== status ||
+    comments !== row.comments ||
+    actionPoints !== row.actionPoints;
+
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onSave({
+        // "" clears the override and hands the column back to the figures.
+        status: status || undefined,
+        comments: comments.trim(),
+        actionPoints: actionPoints.trim(),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 py-1">
+      {/* How the cumulative figure splits — what was carried in against what
+          the system has counted since. Only worth saying when both exist. */}
+      {row.openingTotal > 0 ? (
+        <div className="text-sm">
+          <span className="caps text-[10px] text-gunmetal/55 mr-2">
+            Total actual
+          </span>
+          <span className="tabular font-black">
+            {row.total.toLocaleString()}
+          </span>
+          <span className="text-gunmetal/60">
+            {" "}
+            = opening balance{" "}
+            <span className="tabular font-bold">
+              {row.openingTotal.toLocaleString()}
+            </span>{" "}
+            + recorded since{" "}
+            <span className="tabular font-bold">
+              {row.recordedTotal.toLocaleString()}
+            </span>
+          </span>
+        </div>
+      ) : null}
+
+      {row.breakdown.length ? (
+        <div>
+          <div className="caps text-[10px] text-gunmetal/55 mb-1">
+            Breakdown — recorded in the system
+          </div>
+          <table className="w-full text-sm" style={{ maxWidth: 460 }}>
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-gunmetal/55">
+                <th className="text-left font-bold py-1">Type</th>
+                <th className="text-right font-bold py-1">This week</th>
+                <th className="text-right font-bold py-1">
+                  {WORK_PLAN_YEAR} total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {row.breakdown.map((b) => (
+                <tr key={b.label} className="border-t border-gunmetal/8">
+                  <td className="py-1">{b.label}</td>
+                  <td className="py-1 text-right tabular">
+                    {b.week.toLocaleString()}
+                  </td>
+                  <td className="py-1 text-right tabular font-bold">
+                    {b.total.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {row.output.supporting ? null : canEdit ? (
+        <div className="no-print space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div>
+              <label
+                className="field-label"
+                htmlFor={`status-${row.output.id}`}
+              >
+                Status
+              </label>
+              <select
+                id={`status-${row.output.id}`}
+                className="input"
+                value={status}
+                onChange={(e) =>
+                  setStatus(e.target.value as WorkPlanStatus | "")
+                }
+              >
+                <option value="">
+                  From the figures — {row.derivedStatus}
+                </option>
+                {WORK_PLAN_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                className="field-label"
+                htmlFor={`comments-${row.output.id}`}
+              >
+                Comments
+              </label>
+              <textarea
+                id={`comments-${row.output.id}`}
+                className="input"
+                rows={2}
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="Where the output stands."
+              />
+            </div>
+            <div>
+              <label
+                className="field-label"
+                htmlFor={`actions-${row.output.id}`}
+              >
+                Action Points
+              </label>
+              <textarea
+                id={`actions-${row.output.id}`}
+                className="input"
+                rows={2}
+                value={actionPoints}
+                onChange={(e) => setActionPoints(e.target.value)}
+                placeholder="What happens next, and who does it."
+              />
+            </div>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={save}
+            disabled={busy || !dirty}
+          >
+            {busy ? "Saving…" : "Save"}
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-gunmetal/55 no-print">
+          Status, comments and action points on this output are kept by{" "}
+          {row.output.section}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+
 /**
- * Manual metric cell with local draft state, persisted on blur / Enter.
+ * Manual figure cell with local draft state, persisted on blur / Enter.
  * Binding the input straight to the store value made multi-digit numbers
  * untypable: every keystroke triggered an async write + full reload and the
  * controlled input reverted to the stale value before the next keypress.
@@ -364,7 +1072,11 @@ function ActivitiesPanel({
   };
 
   return (
-    <Panel title={`Additional activities — ${weekLabel}`} flush>
+    <Panel
+      title={`Additional activities — ${weekLabel}`}
+      note="Work that carries no work plan output — meetings attended, ad-hoc requests, anything the plan has no row for."
+      flush
+    >
       <div className="px-4 sm:px-5 no-print">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div className="lg:col-span-2">

@@ -10,16 +10,42 @@
  * this module only concerns the manual metrics.
  */
 import type { DailyEntry, Section, WeekMetrics } from "./types";
-import { MANUAL_METRICS_BY_SECTION, metricKey } from "./weeklyDerivation";
+import { manualOutputsForSection, metricKeysForOutput } from "./workPlan";
+import { metricKey } from "./weeklyDerivation";
 
-/** The metric choices a section's daily count form offers. */
-export function dailyMetricOptions(
-  section: Section,
-): Array<{ key: string; label: string }> {
-  return (MANUAL_METRICS_BY_SECTION[section] || []).map((label) => ({
-    key: metricKey(section, label),
-    label,
-  }));
+/** One thing a section can log a number against on the Daily Updates tab. */
+export interface DailyMetricOption {
+  /** The key a new entry is written to. */
+  key: string;
+  /**
+   * Every key whose stored figures count toward this option — `key` first, then
+   * any the section used before the work plan became the reporting frame.
+   */
+  keys: string[];
+  label: string;
+  /** The work plan output the figure reports against, e.g. "1.2.6". */
+  outputId: string;
+  /** Off-plan supporting figure rather than a work plan output. */
+  supporting: boolean;
+}
+
+/**
+ * The metric choices a section's daily count form offers — its manual outputs
+ * in the approved work plan, then the supporting figures it still tracks. The
+ * key is the same one the weekly report reads, so a logged count lands on its
+ * work plan row without any further mapping.
+ */
+export function dailyMetricOptions(section: Section): DailyMetricOption[] {
+  return manualOutputsForSection(section).map((o) => {
+    const keys = metricKeysForOutput(o);
+    return {
+      key: keys[0] || "",
+      keys,
+      label: o.logLabel || o.description,
+      outputId: o.id,
+      supporting: !!o.supporting,
+    };
+  });
 }
 
 export const NSSS_SECTION: Section = "Nuclear Safety, Security & Safeguards";
@@ -208,10 +234,23 @@ export function sumMetricAcrossWeeks(
   key: string,
   weekFilter: (week: string) => boolean = () => true,
 ): number {
+  return sumMetricsAcrossWeeks(byWeek, [key], weekFilter);
+}
+
+/**
+ * The same, over several keys at once — what one reported figure is made of
+ * when the section logged it under an earlier metric name (see
+ * `metricKeysForOutput`). Keys must be distinct or the figure double counts.
+ */
+export function sumMetricsAcrossWeeks(
+  byWeek: Map<string, Record<string, number>>,
+  keys: readonly string[],
+  weekFilter: (week: string) => boolean = () => true,
+): number {
   let total = 0;
   for (const [week, values] of byWeek) {
     if (!weekFilter(week)) continue;
-    total += values[key] || 0;
+    for (const key of keys) total += values[key] || 0;
   }
   return total;
 }
