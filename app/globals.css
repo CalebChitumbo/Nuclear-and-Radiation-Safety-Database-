@@ -526,6 +526,65 @@ table.data .num {
   z-index: 1;
 }
 
+/* The inspection database and its summary reproduce the Inspectorate
+   workbook's own sheets — sixteen columns on the summary, thirteen on the
+   database. The province / facility column stays pinned so the counts scroll
+   under a row you can still identify, and the two-tier head (INSPECTIONS ·
+   ENGAGEMENTS · OTHER ENFORCEMENTS above the column names) gets a hairline
+   between its bands. */
+.insp-table th:first-child,
+.insp-table td:first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--line);
+  z-index: 2;
+}
+/* Sixteen columns only fit a laptop if the counts are tight; the head runs two
+   lines rather than pushing the totals off the right edge. Past that the panel
+   scrolls sideways under the pinned province column, as the workbook does. */
+table.insp-table {
+  font-size: 0.82rem;
+}
+table.insp-table thead th,
+table.insp-table thead th.num {
+  padding: 0.5rem 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  /* Wrap the two-word column names onto two lines, but never inside a word —
+     a broken "INVESTIG-ATIVE" is worse than a wider column. (The `.num` half of
+     the selector is what outranks `table.data .num`'s nowrap.) */
+  white-space: normal;
+  word-break: keep-all;
+  /* body sets break-word for long facility names; a column head must not
+     inherit it, or "FACILITY LEVEL" wraps as "FACILIT / Y LEVEL". */
+  overflow-wrap: normal;
+  min-width: 3.4rem;
+}
+table.insp-table tbody td {
+  padding: 0.5rem 0.35rem;
+}
+.insp-table thead tr.band th {
+  padding-bottom: 0.25rem;
+  border-bottom: 0;
+  color: rgba(26, 27, 29, 0.75);
+}
+.insp-table thead tr.band th.grp {
+  box-shadow: inset 1px 0 0 var(--line);
+}
+.insp-table thead th.grp,
+.insp-table tbody td.grp {
+  box-shadow: inset 1px 0 0 var(--line);
+}
+.insp-table tbody tr.total-row td {
+  border-top: 1px solid var(--line-strong);
+  font-weight: 900;
+  background: var(--sunken);
+}
+.insp-table tbody tr.total-row td:first-child {
+  background: var(--sunken);
+}
+
 /* ---------------------------------------------------------------------------
    Motion, toast, drawer
 --------------------------------------------------------------------------- */

@@ -3,6 +3,7 @@ import { detectType } from "../rules/detectType";
 import {
   applyInspectionRequestAction,
   buildInspectionRequest,
+  inspectionFromCompletion,
   type InspectionRequestAction,
   type NewInspectionRequestInput,
   type RequestActor,
@@ -663,19 +664,7 @@ class MockStore implements DataStore {
       );
       const inspection: Inspection = {
         id: newId("insp"),
-        date: action.completedDate,
-        week,
-        facilityId: current.facilityId,
-        facilityName: current.facilityName,
-        type: current.type,
-        outcome: action.outcome,
-        province: current.province,
-        sector: current.sector,
-        notes:
-          action.findings?.trim() ||
-          `Pre-authorisation inspection for ${current.facilityName}.`,
-        requestId: id,
-        createdAt: now,
+        ...inspectionFromCompletion(current, action, week, now),
       };
       s.inspections.push(inspection);
       updated = { ...updated, inspectionId: inspection.id };

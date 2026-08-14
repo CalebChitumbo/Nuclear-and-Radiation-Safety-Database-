@@ -10,9 +10,12 @@ import { Field, Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
+import { CardStatusChip } from "@/components/inspectorate/InspectionDatabaseTable";
 import { detectType } from "@/lib/rules/detectType";
+import { cardStatus } from "@/lib/rules/inspectionDatabase";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
 import { authWhen } from "@/lib/rules/licenceStats";
+import { todayISO } from "@/lib/rules/week";
 import {
   workflowCommentCount,
   workflowStatusLabel,
@@ -620,9 +623,23 @@ export function FacilityDetail({
                   <div className="min-w-0">
                     <div className="font-bold break-words">{i.type}</div>
                     <div className="text-xs text-gunmetal/60">{i.outcome}</div>
+                    {i.enforcement ? (
+                      <div className="mt-1">
+                        <span className="chip red">{i.enforcement}</span>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="text-xs tabular text-gunmetal/55 shrink-0">
-                    {i.date}
+                  <div className="text-xs tabular text-gunmetal/55 shrink-0 text-right">
+                    <div>{i.date}</div>
+                    {/* The inspection card issued at the visit, and whether it
+                        is still standing today. */}
+                    {i.cardIssued ? (
+                      <div className="mt-1">
+                        <CardStatusChip
+                          status={cardStatus(i.cardIssued, todayISO())}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               ))}

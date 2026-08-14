@@ -265,6 +265,42 @@ describe("outputs 1.2.4 and 1.2.11 — inspections and enforcement", () => {
     // Enforcement actions are their own output, never folded into 1.2.4.
     expect(breakdown.some((b) => b.label === "Enforcement Actions")).toBe(false);
   });
+
+  it("counts an action recorded on an inspection, as the database does", () => {
+    // The Inspectorate's database records the enforcement against the
+    // inspection it came out of — a routine visit that ends in a seizure is
+    // one inspection AND one enforcement, so it counts under both outputs.
+    const withAction: Inspection[] = [
+      { ...insp("Routine Inspection", Q2, "2026-05-26", 8),
+        enforcement: "Seizure of Device" },
+      { ...insp("Pre-Authorisation", Q2, "2026-05-27", 9),
+        enforcement: "Engagement at Facility Level" },
+    ];
+    const reports = derive({ week: Q2, inspections: withAction });
+    expect(row(reports, "1.2.4").week).toBe(2);
+    expect(row(reports, "1.2.11").week).toBe(2);
+  });
+
+  it("splits 1.2.11 by the action taken, the summary's own columns", () => {
+    const withAction: Inspection[] = [
+      { ...insp("Routine Inspection", Q2, "2026-05-26", 8),
+        enforcement: "Engagement at Facility Level" },
+      { ...insp("Routine Inspection", Q1, "2026-01-06", 9),
+        enforcement: "Engagement at Facility Level" },
+      { ...insp("Follow-up", Q2, "2026-05-27", 10),
+        enforcement: "Seizure of Device" },
+      // Logged before the action was recorded — still in the figure.
+      insp("Enforcement Action", Q2, "2026-05-28", 11),
+    ];
+    const reports = derive({ week: Q2, inspections: withAction });
+    const r = row(reports, "1.2.11");
+    expect(r.total).toBe(4);
+    expect(r.breakdown.map((b) => [b.label, b.week, b.total])).toEqual([
+      ["Facility Level", 1, 2],
+      ["Devices Seized", 1, 1],
+      ["Action not recorded", 1, 1],
+    ]);
+  });
 });
 
 describe("manual outputs", () => {

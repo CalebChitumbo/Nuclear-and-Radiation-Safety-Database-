@@ -12,6 +12,7 @@
  * on completion) live in the store; this module only computes the next value.
  */
 import type {
+  Inspection,
   InspectionOutcome,
   InspectionPriority,
   InspectionRequest,
@@ -132,6 +133,15 @@ export type InspectionRequestAction =
       reportRef: string;
       completedDate: string;
       findings?: string;
+      /**
+       * The two inspection-database columns an inspector fills at the facility:
+       * the enforcement action the visit led to (if any), and whether an
+       * inspection card was issued. Both land on the dated Inspection this
+       * completion records, so a request-driven inspection reaches the province
+       * sheet and the card list as fully as one logged on the Inspectorate tab.
+       */
+      enforcement?: string;
+      cardIssued?: string;
     }
   | { kind: "close"; note?: string }
   | { kind: "cancel"; reason: string }
@@ -159,6 +169,40 @@ export function canApplyAction(
 ): boolean {
   if (kind === "comment") return true;
   return ALLOWED_FROM[kind].includes(status);
+}
+
+/**
+ * The dated Inspection a completed request produces. Both stores record it —
+ * one atomically in a batch, one in memory — so the shape lives here, where the
+ * completion action is defined, rather than being written out twice.
+ *
+ * The facility's district and practice are deliberately absent: the request
+ * carries a `facilityId`, so the inspection database reads them off the
+ * register, which is always more current than a copy taken at completion.
+ */
+export function inspectionFromCompletion(
+  request: InspectionRequest,
+  action: Extract<InspectionRequestAction, { kind: "complete" }>,
+  week: string,
+  now: string,
+): Omit<Inspection, "id"> {
+  return {
+    date: action.completedDate,
+    week,
+    facilityId: request.facilityId,
+    facilityName: request.facilityName,
+    type: request.type,
+    outcome: action.outcome,
+    province: request.province,
+    sector: request.sector,
+    notes:
+      action.findings?.trim() ||
+      `Pre-authorisation inspection for ${request.facilityName}.`,
+    requestId: request.id,
+    ...(action.enforcement ? { enforcement: action.enforcement } : {}),
+    ...(action.cardIssued ? { cardIssued: action.cardIssued } : {}),
+    createdAt: now,
+  };
 }
 
 /**
@@ -245,8 +289,8 @@ export function applyInspectionRequestAction(
       event.status = next.status;
       event.text = withNote(
         `Inspection completed — ${action.outcome}${
-          reportRef ? `. Report: ${reportRef}` : ""
-        }`,
+          action.enforcement ? `. ${action.enforcement}` : ""
+        }${reportRef ? `. Report: ${reportRef}` : ""}`,
         action.findings,
       );
       break;

@@ -9,6 +9,11 @@ import { store } from "@/lib/store";
 import { useToast } from "./Toast";
 import { todayISO } from "@/lib/rules/week";
 import {
+  cardExpiry,
+  ENFORCEMENT_ACTIONS,
+  type EnforcementAction,
+} from "@/lib/rules/inspectionDatabase";
+import {
   REQUEST_PRIORITY_META,
   REQUEST_STATUS_META,
   allowedActions,
@@ -65,6 +70,8 @@ export function InspectionRequestDrawer({
   const [reportRef, setReportRef] = useState("");
   const [completedDate, setCompletedDate] = useState(() => todayISO());
   const [findings, setFindings] = useState("");
+  const [enforcement, setEnforcement] = useState<EnforcementAction | "">("");
+  const [cardIssued, setCardIssued] = useState(false);
   // Shared note / reason
   const [note, setNote] = useState("");
 
@@ -86,6 +93,8 @@ export function InspectionRequestDrawer({
     setNote("");
     setCompletedDate(todayISO());
     setOutcome("Compliant");
+    setEnforcement("");
+    setCardIssued(false);
   };
 
   if (!shown) return null;
@@ -126,6 +135,8 @@ export function InspectionRequestDrawer({
             reportRef: reportRef.trim(),
             completedDate,
             findings: findings || undefined,
+            enforcement: enforcement || undefined,
+            cardIssued: cardIssued ? completedDate : undefined,
           };
           break;
         case "cancel":
@@ -337,6 +348,23 @@ export function InspectionRequestDrawer({
                   onChange={(e) => setReportRef(e.target.value)}
                 />
               </Labeled>
+              {/* The same two database columns the Inspectorate tab asks for,
+                  so a request-driven inspection reaches the province sheet and
+                  the card list as completely as one logged there. */}
+              <Labeled label="Enforcement action taken">
+                <select
+                  className="input mt-1"
+                  value={enforcement}
+                  onChange={(e) =>
+                    setEnforcement(e.target.value as EnforcementAction | "")
+                  }
+                >
+                  <option value="">None</option>
+                  {ENFORCEMENT_ACTIONS.map((a) => (
+                    <option key={a}>{a}</option>
+                  ))}
+                </select>
+              </Labeled>
               <Labeled label="Findings (optional)">
                 <textarea
                   className="input mt-1"
@@ -346,6 +374,19 @@ export function InspectionRequestDrawer({
                   placeholder="Summary of findings / conditions."
                 />
               </Labeled>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={cardIssued}
+                  onChange={(e) => setCardIssued(e.target.checked)}
+                />
+                <span>
+                  Inspection card issued — valid to{" "}
+                  <strong className="tabular">
+                    {cardExpiry(completedDate) || "—"}
+                  </strong>
+                </span>
+              </label>
               <div className="text-[11px] text-gunmetal/60">
                 This files a dated inspection in the Inspectorate log and notifies
                 Licensing that the report is ready.
