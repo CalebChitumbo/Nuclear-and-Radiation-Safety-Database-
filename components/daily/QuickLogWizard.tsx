@@ -5,8 +5,9 @@
  * in the field: big tap targets, the numeric keypad for numbers, no dropdowns,
  * and a clear "done ✓" at the end of every path.
  *
- * - Inspectorate: which facility → what type → outcome → confirm. The entry
- *   goes straight into the inspections register (and the weekly report).
+ * - Inspectorate: which facility → what type → outcome → enforcement action →
+ *   confirm. The entry goes straight into the inspection database (its province
+ *   summary, its card list) and the weekly report.
  * - Licensing / NSSS / NSI: what are you logging → (which border post, for
  *   NSSS vehicle screening) → how many. Counts land on the weekly report's
  *   metric keys; free-text notes are one tap away.
@@ -16,6 +17,11 @@ import { useMemo, useState } from "react";
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
 import { dailyMetricOptions, vehicleScreeningKey } from "@/lib/rules/daily";
+import {
+  cardExpiry,
+  ENFORCEMENT_ACTIONS,
+  type EnforcementAction,
+} from "@/lib/rules/inspectionDatabase";
 import { norm } from "@/lib/rules/matching";
 import {
   INSPECTION_OUTCOMES,
@@ -220,13 +226,15 @@ function InspectionFlow({
   onLogged: () => void;
 }) {
   const toast = useToast();
-  type Step = "facility" | "type" | "outcome" | "confirm" | "done";
+  type Step = "facility" | "type" | "outcome" | "enforcement" | "confirm" | "done";
   const [step, setStep] = useState<Step>("facility");
   const [query, setQuery] = useState("");
   const [facilityId, setFacilityId] = useState<string | null>(null);
   const [freeText, setFreeText] = useState("");
   const [type, setType] = useState<InspectionType | null>(null);
   const [outcome, setOutcome] = useState<InspectionOutcome | null>(null);
+  const [enforcement, setEnforcement] = useState<EnforcementAction | "">("");
+  const [cardIssued, setCardIssued] = useState(false);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -248,6 +256,8 @@ function InspectionFlow({
     setFreeText("");
     setType(null);
     setOutcome(null);
+    setEnforcement("");
+    setCardIssued(false);
     setNotes("");
   };
 
@@ -266,6 +276,12 @@ function InspectionFlow({
         notes: notes.trim(),
         province: selected ? selected.province : "",
         sector: selected ? selected.sector : "",
+        // The database's district and practice columns, carried in from the
+        // register so nobody types what the system already knows.
+        district: selected ? selected.district : "",
+        practice: selected ? selected.practice : "",
+        ...(enforcement ? { enforcement } : {}),
+        ...(cardIssued ? { cardIssued: date } : {}),
       });
       setStep("done");
       onLogged();
@@ -348,7 +364,7 @@ function InspectionFlow({
         title="What type of inspection?"
         sub={facilityName}
         step={1}
-        steps={4}
+        steps={5}
         onBack={() => setStep("facility")}
       >
         {INSPECTION_TYPES.map((t) => (
@@ -371,7 +387,7 @@ function InspectionFlow({
         title="What was the outcome?"
         sub={`${facilityName} · ${type}`}
         step={2}
-        steps={4}
+        steps={5}
         onBack={() => setStep("type")}
       >
         {INSPECTION_OUTCOMES.map((o) => (
@@ -380,6 +396,39 @@ function InspectionFlow({
             label={o}
             onClick={() => {
               setOutcome(o);
+              setStep("enforcement");
+            }}
+          />
+        ))}
+      </StepShell>
+    );
+  }
+
+  // The database's ENFORCEMENT ACTION TAKEN column. "None" comes first because
+  // it is the answer for most inspections — one tap and the flow moves on.
+  if (step === "enforcement") {
+    return (
+      <StepShell
+        title="Any enforcement action?"
+        sub={`${facilityName} · ${outcome}`}
+        step={3}
+        steps={5}
+        onBack={() => setStep("outcome")}
+      >
+        <BigOption
+          label="None"
+          sub="No action taken at this inspection"
+          onClick={() => {
+            setEnforcement("");
+            setStep("confirm");
+          }}
+        />
+        {ENFORCEMENT_ACTIONS.map((a) => (
+          <BigOption
+            key={a}
+            label={a}
+            onClick={() => {
+              setEnforcement(a);
               setStep("confirm");
             }}
           />
@@ -391,23 +440,35 @@ function InspectionFlow({
   return (
     <StepShell
       title="Log this inspection?"
-      step={3}
-      steps={4}
-      onBack={() => setStep("outcome")}
+      step={4}
+      steps={5}
+      onBack={() => setStep("enforcement")}
     >
       <div
         className="rounded-xl px-4 py-3 text-sm space-y-1"
         style={{ background: "rgba(0,160,80,0.07)" }}
       >
         <div className="font-black text-base">{facilityName}</div>
-        <div>
-          <span className="chip slate mr-1">{type}</span>
+        <div className="flex flex-wrap gap-1">
+          <span className="chip slate">{type}</span>
           <span className="chip">{outcome}</span>
+          {enforcement ? <span className="chip red">{enforcement}</span> : null}
         </div>
         <div className="text-gunmetal/60 tabular">
           {date} · {weekLabel}
         </div>
       </div>
+      <label className="flex items-center gap-2 text-sm px-1">
+        <input
+          type="checkbox"
+          checked={cardIssued}
+          onChange={(e) => setCardIssued(e.target.checked)}
+        />
+        <span>
+          Inspection card issued — valid to{" "}
+          <strong className="tabular">{cardExpiry(date)}</strong>
+        </span>
+      </label>
       <textarea
         className="input"
         rows={2}

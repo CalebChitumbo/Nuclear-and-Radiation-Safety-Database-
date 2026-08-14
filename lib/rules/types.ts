@@ -196,6 +196,34 @@ export interface Inspection {
   sector: Sector | "";
   notes: string;
   /**
+   * District and practice as at the inspection — the two columns the
+   * Inspectorate's database carries beside the facility name. Read from the
+   * register when the facility is on it; typed only for a facility that is not
+   * (which is exactly when they cannot be looked up later).
+   */
+  district?: string;
+  practice?: string;
+  /**
+   * The round this inspection belongs to when a province is covered in more
+   * than one ("Phase 1", "Phase 2"). The database and its summary give each
+   * phase its own row, the way the workbook gives each its own sheet. Empty for
+   * a province covered in a single round.
+   */
+  phase?: string;
+  /**
+   * What the inspection led to, from the Inspectorate's enforcement vocabulary
+   * (see ENFORCEMENT_ACTIONS in inspectionDatabase.ts — the strings are that
+   * list's, including its "License" spelling). Absent when no action was taken,
+   * which is the common case.
+   */
+  enforcement?: string;
+  /**
+   * The date the facility's inspection card was issued (usually the date of the
+   * inspection). The card runs 30 days; its expiry and status are derived, never
+   * stored. Absent when no card was issued.
+   */
+  cardIssued?: string;
+  /**
    * Set when this inspection was produced by completing an InspectionRequest
    * (the pre-authorisation handoff between Licensing and Inspectorate). Links the
    * dated inspection log back to the workflow that asked for it.

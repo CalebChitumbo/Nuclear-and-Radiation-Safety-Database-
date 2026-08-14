@@ -55,6 +55,8 @@ describe("mock store — inspection request lifecycle (the integration seam)", (
         reportRef: "RPA/INSP/2026/044",
         completedDate: "2026-06-10",
         findings: "All sources accounted for.",
+        enforcement: "Engagement at Facility Level",
+        cardIssued: "2026-06-10",
       },
       INSP,
     );
@@ -73,6 +75,11 @@ describe("mock store — inspection request lifecycle (the integration seam)", (
     expect(created?.outcome).toBe("Compliant");
     expect(created?.date).toBe("2026-06-10");
     expect(created?.week).not.toBe("");
+    // The inspection-database columns filled at the facility travel with it, so
+    // the province sheet and the card list see a request-driven inspection in
+    // full.
+    expect(created?.enforcement).toBe("Engagement at Facility Level");
+    expect(created?.cardIssued).toBe("2026-06-10");
 
     // Licensing closes the loop.
     const closed = await mockStore.updateInspectionRequest(

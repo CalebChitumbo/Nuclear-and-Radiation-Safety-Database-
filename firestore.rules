@@ -50,7 +50,21 @@ service cloud.firestore {
       return d.date is string && d.date.matches('\\d{4}-\\d{2}-\\d{2}')
         && d.week is string && d.week.size() > 0
         && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
-        && d.outcome in ['Compliant','Minor findings','Major findings','Non-compliant','N/A'];
+        && d.outcome in ['Compliant','Minor findings','Major findings','Non-compliant','N/A']
+        // Inspection-database columns — optional for docs written before them.
+        // The enforcement vocabulary is the Inspectorate workbook's own list
+        // (its "License" spelling included), so the summary's columns and the
+        // stored values stay one controlled set.
+        && (!('enforcement' in d) || d.enforcement in [
+             'Engagement at Facility Level','Engagement at District Level',
+             'Engagement at Provincial Level','Seizure of Device',
+             'Suspension of Practice','Written Warning','Enforcement Notice',
+             'Suspension of License','Cancellation of License'])
+        && (!('cardIssued' in d)
+             || d.cardIssued.matches('\\d{4}-\\d{2}-\\d{2}'))
+        && (!('phase' in d) || (d.phase is string && d.phase.size() <= 40))
+        && (!('district' in d) || d.district is string)
+        && (!('practice' in d) || d.practice is string);
     }
 
     function validInspectionRequest(d) {

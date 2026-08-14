@@ -7,3 +7,4 @@ export * from "./weeklyDerivation";
 export * from "./aggregate";
 export * from "./daily";
 export * from "./inspectionStats";
+export * from "./inspectionDatabase";

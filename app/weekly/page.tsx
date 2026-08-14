@@ -13,7 +13,17 @@ import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
 import { OpeningBalancePanel } from "@/components/weekly/OpeningBalancePanel";
+import {
+  InspectionSummaryFooter,
+  InspectionSummaryTable,
+} from "@/components/inspectorate/InspectionSummaryTable";
 import { useWeek } from "@/lib/weekContext";
+import {
+  buildInspectionDatabase,
+  summariseInspectionDatabase,
+  summaryCsvRows,
+} from "@/lib/rules/inspectionDatabase";
+import { todayISO } from "@/lib/rules/week";
 import {
   effectiveValuesByWeek,
   entriesForWeek,
@@ -37,6 +47,7 @@ import {
 import {
   SECTIONS,
   type Activity,
+  type Inspection,
   type WorkPlanBaseline,
   type WorkPlanNote,
   type WorkPlanStatus,
@@ -329,6 +340,16 @@ export default function WeeklyPage() {
         />
       ))}
 
+      <InspectionSummaryPanel
+        inspections={data.inspections}
+        weekLabel={selected.label}
+        view={view}
+        onExport={(csv, name) => {
+          downloadTextFile(name, csv);
+          toast.push("Inspection summary exported.", "success");
+        }}
+      />
+
       <ActivitiesPanel
         weekLabel={selected.label}
         activities={wkActivities}
@@ -361,6 +382,69 @@ export default function WeeklyPage() {
 
 function printPdf() {
   window.print();
+}
+
+/**
+ * The Inspectorate's own summary, in the format of its inspection database —
+ * province rounds down the side, INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS
+ * across the top. Behind output 1.2.4 the report gives one national figure; the
+ * section's Monday update has always carried this table underneath it, so it is
+ * reproduced here from the same register rather than kept in a workbook.
+ *
+ * It follows the report's own view switch: **This week only** narrows it to the
+ * reporting week, anything else shows the year to date, the way the plan does.
+ */
+function InspectionSummaryPanel({
+  inspections,
+  weekLabel,
+  view,
+  onExport,
+}: {
+  inspections: Inspection[];
+  weekLabel: string;
+  view: WorkPlanView;
+  onExport: (csv: string, filename: string) => void;
+}) {
+  const weekOnly = view === "week";
+  const summary = useMemo(() => {
+    const slice = weekOnly
+      ? inspections.filter((i) => i.week === weekLabel)
+      : inspections.filter(
+          (i) => (i.date || "").slice(0, 4) === String(WORK_PLAN_YEAR),
+        );
+    // District and practice come off the inspection itself here — the summary
+    // needs only province and phase, so the register is not re-read.
+    return summariseInspectionDatabase(
+      buildInspectionDatabase(slice, [], { today: todayISO() }),
+    );
+  }, [inspections, weekLabel, weekOnly]);
+
+  const span = weekOnly ? weekLabel : `Year to date ${WORK_PLAN_YEAR}`;
+
+  return (
+    <Panel
+      title={`Inspection database summary — ${span}`}
+      flush
+      note="Derived from the inspection register: pre-auth, planned, follow-up and investigative inspections by province, with the enforcement actions taken."
+      action={
+        <button
+          className="link-action no-print"
+          onClick={() => {
+            const lines = summaryCsvRows(summary);
+            onExport(
+              toCsv(lines[0], lines.slice(1)),
+              `RPA-inspection-summary-${weekOnly ? weekLabel.split(" ")[0] : WORK_PLAN_YEAR}.csv`,
+            );
+          }}
+        >
+          Export ↓
+        </button>
+      }
+    >
+      <InspectionSummaryTable summary={summary} />
+      <InspectionSummaryFooter summary={summary} />
+    </Panel>
+  );
 }
 
 function Figure({

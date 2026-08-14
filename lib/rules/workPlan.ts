@@ -26,6 +26,7 @@
  * in the same quarter and the columns reconcile with the weekly figures. (W14
  * runs 30 Mar → 3 Apr; it counts to Q1, the quarter it starts in.)
  */
+import { ENFORCEMENT_COLUMNS } from "./inspectionDatabase";
 import {
   INSPECTION_BREAKDOWN,
   LICENCE_BREAKDOWN,
@@ -64,6 +65,19 @@ export function isInspectionVisit(t: InspectionType): boolean {
 }
 
 /**
+ * What output 1.2.11 counts: an inspection that led to an enforcement action.
+ *
+ * The Inspectorate's database records the action on the inspection it came out
+ * of (its ENFORCEMENT ACTION TAKEN column), so an enforcement is not a separate
+ * visit — that is why a routine inspection ending in a seizure counts here as
+ * well as under 1.2.4. Records logged as an "Enforcement Action" type before
+ * the column existed still count, so no history is lost.
+ */
+export function isEnforcement(i: Inspection): boolean {
+  return !!i.enforcement || i.type === "Enforcement Action";
+}
+
+/**
  * How an output's actual figure is obtained.
  *
  * - `licences`    counted off the dated licence register
@@ -75,13 +89,15 @@ export function isInspectionVisit(t: InspectionType): boolean {
  */
 export type OutputSource =
   | { kind: "licences"; match?: (t: LicenceType) => boolean }
-  | { kind: "inspections"; match: (t: InspectionType) => boolean }
+  | { kind: "inspections"; match: (i: Inspection) => boolean }
   | { kind: "manual"; key: string; alsoCount?: readonly string[] };
 
 /** Sub-counts shown when a row is expanded — the detail behind one figure. */
 export type BreakdownSpec =
   | { kind: "licenceTypes" }
   | { kind: "inspectionTypes"; match: (t: InspectionType) => boolean }
+  /** The nine actions of the Inspectorate's enforcement vocabulary. */
+  | { kind: "enforcementActions" }
   | { kind: "borders"; key: string };
 
 export interface WorkPlanOutput {
@@ -312,7 +328,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of inspections",
       target: 500,
       section: INSP,
-      source: { kind: "inspections", match: isInspectionVisit },
+      source: { kind: "inspections", match: (i) => isInspectionVisit(i.type) },
       breakdown: { kind: "inspectionTypes", match: isInspectionVisit },
       note: "Every inspection logged on the register — expand for the routine / follow-up / pre-authorisation / investigation split.",
     },
@@ -377,11 +393,9 @@ const SUB_1_2: Subprogramme = {
       indicator: "# of Enforcement actions",
       target: 50,
       section: INSP,
-      source: {
-        kind: "inspections",
-        match: (t) => t === "Enforcement Action",
-      },
-      note: "Logged on the inspection register as an Enforcement Action.",
+      source: { kind: "inspections", match: isEnforcement },
+      breakdown: { kind: "enforcementActions" },
+      note: "The enforcement action recorded against an inspection — expand for the engagement / suspension / seizure split, the same columns the inspection database summarises.",
     },
     {
       id: "1.2.S1",
@@ -950,6 +964,19 @@ function buildBreakdown(
     );
   }
 
+  if (spec.kind === "enforcementActions") {
+    const rows = ENFORCEMENT_COLUMNS.map((c) =>
+      count(c.label, input.inspections.filter((i) => i.enforcement === c.key)),
+    ).filter((r) => r.total > 0 || r.week > 0);
+    // Records logged as an "Enforcement Action" type before the action itself
+    // was recorded have no column to sit in, but they are still in the figure.
+    const untyped = input.inspections.filter(
+      (i) => i.type === "Enforcement Action" && !i.enforcement,
+    );
+    if (untyped.length) rows.push(count("Action not recorded", untyped));
+    return rows;
+  }
+
   {
     const byBorder = new Map<string, WorkPlanBreakdownRow>();
     for (const e of input.dailyEntries || []) {
@@ -990,7 +1017,7 @@ function deriveRow(
     );
   } else if (source.kind === "inspections") {
     tally = tallyRecords(
-      input.inspections.filter((i) => source.match(i.type)),
+      input.inspections.filter((i) => source.match(i)),
       quarterByWeek,
       input.week,
       year,

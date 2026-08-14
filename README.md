@@ -17,9 +17,10 @@ accounts for (225 use/possession, 73 import, 15 variation, 5 decommissioning,
 breakdowns, every count deep-linking into the filtered register, CSV export)
 · **Authorisations**
 (`/licences` — authorisation statistics built from the register) ·
-**Inspectorate** (`/inspectorate` — the section's own dashboard: inspections
-per type over a week/month/year, outcomes, enforcement actions, the forward
-inspection schedule, and the log/register) · **Nuclear Safety, Security &
+**Inspectorate** (`/inspectorate` — the section's inspection database, in the
+format of its own workbook: the province summary with its INSPECTIONS /
+ENGAGEMENTS / OTHER ENFORCEMENTS columns, a facility-per-row sheet per province
+round, inspection cards falling due, the forward schedule, and the log) · **Nuclear Safety, Security &
 Safeguards** (`/nsss` — the NSSS section's metrics dashboard: vehicle
 screening, IAEA meetings, engagements, TWG) · **Smart Status Update**
 (`/licence-status` — the self-updating RAIS workflow tracker) · Bulk Approval ·
@@ -200,7 +201,7 @@ automatically (Production for the production branch, Preview for others).
 |---|---|
 | `facilities/{id}` | Master register row — projection of all licences held by that facility, plus its register-import axes: `functional`, `category` (Medical/Non-Medical, veterinary counts as Medical), `stalled`, `needsReview`/`reviewNote`, `statusDetail` |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
-| `inspections/{id}` | The dated inspection log |
+| `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
@@ -343,11 +344,12 @@ and actioned, all on one tracked record.
    **assigns** a named inspector and target date (→ Assigned), and **starts** it
    (→ In Progress).
 3. **The inspection is completed** — the inspector records the outcome, the
-   **report reference** (a RAIS ref or a document link) and any findings. This
-   moves the request to **Report Ready**, and — the key integration — records a
-   dated `inspection` in the Inspectorate's log (linked by `inspectionId`/
-   `requestId`) so output 1.2.4 and the "inspections conducted" totals pick
-   it up automatically.
+   **report reference** (a RAIS ref or a document link), any findings, the
+   **enforcement action** it led to and whether an **inspection card** was
+   issued. This moves the request to **Report Ready**, and — the key integration
+   — records a dated `inspection` in the Inspectorate's log (linked by
+   `inspectionId`/`requestId`) so output 1.2.4, the "inspections conducted"
+   totals and the province sheet pick it up automatically.
 4. **Licensing is notified and actions it** — a green "reports ready" signal
    surfaces for A&S. The officer opens the request, follows the report reference,
    and **closes** it once the licensing step is actioned (→ Closed). Either side
@@ -367,6 +369,68 @@ admin-only. The Overview and the Inspectorate tab surface the resulting totals
 — the Inspectorate tab's **schedule** panel lists every active request by its
 target / needed-by date so the pipeline between the two sections stays
 trackable — and the facility drawer lists every request a facility has had.
+
+---
+
+## The inspection database — the Inspectorate's own workbook
+
+The Inspectorate keeps its year in one workbook: a sheet per province round, a
+consolidated Database sheet, and a Summary sheet that Management reads. That
+**is** the Inspectorate tab now (`/inspectorate`,
+`lib/rules/inspectionDatabase.ts`) — same columns, same wording, same two
+headline figures — except that nothing in it is typed twice. Every figure is
+derived from the dated inspection register, so logging one inspection moves the
+facility row, the province summary, the card list and the weekly report at once.
+
+**The Summary sheet.** One row per province round, with the workbook's three
+bands across the top:
+
+| | INSPECTIONS | | | | | ENGAGEMENTS | | | OTHER ENFORCEMENTS | | | | | | |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Province** | Pre-Auth | Planned | Follow-Up | Investigative | **Total** | Facility Level | District Level | Provincial Level | Practices Suspended | Devices Seized | Written Warnings | Enforcement Notices | License Suspensions | License Cancellations | **Total** |
+
+with a **Total** row and, underneath, *Total Inspections Conducted* and *Total
+Enforcements*. Tapping a province opens its sheet.
+
+**A province sheet.** One row per facility — `NO. · FACILITY NAME · DISTRICT ·
+PRACTICE · PRE-AUTH · PLANNED · FOLLOW-UP · INVESTIGATIVE · TOTAL · ENFORCEMENT
+ACTION TAKEN · DATE INSP CARD ISSUED · INSP CARD EXPIRY DATE · INSP CARD
+STATUS`. District and practice are read off the register, never retyped. A
+sheet is also the round's **coverage list**, so it can show the facilities still
+at zero (`Inspected · Not yet inspected · All`) — which is the question a
+half-finished round actually raises.
+
+**Inspection cards.** A card runs **30 days** from the day it is issued; its
+expiry and status are derived, never stored, on the workbook's own thresholds —
+*Expired* once today is past the expiry date, *Expiring Soon* inside the last
+fortnight, otherwise *Active*. The dashboard's **Cards due** panel is that
+column sorted by soonest expiry.
+
+**Phased rounds.** A province covered in more than one visit ("Copperbelt Phase
+2") gets its own summary row and its own sheet, exactly as the workbook gives
+it its own tab. The phase is one optional field on the inspection.
+
+**What an inspector types.** The logging form (and the one-question-at-a-time
+wizard on Daily Updates) asks only for what the columns need: the facility,
+date, type, outcome, the **enforcement action** if one was taken — from the
+workbook's nine-value list, "None" first — the phase if the province is being
+covered in phases, and whether an **inspection card** was issued. Everything
+else the system already knows.
+
+The enforcement vocabulary is stored with the workbook's own spelling
+("Suspension of License"), not the British spelling used for licences
+elsewhere in this codebase, so an exported database pastes straight back into
+the workbook's validated column.
+
+**Exports.** *Export summary* and *Export database* write the two sheets in the
+workbook's own layouts — the Summary with its banded head and footer figures,
+the Database with its thirteen columns.
+
+**On the weekly report.** The sectional update carries the same summary under
+the work plan (following the report's own Year-to-date / This-week switch), so
+the Monday pack reads exactly as it always has. Output **1.2.11** counts every
+inspection that led to an enforcement action — expand it for the nine-action
+split, the same columns the summary bands.
 
 ---
 
@@ -618,7 +682,7 @@ variants. Full mapping in [`docs/border-scan-log.md`](docs/border-scan-log.md).
 npm test
 ```
 
-296 tests across `lib/rules/*` and the seed baseline, including:
+349 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -630,6 +694,13 @@ npm test
   survive re-imports
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
+- `inspectionDatabase` — the Inspectorate workbook reproduced from the register:
+  the 30-day inspection card (expiry, Active / Expiring Soon / Expired, and that
+  the arithmetic does not move with the browser's timezone), the four
+  inspection-type columns and their row total, the enforcement action carried on
+  a row, phased province rounds getting their own sheet and summary row, sheet
+  numbering and province order, the coverage list of facilities still at zero,
+  the Summary roll-up and its two headline figures, and both CSV layouts
 - `daily` — daily-entry sums, the daily-over-weekly precedence rule, that
   daily metric keys match the sectional update's exactly, and the per-border
   screening sums + official-total text
@@ -641,7 +712,8 @@ npm test
 - `workPlan` — the 2026 work plan report: that the plan carries the workbook's
   outputs and targets, week → quarter mapping (including the week that straddles
   a quarter boundary), the auto-filled rows (1.1.4 licences, 1.2.4 inspections
-  excluding enforcement, 1.2.11 enforcement, 1.3.12 screening on the border log's
+  excluding enforcement, 1.2.11 every inspection that led to an enforcement
+  action — split by action — 1.3.12 screening on the border log's
   own metric key), figures logged under pre-work-plan metric names still counting,
   the **opening balance** the cumulative count starts from (the workbook's
   handover actuals, a saved baseline replacing them outright, % and status
@@ -667,7 +739,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
 │   ├── licences/           Authorisations tab — statistics from the register
-│   ├── inspectorate/       Inspectorate dashboard, schedule, log + register
+│   ├── inspectorate/       Inspection database — summary, province sheets, cards, log
 │   ├── inspections/        (moved) redirects to /inspectorate
 │   ├── nsss/               Nuclear Safety, Security & Safeguards dashboard
 │   ├── border/             Border Scan Log — one record per scanned truck
@@ -679,6 +751,9 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── admin/users/
 │   └── settings/
 ├── components/weekly/      OpeningBalancePanel — where the cumulative count starts
+├── components/inspectorate/ InspectionSummaryTable + InspectionDatabaseTable — the
+│                           workbook's Summary and province sheets, shared by the
+│                           Inspectorate dashboard and the weekly report
 ├── components/             UI primitives — Section (Panel/PageHeader/Field), Segmented,
 │                           Sidebar, Topbar, MobileNav, Drawer, Kpi, Bars, Gauge, Toast …
 ├── components/facility/    FacilityDetail — shared by the drawer and /facilities/[id]
@@ -773,6 +848,11 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
       the year** from its opening balance — with a filter for the week alone;
       typed figures, the opening balance and the Status / Comments / Action
       Points columns persist.
+- [x] The Inspectorate tab reproduces the section's inspection database — the
+      province Summary with its INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS
+      columns, a facility-per-row sheet per round, and the 30-day inspection
+      card's expiry and status — all derived from the dated register, exported
+      in the workbook's own layouts, and carried onto the weekly report.
 - [x] Security rules enforce that Inspectorate officers cannot flip licensed
       status, aggregates are not client-writable, and non-admins cannot
       manage users.
