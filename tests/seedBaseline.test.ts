@@ -70,6 +70,21 @@ describe("§16 — seeded baseline (2026 Licensing Status workbook)", () => {
     expect(agg.byStage["Licence Expiring (Renewal Due)"]).toBe(8);
   });
 
+  it("keys every facility by something that survives a re-import", () => {
+    // Ids are document ids in Firestore. A facility RAIS has not issued a RAN
+    // for used to be keyed by its ROW NUMBER, which moves whenever the register
+    // is re-imported and left the previous import's document behind as a
+    // duplicate — so those are keyed by name instead.
+    expect(new Set(mapped.map((f) => f.id)).size).toBe(mapped.length);
+    expect(mapped.filter((f) => /^fac-\d+$/.test(f.id) && !f.facCode)).toEqual([]);
+    for (const f of mapped) {
+      expect(f.id).toBe(
+        f.facCode ? f.facCode.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase() : f.id,
+      );
+      if (!f.facCode) expect(f.id.startsWith("seed-")).toBe(true);
+    }
+  });
+
   it("every licensed facility carries at least one licence", () => {
     const offenders = mapped.filter(
       (f) => f.licensed && (f.auths || []).length === 0,

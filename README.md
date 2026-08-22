@@ -111,6 +111,12 @@ to the seed.
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
    # verify the dashboard reads 538 / 220 / 318 / 401 functional
    ```
+   A re-import can supersede a facility document rather than update it (the
+   workbook dropped it, or RAIS has since issued it a RAN and its id changed).
+   `seed` lists those on every run; `npm run seed -- --prune` deletes them,
+   and only ever the ones carrying no `updatedBy` — a facility added or
+   edited in the app is reported and kept.
+
    **Replacing an existing register** (e.g. applying the 2026 Licensing
    Status workbook over a previously seeded project):
    ```bash

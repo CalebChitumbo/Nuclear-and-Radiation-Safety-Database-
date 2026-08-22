@@ -131,12 +131,30 @@ function buildAuths(ln: string, auth: string): Authorisation[] {
   }));
 }
 
+/**
+ * A seeded facility's document id.
+ *
+ * Its RAN where RAIS has issued one ("FAC/0250" → "fac-0250"). A facility
+ * without one is keyed by its NAME, not by its row number: the register is
+ * sorted licensed-first-then-alphabetical, so the row number moves whenever the
+ * register is re-imported, and an id derived from it would leave the previous
+ * import's document behind as a duplicate.
+ *
+ * The `seed-` prefix keeps these clear of both the RAN ids and the random ids
+ * `addFacility` mints for a facility typed into the app.
+ */
+export function seedFacilityId(s: Pick<SeedFacility, "fac" | "name">): string {
+  if (s.fac) return s.fac.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+  const slug = norm(s.name || "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `seed-${slug}`;
+}
+
 export function mapSeedFacility(s: SeedFacility): Facility {
   const licensed = s.lic === "Yes";
   const name = s.name || "";
-  const id = s.fac
-    ? s.fac.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()
-    : `fac-${s.n}`;
+  const id = seedFacilityId(s);
   const f: Facility = {
     id,
     no: s.n,
