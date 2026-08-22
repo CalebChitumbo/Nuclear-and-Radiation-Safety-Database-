@@ -51,6 +51,16 @@ export function dailyMetricOptions(section: Section): DailyMetricOption[] {
 export const NSSS_SECTION: Section = "Nuclear Safety, Security & Safeguards";
 export const VEHICLE_SCREENING_LABEL = "Vehicle Screening (units)";
 
+/**
+ * A border post's document id, derived from its name so that adding the same
+ * post twice upserts it rather than duplicating it. Both stores and the seed
+ * script derive it the same way — a post seeded from the daily summary
+ * workbook and one an officer types must be the same border.
+ */
+export function borderId(name: string): string {
+  return name.trim().replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+}
+
 /** The weekly-report metric key the border screening counts land on. */
 export function vehicleScreeningKey(): string {
   return metricKey(NSSS_SECTION, VEHICLE_SCREENING_LABEL);

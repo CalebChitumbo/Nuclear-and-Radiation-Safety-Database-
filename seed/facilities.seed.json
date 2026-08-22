@@ -304,12 +304,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register",
-  "detail": "RPA Board Licence Approval · 2026-05-04",
+  "review": "No RAN on the licensing status list row — showing the register's own FAC/0250",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q2 · In Operation",
   "lics": [
    {
     "t": "Renewal of Use/Possession Licence",
-    "q": "",
+    "q": "2026-Q2",
     "n": "AUTH/USE.REN/1072"
    }
   ]
@@ -359,6 +359,11 @@
   "lics": [
    {
     "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Importation Licence",
     "q": "2026-Q1",
     "n": ""
    },
@@ -510,7 +515,7 @@
   "cat": "Medical",
   "stalled": "",
   "review": "",
-  "detail": "2026 Licensing Status · Renewal · 4 licences · Q2 · In Operation",
+  "detail": "2026 Licensing Status · Renewal · 6 licences · Q2, Q3 · In Operation",
   "lics": [
    {
     "t": "Renewal of Use/Possession Licence",
@@ -519,17 +524,27 @@
    },
    {
     "t": "Renewal of Use/Possession Licence",
-    "q": "2026-Q2",
+    "q": "2026-Q3",
     "n": "AUTH/USE.REN/1039"
    },
    {
     "t": "Renewal of Use/Possession Licence",
-    "q": "2026-Q2",
+    "q": "2026-Q3",
     "n": ""
    },
    {
     "t": "Renewal of Use/Possession Licence",
-    "q": "2026-Q2",
+    "q": "2026-Q3",
+    "n": ""
+   },
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q3",
+    "n": ""
+   },
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q3",
     "n": ""
    }
   ]
@@ -1281,6 +1296,16 @@
     "t": "Variation of Terms and Conditions",
     "q": "2026-Q2",
     "n": ""
+   },
+   {
+    "t": "Variation of Terms and Conditions",
+    "q": "2026-Q2",
+    "n": ""
+   },
+   {
+    "t": "Variation of Terms and Conditions",
+    "q": "2026-Q2",
+    "n": ""
    }
   ]
  },
@@ -1501,6 +1526,31 @@
  },
  {
   "n": 56,
+  "name": "Express Diagnostic Services",
+  "dist": "Lusaka",
+  "prov": "Lusaka",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0302",
+  "ln": "AUTH/USE.REN/0806",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": "AUTH/USE.REN/0806"
+   }
+  ]
+ },
+ {
+  "n": 57,
   "name": "Family Medical Clinic Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1525,7 +1575,7 @@
   ]
  },
  {
-  "n": 57,
+  "n": 58,
   "name": "Forest Park Specialised Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1550,7 +1600,7 @@
   ]
  },
  {
-  "n": 58,
+  "n": 59,
   "name": "FQM Trident",
   "dist": "Kalumbila",
   "prov": "North-Western",
@@ -1575,7 +1625,7 @@
   ]
  },
  {
-  "n": 59,
+  "n": 60,
   "name": "Friends Care Medical Centre",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1605,7 +1655,7 @@
   ]
  },
  {
-  "n": 60,
+  "n": 61,
   "name": "Gesika Private Hospital",
   "dist": "Nakonde",
   "prov": "Muchinga",
@@ -1630,7 +1680,7 @@
   ]
  },
  {
-  "n": 61,
+  "n": 62,
   "name": "Goviex Uranium (Z) Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1655,7 +1705,7 @@
   ]
  },
  {
-  "n": 62,
+  "n": 63,
   "name": "Green Cross Laboratory",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1680,7 +1730,7 @@
   ]
  },
  {
-  "n": 63,
+  "n": 64,
   "name": "Grizzly Mining Limited",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -1705,7 +1755,7 @@
   ]
  },
  {
-  "n": 64,
+  "n": 65,
   "name": "Gwembe District Hospital",
   "dist": "Gwembe",
   "prov": "Southern",
@@ -1730,7 +1780,7 @@
   ]
  },
  {
-  "n": 65,
+  "n": 66,
   "name": "Healthlane Medical Centre",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -1755,7 +1805,7 @@
   ]
  },
  {
-  "n": 66,
+  "n": 67,
   "name": "Hilltop Hospital Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1780,7 +1830,7 @@
   ]
  },
  {
-  "n": 67,
+  "n": 68,
   "name": "Hitachi Construction Machinery Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1805,7 +1855,7 @@
   ]
  },
  {
-  "n": 68,
+  "n": 69,
   "name": "Hitech Diagnostics Zambia",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1830,7 +1880,7 @@
   ]
  },
  {
-  "n": 69,
+  "n": 70,
   "name": "International Hospital Of Zambia",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1855,7 +1905,7 @@
   ]
  },
  {
-  "n": 70,
+  "n": 71,
   "name": "International Organisation For Migration",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1880,7 +1930,7 @@
   ]
  },
  {
-  "n": 71,
+  "n": 72,
   "name": "Itezhi-Tezhi District Hospital",
   "dist": "Itezhi-Tezhi",
   "prov": "Southern",
@@ -1905,7 +1955,7 @@
   ]
  },
  {
-  "n": 72,
+  "n": 73,
   "name": "Juflona Clinic",
   "dist": "Kafue",
   "prov": "Lusaka",
@@ -1930,7 +1980,7 @@
   ]
  },
  {
-  "n": 73,
+  "n": 74,
   "name": "K.G.P Dental Surgery",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -1960,7 +2010,7 @@
   ]
  },
  {
-  "n": 74,
+  "n": 75,
   "name": "Kabwe Central Hospital",
   "dist": "Kabwe",
   "prov": "Central",
@@ -1985,7 +2035,7 @@
   ]
  },
  {
-  "n": 75,
+  "n": 76,
   "name": "Kabwe Women Newborn Children's Hospital",
   "dist": "Kabwe",
   "prov": "Central",
@@ -2010,7 +2060,7 @@
   ]
  },
  {
-  "n": 76,
+  "n": 77,
   "name": "Kafue Gorge Lower Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -2035,7 +2085,7 @@
   ]
  },
  {
-  "n": 77,
+  "n": 78,
   "name": "Kalabo District Hospital",
   "dist": "Kalabo",
   "prov": "Western",
@@ -2060,7 +2110,7 @@
   ]
  },
  {
-  "n": 78,
+  "n": 79,
   "name": "Kano Dental Clinic",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -2090,7 +2140,7 @@
   ]
  },
  {
-  "n": 79,
+  "n": 80,
   "name": "Kansanshi Mine Hospital",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -2105,12 +2155,22 @@
   "cat": "Medical",
   "stalled": "",
   "review": "",
-  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "detail": "2026 Licensing Status · Renewal · 3 licences · Q1 · In Operation",
   "lics": [
    {
     "t": "Renewal of Use/Possession Licence",
     "q": "2026-Q1",
     "n": "AUTH/USE.REN/0767"
+   },
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": ""
    },
    {
     "t": "Importation Licence",
@@ -2120,7 +2180,7 @@
   ]
  },
  {
-  "n": 80,
+  "n": 81,
   "name": "Kansanshi Mining Plc",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -2154,37 +2214,17 @@
    },
    {
     "t": "Importation Licence",
+    "q": "2026-Q3",
+    "n": ""
+   },
+   {
+    "t": "Importation Licence",
     "q": "2026-Q2",
     "n": ""
    },
    {
     "t": "Variation of Terms and Conditions",
     "q": "2026-Q3",
-    "n": ""
-   }
-  ]
- },
- {
-  "n": 81,
-  "name": "Kapiri Mposhi District Hospital",
-  "dist": "Kapiri Mposhi",
-  "prov": "Central",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Public",
-  "lic": "Yes",
-  "stage": "Licensed",
-  "auth": "Renewal",
-  "fac": "FAC/0047",
-  "ln": "",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "",
-  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
-  "lics": [
-   {
-    "t": "Renewal of Use/Possession Licence",
-    "q": "2026-Q1",
     "n": ""
    }
   ]
@@ -2254,7 +2294,7 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · New use · 1 licence · Q2 · first-time licensee · In Operation",
   "lics": [
    {
@@ -2856,6 +2896,31 @@
  },
  {
   "n": 108,
+  "name": "Medcross Hospital",
+  "dist": "Lusaka",
+  "prov": "Lusaka",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0072",
+  "ln": "",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "n": 109,
   "name": "Mediheal Diagnostic Centre",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -2880,7 +2945,7 @@
   ]
  },
  {
-  "n": 109,
+  "n": 110,
   "name": "Medland Health Services Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -2905,7 +2970,7 @@
   ]
  },
  {
-  "n": 110,
+  "n": 111,
   "name": "Mimbula Minerals Limited",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -2930,7 +2995,7 @@
   ]
  },
  {
-  "n": 111,
+  "n": 112,
   "name": "MM Integrated Steel Mills Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -2955,7 +3020,7 @@
   ]
  },
  {
-  "n": 112,
+  "n": 113,
   "name": "Mobrin Solutions Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -2980,7 +3045,7 @@
   ]
  },
  {
-  "n": 113,
+  "n": 114,
   "name": "Mongu District Hospital",
   "dist": "Mongu",
   "prov": "Western",
@@ -3005,7 +3070,7 @@
   ]
  },
  {
-  "n": 114,
+  "n": 115,
   "name": "Mopani Copper Mines - Nkana Plant",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -3036,11 +3101,21 @@
     "t": "Importation Licence",
     "q": "2026-Q2",
     "n": ""
+   },
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q2",
+    "n": ""
    }
   ]
  },
  {
-  "n": 115,
+  "n": 116,
   "name": "Mopani Copper Mines – Mufulira",
   "dist": "Mufulira",
   "prov": "Copperbelt",
@@ -3070,7 +3145,7 @@
   ]
  },
  {
-  "n": 116,
+  "n": 117,
   "name": "Mother of Mercy Hospice",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -3095,7 +3170,7 @@
   ]
  },
  {
-  "n": 117,
+  "n": 118,
   "name": "Mpande Limestone Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3120,7 +3195,7 @@
   ]
  },
  {
-  "n": 118,
+  "n": 119,
   "name": "Mtendere Mission Hospital",
   "dist": "Chirundu",
   "prov": "Southern",
@@ -3145,7 +3220,7 @@
   ]
  },
  {
-  "n": 119,
+  "n": 120,
   "name": "Mukuni Medical Centre",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -3170,7 +3245,7 @@
   ]
  },
  {
-  "n": 120,
+  "n": 121,
   "name": "Mulobezi District Hospital",
   "dist": "Mulobezi",
   "prov": "Western",
@@ -3195,7 +3270,7 @@
   ]
  },
  {
-  "n": 121,
+  "n": 122,
   "name": "Multicare Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3220,7 +3295,7 @@
   ]
  },
  {
-  "n": 122,
+  "n": 123,
   "name": "Mum's Care Clinic Bwinjimfumu",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3250,7 +3325,7 @@
   ]
  },
  {
-  "n": 123,
+  "n": 124,
   "name": "Mumbwa District Hospital",
   "dist": "Mumbwa",
   "prov": "Central",
@@ -3275,7 +3350,7 @@
   ]
  },
  {
-  "n": 124,
+  "n": 125,
   "name": "Munyumbwe First Level Hospital",
   "dist": "Gwembe",
   "prov": "Southern",
@@ -3300,7 +3375,7 @@
   ]
  },
  {
-  "n": 125,
+  "n": 126,
   "name": "Muzeyi Rural Health Centre",
   "dist": "Chipangali",
   "prov": "Eastern",
@@ -3330,7 +3405,7 @@
   ]
  },
  {
-  "n": 126,
+  "n": 127,
   "name": "Nac 2000 Corporation Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3355,7 +3430,7 @@
   ]
  },
  {
-  "n": 127,
+  "n": 128,
   "name": "Nakonde District Hospital",
   "dist": "Nakonde",
   "prov": "Muchinga",
@@ -3380,7 +3455,7 @@
   ]
  },
  {
-  "n": 128,
+  "n": 129,
   "name": "Nangoma Mission Hospital",
   "dist": "Mumbwa",
   "prov": "Central",
@@ -3405,7 +3480,7 @@
   ]
  },
  {
-  "n": 129,
+  "n": 130,
   "name": "National Breweries Plc",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3430,7 +3505,7 @@
   ]
  },
  {
-  "n": 130,
+  "n": 131,
   "name": "Nchanga South Hospital",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -3455,7 +3530,7 @@
   ]
  },
  {
-  "n": 131,
+  "n": 132,
   "name": "Ndola Diagnostic and Imaging Centre",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -3480,7 +3555,7 @@
   ]
  },
  {
-  "n": 132,
+  "n": 133,
   "name": "Ndola Teaching Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -3505,7 +3580,7 @@
   ]
  },
  {
-  "n": 133,
+  "n": 134,
   "name": "NFCA Mining Plc",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -3540,7 +3615,7 @@
   ]
  },
  {
-  "n": 134,
+  "n": 135,
   "name": "North Way Dental Clinic",
   "dist": "Mpika",
   "prov": "Muchinga",
@@ -3570,7 +3645,7 @@
   ]
  },
  {
-  "n": 135,
+  "n": 136,
   "name": "Nvumbaranda Health Care Limited",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -3600,7 +3675,7 @@
   ]
  },
  {
-  "n": 136,
+  "n": 137,
   "name": "Occupational Health and Safety Institute (Solwezi)",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -3625,7 +3700,7 @@
   ]
  },
  {
-  "n": 137,
+  "n": 138,
   "name": "Occupational Health and Safety Institute Kitwe",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -3655,7 +3730,7 @@
   ]
  },
  {
-  "n": 138,
+  "n": 139,
   "name": "Occupational Health and Safety Institute Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3680,7 +3755,7 @@
   ]
  },
  {
-  "n": 139,
+  "n": 140,
   "name": "Our Ladys Hospice",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3705,7 +3780,32 @@
   ]
  },
  {
-  "n": 140,
+  "n": 141,
+  "name": "Parrogate Ginneries Limited",
+  "dist": "Lusaka",
+  "prov": "Lusaka",
+  "prac": "Mobile Nuclear Gauges",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0261",
+  "ln": "",
+  "func": "Yes",
+  "cat": "Non-Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q3 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q3",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "n": 142,
   "name": "Pearl of Health Avondale",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3730,7 +3830,7 @@
   ]
  },
  {
-  "n": 141,
+  "n": 143,
   "name": "Pearl of Health Hospital Bwinjimfumu",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3755,7 +3855,7 @@
   ]
  },
  {
-  "n": 142,
+  "n": 144,
   "name": "Pearliwhyte Dental Solutions",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3780,7 +3880,7 @@
   ]
  },
  {
-  "n": 143,
+  "n": 145,
   "name": "Phoenix Health Investment (PHI)",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3805,7 +3905,7 @@
   ]
  },
  {
-  "n": 144,
+  "n": 146,
   "name": "Premium Medical Services",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3830,7 +3930,7 @@
   ]
  },
  {
-  "n": 145,
+  "n": 147,
   "name": "Progress Medical Center - Town Branch",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -3860,7 +3960,7 @@
   ]
  },
  {
-  "n": 146,
+  "n": 148,
   "name": "Progress Medical Centre",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -3885,7 +3985,7 @@
   ]
  },
  {
-  "n": 147,
+  "n": 149,
   "name": "Progress Medical Centre Solwezi",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -3910,7 +4010,7 @@
   ]
  },
  {
-  "n": 148,
+  "n": 150,
   "name": "Reliance Dental Services Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3935,7 +4035,7 @@
   ]
  },
  {
-  "n": 149,
+  "n": 151,
   "name": "Rio Tinto Exploration Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -3968,6 +4068,16 @@
     "n": ""
    },
    {
+    "t": "Importation Licence",
+    "q": "2026-Q2",
+    "n": ""
+   },
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q2",
+    "n": ""
+   },
+   {
     "t": "Export Licence",
     "q": "2026-Q1",
     "n": ""
@@ -3975,7 +4085,7 @@
   ]
  },
  {
-  "n": 150,
+  "n": 152,
   "name": "Roan Antelope General Hospital",
   "dist": "Luanshya",
   "prov": "Copperbelt",
@@ -4000,7 +4110,7 @@
   ]
  },
  {
-  "n": 151,
+  "n": 153,
   "name": "Ronald Ross General Hospital",
   "dist": "Mufulira",
   "prov": "Copperbelt",
@@ -4025,7 +4135,7 @@
   ]
  },
  {
-  "n": 152,
+  "n": 154,
   "name": "Roots Dental Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4050,7 +4160,7 @@
   ]
  },
  {
-  "n": 153,
+  "n": 155,
   "name": "Royal Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4075,7 +4185,7 @@
   ]
  },
  {
-  "n": 154,
+  "n": 156,
   "name": "Royal Palms Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4100,7 +4210,7 @@
   ]
  },
  {
-  "n": 155,
+  "n": 157,
   "name": "Ruth Kaluluma Memorial Hospital",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -4123,6 +4233,11 @@
     "n": "AUTH/USE.REN/0929"
    },
    {
+    "t": "Importation Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
     "t": "Variation of Terms and Conditions",
     "q": "2026-Q2",
     "n": ""
@@ -4135,7 +4250,7 @@
   ]
  },
  {
-  "n": 156,
+  "n": 158,
   "name": "Sable Zinc Kabwe",
   "dist": "Kabwe",
   "prov": "Central",
@@ -4160,7 +4275,7 @@
   ]
  },
  {
-  "n": 157,
+  "n": 159,
   "name": "Sanjeevani Health Care",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4185,7 +4300,7 @@
   ]
  },
  {
-  "n": 158,
+  "n": 160,
   "name": "Sanket Diagnostics Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4210,7 +4325,7 @@
   ]
  },
  {
-  "n": 159,
+  "n": 161,
   "name": "Sanket Sunsol Imaging Services Limited",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -4240,7 +4355,7 @@
   ]
  },
  {
-  "n": 160,
+  "n": 162,
   "name": "Sarovar Hotel",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4265,7 +4380,7 @@
   ]
  },
  {
-  "n": 161,
+  "n": 163,
   "name": "Senga District Hospital",
   "dist": "Senga Hill",
   "prov": "Northern",
@@ -4290,7 +4405,7 @@
   ]
  },
  {
-  "n": 162,
+  "n": 164,
   "name": "Showgrounds Veterinary",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4315,7 +4430,7 @@
   ]
  },
  {
-  "n": 163,
+  "n": 165,
   "name": "Sinozam Friendship Hospital",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -4340,7 +4455,7 @@
   ]
  },
  {
-  "n": 164,
+  "n": 166,
   "name": "Smile Dental Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4365,7 +4480,7 @@
   ]
  },
  {
-  "n": 165,
+  "n": 167,
   "name": "Solwezi General Hospital",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -4390,7 +4505,7 @@
   ]
  },
  {
-  "n": 166,
+  "n": 168,
   "name": "South Point Clinic - Avondale",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4415,7 +4530,7 @@
   ]
  },
  {
-  "n": 167,
+  "n": 169,
   "name": "South Point Clinic - Great East",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4440,7 +4555,7 @@
   ]
  },
  {
-  "n": 168,
+  "n": 170,
   "name": "South Point Clinic - Woodlands",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4465,7 +4580,7 @@
   ]
  },
  {
-  "n": 169,
+  "n": 171,
   "name": "St Luke'S Mission Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4479,7 +4594,7 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "review": "No practice recorded — category assumed Medical, confirm · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
   "detail": "2026 Licensing Status · Renewal · 1 licence · Q2 · In Operation",
   "lics": [
    {
@@ -4490,7 +4605,7 @@
   ]
  },
  {
-  "n": 170,
+  "n": 172,
   "name": "St. Dominic's Mission Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -4515,7 +4630,57 @@
   ]
  },
  {
-  "n": 171,
+  "n": 173,
+  "name": "St. Johns Medical Centre Ltd Lusaka",
+  "dist": "Lusaka",
+  "prov": "Lusaka",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0240",
+  "ln": "AUTH/USE.REN/0672",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": "AUTH/USE.REN/0672"
+   }
+  ]
+ },
+ {
+  "n": 174,
+  "name": "St. Johns Medical Centre Solwezi",
+  "dist": "Solwezi",
+  "prov": "North-Western",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0332",
+  "ln": "AUTH/USE.REN/0673",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": "AUTH/USE.REN/0673"
+   }
+  ]
+ },
+ {
+  "n": 175,
   "name": "St. Luke's Mission Hospital",
   "dist": "Rufunsa",
   "prov": "Lusaka",
@@ -4540,7 +4705,7 @@
   ]
  },
  {
-  "n": 172,
+  "n": 176,
   "name": "Tandem Construction Mining Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4565,7 +4730,7 @@
   ]
  },
  {
-  "n": 173,
+  "n": 177,
   "name": "Teba Care Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4590,7 +4755,7 @@
   ]
  },
  {
-  "n": 174,
+  "n": 178,
   "name": "Thomson District Hospital",
   "dist": "Luanshya",
   "prov": "Copperbelt",
@@ -4615,7 +4780,62 @@
   ]
  },
  {
-  "n": 175,
+  "n": 179,
+  "name": "Tinna Medical Centre",
+  "dist": "Kitwe",
+  "prov": "Copperbelt",
+  "prac": "",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "New",
+  "fac": "FAC/0627",
+  "ln": "",
+  "func": "No",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "No practice recorded — category assumed Medical, confirm",
+  "detail": "2026 Licensing Status · New use · 1 licence · Q3 · Not yet Operational",
+  "lics": [
+   {
+    "t": "New Use/Possession Licence",
+    "q": "2026-Q3",
+    "n": ""
+   },
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q1",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "n": 180,
+  "name": "TMS Medical Services",
+  "dist": "Lusaka",
+  "prov": "Lusaka",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0357",
+  "ln": "AUTH/USE.REN/0648",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": "AUTH/USE.REN/0648"
+   }
+  ]
+ },
+ {
+  "n": 181,
   "name": "Trans Subsahara Diagnostics Logistics Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4645,7 +4865,7 @@
   ]
  },
  {
-  "n": 176,
+  "n": 182,
   "name": "Trident Town Clinic",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -4680,7 +4900,7 @@
   ]
  },
  {
-  "n": 177,
+  "n": 183,
   "name": "Trust Medical Services Hospital Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4694,7 +4914,7 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
   "lics": [
    {
@@ -4705,7 +4925,7 @@
   ]
  },
  {
-  "n": 178,
+  "n": 184,
   "name": "Ultra-Dental Centre",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -4730,7 +4950,7 @@
   ]
  },
  {
-  "n": 179,
+  "n": 185,
   "name": "Ultraspec Diagnostic Limited",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -4765,7 +4985,7 @@
   ]
  },
  {
-  "n": 180,
+  "n": 186,
   "name": "Unik Construction",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4790,7 +5010,7 @@
   ]
  },
  {
-  "n": 181,
+  "n": 187,
   "name": "Unilabs – Chipata",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -4815,7 +5035,7 @@
   ]
  },
  {
-  "n": 182,
+  "n": 188,
   "name": "Unilabs – Ndola",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -4840,7 +5060,32 @@
   ]
  },
  {
-  "n": 183,
+  "n": 189,
+  "name": "UNILABS – Solwezi",
+  "dist": "Solwezi",
+  "prov": "North-Western",
+  "prac": "Diagnostic Imaging",
+  "sec": "Private",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0549",
+  "ln": "AUTH/USE.REN/0817",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q1 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q1",
+    "n": "AUTH/USE.REN/0817"
+   }
+  ]
+ },
+ {
+  "n": 190,
   "name": "Unilabs-Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4865,7 +5110,7 @@
   ]
  },
  {
-  "n": 184,
+  "n": 191,
   "name": "Unilus Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4895,7 +5140,7 @@
   ]
  },
  {
-  "n": 185,
+  "n": 192,
   "name": "Universal Mining and Chemical Industries Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4920,7 +5165,7 @@
   ]
  },
  {
-  "n": 186,
+  "n": 193,
   "name": "University Teaching Hospital - Nuclear Medicine",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4950,7 +5195,7 @@
   ]
  },
  {
-  "n": 187,
+  "n": 194,
   "name": "Unza Veterinary",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -4975,7 +5220,7 @@
   ]
  },
  {
-  "n": 188,
+  "n": 195,
   "name": "Victoria Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5000,7 +5245,7 @@
   ]
  },
  {
-  "n": 189,
+  "n": 196,
   "name": "Victoria Hospital - Mazabuka",
   "dist": "Mazabuka",
   "prov": "Southern",
@@ -5025,7 +5270,7 @@
   ]
  },
  {
-  "n": 190,
+  "n": 197,
   "name": "Victoria Hospital Chilanga",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -5050,7 +5295,7 @@
   ]
  },
  {
-  "n": 191,
+  "n": 198,
   "name": "Viva Med Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5075,7 +5320,7 @@
   ]
  },
  {
-  "n": 192,
+  "n": 199,
   "name": "Wellspring Speciality Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5105,7 +5350,7 @@
   ]
  },
  {
-  "n": 193,
+  "n": 200,
   "name": "Wireline Workshop Pty Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5130,7 +5375,7 @@
   ]
  },
  {
-  "n": 194,
+  "n": 201,
   "name": "Wusakile Mine Hospital",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -5151,11 +5396,16 @@
     "t": "Renewal of Use/Possession Licence",
     "q": "2026-Q1",
     "n": "AUTH/USE.REN/0590"
+   },
+   {
+    "t": "Variation of Terms and Conditions",
+    "q": "2026-Q1",
+    "n": ""
    }
   ]
  },
  {
-  "n": 195,
+  "n": 202,
   "name": "Zambart",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5190,7 +5440,32 @@
   ]
  },
  {
-  "n": 196,
+  "n": 203,
+  "name": "Zambia Flying Doctor Services",
+  "dist": "Ndola",
+  "prov": "Copperbelt",
+  "prac": "",
+  "sec": "Public",
+  "lic": "Yes",
+  "stage": "Licensed",
+  "auth": "Renewal",
+  "fac": "FAC/0451",
+  "ln": "",
+  "func": "Yes",
+  "cat": "Non-Medical",
+  "stalled": "",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
+  "detail": "2026 Licensing Status · Renewal · 1 licence · Q3 · In Operation",
+  "lics": [
+   {
+    "t": "Renewal of Use/Possession Licence",
+    "q": "2026-Q3",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "n": 204,
   "name": "Zambian Breweries Plc Ndola",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -5215,7 +5490,7 @@
   ]
  },
  {
-  "n": 197,
+  "n": 205,
   "name": "Zambian Italian Orthopaedic Hospital Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5240,7 +5515,7 @@
   ]
  },
  {
-  "n": 198,
+  "n": 206,
   "name": "ZCCM Investment Holdings Plc",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -5270,7 +5545,7 @@
   ]
  },
  {
-  "n": 199,
+  "n": 207,
   "name": "Zega Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5295,7 +5570,7 @@
   ]
  },
  {
-  "n": 200,
+  "n": 208,
   "name": "ZRA Chanida",
   "dist": "Chadiza",
   "prov": "Eastern",
@@ -5320,7 +5595,7 @@
   ]
  },
  {
-  "n": 201,
+  "n": 209,
   "name": "ZRA Chingola",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -5345,7 +5620,7 @@
   ]
  },
  {
-  "n": 202,
+  "n": 210,
   "name": "ZRA Chirundu",
   "dist": "Chirundu",
   "prov": "Lusaka",
@@ -5375,7 +5650,7 @@
   ]
  },
  {
-  "n": 203,
+  "n": 211,
   "name": "ZRA Kapiri Mposhi Cargo Scanner",
   "dist": "Kapiri Mposhi",
   "prov": "Central",
@@ -5405,7 +5680,7 @@
   ]
  },
  {
-  "n": 204,
+  "n": 212,
   "name": "ZRA Kasumbalesa",
   "dist": "Chililabombwe",
   "prov": "Copperbelt",
@@ -5435,7 +5710,7 @@
   ]
  },
  {
-  "n": 205,
+  "n": 213,
   "name": "ZRA Katima Mulilo",
   "dist": "Sesheke",
   "prov": "Western",
@@ -5465,7 +5740,7 @@
   ]
  },
  {
-  "n": 206,
+  "n": 214,
   "name": "ZRA Kazungula",
   "dist": "Kazungula",
   "prov": "Southern",
@@ -5500,7 +5775,7 @@
   ]
  },
  {
-  "n": 207,
+  "n": 215,
   "name": "ZRA Kitwe",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -5525,7 +5800,7 @@
   ]
  },
  {
-  "n": 208,
+  "n": 216,
   "name": "ZRA Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5550,7 +5825,7 @@
   ]
  },
  {
-  "n": 209,
+  "n": 217,
   "name": "ZRA Mwami",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -5575,7 +5850,7 @@
   ]
  },
  {
-  "n": 210,
+  "n": 218,
   "name": "ZRA Nakonde",
   "dist": "Nakonde",
   "prov": "Muchinga",
@@ -5610,7 +5885,7 @@
   ]
  },
  {
-  "n": 211,
+  "n": 219,
   "name": "ZRA Ndola",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -5635,7 +5910,7 @@
   ]
  },
  {
-  "n": 212,
+  "n": 220,
   "name": "ZRA Solwezi",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -5660,7 +5935,7 @@
   ]
  },
  {
-  "n": 213,
+  "n": 221,
   "name": "64 Armoured Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5674,12 +5949,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 214,
+  "n": 222,
   "name": "African Mechanical Superlift Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -5693,12 +5968,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 215,
+  "n": 223,
   "name": "African Power Coal Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5712,12 +5987,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Non operational",
   "lics": []
  },
  {
-  "n": 216,
+  "n": 224,
   "name": "Africorp Healthcare Systems Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5731,12 +6006,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Operational",
   "lics": []
  },
  {
-  "n": 217,
+  "n": 225,
   "name": "Alistair Logistics Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5766,7 +6041,7 @@
   ]
  },
  {
-  "n": 218,
+  "n": 226,
   "name": "All Africa Tranport",
   "dist": "",
   "prov": "Lusaka",
@@ -5780,12 +6055,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 219,
+  "n": 227,
   "name": "Arthur Davison Children's Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -5804,7 +6079,7 @@
   "lics": []
  },
  {
-  "n": 220,
+  "n": 228,
   "name": "Asthetic Dental Edge",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5818,12 +6093,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 221,
+  "n": 229,
   "name": "Australian Laboratory Group (Z) Ltd",
   "dist": "",
   "prov": "Lusaka",
@@ -5837,12 +6112,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 222,
+  "n": 230,
   "name": "Bank of Zambia Ndola",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -5861,7 +6136,7 @@
   "lics": []
  },
  {
-  "n": 223,
+  "n": 231,
   "name": "Batoka Hospital",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -5880,7 +6155,7 @@
   "lics": []
  },
  {
-  "n": 224,
+  "n": 232,
   "name": "Bauleni Urban Health Center",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5899,7 +6174,7 @@
   "lics": []
  },
  {
-  "n": 225,
+  "n": 233,
   "name": "Bibagry Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -5913,12 +6188,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 226,
+  "n": 234,
   "name": "Build Trust Construction Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5937,7 +6212,7 @@
   "lics": []
  },
  {
-  "n": 227,
+  "n": 235,
   "name": "Buildcon Investments Limited",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -5956,7 +6231,7 @@
   "lics": []
  },
  {
-  "n": 228,
+  "n": 236,
   "name": "Care for You Medical Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -5975,7 +6250,7 @@
   "lics": []
  },
  {
-  "n": 229,
+  "n": 237,
   "name": "Cecil Chams Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -5989,12 +6264,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 230,
+  "n": 238,
   "name": "Chadiza District Hospital",
   "dist": "Chadiza",
   "prov": "Eastern",
@@ -6013,7 +6288,7 @@
   "lics": []
  },
  {
-  "n": 231,
+  "n": 239,
   "name": "Chainama Hills College Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6027,7 +6302,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": [
    {
@@ -6038,7 +6313,7 @@
   ]
  },
  {
-  "n": 232,
+  "n": 240,
   "name": "Chama District Hospital",
   "dist": "Chama",
   "prov": "Muchinga",
@@ -6057,7 +6332,7 @@
   "lics": []
  },
  {
-  "n": 233,
+  "n": 241,
   "name": "Chavuma District Hospital",
   "dist": "Chavuma",
   "prov": "North-Western",
@@ -6076,7 +6351,7 @@
   "lics": []
  },
  {
-  "n": 234,
+  "n": 242,
   "name": "Chavuma Mission Hospital",
   "dist": "Chavuma",
   "prov": "North-Western",
@@ -6095,7 +6370,7 @@
   "lics": []
  },
  {
-  "n": 235,
+  "n": 243,
   "name": "Chawama General Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6114,7 +6389,7 @@
   "lics": []
  },
  {
-  "n": 236,
+  "n": 244,
   "name": "Chelston Health Center",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6128,12 +6403,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 237,
+  "n": 245,
   "name": "Chetak Zambia Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6152,7 +6427,7 @@
   "lics": []
  },
  {
-  "n": 238,
+  "n": 246,
   "name": "Chibombo District Health Office",
   "dist": "Chibombo",
   "prov": "Central",
@@ -6177,7 +6452,7 @@
   ]
  },
  {
-  "n": 239,
+  "n": 247,
   "name": "Chibuluma Mines Plc",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -6191,12 +6466,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 240,
+  "n": 248,
   "name": "Chiengi District Hospital",
   "dist": "Chienge",
   "prov": "Luapula",
@@ -6215,7 +6490,7 @@
   "lics": []
  },
  {
-  "n": 241,
+  "n": 249,
   "name": "Chifubu District Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -6234,7 +6509,7 @@
   "lics": []
  },
  {
-  "n": 242,
+  "n": 250,
   "name": "Chikuni Mission Hospital",
   "dist": "Monze",
   "prov": "Southern",
@@ -6253,7 +6528,7 @@
   "lics": []
  },
  {
-  "n": 243,
+  "n": 251,
   "name": "Chilenje First Level Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6272,7 +6547,7 @@
   "lics": []
  },
  {
-  "n": 244,
+  "n": 252,
   "name": "Chililabombwe District Hospital",
   "dist": "Chililabombwe",
   "prov": "Copperbelt",
@@ -6291,7 +6566,7 @@
   "lics": []
  },
  {
-  "n": 245,
+  "n": 253,
   "name": "Chilubi Island District Hospital",
   "dist": "Chilubi",
   "prov": "Northern",
@@ -6310,7 +6585,7 @@
   "lics": []
  },
  {
-  "n": 246,
+  "n": 254,
   "name": "Chimanga Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6324,12 +6599,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 247,
+  "n": 255,
   "name": "Chimwemwe Level 1 Hospital",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -6348,7 +6623,7 @@
   "lics": []
  },
  {
-  "n": 248,
+  "n": 256,
   "name": "China Habour Engineering Company Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6367,7 +6642,7 @@
   "lics": []
  },
  {
-  "n": 249,
+  "n": 257,
   "name": "China Jiangxi Corporation for International Economic Tech",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6386,7 +6661,7 @@
   "lics": []
  },
  {
-  "n": 250,
+  "n": 258,
   "name": "China Railway Seventh Group (Z) Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6405,7 +6680,7 @@
   "lics": []
  },
  {
-  "n": 251,
+  "n": 259,
   "name": "China State Construction Engineering Corporation Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6424,7 +6699,7 @@
   "lics": []
  },
  {
-  "n": 252,
+  "n": 260,
   "name": "Chindwin Garrison Camp Hospital",
   "dist": "",
   "prov": "Lusaka",
@@ -6438,7 +6713,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": [
    {
@@ -6449,7 +6724,7 @@
   ]
  },
  {
-  "n": 253,
+  "n": 261,
   "name": "Chinsali District Hospital",
   "dist": "Chinsali",
   "prov": "Muchinga",
@@ -6468,7 +6743,7 @@
   "lics": []
  },
  {
-  "n": 254,
+  "n": 262,
   "name": "Chinsali General Hospital",
   "dist": "Chinsali",
   "prov": "Muchinga",
@@ -6487,7 +6762,7 @@
   "lics": []
  },
  {
-  "n": 255,
+  "n": 263,
   "name": "Chipata Airport",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -6506,7 +6781,7 @@
   "lics": []
  },
  {
-  "n": 256,
+  "n": 264,
   "name": "Chipata Central Hospital",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -6525,7 +6800,7 @@
   "lics": []
  },
  {
-  "n": 257,
+  "n": 265,
   "name": "Chisamba District Health Office",
   "dist": "Chisamba",
   "prov": "Central",
@@ -6544,7 +6819,7 @@
   "lics": []
  },
  {
-  "n": 258,
+  "n": 266,
   "name": "Chitambo Mission Hospital",
   "dist": "Chitambo",
   "prov": "Central",
@@ -6563,7 +6838,7 @@
   "lics": []
  },
  {
-  "n": 259,
+  "n": 267,
   "name": "Chivuna Mission Rural Health Center",
   "dist": "Mazabuka",
   "prov": "Southern",
@@ -6577,12 +6852,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 260,
+  "n": 268,
   "name": "Choma General Hospital",
   "dist": "Choma",
   "prov": "Southern",
@@ -6607,7 +6882,7 @@
   ]
  },
  {
-  "n": 261,
+  "n": 269,
   "name": "Chongwe District Hospital",
   "dist": "Chongwe",
   "prov": "Lusaka",
@@ -6626,7 +6901,7 @@
   "lics": []
  },
  {
-  "n": 262,
+  "n": 270,
   "name": "Chuya Mwenechanya Family Care",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6645,7 +6920,7 @@
   "lics": []
  },
  {
-  "n": 263,
+  "n": 271,
   "name": "CIDRZ Kanyama, Chawama",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6659,12 +6934,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 264,
+  "n": 272,
   "name": "CJ Nyirenda Training School",
   "dist": "",
   "prov": "Lusaka",
@@ -6678,7 +6953,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": [
    {
@@ -6689,7 +6964,7 @@
   ]
  },
  {
-  "n": 265,
+  "n": 273,
   "name": "Const Lab Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6703,12 +6978,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 266,
+  "n": 274,
   "name": "Control Lab Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6727,7 +7002,7 @@
   "lics": []
  },
  {
-  "n": 267,
+  "n": 275,
   "name": "Copperbelt University (CBU)",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -6746,7 +7021,7 @@
   "lics": []
  },
  {
-  "n": 268,
+  "n": 276,
   "name": "Corpmed Medical Centre",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6760,12 +7035,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 269,
+  "n": 277,
   "name": "Defence School of Health Sciences",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6779,12 +7054,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 270,
+  "n": 278,
   "name": "Drug Enforcement Commission - Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6798,12 +7073,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 271,
+  "n": 279,
   "name": "Drug Enforcement Commission - Ndola",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6822,7 +7097,7 @@
   "lics": []
  },
  {
-  "n": 272,
+  "n": 280,
   "name": "Drug Enforcement Commission Livingstone Airport",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -6836,12 +7111,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 273,
+  "n": 281,
   "name": "Eastwest Investment Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -6855,12 +7130,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 274,
+  "n": 282,
   "name": "El-Roi Medical Centre",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -6879,7 +7154,7 @@
   "lics": []
  },
  {
-  "n": 275,
+  "n": 283,
   "name": "Emerged Railways Properties (Pvt) Limited (ERP)",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6893,7 +7168,7 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": [
    {
@@ -6904,7 +7179,7 @@
   ]
  },
  {
-  "n": 276,
+  "n": 284,
   "name": "Emmaron Investments Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -6918,12 +7193,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 277,
+  "n": 285,
   "name": "Evelyn Hone College",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6942,7 +7217,7 @@
   "lics": []
  },
  {
-  "n": 278,
+  "n": 286,
   "name": "Exclusive Dental Care",
   "dist": "Kafue",
   "prov": "Lusaka",
@@ -6956,31 +7231,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 279,
-  "name": "Express Diagnostic Services",
-  "dist": "Lusaka",
-  "prov": "Lusaka",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0302",
-  "ln": "AUTH/USE.REN/0806",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 280,
+  "n": 287,
   "name": "Golden Mark Resources",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -6994,7 +7250,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": [
    {
@@ -7005,7 +7261,7 @@
   ]
  },
  {
-  "n": 281,
+  "n": 288,
   "name": "Government Communication Division",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7019,12 +7275,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 282,
+  "n": 289,
   "name": "Hanhe Industry Zambia Limited",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -7043,7 +7299,7 @@
   "lics": []
  },
  {
-  "n": 283,
+  "n": 290,
   "name": "Harry Mwaanga Nkumbula International Airport",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -7062,7 +7318,7 @@
   "lics": []
  },
  {
-  "n": 284,
+  "n": 291,
   "name": "Healing Touch Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7081,7 +7337,7 @@
   "lics": []
  },
  {
-  "n": 285,
+  "n": 292,
   "name": "Hermes Radiology Center",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -7100,7 +7356,7 @@
   "lics": []
  },
  {
-  "n": 286,
+  "n": 293,
   "name": "Hightech Diagnostic Centre",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -7114,7 +7370,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": [
    {
@@ -7130,7 +7386,7 @@
   ]
  },
  {
-  "n": 287,
+  "n": 294,
   "name": "Hilltop Hospital - Kasama",
   "dist": "Kasama",
   "prov": "Northern",
@@ -7149,7 +7405,7 @@
   "lics": []
  },
  {
-  "n": 288,
+  "n": 295,
   "name": "Hilltop Hospital Solwezi",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -7168,7 +7424,7 @@
   "lics": []
  },
  {
-  "n": 289,
+  "n": 296,
   "name": "Hillview Medical Center",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7182,12 +7438,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 290,
+  "n": 297,
   "name": "Ikelenge Rural Health Centre",
   "dist": "Ikelenge",
   "prov": "North-Western",
@@ -7206,7 +7462,7 @@
   "lics": []
  },
  {
-  "n": 291,
+  "n": 298,
   "name": "Information and Communication University",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7220,12 +7476,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 292,
+  "n": 299,
   "name": "Innoray Medical Equipment Company",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7241,10 +7497,36 @@
   "stalled": "",
   "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
+  "lics": [
+   {
+    "t": "Transfer Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Transfer Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Transfer Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Transfer Licence",
+    "q": "2026-Q1",
+    "n": ""
+   },
+   {
+    "t": "Transfer Licence",
+    "q": "2026-Q1",
+    "n": ""
+   }
+  ]
  },
  {
-  "n": 293,
+  "n": 300,
   "name": "Inyatsi Roads Zambia Limmited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7258,12 +7540,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 294,
+  "n": 301,
   "name": "Isoka District Hospital",
   "dist": "Isoka",
   "prov": "Muchinga",
@@ -7282,7 +7564,7 @@
   "lics": []
  },
  {
-  "n": 295,
+  "n": 302,
   "name": "Ivory Dental Clinic",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -7293,15 +7575,15 @@
   "auth": "",
   "fac": "FAC/0135",
   "ln": "",
-  "func": "Yes",
+  "func": "No",
   "cat": "Medical",
   "stalled": "",
   "review": "",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 296,
+  "n": 303,
   "name": "Kabompo District Hospital",
   "dist": "Kabompo",
   "prov": "North-Western",
@@ -7320,10 +7602,10 @@
   "lics": []
  },
  {
-  "n": 297,
+  "n": 304,
   "name": "Kabwe Training School Clinic",
   "dist": "",
-  "prov": "Lusaka",
+  "prov": "Central",
   "prac": "",
   "sec": "Private",
   "lic": "No",
@@ -7334,12 +7616,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet operational",
   "lics": []
  },
  {
-  "n": 298,
+  "n": 305,
   "name": "Kafakumba Clinic",
   "dist": "Luanshya",
   "prov": "Copperbelt",
@@ -7358,7 +7640,7 @@
   "lics": []
  },
  {
-  "n": 299,
+  "n": 306,
   "name": "Kafue General Hospital",
   "dist": "Kafue",
   "prov": "Lusaka",
@@ -7377,7 +7659,7 @@
   "lics": []
  },
  {
-  "n": 300,
+  "n": 307,
   "name": "Kafue Gorge Hospital",
   "dist": "Kafue",
   "prov": "Lusaka",
@@ -7396,7 +7678,7 @@
   "lics": []
  },
  {
-  "n": 301,
+  "n": 308,
   "name": "Kagem Mining Limited",
   "dist": "Lufwanyama",
   "prov": "Copperbelt",
@@ -7415,7 +7697,7 @@
   "lics": []
  },
  {
-  "n": 302,
+  "n": 309,
   "name": "Kakoso First Level Hospital",
   "dist": "Chililabombwe",
   "prov": "Copperbelt",
@@ -7434,7 +7716,7 @@
   "lics": []
  },
  {
-  "n": 303,
+  "n": 310,
   "name": "Kalene Mission Hospital",
   "dist": "Ikelenge",
   "prov": "North-Western",
@@ -7453,7 +7735,7 @@
   "lics": []
  },
  {
-  "n": 304,
+  "n": 311,
   "name": "Kalewa Garrison Camp Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -7478,7 +7760,7 @@
   ]
  },
  {
-  "n": 305,
+  "n": 312,
   "name": "Kalindawalo General Hospital",
   "dist": "Petauke",
   "prov": "Eastern",
@@ -7497,7 +7779,7 @@
   "lics": []
  },
  {
-  "n": 306,
+  "n": 313,
   "name": "Kalingalinga Health Centre",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7516,7 +7798,7 @@
   "lics": []
  },
  {
-  "n": 307,
+  "n": 314,
   "name": "Kalomo District Hospital",
   "dist": "Kalomo",
   "prov": "Southern",
@@ -7535,7 +7817,7 @@
   "lics": []
  },
  {
-  "n": 308,
+  "n": 315,
   "name": "Kalulushi General Hospital",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -7554,7 +7836,7 @@
   "lics": []
  },
  {
-  "n": 309,
+  "n": 316,
   "name": "Kalulushi Government Clinic",
   "dist": "Kalulushi",
   "prov": "Copperbelt",
@@ -7573,7 +7855,7 @@
   "lics": []
  },
  {
-  "n": 310,
+  "n": 317,
   "name": "Kamoto Mission Hospital",
   "dist": "Mambwe",
   "prov": "Eastern",
@@ -7592,7 +7874,7 @@
   "lics": []
  },
  {
-  "n": 311,
+  "n": 318,
   "name": "Kamuchanga District Hospital",
   "dist": "Mufulira",
   "prov": "Copperbelt",
@@ -7611,7 +7893,7 @@
   "lics": []
  },
  {
-  "n": 312,
+  "n": 319,
   "name": "Kanyama General Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7630,7 +7912,7 @@
   "lics": []
  },
  {
-  "n": 313,
+  "n": 320,
   "name": "Kaoma District Hospital",
   "dist": "Kaoma",
   "prov": "Western",
@@ -7649,7 +7931,7 @@
   "lics": []
  },
  {
-  "n": 314,
+  "n": 321,
   "name": "Kaonga Clinic",
   "dist": "Mazabuka",
   "prov": "Southern",
@@ -7668,7 +7950,26 @@
   "lics": []
  },
  {
-  "n": 315,
+  "n": 322,
+  "name": "Kapiri Mposhi District Hospital",
+  "dist": "Kapiri Mposhi",
+  "prov": "Central",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Public",
+  "lic": "No",
+  "stage": "Licence Expiring (Renewal Due)",
+  "auth": "",
+  "fac": "FAC/0047",
+  "ln": "",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
+  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "lics": []
+ },
+ {
+  "n": 323,
   "name": "Kaputa District Hospital",
   "dist": "Kaputa",
   "prov": "Northern",
@@ -7687,7 +7988,7 @@
   "lics": []
  },
  {
-  "n": 316,
+  "n": 324,
   "name": "Kasama Airport",
   "dist": "Kasama",
   "prov": "Northern",
@@ -7706,7 +8007,7 @@
   "lics": []
  },
  {
-  "n": 317,
+  "n": 325,
   "name": "Kasama General Hospital",
   "dist": "Kasama",
   "prov": "Northern",
@@ -7725,7 +8026,7 @@
   "lics": []
  },
  {
-  "n": 318,
+  "n": 326,
   "name": "Kawambwa District Hospital",
   "dist": "Kawambwa",
   "prov": "Luapula",
@@ -7744,7 +8045,7 @@
   "lics": []
  },
  {
-  "n": 319,
+  "n": 327,
   "name": "King Salman Bin Abdul-Aziz Specialist Hospital",
   "dist": "",
   "prov": "Lusaka",
@@ -7758,7 +8059,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -7769,7 +8070,7 @@
   ]
  },
  {
-  "n": 320,
+  "n": 328,
   "name": "Kitwe Training School",
   "dist": "",
   "prov": "Copperbelt",
@@ -7788,7 +8089,7 @@
   "lics": []
  },
  {
-  "n": 321,
+  "n": 329,
   "name": "Levy Mwanawasa University Teaching Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -7807,7 +8108,7 @@
   "lics": []
  },
  {
-  "n": 322,
+  "n": 330,
   "name": "Lewanika General Hospital",
   "dist": "Mongu",
   "prov": "Western",
@@ -7826,7 +8127,7 @@
   "lics": []
  },
  {
-  "n": 323,
+  "n": 331,
   "name": "Liteta District Hospital",
   "dist": "Chisamba",
   "prov": "Central",
@@ -7845,7 +8146,7 @@
   "lics": []
  },
  {
-  "n": 324,
+  "n": 332,
   "name": "Livingstone Teaching Hospital",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -7864,7 +8165,7 @@
   "lics": []
  },
  {
-  "n": 325,
+  "n": 333,
   "name": "Loloma Mission Hospital",
   "dist": "Manyinga",
   "prov": "North-Western",
@@ -7883,7 +8184,7 @@
   "lics": []
  },
  {
-  "n": 326,
+  "n": 334,
   "name": "Luampa Mission Hospital",
   "dist": "Kaoma",
   "prov": "Western",
@@ -7897,12 +8198,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "review": "",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 327,
+  "n": 335,
   "name": "Luampa Mission Hospital",
   "dist": "Kaoma",
   "prov": "Western",
@@ -7916,12 +8217,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register · New facility in the licensing status list — confirm sector, practice and category · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 328,
+  "n": 336,
   "name": "Luangwa District Hospital",
   "dist": "Luangwa",
   "prov": "Lusaka",
@@ -7940,7 +8241,7 @@
   "lics": []
  },
  {
-  "n": 329,
+  "n": 337,
   "name": "Lubambe Medical and Child Welfare Centre",
   "dist": "Chililabombwe",
   "prov": "Copperbelt",
@@ -7954,12 +8255,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 330,
+  "n": 338,
   "name": "Lubwe Mission Hospital",
   "dist": "Samfya",
   "prov": "Luapula",
@@ -7978,7 +8279,7 @@
   "lics": []
  },
  {
-  "n": 331,
+  "n": 339,
   "name": "Lufwanyama District Hospital",
   "dist": "Lufwanyama",
   "prov": "Copperbelt",
@@ -7997,7 +8298,7 @@
   "lics": []
  },
  {
-  "n": 332,
+  "n": 340,
   "name": "Lukulu District Hospital",
   "dist": "Lukulu",
   "prov": "Western",
@@ -8016,7 +8317,7 @@
   "lics": []
  },
  {
-  "n": 333,
+  "n": 341,
   "name": "Lusaka Adventist Dental Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8041,7 +8342,7 @@
   ]
  },
  {
-  "n": 334,
+  "n": 342,
   "name": "Lusaka Apex Medical University",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8060,7 +8361,7 @@
   "lics": []
  },
  {
-  "n": 335,
+  "n": 343,
   "name": "Lusaka Correctional Facility Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8074,12 +8375,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 336,
+  "n": 344,
   "name": "Lusaka Imaging Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8093,12 +8394,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 337,
+  "n": 345,
   "name": "Lusaka IVF And Fertility Clinic Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8123,7 +8424,7 @@
   ]
  },
  {
-  "n": 338,
+  "n": 346,
   "name": "Luwi Mission Hospital",
   "dist": "Mwinilunga",
   "prov": "North-Western",
@@ -8148,7 +8449,7 @@
   ]
  },
  {
-  "n": 339,
+  "n": 347,
   "name": "Luwingu District Hospital",
   "dist": "Luwingu",
   "prov": "Northern",
@@ -8167,7 +8468,7 @@
   "lics": []
  },
  {
-  "n": 340,
+  "n": 348,
   "name": "Mabiza Resources Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8186,7 +8487,7 @@
   "lics": []
  },
  {
-  "n": 341,
+  "n": 349,
   "name": "Macha Mission Hospital",
   "dist": "Choma",
   "prov": "Southern",
@@ -8205,7 +8506,7 @@
   "lics": []
  },
  {
-  "n": 342,
+  "n": 350,
   "name": "Mahatma Gandhi Clinic",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -8224,7 +8525,7 @@
   "lics": []
  },
  {
-  "n": 343,
+  "n": 351,
   "name": "Maina Soko Military Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8249,7 +8550,7 @@
   ]
  },
  {
-  "n": 344,
+  "n": 352,
   "name": "Mambilima Mission Hospital",
   "dist": "Mwense",
   "prov": "Luapula",
@@ -8268,7 +8569,7 @@
   "lics": []
  },
  {
-  "n": 345,
+  "n": 353,
   "name": "Mangango Mission Hospital",
   "dist": "Kaoma",
   "prov": "Western",
@@ -8287,7 +8588,7 @@
   "lics": []
  },
  {
-  "n": 346,
+  "n": 354,
   "name": "Mansa Airport",
   "dist": "Mansa",
   "prov": "Luapula",
@@ -8306,7 +8607,7 @@
   "lics": []
  },
  {
-  "n": 347,
+  "n": 355,
   "name": "Mansa General Hospital",
   "dist": "Mansa",
   "prov": "Luapula",
@@ -8325,7 +8626,7 @@
   "lics": []
  },
  {
-  "n": 348,
+  "n": 356,
   "name": "Masaiti District Hospital",
   "dist": "Masaiti",
   "prov": "Copperbelt",
@@ -8344,7 +8645,7 @@
   "lics": []
  },
  {
-  "n": 349,
+  "n": 357,
   "name": "Masansa Rural Health Centre",
   "dist": "Mkushi",
   "prov": "Central",
@@ -8363,7 +8664,7 @@
   "lics": []
  },
  {
-  "n": 350,
+  "n": 358,
   "name": "Matero First Level Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8382,7 +8683,7 @@
   "lics": []
  },
  {
-  "n": 351,
+  "n": 359,
   "name": "Matero General Hospital",
   "dist": "",
   "prov": "Lusaka",
@@ -8396,12 +8697,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register · No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 352,
+  "n": 360,
   "name": "Max Clinic Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8415,7 +8716,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -8426,7 +8727,7 @@
   ]
  },
  {
-  "n": 353,
+  "n": 361,
   "name": "Mbala Airport",
   "dist": "Mbala",
   "prov": "Northern",
@@ -8445,7 +8746,7 @@
   "lics": []
  },
  {
-  "n": 354,
+  "n": 362,
   "name": "Mbala General Hospital",
   "dist": "Mbala",
   "prov": "Northern",
@@ -8464,7 +8765,7 @@
   "lics": []
  },
  {
-  "n": 355,
+  "n": 363,
   "name": "Mbereshi Mission Hospital",
   "dist": "Mwansabombwe",
   "prov": "Luapula",
@@ -8483,7 +8784,7 @@
   "lics": []
  },
  {
-  "n": 356,
+  "n": 364,
   "name": "Medcop",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -8502,26 +8803,7 @@
   "lics": []
  },
  {
-  "n": 357,
-  "name": "Medcross Hospital",
-  "dist": "Lusaka",
-  "prov": "Lusaka",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0072",
-  "ln": "",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 358,
+  "n": 365,
   "name": "Metro SDA Hospital Limited",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -8540,7 +8822,7 @@
   "lics": []
  },
  {
-  "n": 359,
+  "n": 366,
   "name": "Mfuwe International Airport",
   "dist": "Mambwe",
   "prov": "Eastern",
@@ -8559,7 +8841,7 @@
   "lics": []
  },
  {
-  "n": 360,
+  "n": 367,
   "name": "Michael Chilufya Sata Dental Clinic",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -8578,7 +8860,7 @@
   "lics": []
  },
  {
-  "n": 361,
+  "n": 368,
   "name": "Michael Chilufya Sata Hospital",
   "dist": "Mpika",
   "prov": "Muchinga",
@@ -8597,7 +8879,7 @@
   "lics": []
  },
  {
-  "n": 362,
+  "n": 369,
   "name": "Mikango Camp Hospital",
   "dist": "",
   "prov": "Lusaka",
@@ -8611,7 +8893,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -8622,7 +8904,7 @@
   ]
  },
  {
-  "n": 363,
+  "n": 370,
   "name": "Minexec (PTY) Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8636,12 +8918,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 364,
+  "n": 371,
   "name": "Minga Mission Hospital",
   "dist": "Petauke",
   "prov": "Eastern",
@@ -8660,7 +8942,7 @@
   "lics": []
  },
  {
-  "n": 365,
+  "n": 372,
   "name": "Mingomba Mining Limited",
   "dist": "Chililabombwe",
   "prov": "Copperbelt",
@@ -8679,7 +8961,7 @@
   "lics": []
  },
  {
-  "n": 366,
+  "n": 373,
   "name": "Mkushi District Hospital",
   "dist": "Mkushi",
   "prov": "Central",
@@ -8698,7 +8980,7 @@
   "lics": []
  },
  {
-  "n": 367,
+  "n": 374,
   "name": "Monze Mission Hospital",
   "dist": "Monze",
   "prov": "Southern",
@@ -8717,7 +8999,7 @@
   "lics": []
  },
  {
-  "n": 368,
+  "n": 375,
   "name": "Mount Makulu Clinic",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -8736,7 +9018,7 @@
   "lics": []
  },
  {
-  "n": 369,
+  "n": 376,
   "name": "Mpika District Hospital",
   "dist": "Mpika",
   "prov": "Muchinga",
@@ -8755,7 +9037,7 @@
   "lics": []
  },
  {
-  "n": 370,
+  "n": 377,
   "name": "Mpongwe Mission Hospital",
   "dist": "Luanshya",
   "prov": "Copperbelt",
@@ -8774,7 +9056,7 @@
   "lics": []
  },
  {
-  "n": 371,
+  "n": 378,
   "name": "Mporokoso District Hospital",
   "dist": "Mporokoso",
   "prov": "Northern",
@@ -8793,7 +9075,7 @@
   "lics": []
  },
  {
-  "n": 372,
+  "n": 379,
   "name": "Mpulungu District Hospital",
   "dist": "Mpulungu",
   "prov": "Northern",
@@ -8812,7 +9094,7 @@
   "lics": []
  },
  {
-  "n": 373,
+  "n": 380,
   "name": "Mudachi Medical Solutions",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -8826,12 +9108,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Non operational",
   "lics": []
  },
  {
-  "n": 374,
+  "n": 381,
   "name": "Mufumbwe District Hospital",
   "dist": "Mufumbwe",
   "prov": "North-Western",
@@ -8850,7 +9132,7 @@
   "lics": []
  },
  {
-  "n": 375,
+  "n": 382,
   "name": "Mukinge Mission Hospital",
   "dist": "Kasempa",
   "prov": "North-Western",
@@ -8869,7 +9151,7 @@
   "lics": []
  },
  {
-  "n": 376,
+  "n": 383,
   "name": "Mulungushi University",
   "dist": "Kabwe",
   "prov": "Central",
@@ -8888,7 +9170,7 @@
   "lics": []
  },
  {
-  "n": 377,
+  "n": 384,
   "name": "Mum's Care Clinic Woodlands",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8907,7 +9189,7 @@
   "lics": []
  },
  {
-  "n": 378,
+  "n": 385,
   "name": "Mumana Mineral Resources Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -8921,12 +9203,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register · New facility in the licensing status list — confirm sector, practice and category",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 379,
+  "n": 386,
   "name": "Mungwi Baptist Rural Health Centre",
   "dist": "Mungwi",
   "prov": "Northern",
@@ -8945,7 +9227,7 @@
   "lics": []
  },
  {
-  "n": 380,
+  "n": 387,
   "name": "Mungwi District Hospital",
   "dist": "Mungwi",
   "prov": "Northern",
@@ -8964,7 +9246,7 @@
   "lics": []
  },
  {
-  "n": 381,
+  "n": 388,
   "name": "Muyombe Level 1 Hospital",
   "dist": "Mafinga",
   "prov": "Muchinga",
@@ -8983,7 +9265,7 @@
   "lics": []
  },
  {
-  "n": 382,
+  "n": 389,
   "name": "Mvuu Resources Limited",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -9002,7 +9284,7 @@
   "lics": []
  },
  {
-  "n": 383,
+  "n": 390,
   "name": "Mwami Adventist Hospital",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -9021,7 +9303,7 @@
   "lics": []
  },
  {
-  "n": 384,
+  "n": 391,
   "name": "Mwandi Mission Hospital",
   "dist": "Mwandi",
   "prov": "Western",
@@ -9040,7 +9322,7 @@
   "lics": []
  },
  {
-  "n": 385,
+  "n": 392,
   "name": "Mwansabombwe District Hospital",
   "dist": "Mwansabombwe",
   "prov": "Luapula",
@@ -9059,7 +9341,7 @@
   "lics": []
  },
  {
-  "n": 386,
+  "n": 393,
   "name": "Mwense District Hospital",
   "dist": "Mwense",
   "prov": "Luapula",
@@ -9078,7 +9360,7 @@
   "lics": []
  },
  {
-  "n": 387,
+  "n": 394,
   "name": "Mwinilunga District Hospital",
   "dist": "Mwinilunga",
   "prov": "North-Western",
@@ -9097,7 +9379,7 @@
   "lics": []
  },
  {
-  "n": 388,
+  "n": 395,
   "name": "Nakangea Construction Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9116,7 +9398,7 @@
   "lics": []
  },
  {
-  "n": 389,
+  "n": 396,
   "name": "Nalolo District Hospital",
   "dist": "",
   "prov": "Western",
@@ -9135,7 +9417,7 @@
   "lics": []
  },
  {
-  "n": 390,
+  "n": 397,
   "name": "Namwala District Hospital",
   "dist": "Namwala",
   "prov": "Southern",
@@ -9154,7 +9436,7 @@
   "lics": []
  },
  {
-  "n": 391,
+  "n": 398,
   "name": "Namwianga Mission Hospital",
   "dist": "Kalomo",
   "prov": "Southern",
@@ -9173,7 +9455,7 @@
   "lics": []
  },
  {
-  "n": 392,
+  "n": 399,
   "name": "Nathan Mulenga Institute",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9192,7 +9474,7 @@
   "lics": []
  },
  {
-  "n": 393,
+  "n": 400,
   "name": "National Council for Construction",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9211,7 +9493,7 @@
   "lics": []
  },
  {
-  "n": 394,
+  "n": 401,
   "name": "National Health Research and Training Institute",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -9230,7 +9512,7 @@
   "lics": []
  },
  {
-  "n": 395,
+  "n": 402,
   "name": "National Heart Hospital",
   "dist": "Chongwe",
   "prov": "Lusaka",
@@ -9249,7 +9531,7 @@
   "lics": []
  },
  {
-  "n": 396,
+  "n": 403,
   "name": "National Institute for Scientific Research (NISIR)",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9268,7 +9550,7 @@
   "lics": []
  },
  {
-  "n": 397,
+  "n": 404,
   "name": "Nature Mining Resources Zambia",
   "dist": "",
   "prov": "Lusaka",
@@ -9282,12 +9564,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 398,
+  "n": 405,
   "name": "Nchanga North General Hospital",
   "dist": "Chingola",
   "prov": "Copperbelt",
@@ -9306,7 +9588,7 @@
   "lics": []
  },
  {
-  "n": 399,
+  "n": 406,
   "name": "Nchelenge District Hospital",
   "dist": "Nchelenge",
   "prov": "Luapula",
@@ -9325,7 +9607,7 @@
   "lics": []
  },
  {
-  "n": 400,
+  "n": 407,
   "name": "Ndola Cancer Treatment Centre",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -9336,15 +9618,15 @@
   "auth": "",
   "fac": "FAC/0513",
   "ln": "",
-  "func": "Yes",
+  "func": "No",
   "cat": "Medical",
   "stalled": "",
   "review": "",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 401,
+  "n": 408,
   "name": "Needs Care Trust Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9358,12 +9640,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 402,
+  "n": 409,
   "name": "Nett Healthcare Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -9377,12 +9659,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 403,
+  "n": 410,
   "name": "Newcreast Lime Limited",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -9396,7 +9678,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -9407,7 +9689,7 @@
   ]
  },
  {
-  "n": 404,
+  "n": 411,
   "name": "Newlands Dental Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9421,12 +9703,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 405,
+  "n": 412,
   "name": "Ng'anga Bilonda Level 1 Hospital",
   "dist": "Mwansabombwe",
   "prov": "Luapula",
@@ -9445,7 +9727,7 @@
   "lics": []
  },
  {
-  "n": 406,
+  "n": 413,
   "name": "Ngandu Consulting Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9464,7 +9746,7 @@
   "lics": []
  },
  {
-  "n": 407,
+  "n": 414,
   "name": "Ngwerere Rural Health Centre",
   "dist": "Chongwe",
   "prov": "Lusaka",
@@ -9483,7 +9765,7 @@
   "lics": []
  },
  {
-  "n": 408,
+  "n": 415,
   "name": "Northern Command Military Hospital",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -9502,7 +9784,7 @@
   "lics": []
  },
  {
-  "n": 409,
+  "n": 416,
   "name": "Noside Soil Laboratory Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9521,7 +9803,7 @@
   "lics": []
  },
  {
-  "n": 410,
+  "n": 417,
   "name": "Nsangu Investments Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9546,7 +9828,7 @@
   ]
  },
  {
-  "n": 411,
+  "n": 418,
   "name": "Nsumbu District Hospital",
   "dist": "Nsama",
   "prov": "Northern",
@@ -9565,7 +9847,7 @@
   "lics": []
  },
  {
-  "n": 412,
+  "n": 419,
   "name": "Nutrident Clinic",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -9579,12 +9861,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 413,
+  "n": 420,
   "name": "Nyanje Mission Hospital",
   "dist": "Sinda",
   "prov": "Eastern",
@@ -9603,7 +9885,7 @@
   "lics": []
  },
  {
-  "n": 414,
+  "n": 421,
   "name": "Nyimba District Hospital",
   "dist": "Nyimba",
   "prov": "Eastern",
@@ -9622,7 +9904,7 @@
   "lics": []
  },
  {
-  "n": 415,
+  "n": 422,
   "name": "Olivine Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9633,11 +9915,11 @@
   "auth": "",
   "fac": "FAC/0512",
   "ln": "",
-  "func": "Yes",
+  "func": "No",
   "cat": "Medical",
   "stalled": "",
   "review": "",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
     "t": "Importation Licence",
@@ -9647,7 +9929,7 @@
   ]
  },
  {
-  "n": 416,
+  "n": 423,
   "name": "On Track Welding & NDE Solutions",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9661,31 +9943,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 417,
-  "name": "Parrogate Ginneries Limited",
-  "dist": "Lusaka",
-  "prov": "Lusaka",
-  "prac": "Mobile Nuclear Gauges",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "In Final Processing",
-  "auth": "",
-  "fac": "FAC/0261",
-  "ln": "",
-  "func": "Yes",
-  "cat": "Non-Medical",
-  "stalled": "",
-  "review": "",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 418,
+  "n": 424,
   "name": "PDV Metals Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9704,7 +9967,7 @@
   "lics": []
  },
  {
-  "n": 419,
+  "n": 425,
   "name": "Petauke District Hospital",
   "dist": "Petauke",
   "prov": "Eastern",
@@ -9723,7 +9986,7 @@
   "lics": []
  },
  {
-  "n": 420,
+  "n": 426,
   "name": "Premium Health Medical Centre",
   "dist": "Luanshya",
   "prov": "Copperbelt",
@@ -9742,7 +10005,7 @@
   "lics": []
  },
  {
-  "n": 421,
+  "n": 427,
   "name": "Proctor Engineering Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9761,7 +10024,7 @@
   "lics": []
  },
  {
-  "n": 422,
+  "n": 428,
   "name": "Quantum Medical Imaging Limited",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -9780,7 +10043,7 @@
   "lics": []
  },
  {
-  "n": 423,
+  "n": 429,
   "name": "Quicklog geophysics PTY Ltd",
   "dist": "",
   "prov": "Lusaka",
@@ -9794,12 +10057,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · Operating status reads \"Transporter\" (a role, not a status) — confirm the facility is operating · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "Operating status reads \"Transporter\" (a role, not a status) — confirm the facility is operating · No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Transporter",
   "lics": []
  },
  {
-  "n": 424,
+  "n": 430,
   "name": "Rankin Engineering Consultants",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9818,7 +10081,7 @@
   "lics": []
  },
  {
-  "n": 425,
+  "n": 431,
   "name": "Redachem Zambia",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -9837,7 +10100,7 @@
   "lics": []
  },
  {
-  "n": 426,
+  "n": 432,
   "name": "Rehan Hospital Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9851,7 +10114,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -9862,7 +10125,7 @@
   ]
  },
  {
-  "n": 427,
+  "n": 433,
   "name": "Road Development Agency",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9881,7 +10144,7 @@
   "lics": []
  },
  {
-  "n": 428,
+  "n": 434,
   "name": "Roads and Pavings Zambia Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9900,7 +10163,7 @@
   "lics": []
  },
  {
-  "n": 429,
+  "n": 435,
   "name": "Rocinantes Zambia",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9914,12 +10177,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 430,
+  "n": 436,
   "name": "Royal Diagnostic Centre",
   "dist": "",
   "prov": "Lusaka",
@@ -9933,12 +10196,12 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 431,
+  "n": 437,
   "name": "Royal Oak Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9957,7 +10220,7 @@
   "lics": []
  },
  {
-  "n": 432,
+  "n": 438,
   "name": "RT Development Corporation Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -9971,12 +10234,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 433,
+  "n": 439,
   "name": "Samfya District Hospital",
   "dist": "Samfya",
   "prov": "Luapula",
@@ -9995,7 +10258,7 @@
   "lics": []
  },
  {
-  "n": 434,
+  "n": 440,
   "name": "Sandstone Consortium Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10014,7 +10277,7 @@
   "lics": []
  },
  {
-  "n": 435,
+  "n": 441,
   "name": "Santa Maria Mission Hospital",
   "dist": "Chilubi",
   "prov": "Northern",
@@ -10033,7 +10296,7 @@
   "lics": []
  },
  {
-  "n": 436,
+  "n": 442,
   "name": "Scirocco Enterprises Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10052,7 +10315,7 @@
   "lics": []
  },
  {
-  "n": 437,
+  "n": 443,
   "name": "Senama Rural Health Centre",
   "dist": "Mansa",
   "prov": "Luapula",
@@ -10071,7 +10334,7 @@
   "lics": []
  },
  {
-  "n": 438,
+  "n": 444,
   "name": "Senanga General Hospital",
   "dist": "Senanga",
   "prov": "Western",
@@ -10090,7 +10353,7 @@
   "lics": []
  },
  {
-  "n": 439,
+  "n": 445,
   "name": "Serenje District Hospital",
   "dist": "Serenje",
   "prov": "Central",
@@ -10109,7 +10372,7 @@
   "lics": []
  },
  {
-  "n": 440,
+  "n": 446,
   "name": "SGS Inspection Service",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10128,7 +10391,7 @@
   "lics": []
  },
  {
-  "n": 441,
+  "n": 447,
   "name": "Shachitari Contractor, Chipata",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -10147,7 +10410,7 @@
   "lics": []
  },
  {
-  "n": 442,
+  "n": 448,
   "name": "Shah Medical and Dental Clinic",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -10166,7 +10429,7 @@
   "lics": []
  },
  {
-  "n": 443,
+  "n": 449,
   "name": "Shangombo District Hospital",
   "dist": "Shangombo",
   "prov": "Western",
@@ -10185,7 +10448,7 @@
   "lics": []
  },
  {
-  "n": 444,
+  "n": 450,
   "name": "Siavonga District Hospital",
   "dist": "Gwembe",
   "prov": "Southern",
@@ -10204,7 +10467,7 @@
   "lics": []
  },
  {
-  "n": 445,
+  "n": 451,
   "name": "Simon Mwansa Kapwepwe International Airport",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -10223,7 +10486,7 @@
   "lics": []
  },
  {
-  "n": 446,
+  "n": 452,
   "name": "Sinohydro Zambia Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10248,7 +10511,7 @@
   ]
  },
  {
-  "n": 447,
+  "n": 453,
   "name": "Solwezi Airport",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -10267,7 +10530,7 @@
   "lics": []
  },
  {
-  "n": 448,
+  "n": 454,
   "name": "Sons of Thunder Clinic",
   "dist": "Kazungula",
   "prov": "Southern",
@@ -10281,12 +10544,18 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
-  "lics": []
+  "lics": [
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q1",
+    "n": ""
+   }
+  ]
  },
  {
-  "n": 449,
+  "n": 455,
   "name": "South Luangwa Conservation Animal Health Center",
   "dist": "Nyimba",
   "prov": "Eastern",
@@ -10305,7 +10574,7 @@
   "lics": []
  },
  {
-  "n": 450,
+  "n": 456,
   "name": "Southern Bioenergy Limited",
   "dist": "Mazabuka",
   "prov": "Southern",
@@ -10324,7 +10593,7 @@
   "lics": []
  },
  {
-  "n": 451,
+  "n": 457,
   "name": "Sparkle Dental Clinic and Wellness Centre",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10338,7 +10607,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -10349,7 +10618,7 @@
   ]
  },
  {
-  "n": 452,
+  "n": 458,
   "name": "Specialised Emergency Services",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10363,12 +10632,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 453,
+  "n": 459,
   "name": "Spectech Inspection Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10382,12 +10651,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 454,
+  "n": 460,
   "name": "Springs of Life Medical Centre",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -10406,7 +10675,7 @@
   "lics": []
  },
  {
-  "n": 455,
+  "n": 461,
   "name": "St Dorothy Rural Health Centre",
   "dist": "Solwezi",
   "prov": "North-Western",
@@ -10425,7 +10694,7 @@
   "lics": []
  },
  {
-  "n": 456,
+  "n": 462,
   "name": "St Theresa Mission Hospital",
   "dist": "Masaiti",
   "prov": "Copperbelt",
@@ -10444,26 +10713,7 @@
   "lics": []
  },
  {
-  "n": 457,
-  "name": "St. Fidelis Mission Hospital",
-  "dist": "Kasama",
-  "prov": "Northern",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Public",
-  "lic": "No",
-  "stage": "Waiting for Payment",
-  "auth": "",
-  "fac": "FAC/0561",
-  "ln": "",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 458,
+  "n": 463,
   "name": "St. Fidelis Mission Hospital",
   "dist": "Kasama",
   "prov": "Northern",
@@ -10477,12 +10727,31 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 459,
+  "n": 464,
+  "name": "St. Fidelis Mission Hospital",
+  "dist": "Kasama",
+  "prov": "Northern",
+  "prac": "Diagnostic Imaging (X-ray)",
+  "sec": "Public",
+  "lic": "No",
+  "stage": "Waiting for Payment",
+  "auth": "",
+  "fac": "FAC/0561",
+  "ln": "",
+  "func": "Yes",
+  "cat": "Medical",
+  "stalled": "",
+  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "lics": []
+ },
+ {
+  "n": 465,
   "name": "St. Francis Mission Hospital",
   "dist": "Katete",
   "prov": "Eastern",
@@ -10501,45 +10770,7 @@
   "lics": []
  },
  {
-  "n": 460,
-  "name": "St. Johns Medical Centre Ltd Lusaka",
-  "dist": "Lusaka",
-  "prov": "Lusaka",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0240",
-  "ln": "AUTH/USE.REN/0672",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 461,
-  "name": "St. Johns Medical Centre Solwezi",
-  "dist": "Solwezi",
-  "prov": "North-Western",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0332",
-  "ln": "AUTH/USE.REN/0673",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 462,
+  "n": 466,
   "name": "St. Joseph Chamilalamini Mission Hospital",
   "dist": "Nyimba",
   "prov": "Eastern",
@@ -10558,7 +10789,7 @@
   "lics": []
  },
  {
-  "n": 463,
+  "n": 467,
   "name": "St. Joseph Rural Mini Hospital",
   "dist": "Nyimba",
   "prov": "Eastern",
@@ -10577,7 +10808,7 @@
   "lics": []
  },
  {
-  "n": 464,
+  "n": 468,
   "name": "St. Pauls Mission Hospital",
   "dist": "Nchelenge",
   "prov": "Luapula",
@@ -10596,7 +10827,7 @@
   "lics": []
  },
  {
-  "n": 465,
+  "n": 469,
   "name": "Steffanutti Stocks Construction Ltd",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10615,7 +10846,7 @@
   "lics": []
  },
  {
-  "n": 466,
+  "n": 470,
   "name": "Stratum Laboratories Limited",
   "dist": "Lumwana",
   "prov": "North-Western",
@@ -10629,12 +10860,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 467,
+  "n": 471,
   "name": "Sunshine Dental Clinic",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10653,7 +10884,7 @@
   "lics": []
  },
  {
-  "n": 468,
+  "n": 472,
   "name": "Sunsol Imaging Services Limited - Lusaka",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10672,7 +10903,7 @@
   "lics": []
  },
  {
-  "n": 469,
+  "n": 473,
   "name": "Suntrion Healthcare Services Ltd",
   "dist": "",
   "prov": "Lusaka",
@@ -10686,12 +10917,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 470,
+  "n": 474,
   "name": "TCCC Metals Trading Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10705,56 +10936,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 471,
-  "name": "Tinna Medical Centre",
-  "dist": "Kitwe",
-  "prov": "Copperbelt",
-  "prac": "",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Under Review and Assessment",
-  "auth": "",
-  "fac": "FAC/0627",
-  "ln": "",
-  "func": "No",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "No practice recorded — category assumed Medical, confirm",
-  "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
-  "lics": [
-   {
-    "t": "Importation Licence",
-    "q": "2026-Q1",
-    "n": ""
-   }
-  ]
- },
- {
-  "n": 472,
-  "name": "TMS Medical Services",
-  "dist": "Lusaka",
-  "prov": "Lusaka",
-  "prac": "Diagnostic Imaging (X-ray)",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0357",
-  "ln": "AUTH/USE.REN/0648",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 473,
+  "n": 475,
   "name": "Tobbaco Board of Zambia",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10768,7 +10955,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -10779,7 +10966,7 @@
   ]
  },
  {
-  "n": 474,
+  "n": 476,
   "name": "Tonawanda Procurement Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -10793,7 +10980,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -10804,7 +10991,7 @@
   ]
  },
  {
-  "n": 475,
+  "n": 477,
   "name": "Tropical Diseases Research Centre",
   "dist": "",
   "prov": "Copperbelt",
@@ -10823,7 +11010,7 @@
   "lics": []
  },
  {
-  "n": 476,
+  "n": 478,
   "name": "Tusekelemo Community Medical Centre",
   "dist": "Mkushi",
   "prov": "Central",
@@ -10848,7 +11035,7 @@
   ]
  },
  {
-  "n": 477,
+  "n": 479,
   "name": "Umoyo Withu Private Clinic",
   "dist": "Lundazi",
   "prov": "Eastern",
@@ -10867,26 +11054,7 @@
   "lics": []
  },
  {
-  "n": 478,
-  "name": "UNILABS – Solwezi",
-  "dist": "Solwezi",
-  "prov": "North-Western",
-  "prac": "Diagnostic Imaging",
-  "sec": "Private",
-  "lic": "No",
-  "stage": "Licence Expiring (Renewal Due)",
-  "auth": "",
-  "fac": "FAC/0549",
-  "ln": "AUTH/USE.REN/0817",
-  "func": "Yes",
-  "cat": "Medical",
-  "stalled": "",
-  "review": "Register showed this facility licensed; the licensing status list records no current licence — confirm the renewal",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 479,
+  "n": 480,
   "name": "United Capital Fertilizer",
   "dist": "",
   "prov": "Lusaka",
@@ -10900,12 +11068,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 480,
+  "n": 481,
   "name": "United Nations Development Programme",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10924,7 +11092,7 @@
   "lics": []
  },
  {
-  "n": 481,
+  "n": 482,
   "name": "University of Zambia Ridgeway Campus",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10938,12 +11106,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "Not in the 2026 licensing status list — confirm the facility is still on the register · New facility in the licensing status list — confirm sector, practice and category",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 482,
+  "n": 483,
   "name": "University Teaching Hospital - Radiology",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10962,7 +11130,7 @@
   "lics": []
  },
  {
-  "n": 483,
+  "n": 484,
   "name": "University Teaching Hospitals Children's Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -10981,7 +11149,7 @@
   "lics": []
  },
  {
-  "n": 484,
+  "n": 485,
   "name": "VS Construction and Mining Services Limited",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11000,7 +11168,7 @@
   "lics": []
  },
  {
-  "n": 485,
+  "n": 486,
   "name": "Vubwi District Hospital",
   "dist": "Mambwe",
   "prov": "Eastern",
@@ -11019,7 +11187,7 @@
   "lics": []
  },
  {
-  "n": 486,
+  "n": 487,
   "name": "WBHO Construction Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11038,7 +11206,7 @@
   "lics": []
  },
  {
-  "n": 487,
+  "n": 488,
   "name": "Wilmar Industries Zambia Limited",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11057,7 +11225,7 @@
   "lics": []
  },
  {
-  "n": 488,
+  "n": 489,
   "name": "WRC Consultants Limited",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11068,15 +11236,15 @@
   "auth": "",
   "fac": "FAC/0260",
   "ln": "",
-  "func": "Yes",
+  "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
+  "detail": "2026 Licensing Status · no current use/possession licence · Temporarily not in operation",
   "lics": []
  },
  {
-  "n": 489,
+  "n": 490,
   "name": "Wumi Mini Hospital",
   "dist": "Kalumbila",
   "prov": "North-Western",
@@ -11090,12 +11258,12 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 490,
+  "n": 491,
   "name": "Yearning Investments Limited",
   "dist": "",
   "prov": "Lusaka",
@@ -11109,12 +11277,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "No province in the licensing status list — confirm · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 491,
+  "n": 492,
   "name": "Yeta District Hospital",
   "dist": "Mongu",
   "prov": "Western",
@@ -11133,7 +11301,7 @@
   "lics": []
  },
  {
-  "n": 492,
+  "n": 493,
   "name": "Yuka Mission Hospital",
   "dist": "Kalabo",
   "prov": "Western",
@@ -11152,7 +11320,7 @@
   "lics": []
  },
  {
-  "n": 493,
+  "n": 494,
   "name": "ZA 1 Commando",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11177,7 +11345,7 @@
   ]
  },
  {
-  "n": 494,
+  "n": 495,
   "name": "ZA Arackan",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11191,7 +11359,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11202,7 +11370,7 @@
   ]
  },
  {
-  "n": 495,
+  "n": 496,
   "name": "ZA Gondar",
   "dist": "Chipata",
   "prov": "Eastern",
@@ -11227,7 +11395,7 @@
   ]
  },
  {
-  "n": 496,
+  "n": 497,
   "name": "ZA Kalewa",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11246,7 +11414,7 @@
   "lics": []
  },
  {
-  "n": 497,
+  "n": 498,
   "name": "ZA L85 (Apollo)",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -11260,7 +11428,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11271,7 +11439,7 @@
   ]
  },
  {
-  "n": 498,
+  "n": 499,
   "name": "ZA Luena",
   "dist": "Kaoma",
   "prov": "Western",
@@ -11296,7 +11464,7 @@
   ]
  },
  {
-  "n": 499,
+  "n": 500,
   "name": "ZA Mikango",
   "dist": "Chongwe",
   "prov": "Lusaka",
@@ -11310,12 +11478,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 500,
+  "n": 501,
   "name": "ZA Tug-Argan",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11340,7 +11508,7 @@
   ]
  },
  {
-  "n": 501,
+  "n": 502,
   "name": "ZA ZCCF",
   "dist": "Kitwe",
   "prov": "Copperbelt",
@@ -11365,7 +11533,7 @@
   ]
  },
  {
-  "n": 502,
+  "n": 503,
   "name": "ZAF Hospital",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11384,7 +11552,7 @@
   "lics": []
  },
  {
-  "n": 503,
+  "n": 504,
   "name": "ZAF Kabwe",
   "dist": "Kabwe",
   "prov": "Central",
@@ -11403,7 +11571,7 @@
   "lics": []
  },
  {
-  "n": 504,
+  "n": 505,
   "name": "ZAF Kabwe",
   "dist": "Livingstone",
   "prov": "Southern",
@@ -11417,7 +11585,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
+  "review": "No practice recorded — category assumed Non-Medical, confirm · The licensing status list carries this name twice under different RANs — confirm they are separate facilities",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11428,7 +11596,7 @@
   ]
  },
  {
-  "n": 505,
+  "n": 506,
   "name": "ZAF Lusaka",
   "dist": "Chongwe",
   "prov": "Lusaka",
@@ -11442,7 +11610,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11453,7 +11621,7 @@
   ]
  },
  {
-  "n": 506,
+  "n": 507,
   "name": "ZAF Mbala",
   "dist": "Mbala",
   "prov": "Northern",
@@ -11472,7 +11640,7 @@
   "lics": []
  },
  {
-  "n": 507,
+  "n": 508,
   "name": "ZAF Mt Eugen",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -11486,12 +11654,12 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
  {
-  "n": 508,
+  "n": 509,
   "name": "ZAF Mt Eugenia",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11505,7 +11673,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11516,7 +11684,7 @@
   ]
  },
  {
-  "n": 509,
+  "n": 510,
   "name": "ZAF Mumbwa",
   "dist": "Mumbwa",
   "prov": "Central",
@@ -11541,7 +11709,7 @@
   ]
  },
  {
-  "n": 510,
+  "n": 511,
   "name": "ZAF Samora AFB",
   "dist": "Mbala",
   "prov": "Northern",
@@ -11566,7 +11734,7 @@
   ]
  },
  {
-  "n": 511,
+  "n": 512,
   "name": "ZALAWI Haulage Ltd",
   "dist": "",
   "prov": "Copperbelt",
@@ -11585,7 +11753,7 @@
   "lics": []
  },
  {
-  "n": 512,
+  "n": 513,
   "name": "Zambezi District Hospital",
   "dist": "Zambezi",
   "prov": "North-Western",
@@ -11604,7 +11772,7 @@
   "lics": []
  },
  {
-  "n": 513,
+  "n": 514,
   "name": "Zambezi Portland Cement",
   "dist": "Ndola",
   "prov": "Copperbelt",
@@ -11623,7 +11791,7 @@
   "lics": []
  },
  {
-  "n": 514,
+  "n": 515,
   "name": "Zambia Agriculture Research Institute",
   "dist": "Chilanga",
   "prov": "Lusaka",
@@ -11642,7 +11810,7 @@
   "lics": []
  },
  {
-  "n": 515,
+  "n": 516,
   "name": "Zambia Air Force",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11656,12 +11824,12 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  },
  {
-  "n": 516,
+  "n": 517,
   "name": "Zambia Airports",
   "dist": "Lusaka",
   "prov": "Lusaka",
@@ -11680,7 +11848,7 @@
   "lics": []
  },
  {
-  "n": 517,
+  "n": 518,
   "name": "Zambia Airports Corporation Mongu Airport",
   "dist": "Mongu",
   "prov": "Western",
@@ -11690,25 +11858,6 @@
   "stage": "No Application Submitted",
   "auth": "",
   "fac": "FAC/0407",
-  "ln": "",
-  "func": "Yes",
-  "cat": "Non-Medical",
-  "stalled": "",
-  "review": "No practice recorded — category assumed Non-Medical, confirm",
-  "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
- },
- {
-  "n": 518,
-  "name": "Zambia Flying Doctor Services",
-  "dist": "Ndola",
-  "prov": "Copperbelt",
-  "prac": "",
-  "sec": "Public",
-  "lic": "No",
-  "stage": "Waiting for Payment",
-  "auth": "",
-  "fac": "FAC/0451",
   "ln": "",
   "func": "Yes",
   "cat": "Non-Medical",
@@ -11770,7 +11919,7 @@
   "func": "Yes",
   "cat": "Medical",
   "stalled": "",
-  "review": "Operating status reads \"Service provider\" (a role, not a status) — confirm the facility is operating · New facility in the licensing status list — confirm sector, practice and category",
+  "review": "Operating status reads \"Service provider\" (a role, not a status) — confirm the facility is operating · No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Service provider",
   "lics": []
  },
@@ -11789,7 +11938,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
@@ -11810,7 +11959,13 @@
   "stalled": "",
   "review": "",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
-  "lics": []
+  "lics": [
+   {
+    "t": "Importation Licence",
+    "q": "2026-Q1",
+    "n": ""
+   }
+  ]
  },
  {
   "n": 524,
@@ -11922,7 +12077,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
@@ -11941,7 +12096,7 @@
   "func": "No",
   "cat": "Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -11991,7 +12146,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": [
    {
@@ -12041,7 +12196,7 @@
   "func": "No",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · Not yet Operational",
   "lics": []
  },
@@ -12135,7 +12290,7 @@
   "func": "Yes",
   "cat": "Non-Medical",
   "stalled": "",
-  "review": "New facility in the licensing status list — confirm sector, practice and category",
+  "review": "No practice recorded — category assumed Non-Medical, confirm",
   "detail": "2026 Licensing Status · no current use/possession licence · In Operation",
   "lics": []
  }

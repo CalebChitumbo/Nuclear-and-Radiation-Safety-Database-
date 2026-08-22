@@ -259,8 +259,8 @@ def read_workbook(path: str):
     facilities = []
     for v in cells(main, min_row=2):
         v += [""] * (9 - len(v))
-        if not v[0] or not v[8]:
-            continue  # the sheet's trailing total row has no name / RAN
+        if not v[0]:
+            continue  # the sheet's trailing total row carries no name
         facilities.append({
             "raw_name": v[0],
             "lic_status": v[1],
@@ -271,6 +271,11 @@ def read_workbook(path: str):
             "fac_status": v[6],
             "region": v[7],
             "fac": v[8],
+            # Identity within this import. A row RAIS has not yet given a FAC
+            # code keeps its licences and its match to the previous register,
+            # so its key falls back to the name — dropping it would silently
+            # lose the licences the workbook counts against it.
+            "key": v[8] or f"noran:{norm(v[0])}",
         })
     return facilities, type_rows, new_licensees, totals
 
@@ -333,7 +338,8 @@ def match_register(new_rows, old_rows):
     name, fuzzy name. A row named in ALIASES is matched by its alias alone — it
     is there precisely because its own name and FAC code point somewhere else.
 
-    Returns (matches: fac -> old row, how: fac -> tier label).
+    Returns (matches: row key -> old row, how: row key -> tier label). The key
+    is the workbook's FAC code, or a name-derived one for a row that has none.
     """
     aliased = {id(o) for o in old_rows if norm(o["name"]) in ALIASES}
     by_fac = defaultdict(list)
@@ -365,11 +371,11 @@ def match_register(new_rows, old_rows):
     cands.sort(key=lambda c: (c[0], -c[1]))
     matches, how, used_old, used_new = {}, {}, set(), set()
     for tier, score, label, r, o in cands:
-        if r["fac"] in used_new or id(o) in used_old:
+        if r["key"] in used_new or id(o) in used_old:
             continue
-        matches[r["fac"]] = o
-        how[r["fac"]] = label if label != "fuzzy" else f"fuzzy {score:.2f}"
-        used_new.add(r["fac"])
+        matches[r["key"]] = o
+        how[r["key"]] = label if label != "fuzzy" else f"fuzzy {score:.2f}"
+        used_new.add(r["key"])
         used_old.add(id(o))
     return matches, how
 
@@ -540,42 +546,55 @@ def convert(xlsx_path, old_seed_path, year):
         "licence_aliases_used": [],
     }
 
-    new_by_fac = {r["fac"]: r for r in new_rows}
+    new_by_key = {r["key"]: r for r in new_rows}
     matches, how = match_register(new_rows, old_rows)
-    merged, carried = classify_leftovers(old_rows, matches, new_by_fac)
+    merged, carried = classify_leftovers(old_rows, matches, new_by_key)
     report["carried"] = carried
     report["merged"] = [
-        (o["name"], title_case(new_by_fac[fac]["raw_name"]), fac) for o, fac in merged
+        (o["name"], title_case(new_by_key[key]["raw_name"]), key) for o, key in merged
     ]
     # Licence numbers a merged duplicate carried belong to the facility it
     # merges into.
     extra_numbers = defaultdict(list)
-    for o, fac in merged:
-        extra_numbers[fac].extend(licence_numbers(o))
-    def numbers_for(fac):
+    for o, key in merged:
+        extra_numbers[key].extend(licence_numbers(o))
+    def numbers_for(key):
         """AUTH numbers the previous register held for this facility."""
         seen, out = set(), []
-        for n in licence_numbers(matches.get(fac)) + extra_numbers.get(fac, []):
+        for n in licence_numbers(matches.get(key)) + extra_numbers.get(key, []):
             if n not in seen:
                 seen.add(n)
                 out.append(n)
         return out
 
-    for fac, label in sorted(how.items()):
+    def ran_of(key):
+        """How a row is named in the report — its RAN, or that it has none."""
+        return new_by_key[key]["fac"] or "no RAN"
+
+    for key, label in sorted(how.items()):
         if label.startswith("fuzzy"):
-            row = next(r for r in new_rows if r["fac"] == fac)
-            report["fuzzy"].append((row["raw_name"], matches[fac]["name"], fac, label))
+            row = new_by_key[key]
+            report["fuzzy"].append(
+                (row["raw_name"], matches[key]["name"], ran_of(key), label)
+            )
         elif label == "alias":
-            row = next(r for r in new_rows if r["fac"] == fac)
-            report["aliases"].append((matches[fac]["name"], row["raw_name"], fac))
+            row = new_by_key[key]
+            report["aliases"].append(
+                (matches[key]["name"], row["raw_name"], ran_of(key))
+            )
 
     # Facilities the workbook's register sheet omits are carried over from the
     # previous register (flagged for review), so licences the workbook records
     # for them still have a holder.
     carried_key = {id(o): f"prev:{norm(o['name'])}" for o in carried}
-    pool = [{"key": r["fac"], "name": r["raw_name"]} for r in new_rows]
+    pool = [{"key": r["key"], "name": r["raw_name"]} for r in new_rows]
     pool += [{"key": carried_key[id(o)], "name": o["name"]} for o in carried]
     standalone = match_licence_rows(type_rows, pool, report)
+    # Carried-over rows the workbook's licence sheets DO record a licence for —
+    # the reason its register sheet is not treated as the whole register.
+    report["carried_with_licences"] = sorted(
+        o["name"] for o in carried if standalone.get(carried_key[id(o)])
+    )
     first_time = set()
     for name in new_licensees:
         target = None
@@ -587,18 +606,28 @@ def convert(xlsx_path, old_seed_path, year):
         if best_score >= FUZZY_FLOOR:
             target = best
         if target:
-            first_time.add(target["fac"])
+            first_time.add(target["key"])
 
     dist_prov = build_district_province_map(new_rows)
     name_counts = Counter(norm(r["raw_name"]) for r in new_rows)
 
     seeds = []
     for r in new_rows:
-        old = matches.get(r["fac"])
+        old = matches.get(r["key"])
         review = []
 
         licensed = r["lic_status"].strip().lower().startswith("licens")
         name = old["name"] if old else title_case(r["raw_name"])
+
+        # A row the workbook carries without a RAN keeps the FAC code the
+        # previous register knew for it, so the facility's permalink and its
+        # history survive RAIS not having caught up.
+        fac = r["fac"] or (old.get("fac", "") if old else "")
+        if not r["fac"]:
+            review.append(
+                "No RAN on the licensing status list row — "
+                + (f"showing the register's own {fac}" if fac else "confirm the RAIS code")
+            )
 
         district = r["district"] or (old.get("dist") if old else "")
         province = r["region"] if r["region"] in PROVINCES else ""
@@ -631,21 +660,26 @@ def convert(xlsx_path, old_seed_path, year):
         # stage the previous register knew, except a facility that has just
         # come off the licensed list.
         old_stage = (old or {}).get("stage", "")
+        expiring = "Licence Expiring (Renewal Due)"
         if licensed:
             stage = "Licensed"
         elif old and old.get("lic") == "Yes":
-            stage = "Licence Expiring (Renewal Due)"
-            review.append(
-                "Register showed this facility licensed; the licensing status "
-                "list records no current licence — confirm the renewal"
-            )
-            report["licence_status_lost"].append((name, r["fac"], old_stage))
+            stage = expiring
+            report["licence_status_lost"].append((name, fac or "no RAN", old_stage))
         elif old_stage and old_stage != "Licensed":
             stage = old_stage
         else:
             stage = "No Application Submitted"
+        # The renewal is still unconfirmed however the row reached this stage —
+        # re-importing the same workbook must not quietly drop the prompt, so
+        # the note follows the stage rather than the transition into it.
+        if stage == expiring:
+            review.append(
+                "Register showed this facility licensed; the licensing status "
+                "list records no current licence — confirm the renewal"
+            )
         if licensed and old and old.get("lic") == "No":
-            report["licence_status_gained"].append((name, r["fac"], old_stage))
+            report["licence_status_gained"].append((name, fac or "no RAN", old_stage))
 
         # Authorisations: the Use/Possession licences from the main sheet plus
         # every standalone authorisation the type sheets record.
@@ -653,14 +687,14 @@ def convert(xlsx_path, old_seed_path, year):
         if licensed:
             qty = int(float(r["qty"])) if r["qty"] else 1
             lic_type = use_licence_type(r["lic_type"])
-            numbers = numbers_for(r["fac"])
+            numbers = numbers_for(r["key"])
             for i, q in enumerate(parse_quarters(r["quarters"], qty)):
                 lics.append({
                     "t": lic_type,
                     "q": f"{year}-{q}" if q else "",
                     "n": numbers[i] if i < len(numbers) else "",
                 })
-        for a in standalone.get(r["fac"], []):
+        for a in standalone.get(r["key"], []):
             lics.append({
                 "t": a["type"],
                 "q": f"{year}-{a['quarter']}" if a["quarter"] else "",
@@ -668,7 +702,7 @@ def convert(xlsx_path, old_seed_path, year):
             })
 
         if not old:
-            report["new_facilities"].append((name, r["fac"], district, province))
+            report["new_facilities"].append((name, fac or "no RAN", district, province))
             review.append(
                 "New facility in the licensing status list — confirm sector, "
                 "practice and category"
@@ -682,7 +716,7 @@ def convert(xlsx_path, old_seed_path, year):
                 "The licensing status list carries this name twice under "
                 "different RANs — confirm they are separate facilities"
             )
-            report["workbook_duplicate_names"].append((r["raw_name"], r["fac"]))
+            report["workbook_duplicate_names"].append((r["raw_name"], fac or "no RAN"))
 
         detail_bits = [f"{year} Licensing Status"]
         if licensed:
@@ -692,12 +726,12 @@ def convert(xlsx_path, old_seed_path, year):
             detail_bits.append(f"{short} · {n} licence{'s' if n > 1 else ''} · {qs}")
         else:
             detail_bits.append("no current use/possession licence")
-        if r["fac"] in first_time:
+        if r["key"] in first_time:
             detail_bits.append("first-time licensee")
         if r["fac_status"]:
             detail_bits.append(r["fac_status"])
 
-        all_numbers = numbers_for(r["fac"])
+        all_numbers = numbers_for(r["key"])
         seeds.append({
             "name": name,
             "dist": district,
@@ -707,7 +741,7 @@ def convert(xlsx_path, old_seed_path, year):
             "lic": "Yes" if licensed else "No",
             "stage": stage,
             "auth": "Renewal" if licensed and "Renewal" in use_licence_type(r["lic_type"]) else ("New" if licensed else ""),
-            "fac": r["fac"],
+            "fac": fac,
             "ln": "; ".join(all_numbers),
             "func": "Yes" if functional else "No",
             "cat": category,
@@ -848,8 +882,7 @@ def write_report(path, report, xlsx_path, year, imported_on):
     L.append(
         f"Imported {imported_on} from `{source_name(xlsx_path)}` (the "
         "Authorisation & Standards licensing status workbook), replacing the "
-        "register seeded from the July 2026 Facility Status List. Regenerate "
-        "with:\n"
+        "register the previous import left behind. Regenerate with:\n"
     )
     L.append(
         "```\npython3 scripts/convert-licensing-status-xlsx.py "
@@ -965,12 +998,18 @@ def write_report(path, report, xlsx_path, year, imported_on):
             "## Carried over — not in the workbook "
             f"({len(report['carried'])})\n"
         )
+        held = report.get("carried_with_licences") or []
+        why = (
+            " " + ", ".join(held) + (" does" if len(held) == 1 else " do")
+            + " appear on its licence sheets, which is why they are kept "
+            "rather than removed."
+            if held
+            else ""
+        )
         L.append(
             "The workbook's register sheet has no row for these, but they are "
             "kept on the register with their previous status and flagged for "
-            "review. Two of them do appear on its licence sheets (K.G.P "
-            "Dental Surgery, CIDRZ – Ibex Campus), which is why they are kept "
-            "rather than removed.\n"
+            f"review.{why}\n"
         )
         for o in report["carried"]:
             L.append(

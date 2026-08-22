@@ -593,23 +593,37 @@ export function findOutput(id: string): WorkPlanOutput | null {
  * What an output had already achieved before the system started counting it,
  * per quarter. The report is cumulative for the plan year, so every row starts
  * from its opening balance and adds what has been recorded since — a section
- * that was at 125 licences when it moved onto the system reports 126 after the
+ * that was at 357 licences when it moved onto the system reports 358 after the
  * next one is logged, not 1.
  *
- * These are the actuals carried in the approved 2026 workbook at handover. A
- * saved `workPlanBaseline` document REPLACES them wholesale (it does not add),
- * so an officer can correct or re-baseline the plan without touching the code.
+ * These are the sections' own actuals as at the August 2026 update, taken from
+ * the workbooks each section keeps:
+ *
+ * - 1.1.x  the *Licensing Status* workbook (see
+ *          docs/licensing-status-2026-import.md) — 1.1.4 is its 357 licences
+ *          split by quarter of issue.
+ * - 1.2.x  the Inspectorate's *Subprogram 1.2* work plan sheet (see
+ *          docs/inspectorate-work-plan-2026-update.md).
+ * - 1.3.x  the section's own figures; 1.3.12 is **zero** because the screening
+ *          counts are now real daily entries (seed/daily-screening-2026.seed.json,
+ *          see docs/daily-screening-2026-import.md), which the row counts
+ *          directly — a balance here as well would double count them.
+ *
+ * A saved `workPlanBaseline` document REPLACES these wholesale (it does not
+ * add), so an officer can correct or re-baseline the plan without touching the
+ * code.
  *
  * The one thing to watch: an output's opening balance covers work the registers
  * do NOT hold. Back-importing the same licences or inspections would count them
- * twice — re-baseline to zero for that output if you ever do.
+ * twice — re-baseline to zero for that output if you ever do, the way 1.3.12
+ * already is.
  */
 export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   // Subprogramme 1.1 — Authorisation and Standards
   "1.1.1": [0, 3, 0, 0],
   "1.1.2": [0, 2, 0, 0],
   "1.1.3": [0, 1, 0, 0],
-  "1.1.4": [0, 125, 0, 0],
+  "1.1.4": [196, 142, 19, 0],
   "1.1.5": [0, 1, 0, 0],
   "1.1.6": [0, 3, 0, 0],
   "1.1.7": [0, 0, 0, 0],
@@ -620,14 +634,14 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.2.1": [1, 0, 0, 0],
   "1.2.2": [1, 0, 0, 0],
   "1.2.3": [0, 2, 0, 0],
-  "1.2.4": [40, 96, 0, 0],
-  "1.2.5": [1, 0, 0, 0],
-  "1.2.6": [3, 1, 0, 0],
+  "1.2.4": [40, 123, 121, 0],
+  "1.2.5": [1, 1, 0, 0],
+  "1.2.6": [8, 8, 7, 0],
   "1.2.7": [1, 1, 0, 0],
   "1.2.8": [1, 0, 0, 0],
   "1.2.9": [0, 1, 0, 0],
   "1.2.10": [0, 1, 0, 0],
-  "1.2.11": [0, 61, 0, 0],
+  "1.2.11": [45, 61, 87, 0],
   // Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
   "1.3.1": [0, 0, 0, 0],
   "1.3.2": [0, 0, 0, 0],
@@ -640,7 +654,8 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.3.9": [0, 0, 65, 0],
   "1.3.10": [0, 0, 0, 0],
   "1.3.11": [0, 0, 0, 0],
-  "1.3.12": [138155, 239650, 0, 0],
+  // Counted from the seeded daily screening log, not carried in — see above.
+  "1.3.12": [0, 0, 0, 0],
   "1.3.13": [0, 0, 24, 0],
   "1.3.14": [0, 0, 0, 0],
 };
