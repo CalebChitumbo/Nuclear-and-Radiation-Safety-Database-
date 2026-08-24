@@ -17,7 +17,11 @@ counts across the eight posts, 331,177 vehicles assessed — seeded as ordinary
 daily entries so work plan output 1.3.12 counts them post by post rather than
 carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
 
-**Navigation** (sidebar, in order): Overview · Facilities · **Reports**
+**Navigation** (sidebar, in order): Overview · Facilities · **Source
+Inventory** (`/source-inventory` — the 215 radiation sources and
+radiation-emitting devices held across 75 facilities, from Annex I of the field
+verification exercise; searchable and filterable by machine family and status,
+with CSV export) · **Reports**
 (`/reports` — live status × functional matrix, sector/category/province
 breakdowns, every count deep-linking into the filtered register, CSV export)
 · **Authorisations**
@@ -693,13 +697,47 @@ variants. Full mapping in [`docs/border-scan-log.md`](docs/border-scan-log.md).
 
 ---
 
+## Source Inventory
+
+The **Source Inventory** tab (`/source-inventory`) is the register of radiation
+sources and radiation-emitting devices held by the facilities catalogued in the
+field verification exercise — the 215 items of **Annex I** of the *Activity
+Report on the Source Inventory Programme* (7 May – 22 July 2026), across
+75 establishments. Each row is one item exactly as recorded: establishment,
+equipment type, serial number and the field status.
+
+Unlike the register, this is **read-only reference data from a published
+report**, so it is not a Firestore collection: the page loads
+`seed/source-inventory-2026.seed.json` directly into its own route chunk (it
+never pulls in the Firestore store, and it adds nothing to the security rules).
+
+Everything on the page is derived from those detail rows, so every figure
+reconciles with a filter of the table:
+
+- the four KPIs (sources & devices · facilities · in use · radioactive sources);
+- a breakdown by the nine **machine families** the exercise reports against
+  (`categorizeEquipment` folds the fifty-odd free-form spellings — `Fixed Xray`,
+  `CT-Scan`, `C-arm (Mini)`, `Source: Cs-137`, `Industrial Nuclear Gauge` … —
+  into one of nine buckets), each a click-to-filter row;
+- a **status** filter (`statusGroup` collapses the field statuses to In use /
+  Not in use / Unspecified, reading the negatives before the positives they
+  contain so `Expired (Inactive)` and `Not Yet In Use` are not counted as in
+  use); and
+- search across facility, equipment and serial, with CSV export of the current
+  view.
+
+The rules live in `lib/rules/sourceInventory.ts` (pure and unit-tested); the
+page is `app/source-inventory/page.tsx`.
+
+---
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-349 tests across `lib/rules/*` and the seed baseline, including:
+370 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -745,6 +783,10 @@ npm test
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
+- `sourceInventory` — verifies the seeded Annex I inventory (215 items numbered
+  1…215, 75 facilities) and that every derived grouping reconciles to it: the
+  nine machine-family buckets, the status groups (reading the negatives first),
+  the serial-provided count, and the CSV columns
 
 Add Firestore rules tests with the emulator in a follow-up.
 
@@ -758,6 +800,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── login/
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
+│   ├── source-inventory/   Source Inventory — Annex I sources & devices (read-only)
 │   ├── licences/           Authorisations tab — statistics from the register
 │   ├── inspectorate/       Inspection database — summary, province sheets, cards, log
 │   ├── inspections/        (moved) redirects to /inspectorate
@@ -787,7 +830,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
 ├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
-│                           daily-screening-2026.seed.json (8 posts, 1,484 days)
+│                           daily-screening-2026.seed.json (8 posts, 1,484 days),
+│                           source-inventory-2026.seed.json (215 sources, Annex I)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json

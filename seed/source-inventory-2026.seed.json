@@ -1,0 +1,1523 @@
+{
+  "meta": {
+    "title": "Source Inventory Programme — Field Verification 2026",
+    "sourceDocument": "Activity Report on Source Inventory Programme",
+    "reportDate": "2026-08-10",
+    "exercisePeriod": "7 May – 22 July 2026",
+    "preparedBy": [
+      "Mr. Dean Siachilima",
+      "Ms. Tukiya Lukuta"
+    ],
+    "department": "Nuclear and Radiation Safety Department",
+    "coverage": "Lusaka Central Business District (Zone 1) with reconciliation audits across Zones 2–6",
+    "totalItems": 215,
+    "annexReference": "Annex I — Numbered & Categorized Audit Summary"
+  },
+  "items": [
+    {
+      "no": 1,
+      "facility": "Sali International Women's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "136831HLS",
+      "status": "In Use"
+    },
+    {
+      "no": 2,
+      "facility": "Sanjeevani Healthcare Ltd.",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "340798",
+      "status": "In Use"
+    },
+    {
+      "no": 3,
+      "facility": "Sanjeevani Healthcare Ltd.",
+      "equipmentType": "Portable X-ray Dental",
+      "serialNumber": "Y098P24071009",
+      "status": "In Use"
+    },
+    {
+      "no": 4,
+      "facility": "A-One Dental Center",
+      "equipmentType": "Fixed Dental X-ray",
+      "serialNumber": "DAT-10",
+      "status": "Not In Use"
+    },
+    {
+      "no": 5,
+      "facility": "City Dental Lusaka",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "3001VA4475",
+      "status": "In Use"
+    },
+    {
+      "no": 6,
+      "facility": "City Dental Lusaka",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "2911VA3764",
+      "status": "In Use"
+    },
+    {
+      "no": 7,
+      "facility": "Dental Training School",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "H18828",
+      "status": "Not In Use"
+    },
+    {
+      "no": 8,
+      "facility": "Dental Training School",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "BKYM015",
+      "status": "In Use"
+    },
+    {
+      "no": 9,
+      "facility": "MDC Dental Surgery (Done at Medical and Dental Surgery)",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "1801102",
+      "status": "Not In Use"
+    },
+    {
+      "no": 10,
+      "facility": "CFB Medical Centre",
+      "equipmentType": "Mammograph",
+      "serialNumber": "404089",
+      "status": "Not In Use"
+    },
+    {
+      "no": 11,
+      "facility": "CFB Medical Centre",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "10967666",
+      "status": "In Use"
+    },
+    {
+      "no": 12,
+      "facility": "CFB Medical Centre",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "91478",
+      "status": "In Use"
+    },
+    {
+      "no": 13,
+      "facility": "CFB Medical Centre",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "3716",
+      "status": "In Use"
+    },
+    {
+      "no": 14,
+      "facility": "CFB Medical Centre",
+      "equipmentType": "C-arm",
+      "serialNumber": "17313",
+      "status": "In Use"
+    },
+    {
+      "no": 15,
+      "facility": "ADCL",
+      "equipmentType": "OPD",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 16,
+      "facility": "ADCL",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 17,
+      "facility": "Unilab-Lusaka Branch",
+      "equipmentType": "Fixed",
+      "serialNumber": "M1707012",
+      "status": "In Use"
+    },
+    {
+      "no": 18,
+      "facility": "Unilab-Lusaka Branch",
+      "equipmentType": "Scanners",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 19,
+      "facility": "Dazzling Dental Clinic (Done at Nangwenya Clinic)",
+      "equipmentType": "DPG",
+      "serialNumber": "9576122",
+      "status": "In Use"
+    },
+    {
+      "no": 20,
+      "facility": "Dazzling Dental Clinic (Done at Nangwenya Clinic)",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "YKY-0545",
+      "status": "In Use"
+    },
+    {
+      "no": 21,
+      "facility": "Chreso Ministries Hospital and Clinic",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "08H178",
+      "status": "Not In Use"
+    },
+    {
+      "no": 22,
+      "facility": "Chreso Ministries Hospital and Clinic",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "2938084",
+      "status": "New"
+    },
+    {
+      "no": 23,
+      "facility": "Our Lady's Hospice",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "23H0802",
+      "status": "In Use"
+    },
+    {
+      "no": 24,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "19009-168",
+      "status": "In Use"
+    },
+    {
+      "no": 25,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "19009-169",
+      "status": "In Use"
+    },
+    {
+      "no": 26,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "699152471",
+      "status": "In Use"
+    },
+    {
+      "no": 27,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "N1281200394E",
+      "status": "In Use"
+    },
+    {
+      "no": 28,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "N1281240027E",
+      "status": "In Use"
+    },
+    {
+      "no": 29,
+      "facility": "Levy Mwanawasa University Teaching Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "23XZ4ST",
+      "status": "In Use"
+    },
+    {
+      "no": 30,
+      "facility": "PHI-Family Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "M1808034",
+      "status": "In Use"
+    },
+    {
+      "no": 31,
+      "facility": "PHI-Family Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "RUMYES",
+      "status": "In Use"
+    },
+    {
+      "no": 32,
+      "facility": "PHI-Family Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "HAIRUO",
+      "status": "In Use"
+    },
+    {
+      "no": 33,
+      "facility": "Kalingalinga Clinic",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "1801365",
+      "status": "In Use"
+    },
+    {
+      "no": 34,
+      "facility": "Kabelenga Family Hospital",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "202311188",
+      "status": "In Use"
+    },
+    {
+      "no": 35,
+      "facility": "Pearl of Health Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "17B1159",
+      "status": "In Use"
+    },
+    {
+      "no": 36,
+      "facility": "Medcross Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "E7239X",
+      "status": "In Use"
+    },
+    {
+      "no": 37,
+      "facility": "Carepeak Specialist Clinic",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "24020484F",
+      "status": "In Use"
+    },
+    {
+      "no": 38,
+      "facility": "Evelyn Hone College",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "17M642",
+      "status": "In Use"
+    },
+    {
+      "no": 39,
+      "facility": "Hilltop Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "1903037",
+      "status": "In Use"
+    },
+    {
+      "no": 40,
+      "facility": "Chuya Mwenechanya Centre for Family Health",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "210068",
+      "status": "Not In Use"
+    },
+    {
+      "no": 41,
+      "facility": "Maxcare Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "2231820",
+      "status": "In Use"
+    },
+    {
+      "no": 42,
+      "facility": "Maxcare Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "N32ALV220070",
+      "status": "In Use"
+    },
+    {
+      "no": 43,
+      "facility": "Maxcare Hospital",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "Y098P26052913",
+      "status": "In Use"
+    },
+    {
+      "no": 44,
+      "facility": "Maxcare Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "128122137",
+      "status": "In Use"
+    },
+    {
+      "no": 45,
+      "facility": "Bauleni Urban Clinic",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "ABC 27A2069A",
+      "status": "In Use"
+    },
+    {
+      "no": 46,
+      "facility": "Cardinal Adams Memorial Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "M1803026",
+      "status": "Not In Use"
+    },
+    {
+      "no": 47,
+      "facility": "Cardinal Adams Memorial Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "170/148",
+      "status": "Not In Use"
+    },
+    {
+      "no": 48,
+      "facility": "Cardinal Adams Memorial Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "243/22993",
+      "status": "In Use"
+    },
+    {
+      "no": 49,
+      "facility": "Cardinal Adams Memorial Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "1171612",
+      "status": "In Use"
+    },
+    {
+      "no": 50,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 51,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Fluoroscopy",
+      "serialNumber": "R3020MLP",
+      "status": "In Use"
+    },
+    {
+      "no": 52,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Mammograph",
+      "serialNumber": "85909-0N",
+      "status": "In Use"
+    },
+    {
+      "no": 53,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    },
+    {
+      "no": 54,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "R221/A DHHS",
+      "status": "In Use"
+    },
+    {
+      "no": 55,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 56,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "OPG-X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 57,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 58,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "20410012",
+      "status": "In Use"
+    },
+    {
+      "no": 59,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 60,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 61,
+      "facility": "Maina Soko Military Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 62,
+      "facility": "Prime Dental and Aesthetics Clinic",
+      "equipmentType": "Fixed Dental X-ray",
+      "serialNumber": "9301593",
+      "status": "In Use"
+    },
+    {
+      "no": 63,
+      "facility": "Prime Dental and Aesthetics Clinic",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "XS12 JK-2P",
+      "status": "Not In Use"
+    },
+    {
+      "no": 64,
+      "facility": "Mumscare Hospital (Done at Mumscare Woodlands)",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "F32A2102 14",
+      "status": "In Use"
+    },
+    {
+      "no": 65,
+      "facility": "Fairview Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "BE1178",
+      "status": "In Use"
+    },
+    {
+      "no": 66,
+      "facility": "Fairview Hospital",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "K17-CM2503009",
+      "status": "In Use"
+    },
+    {
+      "no": 67,
+      "facility": "Fairview Hospital",
+      "equipmentType": "Mammography",
+      "serialNumber": "NMH-GA25030003",
+      "status": "In Use"
+    },
+    {
+      "no": 68,
+      "facility": "Fairview Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "40010",
+      "status": "In Use"
+    },
+    {
+      "no": 69,
+      "facility": "Fairview Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "N512EP250004E",
+      "status": "In Use"
+    },
+    {
+      "no": 70,
+      "facility": "Fairview Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "13X3100122",
+      "status": "In Use"
+    },
+    {
+      "no": 71,
+      "facility": "Premium Medical Services",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "15500522",
+      "status": "In Use"
+    },
+    {
+      "no": 72,
+      "facility": "Premium Medical Services",
+      "equipmentType": "Mobile Dental Machine",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 73,
+      "facility": "Sikanze Police Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "302240091",
+      "status": "Not Yet In Use"
+    },
+    {
+      "no": 74,
+      "facility": "Sikanze Police Hospital",
+      "equipmentType": "Fixed Dental X-ray",
+      "serialNumber": "50002224692",
+      "status": "Not In Use"
+    },
+    {
+      "no": 75,
+      "facility": "Chilenje Level One Hospital",
+      "equipmentType": "Fixed X-ray Machine",
+      "serialNumber": "R302/ADHHS",
+      "status": "In Use"
+    },
+    {
+      "no": 76,
+      "facility": "TMS Medical Services",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "230426EX01",
+      "status": "In Use"
+    },
+    {
+      "no": 77,
+      "facility": "TMS Medical Services",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "23031377F",
+      "status": "Not Provided"
+    },
+    {
+      "no": 78,
+      "facility": "South Point Hospital",
+      "equipmentType": "Mobile X-Ray Machine",
+      "serialNumber": "2K8031001",
+      "status": "Not In Use"
+    },
+    {
+      "no": 79,
+      "facility": "Multicare Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "17179-19",
+      "status": "In Use"
+    },
+    {
+      "no": 80,
+      "facility": "Royal Palms Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "31210458",
+      "status": "In Use"
+    },
+    {
+      "no": 81,
+      "facility": "University Teaching Hospitals - Adult Theatre",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "K01240400 12 C",
+      "status": "Not Provided"
+    },
+    {
+      "no": 82,
+      "facility": "University Teaching Hospitals - Adult Theatre",
+      "equipmentType": "C-arm",
+      "serialNumber": "128183/1",
+      "status": "Not Provided"
+    },
+    {
+      "no": 83,
+      "facility": "University Teaching Hospitals - Adult Theatre",
+      "equipmentType": "C-arm",
+      "serialNumber": "20198",
+      "status": "Not Provided"
+    },
+    {
+      "no": 84,
+      "facility": "University Teaching Hospitals - Adult Theatre",
+      "equipmentType": "Fluoroscope X-ray",
+      "serialNumber": "M2-230824-007",
+      "status": "Not Provided"
+    },
+    {
+      "no": 85,
+      "facility": "Sanket Diagnostics",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "HAA0732655",
+      "status": "In Use"
+    },
+    {
+      "no": 86,
+      "facility": "Sanket Diagnostics",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "10360",
+      "status": "In Use"
+    },
+    {
+      "no": 87,
+      "facility": "Sanket Diagnostics",
+      "equipmentType": "Mammography",
+      "serialNumber": "250853",
+      "status": "In Use"
+    },
+    {
+      "no": 88,
+      "facility": "Sanket Diagnostics",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "15H181",
+      "status": "Not In Use"
+    },
+    {
+      "no": 89,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "C-arm",
+      "serialNumber": "715",
+      "status": "In Use"
+    },
+    {
+      "no": 90,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "C-arm",
+      "serialNumber": "211273918",
+      "status": "In Use"
+    },
+    {
+      "no": 91,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "440-0044",
+      "status": "In Use"
+    },
+    {
+      "no": 92,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "43.5-169",
+      "status": "In Use"
+    },
+    {
+      "no": 93,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "221577910",
+      "status": "Not In Use"
+    },
+    {
+      "no": 94,
+      "facility": "Royal Hospital Limited",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 95,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-57",
+      "serialNumber": "129915",
+      "status": "Active"
+    },
+    {
+      "no": 96,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Cs-137",
+      "serialNumber": "Not Provided",
+      "status": "Active"
+    },
+    {
+      "no": 97,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Cs-137",
+      "serialNumber": "C000156872",
+      "status": "Active"
+    },
+    {
+      "no": 98,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Cs-137",
+      "serialNumber": "1896-42-14",
+      "status": "Active"
+    },
+    {
+      "no": 99,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-57",
+      "serialNumber": "1896-66-8",
+      "status": "Active"
+    },
+    {
+      "no": 100,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Ba-133",
+      "serialNumber": "1896-65-19",
+      "status": "Active"
+    },
+    {
+      "no": 101,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-60",
+      "serialNumber": "CK 807",
+      "status": "Inactive"
+    },
+    {
+      "no": 102,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: I-131",
+      "serialNumber": "Not Provided",
+      "status": "Basic"
+    },
+    {
+      "no": 103,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: I-129",
+      "serialNumber": "Not Provided",
+      "status": "Not Provided"
+    },
+    {
+      "no": 104,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-57",
+      "serialNumber": "1959-117",
+      "status": "Not Provided"
+    },
+    {
+      "no": 105,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-60",
+      "serialNumber": "88123026-03",
+      "status": "Expired (Inactive)"
+    },
+    {
+      "no": 106,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Cs-137",
+      "serialNumber": "58117020-01",
+      "status": "Expired (Inactive)"
+    },
+    {
+      "no": 107,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-57",
+      "serialNumber": "58221049-09",
+      "status": "Expired (Inactive)"
+    },
+    {
+      "no": 108,
+      "facility": "University Teaching Hospital - Nuclear Medicine",
+      "equipmentType": "Source: Co-57",
+      "serialNumber": "1218-47-19",
+      "status": "Expired (Inactive)"
+    },
+    {
+      "no": 109,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "9901332791",
+      "status": "Not Provided"
+    },
+    {
+      "no": 110,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "1AB1355375",
+      "status": "Not Provided"
+    },
+    {
+      "no": 111,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "Fluoroscopy",
+      "serialNumber": "2202305132102517",
+      "status": "Not Provided"
+    },
+    {
+      "no": 112,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "Fluoroscopy",
+      "serialNumber": "2202309246602317",
+      "status": "Not Provided"
+    },
+    {
+      "no": 113,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "X ray",
+      "serialNumber": "53900-4R",
+      "status": "Not Provided"
+    },
+    {
+      "no": 114,
+      "facility": "University Teaching Hospitals - Adult Dept. of Radiology",
+      "equipmentType": "CT Scanner",
+      "serialNumber": "667142371",
+      "status": "Not Provided"
+    },
+    {
+      "no": 115,
+      "facility": "Lusaka Trust Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "7188640",
+      "status": "In Use"
+    },
+    {
+      "no": 116,
+      "facility": "Lusaka Trust Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "27431",
+      "status": "In Use"
+    },
+    {
+      "no": 117,
+      "facility": "Lusaka Trust Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "377626 520",
+      "status": "In Use"
+    },
+    {
+      "no": 118,
+      "facility": "Lusaka Trust Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "134 229",
+      "status": "In Use"
+    },
+    {
+      "no": 119,
+      "facility": "Lusaka Adventist Dental Services",
+      "equipmentType": "Dental Xray",
+      "serialNumber": "KPP16010011",
+      "status": "Not Provided"
+    },
+    {
+      "no": 120,
+      "facility": "Lusaka Adventist Dental Services",
+      "equipmentType": "Dental Xray",
+      "serialNumber": "ITPX160101",
+      "status": "Not Provided"
+    },
+    {
+      "no": 121,
+      "facility": "Ruth Kaluluma Memorial Hospital",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "XD57-20.50",
+      "status": "In Use"
+    },
+    {
+      "no": 122,
+      "facility": "Ruth Kaluluma Memorial Hospital",
+      "equipmentType": "Mobile X-Ray",
+      "serialNumber": "1114",
+      "status": "Not In Use"
+    },
+    {
+      "no": 123,
+      "facility": "Ruth Kaluluma Memorial Hospital",
+      "equipmentType": "Dental X-Ray",
+      "serialNumber": "2501187",
+      "status": "In Use"
+    },
+    {
+      "no": 124,
+      "facility": "Ruth Kaluluma Memorial Hospital",
+      "equipmentType": "Dental X-Ray (Chingola)",
+      "serialNumber": "2501184",
+      "status": "Not In Use"
+    },
+    {
+      "no": 125,
+      "facility": "National Heart Hospital",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "24032569N0033",
+      "status": "Not In Use"
+    },
+    {
+      "no": 126,
+      "facility": "National Heart Hospital",
+      "equipmentType": "Digital Mobile X-Ray",
+      "serialNumber": "222157HL0",
+      "status": "In Use"
+    },
+    {
+      "no": 127,
+      "facility": "National Heart Hospital",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 128,
+      "facility": "National Heart Hospital",
+      "equipmentType": "Digital Mobile X-Ray",
+      "serialNumber": "1812457",
+      "status": "Not In Use"
+    },
+    {
+      "no": 129,
+      "facility": "National Heart Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 130,
+      "facility": "Coptic Hospital",
+      "equipmentType": "Mammograph",
+      "serialNumber": "D2510385",
+      "status": "In Use"
+    },
+    {
+      "no": 131,
+      "facility": "Coptic Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "M2207287",
+      "status": "In Use"
+    },
+    {
+      "no": 132,
+      "facility": "Coptic Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "115285Tx9",
+      "status": "Not In Use"
+    },
+    {
+      "no": 133,
+      "facility": "Coptic Hospital",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "52794",
+      "status": "In Use"
+    },
+    {
+      "no": 134,
+      "facility": "Coptic Hospital",
+      "equipmentType": "Mobile Dental X-ray",
+      "serialNumber": "722068100",
+      "status": "In Use"
+    },
+    {
+      "no": 135,
+      "facility": "Coptic Hospital",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "1220680991",
+      "status": "In Use"
+    },
+    {
+      "no": 136,
+      "facility": "Coptic Hospital",
+      "equipmentType": "CT-Scanner",
+      "serialNumber": "691072571",
+      "status": "In Use"
+    },
+    {
+      "no": 137,
+      "facility": "CJNH",
+      "equipmentType": "Mobile X-Ray",
+      "serialNumber": "310190",
+      "status": "Not In Use"
+    },
+    {
+      "no": 138,
+      "facility": "Forest Park Specialised Hospital",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 139,
+      "facility": "Forest Park Specialised Hospital",
+      "equipmentType": "Mobile X-Ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 140,
+      "facility": "Forest Park Specialised Hospital",
+      "equipmentType": "Mammography",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    },
+    {
+      "no": 141,
+      "facility": "Forest Park Specialised Hospital",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 142,
+      "facility": "Forest Park Specialised Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 143,
+      "facility": "IOM",
+      "equipmentType": "Fixed Digital X-Ray",
+      "serialNumber": "679382384",
+      "status": "In Use"
+    },
+    {
+      "no": 144,
+      "facility": "IOM",
+      "equipmentType": "X-Ray Baggage Scan",
+      "serialNumber": "ASTXA160SING26",
+      "status": "Not In Use"
+    },
+    {
+      "no": 145,
+      "facility": "Mum's Care Hospital (Zesco)",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "006C/26464",
+      "status": "In Use"
+    },
+    {
+      "no": 146,
+      "facility": "Mum's Care Hospital (Zesco)",
+      "equipmentType": "Mammography",
+      "serialNumber": "43462-02",
+      "status": "In Use"
+    },
+    {
+      "no": 147,
+      "facility": "Smile Dental Clinic",
+      "equipmentType": "Dental X-ray (OPD)",
+      "serialNumber": "RAP20C7266",
+      "status": "In Use"
+    },
+    {
+      "no": 148,
+      "facility": "Braceline Orthodontics",
+      "equipmentType": "OPG",
+      "serialNumber": "1527860",
+      "status": "In Use"
+    },
+    {
+      "no": 149,
+      "facility": "Medland Hospital",
+      "equipmentType": "C-arm (Cath Lab)",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 150,
+      "facility": "Medland Hospital",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "E500070",
+      "status": "In Use"
+    },
+    {
+      "no": 151,
+      "facility": "Medland Hospital",
+      "equipmentType": "OPG",
+      "serialNumber": "RE36A1800958YC",
+      "status": "In Use"
+    },
+    {
+      "no": 152,
+      "facility": "Medland Hospital",
+      "equipmentType": "Mammography",
+      "serialNumber": "Sysdr/0005/02",
+      "status": "In Use"
+    },
+    {
+      "no": 153,
+      "facility": "Medland Hospital",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "W0322809/E-1",
+      "status": "In Use"
+    },
+    {
+      "no": 154,
+      "facility": "Medland Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "162372HL7",
+      "status": "In Use"
+    },
+    {
+      "no": 155,
+      "facility": "Medland Hospital",
+      "equipmentType": "Dexter",
+      "serialNumber": "470070",
+      "status": "In Use"
+    },
+    {
+      "no": 156,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "Fixed X-ray (Waived)",
+      "serialNumber": "5J0493",
+      "status": "Not In Use"
+    },
+    {
+      "no": 157,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "5F051994",
+      "status": "Not In Use"
+    },
+    {
+      "no": 158,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "C-arm (mini)",
+      "serialNumber": "29660",
+      "status": "Not In Use"
+    },
+    {
+      "no": 159,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "C-arm (Mini)",
+      "serialNumber": "9660694",
+      "status": "Not In Use"
+    },
+    {
+      "no": 160,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "C-arm (Mini)",
+      "serialNumber": "004367",
+      "status": "In Use"
+    },
+    {
+      "no": 161,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 162,
+      "facility": "Zambian Italian Orthopaedic Hospital",
+      "equipmentType": "Mammograph",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 163,
+      "facility": "Perliwhyte Dental Solutions",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "EX1G1210A028",
+      "status": "In Use"
+    },
+    {
+      "no": 164,
+      "facility": "Perliwhyte Dental Solutions",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "YCYA049",
+      "status": "Not In Use"
+    },
+    {
+      "no": 165,
+      "facility": "Perliwhyte Dental Solutions",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "EHYU398",
+      "status": "In Use"
+    },
+    {
+      "no": 166,
+      "facility": "Perliwhyte Dental Solutions",
+      "equipmentType": "OPG",
+      "serialNumber": "1101292",
+      "status": "In Use"
+    },
+    {
+      "no": 167,
+      "facility": "Perliwhyte Dental Solutions",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "KHXQ 224",
+      "status": "In Use"
+    },
+    {
+      "no": 168,
+      "facility": "ZAF Hospital HQ",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "EIYU115",
+      "status": "In Use"
+    },
+    {
+      "no": 169,
+      "facility": "ZAF Hospital HQ",
+      "equipmentType": "Fixed X-Ray",
+      "serialNumber": "18L348",
+      "status": "In Use"
+    },
+    {
+      "no": 170,
+      "facility": "ZAF Hospital HQ",
+      "equipmentType": "Mobile X-Ray",
+      "serialNumber": "521205",
+      "status": "Not In Use"
+    },
+    {
+      "no": 171,
+      "facility": "ZAF Hospital HQ",
+      "equipmentType": "Mammograph",
+      "serialNumber": "21011159",
+      "status": "Not In Use"
+    },
+    {
+      "no": 172,
+      "facility": "MM Integrated Steel Mills",
+      "equipmentType": "Industrial Nuclear Gauge",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 173,
+      "facility": "MM Integrated Steel Mills",
+      "equipmentType": "Industrial Nuclear Gauge",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 174,
+      "facility": "MM Integrated Steel Mills",
+      "equipmentType": "XRF-3000",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    },
+    {
+      "no": 175,
+      "facility": "Sunshine Dental Clinic",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "AIDX 143",
+      "status": "In Use"
+    },
+    {
+      "no": 176,
+      "facility": "Sunshine Dental Clinic",
+      "equipmentType": "Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    },
+    {
+      "no": 177,
+      "facility": "Lusaka Adventist Clinic",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "56051-N3",
+      "status": "Not In Use"
+    },
+    {
+      "no": 178,
+      "facility": "Lusaka Adventist Clinic",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "23022158",
+      "status": "Not In Use"
+    },
+    {
+      "no": 179,
+      "facility": "Lusaka Adventist Clinic",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    },
+    {
+      "no": 180,
+      "facility": "University Teaching Hospital - Childrens Clinic",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "24D202-242",
+      "status": "In Use"
+    },
+    {
+      "no": 181,
+      "facility": "Chisomo Hospital",
+      "equipmentType": "Mobile Xray",
+      "serialNumber": "AB 27 114",
+      "status": "In Use"
+    },
+    {
+      "no": 182,
+      "facility": "Chisomo Hospital",
+      "equipmentType": "Fixed Xray",
+      "serialNumber": "A1807120",
+      "status": "Not In Use"
+    },
+    {
+      "no": 183,
+      "facility": "Hitech Diagnostics / Max Clinic",
+      "equipmentType": "Mobile Xray",
+      "serialNumber": "300 239",
+      "status": "In Use"
+    },
+    {
+      "no": 184,
+      "facility": "Hitech Diagnostics / Max Clinic",
+      "equipmentType": "Fixed Xray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 185,
+      "facility": "Chipata Level One Hospital",
+      "equipmentType": "Fixed Xray",
+      "serialNumber": "RM6F3B097044",
+      "status": "In Use"
+    },
+    {
+      "no": 186,
+      "facility": "Chipata Level One Hospital",
+      "equipmentType": "Portable Xray",
+      "serialNumber": "RM69981AB013",
+      "status": "In Use"
+    },
+    {
+      "no": 187,
+      "facility": "Chipata Level One Hospital",
+      "equipmentType": "Fixed Dental Xray",
+      "serialNumber": "5663",
+      "status": "In Use"
+    },
+    {
+      "no": 188,
+      "facility": "Matero Level 1 Hospital",
+      "equipmentType": "Fixed Xray",
+      "serialNumber": "1581044",
+      "status": "In Use"
+    },
+    {
+      "no": 189,
+      "facility": "Matero Level 1 Hospital",
+      "equipmentType": "Fixed Dental Xray",
+      "serialNumber": "4306440",
+      "status": "Not Provided"
+    },
+    {
+      "no": 190,
+      "facility": "Vivamed Hospital",
+      "equipmentType": "Portable Dental X-ray",
+      "serialNumber": "Not Provided",
+      "status": "In Use"
+    },
+    {
+      "no": 191,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "2590727",
+      "status": "Not In Use"
+    },
+    {
+      "no": 192,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "18701",
+      "status": "In Use"
+    },
+    {
+      "no": 193,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "1046103",
+      "status": "In Use"
+    },
+    {
+      "no": 194,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "89-2217",
+      "status": "In Use"
+    },
+    {
+      "no": 195,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "710201603015",
+      "status": "In Use"
+    },
+    {
+      "no": 196,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "91201597",
+      "status": "In Use"
+    },
+    {
+      "no": 197,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "Portable X-ray",
+      "serialNumber": "A06816",
+      "status": "In Use"
+    },
+    {
+      "no": 198,
+      "facility": "Beit Cure Children's Hospital",
+      "equipmentType": "X-ray Tube",
+      "serialNumber": "610924",
+      "status": "Not In Use"
+    },
+    {
+      "no": 199,
+      "facility": "Hospital ZOS",
+      "equipmentType": "Portable Xray",
+      "serialNumber": "2403787",
+      "status": "In Use"
+    },
+    {
+      "no": 200,
+      "facility": "Hospital ZOS",
+      "equipmentType": "Dental Xray (P)",
+      "serialNumber": "Not Provided",
+      "status": "Not Provided"
+    },
+    {
+      "no": 201,
+      "facility": "Wellspring Speciality Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "2255869",
+      "status": "In Use"
+    },
+    {
+      "no": 202,
+      "facility": "Wellspring Speciality Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "1682",
+      "status": "In Use"
+    },
+    {
+      "no": 203,
+      "facility": "Victoria Hospital",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "2400264",
+      "status": "In Use"
+    },
+    {
+      "no": 204,
+      "facility": "Victoria Hospital",
+      "equipmentType": "Mammograph",
+      "serialNumber": "20192012",
+      "status": "In Use"
+    },
+    {
+      "no": 205,
+      "facility": "Victoria Hospital",
+      "equipmentType": "C-arm",
+      "serialNumber": "1217112",
+      "status": "In Use"
+    },
+    {
+      "no": 206,
+      "facility": "Lilayi Family Clinic",
+      "equipmentType": "Fixed Xray",
+      "serialNumber": "20A 1003",
+      "status": "In Use"
+    },
+    {
+      "no": 207,
+      "facility": "Care Africa Limited",
+      "equipmentType": "Mammograph",
+      "serialNumber": "405508",
+      "status": "In Use"
+    },
+    {
+      "no": 208,
+      "facility": "Care Africa Limited",
+      "equipmentType": "Fixed X-ray",
+      "serialNumber": "1518122",
+      "status": "In Use"
+    },
+    {
+      "no": 209,
+      "facility": "Care Africa Limited",
+      "equipmentType": "CT-Scan",
+      "serialNumber": "348965C1",
+      "status": "In Use"
+    },
+    {
+      "no": 210,
+      "facility": "Southpoint Hospital Avondale",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "18020039",
+      "status": "In Use"
+    },
+    {
+      "no": 211,
+      "facility": "Pearl of Health Avondale Clinic",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "MD100RH17",
+      "status": "In Use"
+    },
+    {
+      "no": 212,
+      "facility": "Chawama Level One Hospital",
+      "equipmentType": "Fixed X ray",
+      "serialNumber": "RM6FJB097046",
+      "status": "In Use"
+    },
+    {
+      "no": 213,
+      "facility": "Chawama Level One Hospital",
+      "equipmentType": "Portable Xray",
+      "serialNumber": "RM699819409",
+      "status": "In Use"
+    },
+    {
+      "no": 214,
+      "facility": "Chawama Level One Hospital",
+      "equipmentType": "Fixed Dental Xray",
+      "serialNumber": "5610",
+      "status": "In Use"
+    },
+    {
+      "no": 215,
+      "facility": "Morningstar Clinic",
+      "equipmentType": "Mobile X-ray",
+      "serialNumber": "Not Provided",
+      "status": "Not In Use"
+    }
+  ]
+}
