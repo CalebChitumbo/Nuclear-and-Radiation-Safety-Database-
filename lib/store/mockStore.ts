@@ -40,18 +40,31 @@ import {
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
+import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import facilitiesSeed from "../../seed/facilities.seed.json";
+import screeningSeed from "../../seed/daily-screening-2026.seed.json";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
-import { mapAllSeed, type SeedFacility } from "./seeding";
+import {
+  mapAllSeed,
+  mapSeedBorders,
+  mapSeedScreening,
+  type SeedFacility,
+  type SeedScreening,
+} from "./seeding";
 import type { DataStore } from "./types";
 
-// v3: the 2026 Licensing Status workbook register replacement. Bumping the key
-// makes every mock/demo browser start fresh from the new seed (the old
-// register AND the history recorded against it are gone by design).
-const STORAGE_KEY = "rpa-mock-store-v3";
-const OLD_STORAGE_KEYS = ["rpa-mock-store-v1", "rpa-mock-store-v2"];
+// v4: the August 2026 data refresh — the updated Licensing Status register and
+// the inland offices' seeded daily screening log. Bumping the key makes every
+// mock/demo browser start fresh from the new seed (the old register AND the
+// history recorded against it are gone by design).
+const STORAGE_KEY = "rpa-mock-store-v4";
+const OLD_STORAGE_KEYS = [
+  "rpa-mock-store-v1",
+  "rpa-mock-store-v2",
+  "rpa-mock-store-v3",
+];
 
 interface State {
   facilities: Facility[];
@@ -69,22 +82,6 @@ interface State {
   users: UserDoc[];
 }
 
-export function borderId(name: string): string {
-  return name.trim().replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
-}
-
-/** Demo border posts (mock mode only — a real deployment adds its own). */
-function defaultBorders(): Border[] {
-  return [
-    "Chirundu",
-    "Kasumbalesa",
-    "Nakonde",
-    "Kazungula",
-    "Mwami",
-    "Victoria Falls",
-  ].map((name) => ({ id: borderId(name), name, active: true }));
-}
-
 function freshState(): State {
   return {
     facilities: mapAllSeed(facilitiesSeed as SeedFacility[]),
@@ -96,8 +93,11 @@ function freshState(): State {
     weekMetrics: {},
     workPlanNotes: {},
     workPlanBaseline: {},
-    dailyEntries: [],
-    borders: defaultBorders(),
+    // The inland offices' 2026 screening log, seeded as daily entries so the
+    // NSSS tab and work plan output 1.3.12 read real figures rather than an
+    // opening balance — see docs/daily-screening-2026-import.md.
+    dailyEntries: mapSeedScreening(screeningSeed as SeedScreening, weeksSeed),
+    borders: mapSeedBorders(screeningSeed as SeedScreening),
     truckScans: [],
     users: [
       {
@@ -154,7 +154,9 @@ function load(): State {
     if (!parsed.workPlanNotes) parsed.workPlanNotes = {};
     if (!parsed.workPlanBaseline) parsed.workPlanBaseline = {};
     // Back-compat: stores saved before border posts existed.
-    if (!parsed.borders) parsed.borders = defaultBorders();
+    if (!parsed.borders) {
+      parsed.borders = mapSeedBorders(screeningSeed as SeedScreening);
+    }
     if (!parsed.truckScans) parsed.truckScans = [];
     // Back-compat: add the NSSS demo account to older saved stores.
     if (!parsed.users.some((u) => u.uid === "demo-nsss")) {

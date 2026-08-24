@@ -468,15 +468,22 @@ describe("exports", () => {
 });
 
 describe("opening balance — the plan is cumulative for the year", () => {
-  it("ships the approved workbook's actuals at handover", () => {
-    // The figures Management's sheet showed when the section moved onto the
-    // system. Changing them silently re-states every report, so they are
-    // pinned here.
-    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([0, 125, 0, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 96, 0, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([0, 61, 0, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([138155, 239650, 0, 0]);
+  it("ships the sections' own actuals as at the August 2026 update", () => {
+    // The figures each section's workbook showed. Changing them silently
+    // re-states every report, so they are pinned here.
+    // 1.1.4 — the Licensing Status workbook's 357 licences, by quarter.
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([196, 142, 19, 0]);
+    // 1.2.x — the Inspectorate's Subprogram 1.2 sheet.
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 123, 121, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.6"]).toEqual([8, 8, 7, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 61, 87, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.9"]).toEqual([0, 0, 65, 0]);
+  });
+
+  it("carries nothing in on 1.3.12 — the screening log is counted, not carried", () => {
+    // The inland offices' figures are seeded as daily entries, so an opening
+    // balance here would count all 331,177 of them a second time.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([0, 0, 0, 0]);
   });
 
   it("adds what the system records on top of what was carried in", () => {
@@ -494,12 +501,12 @@ describe("opening balance — the plan is cumulative for the year", () => {
       baseline: null,
     });
     const r = row(reports, "1.1.4");
-    expect(r.opening).toEqual([0, 125, 0, 0]);
+    expect(r.opening).toEqual([196, 142, 19, 0]);
     expect(r.recorded).toEqual([0, 2, 1, 0]);
-    expect(r.quarters).toEqual([0, 127, 1, 0]);
-    expect(r.openingTotal).toBe(125);
+    expect(r.quarters).toEqual([196, 144, 20, 0]);
+    expect(r.openingTotal).toBe(357);
     expect(r.recordedTotal).toBe(3);
-    expect(r.total).toBe(128);
+    expect(r.total).toBe(360);
     // The week column stays the week's own work — it is not cumulative.
     expect(r.week).toBe(2);
   });
@@ -513,10 +520,10 @@ describe("opening balance — the plan is cumulative for the year", () => {
       valuesByWeek: new Map(),
       baseline: null,
     });
-    // 61 enforcement actions carried in against a target of 50.
+    // 193 enforcement actions carried in against a target of 50.
     const enforcement = row(reports, "1.2.11");
-    expect(enforcement.total).toBe(61);
-    expect(formatPercent(enforcement.percent)).toBe("122%");
+    expect(enforcement.total).toBe(193);
+    expect(formatPercent(enforcement.percent)).toBe("386%");
     expect(enforcement.status).toBe("Achieved");
     // Nothing carried in and nothing recorded stays Not Started.
     expect(row(reports, "1.1.8").total).toBe(0);
@@ -573,11 +580,11 @@ describe("opening balance — the plan is cumulative for the year", () => {
       baseline: null,
     });
     const line = workPlanRows(reports).find((r) => r[1] === "1.1.4")!;
-    expect(line[10]).toBe("126"); // Total Actual
-    expect(line[15]).toBe("125"); // Opening Balance
+    expect(line[10]).toBe("358"); // Total Actual
+    expect(line[15]).toBe("357"); // Opening Balance
     expect(line[16]).toBe("1"); // Recorded in System
     expect(workPlanBrief(reports, Q2)).toContain(
-      "[opening balance 125, recorded since 1]",
+      "[opening balance 357, recorded since 1]",
     );
   });
 });

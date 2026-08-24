@@ -18,10 +18,14 @@ import type { WorkPlanBaseline } from "@/lib/rules/types";
  * the system started counting it.
  *
  * The report is cumulative for the plan year, so this is what every row counts
- * up from: a section already at 125 licences when it came onto the system
- * reports 126 once the next one is logged, not 1. The figures ship with the
- * approved workbook's actuals at handover; this panel is how an officer
- * corrects them or re-baselines the year.
+ * up from: a section already at 357 licences when it came onto the system
+ * reports 358 once the next one is logged, not 1. The figures ship with each
+ * section's own actuals as at the last data update; this panel is how an
+ * officer corrects them or re-baselines the year.
+ *
+ * An output whose history the system actually holds carries nothing in — the
+ * screened-vehicles row (1.3.12) counts the seeded daily log rather than a
+ * lump sum — so a zero here is a deliberate figure, not a gap.
  *
  * Only admins may write it — it moves every section's reported figures at once.
  * Everyone else sees what is in force and where it came from.
@@ -113,7 +117,7 @@ export function OpeningBalancePanel({
 
   const provenance = baseline?.updatedAt
     ? `Saved ${baseline.updatedAt.slice(0, 10)}`
-    : `From the approved ${year} workbook at handover`;
+    : `From each section's ${year} workbook`;
 
   return (
     <Panel
@@ -234,7 +238,7 @@ export function OpeningBalancePanel({
                   setDraft(effectiveOpeningBalance(WORK_PLAN_OPENING_BALANCE))
                 }
               >
-                Reset to the approved workbook
+                Reset to the sections' workbooks
               </button>
               <button
                 className="btn btn-ghost"

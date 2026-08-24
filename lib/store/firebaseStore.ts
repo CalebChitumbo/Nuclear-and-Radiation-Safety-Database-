@@ -61,6 +61,7 @@ import {
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
+import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import type { DataStore } from "./types";
@@ -338,7 +339,7 @@ class FirebaseStore implements DataStore {
     if (!trimmed) throw new Error("A border name is required.");
     // Deterministic id from the name so re-adding upserts (and reactivates)
     // the same border instead of duplicating it.
-    const id = trimmed.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase();
+    const id = borderId(trimmed);
     const border: Border = {
       id,
       name: trimmed,

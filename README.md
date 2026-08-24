@@ -5,12 +5,17 @@ Authority of Zambia (RPA) — Nuclear & Radiation Safety Department**. It
 unifies the licensing register, authorisations, inspections, and daily/weekly
 sectional reporting into one system, backed by Firebase and pre-seeded with
 the real register of **538 facilities** from the *2026 Licensing Status*
-workbook: 405 functional / 133 non-functional, 212 licensed, each classified
-Medical or Non-Medical, and **332 licences on record** — the 327 the workbook
-accounts for (225 use/possession, 73 import, 15 variation, 5 decommissioning,
-3 export, 3 transit, 2 transfer, 1 transport), dated by quarter of issue (see
-`docs/licensing-status-2026-import.md` for the full import log, and
+workbook: 401 functional / 137 non-functional, 220 licensed, each classified
+Medical or Non-Medical, and **361 licences on record** — the 357 the workbook
+accounts for (238 use/possession, 82 import, 18 variation, 7 transfer,
+5 decommissioning, 3 export, 3 transit, 1 transport), dated by quarter of issue
+(see `docs/licensing-status-2026-import.md` for the full import log, and
 `docs/register-2026-import.md` for the July 2026 register it replaced).
+
+It also ships the inland offices' **2026 daily screening log** — 1,484 daily
+counts across the eight posts, 331,177 vehicles assessed — seeded as ordinary
+daily entries so work plan output 1.3.12 counts them post by post rather than
+carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
 
 **Navigation** (sidebar, in order): Overview · Facilities · **Reports**
 (`/reports` — live status × functional matrix, sector/category/province
@@ -62,8 +67,8 @@ and is exercised by `tests/recordLicence.test.ts`. Do not bypass them.
 
 The Firestore SDK is loaded only when running in **Firebase mode**. The app
 also ships with an in-memory **mock data store** that loads the 538-facility
-seed at startup, so the system can be demoed and developed without Firebase
-credentials.
+register and the 1,484-entry screening log at startup, so the system can be
+demoed and developed without Firebase credentials.
 
 ---
 
@@ -104,8 +109,14 @@ to the seed.
 4. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
-   # verify the dashboard reads 538 / 212 / 326 / 405 functional
+   # verify the dashboard reads 538 / 220 / 318 / 401 functional
    ```
+   A re-import can supersede a facility document rather than update it (the
+   workbook dropped it, or RAIS has since issued it a RAN and its id changed).
+   `seed` lists those on every run; `npm run seed -- --prune` deletes them,
+   and only ever the ones carrying no `updatedBy` — a facility added or
+   edited in the app is reported and kept.
+
    **Replacing an existing register** (e.g. applying the 2026 Licensing
    Status workbook over a previously seeded project):
    ```bash
@@ -206,8 +217,8 @@ automatically (Production for the production branch, Preview for others).
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
 | `workPlanBaseline/{year}` | The plan year's **opening balance** — what each output had already achieved before the system started counting it. The report is cumulative, so every row counts up from here. Admin-writable only (it moves every section's figures at once) |
-| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures |
-| `borders/{id}` | NSSS border posts (vehicle screening); managed by NSSS/admins, deactivation keeps history |
+| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
+| `borders/{id}` | NSSS border posts (vehicle screening); seeded with the eight inland offices, then managed by NSSS/admins — deactivation keeps history |
 | `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`), carrying the application's append-only officer **notes & history** trail (`notes`) |
@@ -468,12 +479,16 @@ and the choice is remembered:
 
 The sections did not start the year on this system, so every output counts up
 from an **opening balance**: what it had already achieved before the system
-began recording it. A section at 125 licences when it came onto the system
-reports 126 once the next one is logged, not 1.
+began recording it. A section at 357 licences when it came onto the system
+reports 358 once the next one is logged, not 1.
 
-The figures ship with the approved workbook's actuals at handover
+The figures ship with each section's own actuals as at the August 2026 update
 (`WORK_PLAN_OPENING_BALANCE` in `lib/rules/workPlan.ts`), so the report is right
-from the first day. **Opening balance — 2026** on `/weekly` shows what is in
+from the first day — 1.1.x from the *Licensing Status* workbook, 1.2.x from the
+Inspectorate's *Subprogram 1.2* sheet (see
+[`docs/inspectorate-work-plan-2026-update.md`](docs/inspectorate-work-plan-2026-update.md)),
+1.3.12 from nothing at all because its daily log is seeded instead.
+**Opening balance — 2026** on `/weekly` shows what is in
 force and, for an admin, how to change it: paste rows straight out of the plan
 spreadsheet (`parseOpeningBalance` reads the workbook's column order, or a
 looser *id then Q1–Q4*), or type into the per-quarter grid, then save. Buttons
@@ -487,7 +502,9 @@ touches those outputs — the rest of the grid keeps what it was showing.
 > the same licences or inspections would count them twice; zero that output's
 > opening figures first if you ever do. Expanding a row shows the split —
 > *Total actual = opening balance + recorded since* — so the two are always
-> separable, and the CSV carries them as trailing columns.
+> separable, and the CSV carries them as trailing columns. Output **1.3.12**
+> (vehicles screened) is exactly that case: the inland offices' figures are
+> seeded as daily entries, so it carries **nothing** in.
 
 ### Nothing on the plan is retyped that the system already knows
 
@@ -715,13 +732,16 @@ npm test
   excluding enforcement, 1.2.11 every inspection that led to an enforcement
   action — split by action — 1.3.12 screening on the border log's
   own metric key), figures logged under pre-work-plan metric names still counting,
-  the **opening balance** the cumulative count starts from (the workbook's
-  handover actuals, a saved baseline replacing them outright, % and status
-  measured on the combined total), the spreadsheet paste parser, and the export
-  columns
+  the **opening balance** the cumulative count starts from (each section's own
+  actuals, 1.3.12 carrying nothing in, a saved baseline replacing them outright,
+  % and status measured on the combined total), the spreadsheet paste parser,
+  and the export columns
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
-- `seedBaseline` — verifies the register baseline (538 / 212 / 326 / 405 functional /
+- `screeningSeed` — verifies the seeded daily screening log (1,484 entries,
+  331,177 vehicles, reconciled post by post against the workbook's Summary
+  sheet) and that it fills in work plan output 1.3.12 with nothing carried in
+- `seedBaseline` — verifies the register baseline (538 / 220 / 318 / 401 functional /
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
@@ -766,7 +786,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
 ├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
-├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52)
+├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
+│                           daily-screening-2026.seed.json (8 posts, 1,484 days)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json
@@ -831,8 +852,8 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
 
 ## Acceptance criteria (from §16 of the spec)
 
-- [x] Seeded dashboard shows **538 total, 212 licensed, 326 unlicensed,
-      405 functional, Public 65/250, Private 147/288, 332 authorisations** —
+- [x] Seeded dashboard shows **538 total, 220 licensed, 318 unlicensed,
+      401 functional, Public 65/250, Private 155/288, 361 authorisations** —
       verified by `tests/seedBaseline.test.ts` (2026 Licensing Status workbook).
 - [x] The §6 worked expectation passes — `tests/recordLicence.test.ts`.
 - [x] Authorisations-on-Record increments on every recorded licence with or
