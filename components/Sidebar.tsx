@@ -17,6 +17,7 @@ const NAV_GROUPS: {
     items: [
       { href: "/", label: "Overview", icon: "▣" },
       { href: "/facilities", label: "Facilities", icon: "▤" },
+      { href: "/source-inventory", label: "Source Inventory", icon: "⚛" },
       { href: "/reports", label: "Reports", icon: "▥" },
       { href: "/licences", label: "Authorisations", icon: "▦" },
     ],
