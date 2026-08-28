@@ -1,11 +1,17 @@
 import { toCsv } from "./exportCsv";
 
 /**
- * The Source Inventory tab — the radiation sources and radiation-emitting
- * devices held by the facilities catalogued in the Authority's field
- * verification exercise. Each record is one item as recorded in Annex I of the
- * "Activity Report on Source Inventory Programme": establishment, equipment
- * type, serial number and the status observed in the field.
+ * The Verified Source Inventory tab — the radiation sources and radiation-
+ * emitting devices the field team physically confirmed at the facilities
+ * catalogued in the Authority's verification exercise. Each record is one item
+ * as recorded in Annex I of the "Activity Report on Source Inventory
+ * Programme": establishment, equipment type, serial number and the status
+ * observed in the field.
+ *
+ * This is the ground truth, not the register: the companion tab, Source
+ * Inventory (`raisInventory.ts`), holds every item on the books in RAIS. These
+ * 215 items are the subset an officer stood in front of and confirmed, which is
+ * why they carry a facility and a field status that RAIS cannot supply.
  *
  * The raw equipment-type text in the annex is free-form (fifty-odd spellings of
  * a dozen real machine families), so every helper here derives its groupings
@@ -15,7 +21,7 @@ import { toCsv } from "./exportCsv";
  */
 
 /** One inventoried item, exactly as recorded in Annex I. */
-export interface SourceRecord {
+export interface VerifiedRecord {
   /** Running number in the annex (1…215). */
   no: number;
   /** Establishment / facility holding the item. */
@@ -29,7 +35,7 @@ export interface SourceRecord {
 }
 
 /** Provenance for the inventory, carried on the seed so the page can cite it. */
-export interface SourceInventoryMeta {
+export interface VerifiedInventoryMeta {
   title: string;
   sourceDocument: string;
   reportDate: string;
@@ -41,9 +47,9 @@ export interface SourceInventoryMeta {
   annexReference: string;
 }
 
-export interface SourceInventorySeed {
-  meta: SourceInventoryMeta;
-  items: SourceRecord[];
+export interface VerifiedInventorySeed {
+  meta: VerifiedInventoryMeta;
+  items: VerifiedRecord[];
 }
 
 /**
@@ -142,7 +148,7 @@ export function isSerialProvided(serial: string): boolean {
   );
 }
 
-export interface InventorySummary {
+export interface VerifiedInventorySummary {
   total: number;
   facilities: number;
   serialsProvided: number;
@@ -153,7 +159,7 @@ export interface InventorySummary {
 }
 
 /** Roll the detail rows up into the figures shown on the page. */
-export function summarizeInventory(records: SourceRecord[]): InventorySummary {
+export function summarizeVerifiedInventory(records: VerifiedRecord[]): VerifiedInventorySummary {
   const catCounts = new Map<SourceCategory, number>(
     SOURCE_CATEGORIES.map((c) => [c, 0]),
   );
@@ -196,7 +202,7 @@ export function summarizeInventory(records: SourceRecord[]): InventorySummary {
  * drops any row missing both a facility and an equipment type (a defensive
  * guard against a malformed seed edit).
  */
-export function loadSourceInventory(seed: SourceInventorySeed): SourceRecord[] {
+export function loadVerifiedInventory(seed: VerifiedInventorySeed): VerifiedRecord[] {
   return seed.items
     .map((r) => ({
       no: r.no,
@@ -210,7 +216,7 @@ export function loadSourceInventory(seed: SourceInventorySeed): SourceRecord[] {
 }
 
 /** Flatten records for CSV export, one line per item, with the derived groups. */
-export function sourceInventoryToCsv(records: SourceRecord[]): string {
+export function verifiedInventoryToCsv(records: VerifiedRecord[]): string {
   const header = [
     "No",
     "Facility",

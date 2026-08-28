@@ -4,27 +4,27 @@ import {
   SOURCE_CATEGORIES,
   categorizeEquipment,
   isSerialProvided,
-  loadSourceInventory,
-  sourceInventoryToCsv,
+  loadVerifiedInventory,
+  verifiedInventoryToCsv,
   statusGroup,
-  summarizeInventory,
-  type SourceInventorySeed,
-} from "../lib/rules/sourceInventory";
-import seed from "../seed/source-inventory-2026.seed.json";
+  summarizeVerifiedInventory,
+  type VerifiedInventorySeed,
+} from "../lib/rules/verifiedInventory";
+import seed from "../seed/verified-source-inventory-2026.seed.json";
 
 /**
- * The Source Inventory tab is seeded from Annex I of the Activity Report on the
+ * The Verified Source Inventory tab is seeded from Annex I of the Activity Report on the
  * Source Inventory Programme. These tests pin the annex's own totals so a bad
  * seed edit is caught, and check that every derived grouping still reconciles
  * to the 215 detail rows.
  */
-const INVENTORY = loadSourceInventory(seed as SourceInventorySeed);
-const SUMMARY = summarizeInventory(INVENTORY);
+const INVENTORY = loadVerifiedInventory(seed as VerifiedInventorySeed);
+const SUMMARY = summarizeVerifiedInventory(INVENTORY);
 
-describe("Source Inventory seed — Annex I", () => {
+describe("Verified Source Inventory seed — Annex I", () => {
   it("loads all 215 recorded items with the four fields populated", () => {
     expect(INVENTORY.length).toBe(215);
-    expect((seed as SourceInventorySeed).meta.totalItems).toBe(215);
+    expect((seed as VerifiedInventorySeed).meta.totalItems).toBe(215);
     for (const r of INVENTORY) {
       expect(r.facility).not.toBe("");
       expect(r.equipmentType).not.toBe("");
@@ -148,9 +148,9 @@ describe("isSerialProvided", () => {
   });
 });
 
-describe("sourceInventoryToCsv", () => {
+describe("verifiedInventoryToCsv", () => {
   it("emits a header plus one line per record with the derived columns", () => {
-    const csv = sourceInventoryToCsv(INVENTORY);
+    const csv = verifiedInventoryToCsv(INVENTORY);
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(
       "No,Facility,Equipment Type,Category,Serial Number,Status,Status Group",

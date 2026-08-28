@@ -18,10 +18,12 @@ daily entries so work plan output 1.3.12 counts them post by post rather than
 carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
 
 **Navigation** (sidebar, in order): Overview · Facilities · **Source
-Inventory** (`/source-inventory` — the 215 radiation sources and
-radiation-emitting devices held across 75 facilities, from Annex I of the field
-verification exercise; searchable and filterable by machine family and status,
-with CSV export) · **Reports**
+Inventory** (`/source-inventory` — the national RAIS register: 1,752 radiation
+generators and sealed sources, searchable and filterable by machine family,
+nuclide and IAEA source category, with CSV export) · **Verified Source
+Inventory** (`/verified-source-inventory` — the 215 items the field team
+confirmed on the ground across 75 facilities, from Annex I of the verification
+exercise) · **Reports**
 (`/reports` — live status × functional matrix, sector/category/province
 breakdowns, every count deep-linking into the filtered register, CSV export)
 · **Authorisations**
@@ -699,22 +701,75 @@ variants. Full mapping in [`docs/border-scan-log.md`](docs/border-scan-log.md).
 
 ## Source Inventory
 
-The **Source Inventory** tab (`/source-inventory`) is the register of radiation
-sources and radiation-emitting devices held by the facilities catalogued in the
-field verification exercise — the 215 items of **Annex I** of the *Activity
-Report on the Source Inventory Programme* (7 May – 22 July 2026), across
-75 establishments. Each row is one item exactly as recorded: establishment,
-equipment type, serial number and the field status.
+The inventory is **two tabs**, because the Authority holds two different
+answers to "what sources are there?" and the gap between them is the point:
 
-Unlike the register, this is **read-only reference data from a published
-report**, so it is not a Firestore collection: the page loads
-`seed/source-inventory-2026.seed.json` directly into its own route chunk (it
-never pulls in the Firestore store, and it adds nothing to the security rules).
+| Tab | Route | What it is |
+| --- | --- | --- |
+| **Source Inventory** | `/source-inventory` | The national register **as held in RAIS** — 1,752 items on the books |
+| **Verified Source Inventory** | `/verified-source-inventory` | The **215 items confirmed on the ground** in the field verification exercise |
 
-Everything on the page is derived from those detail rows, so every figure
+Neither is a Firestore collection. Both are **read-only reference data**, loaded
+from their seed straight into their own route chunk — they never pull in the
+Firestore store, and they add nothing to the security rules.
+
+### Source Inventory — the RAIS register
+
+RAIS (the IAEA **Regulatory Authority Information System**) is the Authority's
+system of record for every authorised item. It exports generators and sources
+as two sheets with different columns; `scripts/convert-rais-inventory.py`
+flattens them into one register keyed by **RAN** (Radiation Accession Number) —
+**963 radiation generators** (`RG/nnnn`) and **789 sealed sources**
+(`SS/nnnn`) — as `seed/rais-source-inventory.seed.json`.
+
+The import copies the export **verbatim**; nothing is corrected. A missing
+serial number or a mistyped nuclide is a finding to report, not a defect to
+paper over — that is half the reason for showing RAIS beside the field-verified
+figures. The only reshaping is structural (whitespace, ISO dates,
+empty-vs-placeholder), plus two rules:
+
+- `SealedCategoryManual` **overrides** `SealedCategory` — the plain column is
+  what RAIS computes from the A/D ratio, the "Manual" one is an officer's own
+  determination. Where they disagree (5 sources) the record keeps both and the
+  page reports the conflict.
+- RAIS' internal GUID is dropped. The RAN is unique and is what a re-import
+  joins on; the random GUIDs alone would more than double the page's payload
+  (74 KB gzipped with them, 31 KB without).
+
+Everything on the page derives from those detail rows, so every figure
 reconciles with a filter of the table:
 
-- the four KPIs (sources & devices · facilities · in use · radioactive sources);
+- four KPIs — registered items · generators · sealed sources · **security
+  significant** (IAEA Category 1–3, the sources the Code of Conduct expects to
+  be tracked individually: 150 of 789);
+- generators by **machine family** (`generatorFamily` folds the 33 free-form
+  `Type` spellings into twelve buckets, reading the specific machine before the
+  generic word it contains so a `Digital Mammography` is not swept into digital
+  radiography, an `Industrial Xray fluoroscopy` is NDT kit rather than a
+  cathlab, and a `Baggage Scanner` never lands in CT), each click-to-filter;
+- sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
+- a **register gaps** panel — the counts of items RAIS cannot fully describe
+  (110 with no serial, 109 generators with no type, 69 sources with no nuclide,
+  345 with no activity, 591 never categorised, 5 conflicting categories); and
+- search across RAN, manufacturer, model, serial and nuclide, with CSV export
+  of the current view.
+
+`parseActivity` reads RAIS' scientific notation (`9.99E+02 GBq`, `5E+00 mCi`)
+into becquerels so records in different units compare, returning `null` rather
+than counting an unreadable value as zero.
+
+The rules live in `lib/rules/raisInventory.ts` (pure and unit-tested); the page
+is `app/source-inventory/page.tsx`.
+
+### Verified Source Inventory — the field exercise
+
+The **215 items of Annex I** of the *Activity Report on the Source Inventory
+Programme* (7 May – 22 July 2026), across 75 establishments — the subset an
+officer stood in front of and confirmed. Each row is one item exactly as
+recorded: establishment, equipment type, serial number and the field status.
+These carry a facility and a field status that RAIS cannot supply.
+
+- four KPIs (sources & devices · facilities · in use · radioactive sources);
 - a breakdown by the nine **machine families** the exercise reports against
   (`categorizeEquipment` folds the fifty-odd free-form spellings — `Fixed Xray`,
   `CT-Scan`, `C-arm (Mini)`, `Source: Cs-137`, `Industrial Nuclear Gauge` … —
@@ -723,11 +778,10 @@ reconciles with a filter of the table:
   Not in use / Unspecified, reading the negatives before the positives they
   contain so `Expired (Inactive)` and `Not Yet In Use` are not counted as in
   use); and
-- search across facility, equipment and serial, with CSV export of the current
-  view.
+- search across facility, equipment and serial, with CSV export.
 
-The rules live in `lib/rules/sourceInventory.ts` (pure and unit-tested); the
-page is `app/source-inventory/page.tsx`.
+The rules live in `lib/rules/verifiedInventory.ts` (pure and unit-tested); the
+page is `app/verified-source-inventory/page.tsx`.
 
 ---
 
@@ -737,7 +791,7 @@ page is `app/source-inventory/page.tsx`.
 npm test
 ```
 
-370 tests across `lib/rules/*` and the seed baseline, including:
+402 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -783,10 +837,16 @@ npm test
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
-- `sourceInventory` — verifies the seeded Annex I inventory (215 items numbered
+- `verifiedInventory` — verifies the seeded Annex I inventory (215 items numbered
   1…215, 75 facilities) and that every derived grouping reconciles to it: the
   nine machine-family buckets, the status groups (reading the negatives first),
   the serial-provided count, and the CSV columns
+- `raisInventory` — verifies the seeded RAIS register (1,752 items, 963
+  generators then 789 sources, each in accession order with a unique RAN) and
+  that every derived grouping reconciles to it: the twelve family buckets, the
+  IAEA categories and the 150 security-significant sources, the nuclide
+  breakdown with its gap bucket sorted last, the register-gap counts against
+  the right denominator, activity parsing in Bq/Ci, and the CSV columns
 
 Add Firestore rules tests with the emulator in a follow-up.
 
@@ -800,7 +860,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── login/
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
-│   ├── source-inventory/   Source Inventory — Annex I sources & devices (read-only)
+│   ├── source-inventory/   Source Inventory — the RAIS register (read-only)
+│   ├── verified-source-inventory/  Annex I items confirmed in the field (read-only)
 │   ├── licences/           Authorisations tab — statistics from the register
 │   ├── inspectorate/       Inspection database — summary, province sheets, cards, log
 │   ├── inspections/        (moved) redirects to /inspectorate
@@ -829,9 +890,11 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
 ├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
+├── scripts/convert-rais-inventory.py   Flattens the two RAIS exports into one register seed
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
 │                           daily-screening-2026.seed.json (8 posts, 1,484 days),
-│                           source-inventory-2026.seed.json (215 sources, Annex I)
+│                           rais-source-inventory.seed.json (1,752 RAIS items),
+│                           verified-source-inventory-2026.seed.json (215, Annex I)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/auth";
 
-/** Grouped so the eleven destinations read as four short lists, not one wall. */
+/** Grouped so the twelve destinations read as four short lists, not one wall. */
 const NAV_GROUPS: {
   heading: string;
   items: { href: string; label: string; short?: string; icon: string }[];
@@ -18,6 +18,12 @@ const NAV_GROUPS: {
       { href: "/", label: "Overview", icon: "▣" },
       { href: "/facilities", label: "Facilities", icon: "▤" },
       { href: "/source-inventory", label: "Source Inventory", icon: "⚛" },
+      {
+        href: "/verified-source-inventory",
+        label: "Verified Source Inventory",
+        short: "Verified Sources",
+        icon: "✓",
+      },
       { href: "/reports", label: "Reports", icon: "▥" },
       { href: "/licences", label: "Authorisations", icon: "▦" },
     ],
