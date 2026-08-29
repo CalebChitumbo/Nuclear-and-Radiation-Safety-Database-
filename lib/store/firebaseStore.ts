@@ -35,6 +35,14 @@ import {
   workflowIssueDate,
   workflowLicenceType,
 } from "../rules/licenceFamily";
+import {
+  editId,
+  sanitizePatch,
+  validateEdit,
+  type InventoryEdit,
+  type InventoryEditInput,
+  type InventoryKind,
+} from "../rules/inventoryEdits";
 import { recordLicence } from "../rules/recordLicence";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
@@ -210,6 +218,69 @@ class FirebaseStore implements DataStore {
       );
     }
     return note;
+  }
+
+  async listInventoryEdits(): Promise<InventoryEdit[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "inventoryEdits"));
+    return snap.docs.map((d) => d.data() as InventoryEdit);
+  }
+
+  async saveInventoryEdit(
+    input: InventoryEditInput,
+    actor: RequestActor,
+  ): Promise<InventoryEdit> {
+    const db = requireDb();
+    const patch = sanitizePatch(input.inventory, input.patch);
+    const id = editId(input.inventory, input.key);
+
+    // An addition stays an addition however many times it is later corrected,
+    // so the stored flag wins over whatever the caller passed.
+    const prior = await getDoc(doc(db, "inventoryEdits", id));
+    const wasAdded = prior.exists() && (prior.data() as InventoryEdit).added;
+    const added = Boolean(input.added || wasAdded);
+
+    // Only a genuine first addition can collide: it must not reuse an accession
+    // number already recorded in-app. Baseline collisions are caught in the
+    // page, which is what holds the seed.
+    let taken = new Set<string>();
+    if (added && !wasAdded) {
+      const existing = await this.listInventoryEdits();
+      taken = new Set(
+        existing
+          .filter((e) => e.inventory === input.inventory && e.added)
+          .map((e) => e.key),
+      );
+      taken.delete(input.key);
+    }
+    const problem = validateEdit({ ...input, patch, added }, taken);
+    if (problem) throw new Error(problem);
+
+    const edit: InventoryEdit = {
+      id,
+      inventory: input.inventory,
+      key: input.key,
+      patch,
+      removed: input.removed || undefined,
+      added: added || undefined,
+      note: input.note?.trim() || undefined,
+      updatedBy: actor.uid,
+      updatedByName: actor.name,
+      updatedAt: new Date().toISOString(),
+    };
+    // Written whole rather than merged: the patch says what the record should
+    // read now, so a field cleared in the form must not survive from the
+    // previous save.
+    await setDoc(doc(db, "inventoryEdits", id), stripUndefined(edit));
+    return edit;
+  }
+
+  async revertInventoryEdit(
+    inventory: InventoryKind,
+    key: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "inventoryEdits", editId(inventory, key)));
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -872,6 +943,7 @@ class FirebaseStore implements DataStore {
       truckScans,
       workPlanNotes,
       workPlanBaseline,
+      inventoryEdits,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -885,6 +957,7 @@ class FirebaseStore implements DataStore {
       this.listTruckScans().catch(() => [] as TruckScan[]),
       this.listWorkPlanNotes().catch(() => [] as WorkPlanNote[]),
       this.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(() => null),
+      this.listInventoryEdits().catch(() => [] as InventoryEdit[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -905,6 +978,7 @@ class FirebaseStore implements DataStore {
       dailyEntries,
       borders,
       truckScans,
+      inventoryEdits,
     };
   }
 }

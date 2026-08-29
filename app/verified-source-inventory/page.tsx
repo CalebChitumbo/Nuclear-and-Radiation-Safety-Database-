@@ -2,10 +2,17 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 
+import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { downloadTextFile } from "@/components/downloadFile";
+import {
+  InventoryEditDrawer,
+  type EditField,
+} from "@/components/inventory/InventoryEditDrawer";
+import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
+import { mergeVerifiedInventory } from "@/lib/rules/inventoryEdits";
 import {
   SOURCE_CATEGORIES,
   categorizeEquipment,
@@ -29,17 +36,36 @@ import seed from "@/seed/verified-source-inventory-2026.seed.json";
  * is the RAIS register of everything on the books; this tab is what was found
  * on the ground.
  *
- * It is a read-only register: the figures, category breakdown and the
- * searchable list are all derived from the same detail rows, so any count
+ * The annex is the baseline and is never written to. Officers' corrections are
+ * stored as an overlay keyed by the annex row number and merged in here, so the
+ * seed keeps matching the published report while the tab shows what the section
+ * now knows. Every figure is computed from the merged rows, so any count
  * reconciles with a filter of the table below.
  */
 
-// Loaded once at module scope — the annex is fixed reference data, so it lives
-// in this route's chunk rather than behind an async store read.
-const INVENTORY = loadVerifiedInventory(seed as VerifiedInventorySeed);
+// The seed is loaded once at module scope — the annex is fixed reference data,
+// so it lives in this route's chunk rather than behind an async store read.
+// Only the (small) overlay of corrections comes from the store.
+const BASELINE = loadVerifiedInventory(seed as VerifiedInventorySeed);
+const BASELINE_BY_NO = new Map(BASELINE.map((r) => [String(r.no), r]));
 const META = (seed as VerifiedInventorySeed).meta;
-const SUMMARY = summarizeVerifiedInventory(INVENTORY);
-const MAX_CATEGORY = Math.max(1, ...SUMMARY.byCategory.map((c) => c.count));
+
+/** The correctable fields, and how the drawer should render each one. */
+const VERIFIED_FIELDS: readonly EditField[] = [
+  { name: "facility", label: "Establishment / facility" },
+  {
+    name: "equipmentType",
+    label: "Equipment type",
+    placeholder: "e.g. Dental X-ray",
+    hint: "The machine family is derived from this text.",
+  },
+  { name: "serialNumber", label: "Serial number" },
+  {
+    name: "status",
+    label: "Status observed",
+    options: ["In Use", "Not In Use", "Not Yet In Use", "Not Provided"],
+  },
+];
 
 const STATUS_FILTERS: { value: "all" | StatusGroup; label: string }[] = [
   { value: "all", label: "All" },
@@ -56,11 +82,39 @@ export default function VerifiedSourceInventoryPage() {
   const [status, setStatus] = useState<"all" | StatusGroup>("all");
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** null = closed; { no: null } = adding a record. */
+  const [editing, setEditing] = useState<{ no: string | null } | null>(null);
+
+  const { edits, canEdit, save, revert, error, reload } =
+    useInventoryEditing("verified");
+
+  const merged = useMemo(() => mergeVerifiedInventory(BASELINE, edits), [edits]);
+  const inventory = merged.records;
+  const summary = useMemo(
+    () => summarizeVerifiedInventory(inventory),
+    [inventory],
+  );
+  const maxCategory = Math.max(1, ...summary.byCategory.map((c) => c.count));
+
+  const editByNo = useMemo(
+    () => new Map(edits.map((e) => [e.key, e])),
+    [edits],
+  );
+  const takenKeys = useMemo(
+    () => new Set([...BASELINE_BY_NO.keys(), ...merged.addedKeys]),
+    [merged.addedKeys],
+  );
+  /** Additions continue the annex numbering rather than reusing a row. */
+  const nextNo = useMemo(() => {
+    let highest = 0;
+    for (const key of takenKeys) highest = Math.max(highest, Number(key) || 0);
+    return String(highest + 1);
+  }, [takenKeys]);
 
   // Normalise each row's search haystack once, not per keystroke.
   const indexed = useMemo(
     () =>
-      INVENTORY.map((r) => ({
+      inventory.map((r) => ({
         r,
         category: categorizeEquipment(r.equipmentType),
         group: statusGroup(r.status),
@@ -68,7 +122,7 @@ export default function VerifiedSourceInventoryPage() {
           .map(norm)
           .join(" "),
       })),
-    [],
+    [inventory],
   );
 
   const filtered = useMemo(() => {
@@ -105,47 +159,69 @@ export default function VerifiedSourceInventoryPage() {
     setPage(0);
   };
 
-  const notInUse = SUMMARY.total - SUMMARY.inUse;
+  const notInUse = summary.total - summary.inUse;
+
+  const editingNo = editing?.no ?? null;
+  const editingRecord =
+    editingNo === null
+      ? null
+      : inventory.find((r) => String(r.no) === editingNo) ||
+        merged.removed.find((r) => String(r.no) === editingNo) ||
+        null;
 
   return (
     <div className="space-y-4 staggered">
       <PageHeader
         eyebrow={META.annexReference}
         title="Verified Source Inventory"
-        subtitle={`${SUMMARY.total} radiation sources and radiation-emitting devices confirmed on the ground across ${SUMMARY.facilities} facilities — field verification ${META.exercisePeriod}.`}
+        subtitle={`${summary.total} radiation sources and radiation-emitting devices confirmed on the ground across ${summary.facilities} facilities — field verification ${META.exercisePeriod}.`}
         actions={
-          <button
-            className="btn btn-secondary flex-1 sm:flex-none"
-            onClick={exportCsv}
-            disabled={filtered.length === 0}
-            title="Download the current filtered view as CSV"
-          >
-            ⬇ CSV ({filtered.length})
-          </button>
+          <>
+            {canEdit ? (
+              <button
+                className="btn btn-primary flex-1 sm:flex-none"
+                onClick={() => setEditing({ no: null })}
+              >
+                + Add record
+              </button>
+            ) : null}
+            <button
+              className="btn btn-secondary flex-1 sm:flex-none"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title="Download the current filtered view as CSV"
+            >
+              ⬇ CSV ({filtered.length})
+            </button>
+          </>
         }
       />
+
+      {/* The annex still reads without the overlay, so a failed load is a
+          banner over live data rather than a blocked page. */}
+      {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <div className="stat">
           <div className="stat-label">Sources & devices</div>
-          <div className="stat-value">{SUMMARY.total}</div>
+          <div className="stat-value">{summary.total}</div>
           <div className="stat-caption">recorded items</div>
         </div>
         <div className="stat">
           <div className="stat-label">Facilities</div>
-          <div className="stat-value">{SUMMARY.facilities}</div>
+          <div className="stat-value">{summary.facilities}</div>
           <div className="stat-caption">establishments holding sources</div>
         </div>
         <div className="stat">
           <div className="stat-label">In use</div>
           <div className="stat-value text-[var(--rpa-green-dark)]">
-            {SUMMARY.inUse}
+            {summary.inUse}
           </div>
           <div className="stat-caption">{notInUse} not in use / unspecified</div>
         </div>
         <div className="stat">
           <div className="stat-label">Radioactive sources</div>
-          <div className="stat-value">{SUMMARY.radioactiveSources}</div>
+          <div className="stat-value">{summary.radioactiveSources}</div>
           <div className="stat-caption">sealed sources &amp; gauges</div>
         </div>
       </section>
@@ -155,7 +231,7 @@ export default function VerifiedSourceInventoryPage() {
         note="Tap a category to filter the list below."
       >
         <ul className="mt-1 space-y-1.5">
-          {SUMMARY.byCategory.map(({ category: c, count }) => {
+          {summary.byCategory.map(({ category: c, count }) => {
             const active = category === c;
             return (
               <li key={c}>
@@ -183,7 +259,7 @@ export default function VerifiedSourceInventoryPage() {
                     <div
                       className="h-full rounded-full"
                       style={{
-                        width: `${(count / MAX_CATEGORY) * 100}%`,
+                        width: `${(count / maxCategory) * 100}%`,
                         background: active
                           ? "var(--rpa-green-dark)"
                           : "var(--rpa-green, #00A050)",
@@ -197,13 +273,51 @@ export default function VerifiedSourceInventoryPage() {
         </ul>
       </Panel>
 
+      {merged.removed.length > 0 ? (
+        <Panel
+          title={`Removed from the annex (${merged.removed.length})`}
+          note="Out of the counts and the list above, but kept — the record of what the field team found should not lose an entry silently."
+        >
+          <ul className="mt-1 divide-y divide-gunmetal/8">
+            {merged.removed.map((r) => (
+              <li
+                key={r.no}
+                className="flex flex-wrap items-baseline justify-between gap-2 py-2"
+              >
+                <span className="min-w-0">
+                  <span className="tabular text-gunmetal/55">#{r.no}</span>{" "}
+                  <span className="font-bold">{r.facility}</span>
+                  <span className="text-gunmetal/55 text-sm">
+                    {" "}
+                    · {r.equipmentType}
+                  </span>
+                  {editByNo.get(String(r.no))?.note ? (
+                    <span className="block text-[11px] text-gunmetal/50">
+                      {editByNo.get(String(r.no))?.note}
+                    </span>
+                  ) : null}
+                </span>
+                {canEdit ? (
+                  <button
+                    className="btn btn-ghost shrink-0"
+                    onClick={() => setEditing({ no: String(r.no) })}
+                  >
+                    Review
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
+
       <Panel>
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="source-search" className="field-label">
               Search{" "}
               <span className="text-gunmetal/45">
-                ({filtered.length} of {SUMMARY.total})
+                ({filtered.length} of {summary.total})
               </span>
             </label>
             <input
@@ -284,15 +398,27 @@ export default function VerifiedSourceInventoryPage() {
                 <th>Equipment</th>
                 <th>Serial Number</th>
                 <th>Status</th>
+                {canEdit ? <th aria-label="Edit" /> : null}
               </tr>
             </thead>
             <tbody>
               {visible.map((r) => (
-                <SourceRow key={r.no} r={r} />
+                <SourceRow
+                  key={r.no}
+                  r={r}
+                  edited={merged.editedKeys.has(String(r.no))}
+                  added={merged.addedKeys.has(String(r.no))}
+                  onEdit={
+                    canEdit ? () => setEditing({ no: String(r.no) }) : null
+                  }
+                />
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-gunmetal/55">
+                  <td
+                    colSpan={canEdit ? 6 : 5}
+                    className="py-10 text-center text-gunmetal/55"
+                  >
                     No sources match these filters.
                   </td>
                 </tr>
@@ -304,7 +430,13 @@ export default function VerifiedSourceInventoryPage() {
         {/* Phone: each item is a row */}
         <ul className="md:hidden divide-y divide-gunmetal/8">
           {visible.map((r) => (
-            <SourceCard key={r.no} r={r} />
+            <SourceCard
+              key={r.no}
+              r={r}
+              edited={merged.editedKeys.has(String(r.no))}
+              added={merged.addedKeys.has(String(r.no))}
+              onEdit={canEdit ? () => setEditing({ no: String(r.no) }) : null}
+            />
           ))}
           {visible.length === 0 ? (
             <li className="py-10 px-4 text-center text-sm text-gunmetal/55">
@@ -329,7 +461,30 @@ export default function VerifiedSourceInventoryPage() {
         Source: {META.sourceDocument} — {META.annexReference}. Field verification
         conducted {META.exercisePeriod} by{" "}
         {META.preparedBy.join(" and ")}, {META.department}. {META.coverage}.
+        Annex values are reproduced as published; anything corrected here is
+        marked and keeps what the annex recorded.
       </p>
+
+      {editing ? (
+        <InventoryEditDrawer
+          open
+          onClose={() => setEditing(null)}
+          inventory="verified"
+          fields={VERIFIED_FIELDS}
+          record={editingRecord}
+          baseline={editingNo ? BASELINE_BY_NO.get(editingNo) ?? null : null}
+          edit={(editingNo && editByNo.get(editingNo)) || null}
+          recordKey={editingNo}
+          keyField={{
+            label: "Row number",
+            placeholder: nextNo,
+            hint: `The annex runs to ${BASELINE.length}; a new row continues from there.`,
+          }}
+          takenKeys={takenKeys}
+          onSave={save}
+          onRevert={() => revert(editingNo as string)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -342,12 +497,36 @@ function StatusChip({ status }: { status: string }) {
   return <span className={cls}>{status}</span>;
 }
 
-const SourceRow = memo(function SourceRow({ r }: { r: VerifiedRecord }) {
+/** Marks a row the published annex did not supply as it stands. */
+function ProvenanceChip({ edited, added }: { edited: boolean; added: boolean }) {
+  if (added) return <span className="chip yellow">Added</span>;
+  if (edited) return <span className="chip amber">Edited</span>;
+  return null;
+}
+
+const SourceRow = memo(function SourceRow({
+  r,
+  edited,
+  added,
+  onEdit,
+}: {
+  r: VerifiedRecord;
+  edited: boolean;
+  added: boolean;
+  onEdit: (() => void) | null;
+}) {
   const provided = isSerialProvided(r.serialNumber);
   return (
     <tr>
       <td className="num tabular text-gunmetal/55">{r.no}</td>
-      <td className="font-bold">{r.facility}</td>
+      <td className="font-bold">
+        {r.facility}
+        {edited || added ? (
+          <div className="mt-1">
+            <ProvenanceChip edited={edited} added={added} />
+          </div>
+        ) : null}
+      </td>
       <td>
         <div>{r.equipmentType}</div>
         <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
@@ -360,11 +539,32 @@ const SourceRow = memo(function SourceRow({ r }: { r: VerifiedRecord }) {
       <td>
         <StatusChip status={r.status} />
       </td>
+      {onEdit ? (
+        <td>
+          <button
+            className="btn btn-ghost"
+            onClick={onEdit}
+            aria-label={`Edit row ${r.no}`}
+          >
+            Edit
+          </button>
+        </td>
+      ) : null}
     </tr>
   );
 });
 
-const SourceCard = memo(function SourceCard({ r }: { r: VerifiedRecord }) {
+const SourceCard = memo(function SourceCard({
+  r,
+  edited,
+  added,
+  onEdit,
+}: {
+  r: VerifiedRecord;
+  edited: boolean;
+  added: boolean;
+  onEdit: (() => void) | null;
+}) {
   const provided = isSerialProvided(r.serialNumber);
   return (
     <li className="px-4 py-3">
@@ -381,13 +581,27 @@ const SourceCard = memo(function SourceCard({ r }: { r: VerifiedRecord }) {
         </div>
         <StatusChip status={r.status} />
       </div>
-      <div className="mt-1 text-xs text-gunmetal/55 tabular">
-        #{r.no} ·{" "}
-        {provided ? (
-          <>Serial {r.serialNumber}</>
-        ) : (
-          <span className="italic text-gunmetal/45">Serial not provided</span>
-        )}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="text-xs text-gunmetal/55 tabular min-w-0">
+          #{r.no} ·{" "}
+          {provided ? (
+            <>Serial {r.serialNumber}</>
+          ) : (
+            <span className="italic text-gunmetal/45">Serial not provided</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <ProvenanceChip edited={edited} added={added} />
+          {onEdit ? (
+            <button
+              className="btn btn-ghost"
+              onClick={onEdit}
+              aria-label={`Edit row ${r.no}`}
+            >
+              Edit
+            </button>
+          ) : null}
+        </div>
       </div>
     </li>
   );

@@ -9,6 +9,14 @@ import {
   type RequestActor,
 } from "../rules/inspectionRequests";
 import {
+  editId,
+  sanitizePatch,
+  validateEdit,
+  type InventoryEdit,
+  type InventoryEditInput,
+  type InventoryKind,
+} from "../rules/inventoryEdits";
+import {
   isUsePossessionWorkflow,
   needsTypeClassification,
   workflowIssueDate,
@@ -79,6 +87,7 @@ interface State {
   dailyEntries: DailyEntry[];
   borders: Border[];
   truckScans: TruckScan[];
+  inventoryEdits: InventoryEdit[];
   users: UserDoc[];
 }
 
@@ -99,6 +108,7 @@ function freshState(): State {
     dailyEntries: mapSeedScreening(screeningSeed as SeedScreening, weeksSeed),
     borders: mapSeedBorders(screeningSeed as SeedScreening),
     truckScans: [],
+    inventoryEdits: [],
     users: [
       {
         uid: "demo-admin",
@@ -158,6 +168,8 @@ function load(): State {
       parsed.borders = mapSeedBorders(screeningSeed as SeedScreening);
     }
     if (!parsed.truckScans) parsed.truckScans = [];
+    // Back-compat: stores saved before the inventories became editable.
+    if (!parsed.inventoryEdits) parsed.inventoryEdits = [];
     // Back-compat: add the NSSS demo account to older saved stores.
     if (!parsed.users.some((u) => u.uid === "demo-nsss")) {
       parsed.users.push({
@@ -288,6 +300,62 @@ class MockStore implements DataStore {
     save(s);
     dispatchChange();
     return note;
+  }
+
+  async listInventoryEdits(): Promise<InventoryEdit[]> {
+    return [...ensure().inventoryEdits];
+  }
+
+  async saveInventoryEdit(
+    input: InventoryEditInput,
+    actor: RequestActor,
+  ): Promise<InventoryEdit> {
+    const s = ensure();
+    const patch = sanitizePatch(input.inventory, input.patch);
+    const taken = new Set(
+      s.inventoryEdits
+        .filter((e) => e.inventory === input.inventory && e.added)
+        .map((e) => e.key),
+    );
+    // An upsert re-validates against the other records, not against itself.
+    taken.delete(input.key);
+    const problem = validateEdit({ ...input, patch }, taken);
+    if (problem) throw new Error(problem);
+
+    const edit: InventoryEdit = {
+      id: editId(input.inventory, input.key),
+      inventory: input.inventory,
+      key: input.key,
+      patch,
+      removed: input.removed || undefined,
+      added: input.added || undefined,
+      note: input.note?.trim() || undefined,
+      updatedBy: actor.uid,
+      updatedByName: actor.name,
+      updatedAt: new Date().toISOString(),
+    };
+    const at = s.inventoryEdits.findIndex((e) => e.id === edit.id);
+    // An addition stays an addition however many times it is later corrected.
+    if (at >= 0) {
+      edit.added = edit.added || s.inventoryEdits[at].added;
+      s.inventoryEdits[at] = edit;
+    } else {
+      s.inventoryEdits.push(edit);
+    }
+    save(s);
+    dispatchChange();
+    return edit;
+  }
+
+  async revertInventoryEdit(
+    inventory: InventoryKind,
+    key: string,
+  ): Promise<void> {
+    const s = ensure();
+    const id = editId(inventory, key);
+    s.inventoryEdits = s.inventoryEdits.filter((e) => e.id !== id);
+    save(s);
+    dispatchChange();
   }
 
   async listUsers(): Promise<UserDoc[]> {
@@ -893,6 +961,7 @@ class MockStore implements DataStore {
       workPlanBaseline:
         s.workPlanBaseline[String(WORK_PLAN_YEAR)] || null,
       dailyEntries: s.dailyEntries,
+      inventoryEdits: s.inventoryEdits,
       truckScans: s.truckScans,
       borders: s.borders,
     };

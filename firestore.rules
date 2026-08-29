@@ -24,6 +24,12 @@ service cloud.firestore {
         section() == 'All' || isAdmin()
       );
     }
+    function isNSI() {
+      return signedIn() && (
+        section() == 'National Source Inventory' ||
+        section() == 'All' || isAdmin()
+      );
+    }
 
     function validFacility(d) {
       return d.name is string && d.name.size() > 0
@@ -192,6 +198,38 @@ service cloud.firestore {
         && request.resource.data.officerUid == resource.data.officerUid;
       allow delete: if isAdmin()
         || (isNSSS() && resource.data.officerUid == request.auth.uid);
+    }
+
+    // Corrections to the two source inventories. The seeds ship with the app
+    // and are never written; this collection is the overlay merged over them,
+    // one document per corrected, removed or added record, keyed
+    // '<inventory>:<record key>'. The registers belong to the National Source
+    // Inventory section, so NSI officers (and admins) write them; every
+    // signed-in officer reads, because both tabs render the merged view.
+    //
+    // Removal is a tombstone inside the document (removed == true), not a
+    // delete: an accession register must keep the fact that a record was
+    // withdrawn. Deleting the document is the separate "revert to what the
+    // register says" action, which restores the seed value rather than losing
+    // it, so it is allowed to the same officers.
+    function validInventoryEdit(d, id) {
+      return d.id == id
+        && d.inventory in ['rais','verified']
+        && d.key is string && d.key.size() > 0 && d.key.size() <= 64
+        && d.id == d.inventory + ':' + d.key
+        && d.patch is map && d.patch.size() <= 20
+        && d.updatedAt is string
+        && (!('removed' in d) || d.removed is bool)
+        && (!('added' in d) || d.added is bool)
+        && (!('note' in d) || (d.note is string && d.note.size() <= 500));
+    }
+
+    match /inventoryEdits/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isNSI()
+        && validInventoryEdit(request.resource.data, id)
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isNSI();
     }
 
     // Border posts the NSSS section screens vehicles at. The border list is
