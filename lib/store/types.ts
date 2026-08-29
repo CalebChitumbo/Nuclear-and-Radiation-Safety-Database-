@@ -4,6 +4,11 @@ import type {
   RequestActor,
 } from "../rules/inspectionRequests";
 import type {
+  InventoryEdit,
+  InventoryEditInput,
+  InventoryKind,
+} from "../rules/inventoryEdits";
+import type {
   Activity,
   Border,
   DailyEntry,
@@ -48,6 +53,28 @@ export interface DataStore {
     text: string,
     actor: RequestActor,
   ): Promise<WorkflowNote>;
+  /**
+   * Corrections made to the two source inventories. The seeds stay the
+   * baseline; this is the overlay the pages merge over them, so it holds only
+   * the records someone has actually changed, removed or added.
+   */
+  listInventoryEdits(): Promise<InventoryEdit[]>;
+  /**
+   * Save one record's correction, keyed by its identity within its inventory
+   * (RAN, or the annex row number). Upserts: saving again replaces the stored
+   * patch, so the overlay always says what the record should read now rather
+   * than accumulating a history of attempts.
+   */
+  saveInventoryEdit(
+    input: InventoryEditInput,
+    actor: RequestActor,
+  ): Promise<InventoryEdit>;
+  /**
+   * Drop a correction entirely, restoring whatever the seed says. This is the
+   * undo for an edit — not the same as removing a record, which is a tombstone
+   * saved through `saveInventoryEdit`.
+   */
+  revertInventoryEdit(inventory: InventoryKind, key: string): Promise<void>;
   listUsers(): Promise<UserDoc[]>;
   getAggregate(): Promise<DashboardAggregate>;
   getWeeks(): Promise<WeekDef[]>;
@@ -191,5 +218,6 @@ export interface DataStore {
     dailyEntries: DailyEntry[];
     borders: Border[];
     truckScans: TruckScan[];
+    inventoryEdits: InventoryEdit[];
   }>;
 }

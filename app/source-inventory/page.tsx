@@ -2,12 +2,21 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 
+import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { downloadTextFile } from "@/components/downloadFile";
+import {
+  InventoryEditDrawer,
+  type EditField,
+} from "@/components/inventory/InventoryEditDrawer";
+import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
+import { mergeRaisInventory } from "@/lib/rules/inventoryEdits";
 import {
   GENERATOR_FAMILIES,
+  IAEA_CATEGORIES,
+  RAIS_KINDS,
   SEALED_CATEGORY_LABELS,
   UNCATEGORISED,
   generatorFamily,
@@ -30,25 +39,80 @@ import seed from "@/seed/rais-source-inventory.seed.json";
  * Verified Source Inventory (`/verified-source-inventory`), holds the items the
  * field team physically confirmed; this tab is everything on the books.
  *
- * It is a read-only register. Every figure is derived from the same detail
- * rows, so each count reconciles with a filter of the table below — including
- * the register-gap figures, which are counts of items RAIS cannot fully
- * describe rather than a separate audit.
+ * The RAIS export is the baseline and is never written to. Officers' own
+ * corrections are stored as an overlay keyed by RAN and merged in here, so a
+ * re-export refreshes all 1,752 rows without discarding a correction, and every
+ * figure below is computed from the merged register rather than from the seed.
  */
 
-// Loaded once at module scope — the RAIS export is fixed reference data, so it
-// lives in this route's chunk rather than behind an async store read.
-const INVENTORY = loadRaisInventory(seed as RaisInventorySeed);
+// The seed is loaded once at module scope — it is fixed reference data, so it
+// lives in this route's chunk rather than behind an async store read. Only the
+// (small) overlay of corrections comes from the store.
+const BASELINE = loadRaisInventory(seed as RaisInventorySeed);
+const BASELINE_BY_RAN = new Map(BASELINE.map((r) => [r.ran, r]));
 const META = (seed as RaisInventorySeed).meta;
-const SUMMARY = summarizeRaisInventory(INVENTORY);
-
-const MAX_FAMILY = Math.max(1, ...SUMMARY.byFamily.map((f) => f.count));
-const MAX_NUCLIDE = Math.max(1, ...SUMMARY.byNuclide.map((n) => n.count));
 
 const KIND_FILTERS: { value: "all" | RaisKind; label: string }[] = [
   { value: "all", label: "All" },
   { value: "Radiation Generator", label: "Generators" },
   { value: "Sealed Source", label: "Sources" },
+];
+
+/** The correctable fields, and how the drawer should render each one. */
+const RAIS_FIELDS: readonly EditField[] = [
+  {
+    name: "kind",
+    label: "Register",
+    options: RAIS_KINDS,
+    hint: "Which register the item belongs to — this decides the fields below.",
+  },
+  { name: "type", label: "Type", placeholder: "e.g. Fixed Xray radiography" },
+  { name: "manufacturer", label: "Manufacturer" },
+  { name: "model", label: "Model" },
+  { name: "serialNumber", label: "Serial number" },
+  {
+    name: "nuclide",
+    label: "Nuclide",
+    placeholder: "e.g. Cs-137",
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "activity",
+    label: "Activity",
+    placeholder: "e.g. 9.99E+02 GBq",
+    hint: "Value and unit, as RAIS records it.",
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "activityDate",
+    label: "Activity date",
+    type: "date",
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "sealedCategory",
+    label: "IAEA category",
+    options: IAEA_CATEGORIES,
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "securityLevel",
+    label: "Security level",
+    options: ["Security Level A", "Security Level B", "Security Level C"],
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "isoCompliance",
+    label: "ISO 2919",
+    options: ["Yes", "No"],
+    when: (v) => v.kind === "Sealed Source",
+  },
+  {
+    name: "workingLife",
+    label: "Recommended working life",
+    placeholder: "e.g. 15 Year",
+    when: (v) => v.kind === "Sealed Source",
+  },
 ];
 
 /**
@@ -67,11 +131,34 @@ export default function SourceInventoryPage() {
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** null = closed; { ran: null } = adding a record. */
+  const [editing, setEditing] = useState<{ ran: string | null } | null>(null);
+
+  const { edits, canEdit, save, revert, error, reload } =
+    useInventoryEditing("rais");
+
+  const merged = useMemo(() => mergeRaisInventory(BASELINE, edits), [edits]);
+  const inventory = merged.records;
+  const summary = useMemo(
+    () => summarizeRaisInventory(inventory),
+    [inventory],
+  );
+  const maxFamily = Math.max(1, ...summary.byFamily.map((f) => f.count));
+  const maxNuclide = Math.max(1, ...summary.byNuclide.map((n) => n.count));
+
+  const editByRan = useMemo(
+    () => new Map(edits.map((e) => [e.key, e])),
+    [edits],
+  );
+  const takenKeys = useMemo(
+    () => new Set([...BASELINE_BY_RAN.keys(), ...merged.addedKeys]),
+    [merged.addedKeys],
+  );
 
   // Normalise each row's search haystack once, not per keystroke.
   const indexed = useMemo(
     () =>
-      INVENTORY.map((r) => ({
+      inventory.map((r) => ({
         r,
         family:
           r.kind === "Radiation Generator" ? generatorFamily(r.type) : null,
@@ -89,7 +176,7 @@ export default function SourceInventoryPage() {
           .map(norm)
           .join(" "),
       })),
-    [],
+    [inventory],
   );
 
   const filtered = useMemo(() => {
@@ -154,54 +241,76 @@ export default function SourceInventoryPage() {
     setPage(0);
   };
 
-  const { dataQuality: gaps } = SUMMARY;
+  const { dataQuality: gaps } = summary;
   const showGenerators = kind !== "Sealed Source";
   const showSources = kind !== "Radiation Generator";
+
+  const editingRan = editing?.ran ?? null;
+  const editingRecord =
+    editingRan === null
+      ? null
+      : inventory.find((r) => r.ran === editingRan) ||
+        merged.removed.find((r) => r.ran === editingRan) ||
+        null;
 
   return (
     <div className="space-y-4 staggered">
       <PageHeader
         eyebrow={META.system}
         title="Source Inventory"
-        subtitle={`${SUMMARY.total} radiation generators and sealed sources on the national register${
+        subtitle={`${summary.total} radiation generators and sealed sources on the national register${
           META.exportedOn ? ` — RAIS export of ${META.exportedOn}` : ""
         }.`}
         actions={
-          <button
-            className="btn btn-secondary flex-1 sm:flex-none"
-            onClick={exportCsv}
-            disabled={filtered.length === 0}
-            title="Download the current filtered view as CSV"
-          >
-            ⬇ CSV ({filtered.length})
-          </button>
+          <>
+            {canEdit ? (
+              <button
+                className="btn btn-primary flex-1 sm:flex-none"
+                onClick={() => setEditing({ ran: null })}
+              >
+                + Add record
+              </button>
+            ) : null}
+            <button
+              className="btn btn-secondary flex-1 sm:flex-none"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title="Download the current filtered view as CSV"
+            >
+              ⬇ CSV ({filtered.length})
+            </button>
+          </>
         }
       />
+
+      {/* The register still reads without the overlay, so a failed load is a
+          banner over live data rather than a blocked page. */}
+      {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <div className="stat">
           <div className="stat-label">Registered items</div>
-          <div className="stat-value">{SUMMARY.total}</div>
+          <div className="stat-value">{summary.total}</div>
           <div className="stat-caption">generators &amp; sealed sources</div>
         </div>
         <div className="stat">
           <div className="stat-label">Radiation generators</div>
-          <div className="stat-value">{SUMMARY.generators}</div>
+          <div className="stat-value">{summary.generators}</div>
           <div className="stat-caption">
             {gaps.missingType} with no type recorded
           </div>
         </div>
         <div className="stat">
           <div className="stat-label">Sealed sources</div>
-          <div className="stat-value">{SUMMARY.sealedSources}</div>
+          <div className="stat-value">{summary.sealedSources}</div>
           <div className="stat-caption">
-            {SUMMARY.distinctNuclides} distinct nuclides
+            {summary.distinctNuclides} distinct nuclides
           </div>
         </div>
         <div className="stat">
           <div className="stat-label">Security significant</div>
           <div className="stat-value text-[var(--rpa-green-dark)]">
-            {SUMMARY.securitySignificant}
+            {summary.securitySignificant}
           </div>
           <div className="stat-caption">IAEA Category 1–3 sources</div>
         </div>
@@ -234,12 +343,12 @@ export default function SourceInventoryPage() {
           note="Tap a family to filter the list below."
         >
           <ul className="mt-1 space-y-1.5">
-            {SUMMARY.byFamily.map(({ family, count }) => (
+            {summary.byFamily.map(({ family, count }) => (
               <BreakdownRow
                 key={family}
                 label={family}
                 count={count}
-                max={MAX_FAMILY}
+                max={maxFamily}
                 active={grouping === `family:${family}`}
                 muted={family === "Type Not Recorded"}
                 onClick={() => pickFamily(family)}
@@ -256,12 +365,12 @@ export default function SourceInventoryPage() {
             note="Tap a nuclide to filter the list below."
           >
             <ul className="mt-1 space-y-1.5">
-              {SUMMARY.byNuclide.map(({ nuclide, count }) => (
+              {summary.byNuclide.map(({ nuclide, count }) => (
                 <BreakdownRow
                   key={nuclide}
                   label={nuclide}
                   count={count}
-                  max={MAX_NUCLIDE}
+                  max={maxNuclide}
                   active={grouping === `nuclide:${nuclide}`}
                   muted={nuclide === "Not recorded"}
                   onClick={() => pickNuclide(nuclide)}
@@ -275,7 +384,7 @@ export default function SourceInventoryPage() {
             note="Categories 1–3 are the security-significant sources the Code of Conduct expects to be tracked individually."
           >
             <div className="flex flex-wrap gap-2 mt-1">
-              {SUMMARY.byCategory.map(({ category: c, count }) => (
+              {summary.byCategory.map(({ category: c, count }) => (
                 <button
                   key={c}
                   type="button"
@@ -308,35 +417,75 @@ export default function SourceInventoryPage() {
           <GapRow
             label="Serial number not recorded"
             count={gaps.missingSerial}
-            of={SUMMARY.total}
+            of={summary.total}
           />
           <GapRow
             label="Generator type not recorded"
             count={gaps.missingType}
-            of={SUMMARY.generators}
+            of={summary.generators}
           />
           <GapRow
             label="Nuclide not recorded"
             count={gaps.missingNuclide}
-            of={SUMMARY.sealedSources}
+            of={summary.sealedSources}
           />
           <GapRow
             label="Activity not recorded"
             count={gaps.missingActivity}
-            of={SUMMARY.sealedSources}
+            of={summary.sealedSources}
           />
           <GapRow
             label="Source not categorised"
             count={gaps.uncategorisedSources}
-            of={SUMMARY.sealedSources}
+            of={summary.sealedSources}
           />
           <GapRow
             label="Entered category contradicts the one RAIS calculated"
             count={gaps.categoryConflicts}
-            of={SUMMARY.sealedSources}
+            of={summary.sealedSources}
           />
         </ul>
       </Panel>
+
+      {merged.removed.length > 0 ? (
+        <Panel
+          title={`Removed from the register (${merged.removed.length})`}
+          note="Out of the counts and the list above, but kept — an accession register should not lose the fact that a record was withdrawn."
+        >
+          <ul className="mt-1 divide-y divide-gunmetal/8">
+            {merged.removed.map((r) => (
+              <li
+                key={r.ran}
+                className="flex flex-wrap items-baseline justify-between gap-2 py-2"
+              >
+                <span className="min-w-0">
+                  <span className="tabular font-bold">{r.ran}</span>
+                  <span className="text-gunmetal/55 text-sm">
+                    {" "}
+                    ·{" "}
+                    {r.kind === "Sealed Source"
+                      ? nuclideLabel(r)
+                      : r.type || "Type not recorded"}
+                  </span>
+                  {editByRan.get(r.ran)?.note ? (
+                    <span className="block text-[11px] text-gunmetal/50">
+                      {editByRan.get(r.ran)?.note}
+                    </span>
+                  ) : null}
+                </span>
+                {canEdit ? (
+                  <button
+                    className="btn btn-ghost shrink-0"
+                    onClick={() => setEditing({ ran: r.ran })}
+                  >
+                    Review
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
 
       <Panel>
         <div className="flex flex-wrap gap-2 items-end">
@@ -344,7 +493,7 @@ export default function SourceInventoryPage() {
             <label htmlFor="rais-search" className="field-label">
               Search{" "}
               <span className="text-gunmetal/45">
-                ({filtered.length} of {SUMMARY.total})
+                ({filtered.length} of {summary.total})
               </span>
             </label>
             <input
@@ -400,7 +549,7 @@ export default function SourceInventoryPage() {
                 ) : null}
                 {showSources ? (
                   <optgroup label="Sealed sources">
-                    {SUMMARY.byNuclide.map(({ nuclide }) => (
+                    {summary.byNuclide.map(({ nuclide }) => (
                       <option key={nuclide} value={`nuclide:${nuclide}`}>
                         {nuclide}
                       </option>
@@ -456,15 +605,25 @@ export default function SourceInventoryPage() {
                 <th>Manufacturer / Model</th>
                 <th>Serial Number</th>
                 <th>Activity / Category</th>
+                {canEdit ? <th aria-label="Edit" /> : null}
               </tr>
             </thead>
             <tbody>
               {visible.map((r) => (
-                <RaisRow key={r.ran} r={r} />
+                <RaisRow
+                  key={r.ran}
+                  r={r}
+                  edited={merged.editedKeys.has(r.ran)}
+                  added={merged.addedKeys.has(r.ran)}
+                  onEdit={canEdit ? () => setEditing({ ran: r.ran }) : null}
+                />
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-gunmetal/55">
+                  <td
+                    colSpan={canEdit ? 6 : 5}
+                    className="py-10 text-center text-gunmetal/55"
+                  >
                     No registered items match these filters.
                   </td>
                 </tr>
@@ -476,7 +635,13 @@ export default function SourceInventoryPage() {
         {/* Phone: each item is a row */}
         <ul className="md:hidden divide-y divide-gunmetal/8">
           {visible.map((r) => (
-            <RaisCard key={r.ran} r={r} />
+            <RaisCard
+              key={r.ran}
+              r={r}
+              edited={merged.editedKeys.has(r.ran)}
+              added={merged.addedKeys.has(r.ran)}
+              onEdit={canEdit ? () => setEditing({ ran: r.ran }) : null}
+            />
           ))}
           {visible.length === 0 ? (
             <li className="py-10 px-4 text-center text-sm text-gunmetal/55">
@@ -500,10 +665,32 @@ export default function SourceInventoryPage() {
       <p className="text-[11px] text-gunmetal/50 px-1">
         Source: {META.sourceDocument}, {META.system}
         {META.exportedOn ? `, exported ${META.exportedOn}` : ""}.{" "}
-        {META.coverage}. Held by the {META.department}. Values are reproduced as
-        registered — see Verified Source Inventory for the items confirmed in
-        the field.
+        {META.coverage}. Held by the {META.department}. Imported values are
+        reproduced as registered; anything corrected here is marked and keeps
+        what the register said. See Verified Source Inventory for the items
+        confirmed in the field.
       </p>
+
+      {editing ? (
+        <InventoryEditDrawer
+          open
+          onClose={() => setEditing(null)}
+          inventory="rais"
+          fields={RAIS_FIELDS}
+          record={editingRecord}
+          baseline={editingRan ? BASELINE_BY_RAN.get(editingRan) ?? null : null}
+          edit={(editingRan && editByRan.get(editingRan)) || null}
+          recordKey={editingRan}
+          keyField={{
+            label: "RAN (accession number)",
+            placeholder: "RG/1024",
+            hint: "RG/nnnn for a radiation generator, SS/nnnn for a sealed source.",
+          }}
+          takenKeys={takenKeys}
+          onSave={save}
+          onRevert={() => revert(editingRan as string)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -591,6 +778,13 @@ function GapRow({
   );
 }
 
+/** Marks a record the register itself did not supply as it stands. */
+function ProvenanceChip({ edited, added }: { edited: boolean; added: boolean }) {
+  if (added) return <span className="chip yellow">Added</span>;
+  if (edited) return <span className="chip amber">Edited</span>;
+  return null;
+}
+
 /** Category 1–3 read as the significant ones; 4–5 and uncategorised are quiet. */
 function CategoryChip({ r }: { r: RaisRecord }) {
   const c = sealedCategoryLabel(r);
@@ -633,11 +827,28 @@ function ItemCell({ r }: { r: RaisRecord }) {
   );
 }
 
-const RaisRow = memo(function RaisRow({ r }: { r: RaisRecord }) {
+const RaisRow = memo(function RaisRow({
+  r,
+  edited,
+  added,
+  onEdit,
+}: {
+  r: RaisRecord;
+  edited: boolean;
+  added: boolean;
+  onEdit: (() => void) | null;
+}) {
   const recorded = isSerialRecorded(r.serialNumber);
   return (
     <tr>
-      <td className="tabular font-bold whitespace-nowrap">{r.ran}</td>
+      <td className="tabular font-bold whitespace-nowrap">
+        {r.ran}
+        {edited || added ? (
+          <div className="mt-1">
+            <ProvenanceChip edited={edited} added={added} />
+          </div>
+        ) : null}
+      </td>
       <td>
         <ItemCell r={r} />
       </td>
@@ -669,11 +880,32 @@ const RaisRow = memo(function RaisRow({ r }: { r: RaisRecord }) {
           <span className="text-gunmetal/35">—</span>
         )}
       </td>
+      {onEdit ? (
+        <td>
+          <button
+            className="btn btn-ghost"
+            onClick={onEdit}
+            aria-label={`Edit ${r.ran}`}
+          >
+            Edit
+          </button>
+        </td>
+      ) : null}
     </tr>
   );
 });
 
-const RaisCard = memo(function RaisCard({ r }: { r: RaisRecord }) {
+const RaisCard = memo(function RaisCard({
+  r,
+  edited,
+  added,
+  onEdit,
+}: {
+  r: RaisRecord;
+  edited: boolean;
+  added: boolean;
+  onEdit: (() => void) | null;
+}) {
   const recorded = isSerialRecorded(r.serialNumber);
   const source = r.kind === "Sealed Source";
   return (
@@ -695,14 +927,28 @@ const RaisCard = memo(function RaisCard({ r }: { r: RaisRecord }) {
         </div>
         {source ? <CategoryChip r={r} /> : null}
       </div>
-      <div className="mt-1 text-xs text-gunmetal/55 tabular">
-        {r.ran} ·{" "}
-        {recorded ? (
-          <>Serial {r.serialNumber}</>
-        ) : (
-          <span className="italic text-gunmetal/45">Serial not recorded</span>
-        )}
-        {source && r.activity ? <> · {r.activity}</> : null}
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="text-xs text-gunmetal/55 tabular min-w-0">
+          {r.ran} ·{" "}
+          {recorded ? (
+            <>Serial {r.serialNumber}</>
+          ) : (
+            <span className="italic text-gunmetal/45">Serial not recorded</span>
+          )}
+          {source && r.activity ? <> · {r.activity}</> : null}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <ProvenanceChip edited={edited} added={added} />
+          {onEdit ? (
+            <button
+              className="btn btn-ghost"
+              onClick={onEdit}
+              aria-label={`Edit ${r.ran}`}
+            >
+              Edit
+            </button>
+          ) : null}
+        </div>
       </div>
     </li>
   );

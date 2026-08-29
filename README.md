@@ -783,6 +783,45 @@ These carry a facility and a field status that RAIS cannot supply.
 The rules live in `lib/rules/verifiedInventory.ts` (pure and unit-tested); the
 page is `app/verified-source-inventory/page.tsx`.
 
+### Correcting a record
+
+Both tabs are editable: an officer can correct a field, remove a record or add
+one that the import does not carry. Neither seed is written to. A change is
+stored as an **overlay** — one small document in `inventoryEdits`, keyed
+`<inventory>:<record key>` (the RAN for RAIS, the annex row number for the
+verified list) — and the page merges baseline + overlay when it reads.
+
+That is what makes the two registers correctable without either drifting from
+its source:
+
+- a fresh RAIS export refreshes all 1,752 rows and **keeps every correction**,
+  because the overlay is keyed by RAN rather than by row position;
+- only the records someone actually touched cost a document, so the tabs still
+  load their register from the page bundle rather than from 1,752 reads;
+- a correction stores **only the fields that differ** from the seed, so a field
+  left alone keeps tracking the register; and
+- the drawer shows *Register says: …* under every changed field, so the
+  imported value is never hidden by the correction sitting on top of it.
+
+Removal is a **tombstone, not a delete**: a removed record leaves the counts and
+the table but stays listed under "Removed from the register", with the note
+explaining why, and can be restored. Reverting an edit deletes the overlay
+document, which restores whatever the seed says. Corrected and added records
+carry an *Edited* / *Added* chip in the table, and every overlay document
+records who changed it and when.
+
+Writes belong to the **National Source Inventory** section (and admins) —
+`canEditSection` keeps the buttons off the page for everyone else, and the
+`inventoryEdits` rule in `firestore.rules` is what actually refuses the write.
+The rules are `lib/rules/inventoryEdits.ts`; the shared form is
+`components/inventory/InventoryEditDrawer.tsx`.
+
+> **Deploying this**: the `inventoryEdits` collection needs its rule published
+> before any correction can save — Firestore denies writes to a collection no
+> deployed rule mentions. Merging to the production branch runs **Deploy
+> Firestore Rules** automatically, because `firestore.rules` changed. Until it
+> has run, both tabs still read fine and a failed save reports the refusal.
+
 ---
 
 ## Tests
@@ -791,7 +830,7 @@ page is `app/verified-source-inventory/page.tsx`.
 npm test
 ```
 
-402 tests across `lib/rules/*` and the seed baseline, including:
+427 tests across `lib/rules/*` and the seed baseline, including:
 
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
@@ -847,6 +886,12 @@ npm test
   IAEA categories and the 150 security-significant sources, the nuclide
   breakdown with its gap bucket sorted last, the register-gap counts against
   the right denominator, activity parsing in Bq/Ci, and the CSV columns
+- `inventoryEdits` — the correction overlay both inventories share: that a patch
+  touches only the record it names and cannot introduce a field the record shape
+  lacks, that only genuine differences are stored, that a removal leaves the
+  counts but stays recoverable, that an addition survives being corrected, and
+  that an added key later arriving in the seed becomes a correction of the
+  imported row rather than a duplicate of it
 
 Add Firestore rules tests with the emulator in a follow-up.
 
