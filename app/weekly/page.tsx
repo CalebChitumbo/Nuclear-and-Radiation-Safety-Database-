@@ -31,25 +31,39 @@ import {
 } from "@/lib/rules/daily";
 import { toCsv } from "@/lib/rules/exportCsv";
 import {
+  applyWorkPlanConfig,
   buildQuarterIndex,
   deriveWorkPlan,
-  effectiveOpeningBalance,
+  describeBinding,
   formatPercent,
+  nextOutputId,
+  retiredOutputs,
+  subprogrammeHeading,
   workPlanBrief,
   workPlanRows,
   WORK_PLAN_CSV_HEADER,
   WORK_PLAN_STATUSES,
   WORK_PLAN_YEAR,
   type Quarter,
+  type Subprogramme,
   type SubprogrammeReport,
   type WorkPlanRow,
 } from "@/lib/rules/workPlan";
 import {
+  draftFromOutput,
+  emptyDraft,
+  OutputForm,
+  type OutputDraft,
+} from "@/components/weekly/OutputEditor";
+import {
   SECTIONS,
   type Activity,
   type Inspection,
+  type Section,
   type WorkPlanBaseline,
+  type WorkPlanConfig,
   type WorkPlanNote,
+  type WorkPlanOutputConfig,
   type WorkPlanStatus,
 } from "@/lib/rules/types";
 
@@ -119,6 +133,7 @@ export default function WeeklyPage() {
       dailyEntries,
       workPlanNotes,
       baseline,
+      config,
     ] = await Promise.all([
       s.listLicenceEvents(),
       s.listInspections(),
@@ -133,6 +148,11 @@ export default function WeeklyPage() {
       s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
         () => null as WorkPlanBaseline | null,
       ),
+      // The sections' own changes to the plan. None (or no rules yet) means
+      // the approved plan applies in full — see applyWorkPlanConfig.
+      s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanConfig | null,
+      ),
     ]);
     return {
       events,
@@ -142,6 +162,7 @@ export default function WeeklyPage() {
       dailyEntries,
       workPlanNotes,
       baseline,
+      config,
     };
   });
 
@@ -161,7 +182,11 @@ export default function WeeklyPage() {
     const notes: Record<string, WorkPlanNote> = {};
     for (const n of data.workPlanNotes) notes[n.id] = n;
 
+    // The plan the report is read through: the approved workbook with the
+    // sections' own changes laid over it.
+    const plan = applyWorkPlanConfig(data.config);
     const reports = deriveWorkPlan({
+      plan,
       weeks,
       week: selected.label,
       events: data.events,
@@ -173,7 +198,8 @@ export default function WeeklyPage() {
       baseline: data.baseline?.values ?? null,
     });
     const quarter = buildQuarterIndex(weeks).get(selected.label) ?? null;
-    return { reports, quarter };
+    const retired = retiredOutputs(data.config);
+    return { plan, reports, quarter, retired };
   }, [data, weeks, selected.label]);
 
   if (!data || !derived) {
@@ -184,7 +210,7 @@ export default function WeeklyPage() {
     );
   }
 
-  const { reports, quarter } = derived;
+  const { plan, reports, quarter, retired } = derived;
   const wkActivities = data.activities.filter((a) => a.week === selected.label);
   const planRows = reports.flatMap((r) => r.rows);
   const achieved = planRows.filter((r) => r.status === "Achieved").length;
@@ -218,6 +244,101 @@ export default function WeeklyPage() {
     } catch (err) {
       toast.push(
         `Saving failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
+
+  /**
+   * Save (or clear, with `null`) one row's changes to the plan itself — its
+   * wording, target, section and the register it counts itself off. Clearing
+   * is the undo: the row goes straight back to the approved workbook.
+   */
+  const onOutputSave = async (
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    message = "Output saved.",
+  ) => {
+    try {
+      const s = await store();
+      await s.setWorkPlanOutputConfig(
+        WORK_PLAN_YEAR,
+        id,
+        entry,
+        user?.uid || "",
+      );
+      toast.push(message, "success");
+      reload();
+    } catch (err) {
+      toast.push(
+        `Saving the output failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
+
+  /**
+   * Take a row off the report, keeping everything else about it — a row that
+   * was reworded stays reworded, and a row a section ADDED keeps its own
+   * definition, without which there would be nothing left to put back.
+   */
+  const onOutputRetire = async (id: string) => {
+    const entry = data.config?.outputs?.[id];
+    await onOutputSave(
+      id,
+      { ...(entry || {}), hidden: true },
+      `Output ${id} retired.`,
+    );
+  };
+
+  /** The way back: the same entry, no longer hidden. */
+  const onOutputRestore = async (id: string) => {
+    const entry = data.config?.outputs?.[id];
+    const rest: WorkPlanOutputConfig = { ...(entry || {}) };
+    delete rest.hidden;
+    delete rest.updatedAt;
+    delete rest.updatedBy;
+    const keep = rest.added || Object.keys(rest).length > 0;
+    await onOutputSave(id, keep ? rest : null, "Output restored to the plan.");
+  };
+
+  const onSubprogrammeSave = async (id: string, title: string) => {
+    try {
+      const s = await store();
+      await s.setWorkPlanSubprogrammeConfig(
+        WORK_PLAN_YEAR,
+        id,
+        title.trim()
+          ? { title: title.trim(), heading: subprogrammeHeading(id, title.trim()) }
+          : null,
+        user?.uid || "",
+      );
+      toast.push("Subprogramme saved.", "success");
+      reload();
+    } catch (err) {
+      toast.push(
+        `Saving failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
+
+  const onResetPlan = async () => {
+    if (
+      !window.confirm(
+        `Drop every change to the ${WORK_PLAN_YEAR} plan and report against the approved workbook? Figures, comments and the opening balance are not touched.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const s = await store();
+      await s.resetWorkPlanConfig(WORK_PLAN_YEAR, user?.uid || "");
+      toast.push("The plan is back to the approved workbook.", "success");
+      reload();
+    } catch (err) {
+      toast.push(
+        `Resetting failed: ${err instanceof Error ? err.message : err}`,
         "error",
       );
     }
@@ -320,6 +441,7 @@ export default function WeeklyPage() {
 
       <OpeningBalancePanel
         year={WORK_PLAN_YEAR}
+        plan={plan}
         baseline={data.baseline}
         canEdit={user?.role === "admin"}
         uid={user?.uid || ""}
@@ -330,15 +452,29 @@ export default function WeeklyPage() {
         <SubprogrammeTable
           key={sub.id}
           sub={sub}
+          plan={plan}
           view={view}
           quarter={quarter}
           openId={openId}
           onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
           canEdit={(section) => canEditSection(user, section)}
+          isAdmin={user?.role === "admin"}
           onWeekValueChange={onWeekValueChange}
           onNoteSave={onNoteSave}
+          onOutputSave={onOutputSave}
+          onOutputRetire={onOutputRetire}
+          onSubprogrammeSave={onSubprogrammeSave}
         />
       ))}
+
+      <RetiredOutputsPanel
+        retired={retired}
+        customised={countCustomised(data.config)}
+        canEdit={(section) => canEditSection(user, section)}
+        isAdmin={user?.role === "admin"}
+        onRestore={onOutputRestore}
+        onReset={onResetPlan}
+      />
 
       <InspectionSummaryPanel
         inspections={data.inspections}
@@ -443,6 +579,101 @@ function InspectionSummaryPanel({
     >
       <InspectionSummaryTable summary={summary} />
       <InspectionSummaryFooter summary={summary} />
+    </Panel>
+  );
+}
+
+/** How many rows a saved config has changed — what "edited" adds up to. */
+function countCustomised(config: WorkPlanConfig | null | undefined): number {
+  return Object.values(config?.outputs || {}).length;
+}
+
+/**
+ * Rows that have been taken off the report, and the way back.
+ *
+ * Retiring a row never deletes anything: its figures, comments and opening
+ * balance stay exactly where they are, so putting it back restores the row
+ * whole. The panel only appears once there is something to say — an untouched
+ * plan shows nothing.
+ */
+function RetiredOutputsPanel({
+  retired,
+  customised,
+  canEdit,
+  isAdmin,
+  onRestore,
+  onReset,
+}: {
+  retired: WorkPlanRow["output"][];
+  customised: number;
+  canEdit: (section: Section) => boolean;
+  isAdmin: boolean;
+  onRestore: (id: string) => Promise<void>;
+  onReset: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!retired.length && !customised) return null;
+
+  return (
+    <Panel
+      title={`Changes to the ${WORK_PLAN_YEAR} plan`}
+      note={`${customised} row${customised === 1 ? "" : "s"} changed from the approved workbook${
+        retired.length
+          ? `, ${retired.length} of them retired from the report`
+          : ""
+      }. Nothing is deleted — a retired row keeps its figures and comments.`}
+      flush
+      action={
+        isAdmin ? (
+          <button className="link-action no-print" onClick={onReset}>
+            Reset the plan
+          </button>
+        ) : undefined
+      }
+    >
+      {retired.length ? (
+        <ul className="divide-y divide-gunmetal/8">
+          {retired.map((o) => (
+            <li
+              key={o.id}
+              className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="text-sm">
+                  <span className="tabular font-bold mr-2">{o.id}</span>
+                  {o.description}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="chip">{o.section}</span>
+                  {o.added ? <span className="chip amber">added</span> : null}
+                </div>
+              </div>
+              {canEdit(o.section) ? (
+                <button
+                  className="link-action no-print shrink-0"
+                  disabled={busy === o.id}
+                  onClick={async () => {
+                    setBusy(o.id);
+                    try {
+                      await onRestore(o.id);
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {busy === o.id ? "Restoring…" : "Put back"}
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="px-4 sm:px-5 py-4 text-sm text-gunmetal/55">
+          Every row of the plan is on the report. Rows marked{" "}
+          <span className="chip amber">edited</span> differ from the approved
+          workbook; open one to see what it now says, or to reset it.
+        </p>
+      )}
     </Panel>
   );
 }
@@ -592,35 +823,125 @@ const VIEW_MIN_WIDTH: Record<WorkPlanView, number> = {
 
 function SubprogrammeTable({
   sub,
+  plan,
   view,
   quarter,
   openId,
   onToggle,
   canEdit,
+  isAdmin,
   onWeekValueChange,
   onNoteSave,
+  onOutputSave,
+  onOutputRetire,
+  onSubprogrammeSave,
 }: {
   sub: SubprogrammeReport;
+  /** The whole plan — the editor needs it to number and link a new row. */
+  plan: Subprogramme[];
   view: WorkPlanView;
   /** The quarter the selected week reports into — its column is highlighted. */
   quarter: Quarter | null;
   openId: string | null;
   onToggle: (id: string) => void;
   canEdit: (section: WorkPlanRow["output"]["section"]) => boolean;
+  isAdmin: boolean;
   onWeekValueChange: (key: string, value: number) => void;
   onNoteSave: (
     id: string,
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
   ) => Promise<void>;
+  onOutputSave: (
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    message?: string,
+  ) => Promise<void>;
+  onOutputRetire: (id: string) => Promise<void>;
+  onSubprogrammeSave: (id: string, title: string) => Promise<void>;
 }) {
   const columns = VIEW_COLUMNS[view];
   const note =
     view === "week"
-      ? "This week's figures beside each output's annual target. Open a row (▸) for the detail behind its figure."
+      ? "This week's figures beside each output's annual target. Open a row (▸) for the detail behind its figure, and to edit it."
       : "Cumulative for the plan year — every output starts from its opening balance and adds what has been recorded since. Scroll sideways for Status, Comments and Action Points.";
 
+  const mayAdd = canEdit(sub.section);
+  const [adding, setAdding] = useState<OutputDraft | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const startAdd = (supporting: boolean) =>
+    setAdding(
+      emptyDraft(
+        nextOutputId(plan, { subprogramme: sub.id, supporting }),
+        sub.section,
+        supporting,
+      ),
+    );
+
   return (
-    <Panel title={sub.heading} note={note} flush>
+    <Panel
+      title={sub.heading}
+      note={note}
+      flush
+      action={
+        isAdmin ? (
+          <button
+            className="link-action no-print"
+            onClick={() => setRenaming(renaming === null ? sub.title : null)}
+          >
+            {renaming === null ? "Rename" : "Cancel"}
+          </button>
+        ) : undefined
+      }
+    >
+      {renaming !== null ? (
+        <div className="px-4 sm:px-5 pb-3 no-print flex flex-wrap items-end gap-2">
+          <div className="grow" style={{ minWidth: "16rem" }}>
+            <label className="field-label" htmlFor={`sub-title-${sub.id}`}>
+              Subprogramme {sub.id} — title
+            </label>
+            <input
+              id={`sub-title-${sub.id}`}
+              className="input"
+              value={renaming}
+              onChange={(e) => setRenaming(e.target.value)}
+            />
+          </div>
+          <button
+            className="btn btn-primary"
+            disabled={busy || !renaming.trim()}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onSubprogrammeSave(sub.id, renaming);
+                setRenaming(null);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Save
+          </button>
+          <button
+            className="btn btn-ghost"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                // An empty title clears the override — back to the workbook.
+                await onSubprogrammeSave(sub.id, "");
+                setRenaming(null);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Use the approved heading
+          </button>
+        </div>
+      ) : null}
+
       <div className="table-wrap">
         <table
           className="data wp-table"
@@ -651,6 +972,8 @@ function SubprogrammeTable({
               <PlanRow
                 key={row.output.id}
                 row={row}
+                plan={plan}
+                subId={sub.id}
                 columns={columns}
                 quarter={quarter}
                 open={openId === row.output.id}
@@ -658,6 +981,8 @@ function SubprogrammeTable({
                 canEdit={canEdit(row.output.section)}
                 onWeekValueChange={onWeekValueChange}
                 onNoteSave={onNoteSave}
+                onOutputSave={onOutputSave}
+                onOutputRetire={onOutputRetire}
               />
             ))}
             {sub.supporting.length ? (
@@ -677,6 +1002,8 @@ function SubprogrammeTable({
               <PlanRow
                 key={row.output.id}
                 row={row}
+                plan={plan}
+                subId={sub.id}
                 columns={columns}
                 quarter={quarter}
                 open={openId === row.output.id}
@@ -684,17 +1011,65 @@ function SubprogrammeTable({
                 canEdit={canEdit(row.output.section)}
                 onWeekValueChange={onWeekValueChange}
                 onNoteSave={onNoteSave}
+                onOutputSave={onOutputSave}
+                onOutputRetire={onOutputRetire}
               />
             ))}
           </tbody>
         </table>
       </div>
+
+      {mayAdd ? (
+        <div className="px-4 sm:px-5 py-3 no-print border-t border-gunmetal/8">
+          {adding ? (
+            <div className="space-y-3">
+              <div className="caps text-[10px] text-gunmetal/55">
+                New row {adding.id} — subprogramme {sub.id}
+              </div>
+              <OutputForm
+                plan={plan}
+                draft={adding}
+                base={null}
+                adding
+                busy={busy}
+                onChange={setAdding}
+                onCancel={() => setAdding(null)}
+                onSave={async (entry) => {
+                  if (!entry) return;
+                  setBusy(true);
+                  try {
+                    await onOutputSave(
+                      adding.id,
+                      { ...entry, subprogramme: sub.id },
+                      `Output ${adding.id} added to the plan.`,
+                    );
+                    setAdding(null);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-ghost" onClick={() => startAdd(false)}>
+                Add an output
+              </button>
+              <button className="btn btn-ghost" onClick={() => startAdd(true)}>
+                Add a supporting figure
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
     </Panel>
   );
 }
 
 function PlanRow({
   row,
+  plan,
+  subId,
   columns,
   quarter,
   open,
@@ -702,8 +1077,13 @@ function PlanRow({
   canEdit,
   onWeekValueChange,
   onNoteSave,
+  onOutputSave,
+  onOutputRetire,
 }: {
   row: WorkPlanRow;
+  plan: Subprogramme[];
+  /** The subprogramme the row is reported under — kept on an added row. */
+  subId: string;
   columns: ColKey[];
   quarter: Quarter | null;
   open: boolean;
@@ -714,10 +1094,17 @@ function PlanRow({
     id: string,
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
   ) => Promise<void>;
+  onOutputSave: (
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    message?: string,
+  ) => Promise<void>;
+  onOutputRetire: (id: string) => Promise<void>;
 }) {
   const { output } = row;
   const supporting = !!output.supporting;
-  const expandable = !supporting || row.breakdown.length > 0;
+  // Every row opens now — the detail is also where the row itself is edited.
+  const expandable = true;
   const typeable = !row.auto && !row.fromDaily && canEdit && !!row.metricKey;
 
   const num = (v: number) => (v ? v.toLocaleString() : "—");
@@ -744,9 +1131,28 @@ function PlanRow({
         return (
           <>
             <div className="font-bold">{output.description}</div>
+            {output.parentId ? (
+              <div className="text-xs text-gunmetal/55 mt-0.5">
+                Detail behind output {output.parentId}
+              </div>
+            ) : null}
             {output.note ? (
               <div className="text-xs text-gunmetal/55 mt-0.5">
                 {output.note}
+              </div>
+            ) : null}
+            {output.added || output.customised ? (
+              <div className="mt-1 no-print">
+                <span
+                  className="chip amber"
+                  title={
+                    output.added
+                      ? "Added by the section — not in the approved workbook."
+                      : "Changed from the approved workbook."
+                  }
+                >
+                  {output.added ? "added" : "edited"}
+                </span>
               </div>
             ) : null}
           </>
@@ -829,8 +1235,12 @@ function PlanRow({
             <div style={{ position: "sticky", left: 0, width: "min(56rem, 84vw)" }}>
               <RowDetail
                 row={row}
+                plan={plan}
+                subId={subId}
                 canEdit={canEdit}
                 onSave={(patch) => onNoteSave(output.id, patch)}
+                onOutputSave={onOutputSave}
+                onOutputRetire={onOutputRetire}
               />
             </div>
           </td>
@@ -871,14 +1281,26 @@ function SourceChip({ row, canEdit }: { row: WorkPlanRow; canEdit: boolean }) {
 
 function RowDetail({
   row,
+  plan,
+  subId,
   canEdit,
   onSave,
+  onOutputSave,
+  onOutputRetire,
 }: {
   row: WorkPlanRow;
+  plan: Subprogramme[];
+  subId: string;
   canEdit: boolean;
   onSave: (
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
   ) => Promise<void>;
+  onOutputSave: (
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    message?: string,
+  ) => Promise<void>;
+  onOutputRetire: (id: string) => Promise<void>;
 }) {
   const [status, setStatus] = useState<WorkPlanStatus | "">(
     row.statusOverridden ? row.status : "",
@@ -886,6 +1308,8 @@ function RowDetail({
   const [comments, setComments] = useState(row.comments);
   const [actionPoints, setActionPoints] = useState(row.actionPoints);
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<OutputDraft | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
 
   useEffect(() => {
     setStatus(row.statusOverridden ? row.status : "");
@@ -913,8 +1337,48 @@ function RowDetail({
     }
   };
 
+  const retire = async () => {
+    if (
+      !window.confirm(
+        `Take ${row.output.id} off the report? Its figures and comments are kept — you can put it back from "Retired rows" at the foot of the report.`,
+      )
+    ) {
+      return;
+    }
+    setPlanBusy(true);
+    try {
+      await onOutputRetire(row.output.id);
+    } finally {
+      setPlanBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-4 py-1">
+      {/* Where the figure comes from — the row's link to the rest of the
+          database, said in words so nobody has to guess whether a number is
+          counted for them or waiting to be typed. */}
+      <div className="text-sm text-gunmetal/70">
+        <span className="caps text-[10px] text-gunmetal/55 mr-2">
+          Where this figure comes from
+        </span>
+        {describeBinding(row.output.binding)}{" "}
+        {row.fromDaily ? (
+          <Link className="link-action" href="/daily">
+            Open Daily Updates
+          </Link>
+        ) : row.output.binding.kind === "licences" ? (
+          <Link className="link-action" href="/licences">
+            Open the licensing register
+          </Link>
+        ) : row.output.binding.kind === "inspections" ||
+          row.output.binding.kind === "enforcement" ? (
+          <Link className="link-action" href="/inspections">
+            Open the inspection register
+          </Link>
+        ) : null}
+      </div>
+
       {/* How the cumulative figure splits — what was carried in against what
           the system has counted since. Only worth saying when both exist. */}
       {row.openingTotal > 0 ? (
@@ -1046,6 +1510,89 @@ function RowDetail({
           {row.output.section}.
         </p>
       )}
+
+      {/* The row itself — its wording, its target and where its figure comes
+          from. Kept behind a click so the report still reads as a report, and
+          open to the section that owns the row rather than admins alone. */}
+      {canEdit ? (
+        <div className="no-print border-t border-gunmetal/8 pt-3">
+          {draft ? (
+            <div className="space-y-3">
+              <div className="caps text-[10px] text-gunmetal/55">
+                Editing output {row.output.id}
+              </div>
+              <OutputForm
+                plan={plan}
+                draft={draft}
+                base={row.output}
+                busy={planBusy}
+                onChange={setDraft}
+                onCancel={() => setDraft(null)}
+                onSave={async (entry) => {
+                  setPlanBusy(true);
+                  try {
+                    await onOutputSave(
+                      row.output.id,
+                      // A row the section added carries its own subprogramme;
+                      // a correction to an approved row does not move it.
+                      entry?.added ? { ...entry, subprogramme: subId } : entry,
+                      entry
+                        ? `Output ${row.output.id} saved.`
+                        : `Output ${row.output.id} is back to the approved plan.`,
+                    );
+                    setDraft(null);
+                  } finally {
+                    setPlanBusy(false);
+                  }
+                }}
+                extraActions={
+                  <>
+                    {row.output.customised ? (
+                      <button
+                        className="btn btn-ghost"
+                        disabled={planBusy}
+                        onClick={async () => {
+                          setPlanBusy(true);
+                          try {
+                            await onOutputSave(
+                              row.output.id,
+                              null,
+                              `Output ${row.output.id} is back to the approved plan.`,
+                            );
+                            setDraft(null);
+                          } finally {
+                            setPlanBusy(false);
+                          }
+                        }}
+                      >
+                        {row.output.added
+                          ? "Remove this row"
+                          : "Reset to the approved plan"}
+                      </button>
+                    ) : null}
+                    <button
+                      className="btn btn-ghost"
+                      style={{ color: "var(--status-stalled)" }}
+                      disabled={planBusy}
+                      onClick={retire}
+                    >
+                      Retire this row
+                    </button>
+                  </>
+                }
+              />
+            </div>
+          ) : (
+            <button
+              className="link-action"
+              onClick={() => setDraft(draftFromOutput(row.output))}
+            >
+              Edit this output — wording, target, and where its figure comes
+              from
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

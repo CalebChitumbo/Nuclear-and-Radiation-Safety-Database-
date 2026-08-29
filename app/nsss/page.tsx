@@ -21,7 +21,13 @@ import {
   vehicleScreeningKey,
 } from "@/lib/rules/daily";
 import { todayISO } from "@/lib/rules/week";
-import type { Border, DailyEntry, Section } from "@/lib/rules/types";
+import { applyWorkPlanConfig, WORK_PLAN_YEAR } from "@/lib/rules/workPlan";
+import type {
+  Border,
+  DailyEntry,
+  Section,
+  WorkPlanConfig,
+} from "@/lib/rules/types";
 
 const NSSS: Section = "Nuclear Safety, Security & Safeguards";
 
@@ -36,17 +42,25 @@ export default function NsssPage() {
   const { weeks, selected } = useWeek();
   const { user } = useAuth();
   const { data, error, reload } = useStoreData(async (s) => {
-    const [weekMetricsAll, entries, borders] = await Promise.all([
+    const [weekMetricsAll, entries, borders, config] = await Promise.all([
       // All reads degrade to empty until their rules/collections exist so the
       // tab always renders.
       s.listWeekMetricsAll().catch(() => []),
       s.listDailyEntries().catch(() => []),
       s.listBorders().catch(() => []),
+      // The section's own changes to the plan — a row NSSS added or reworded
+      // on the weekly report is one of its metrics here too.
+      s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanConfig | null,
+      ),
     ]);
-    return { weekMetricsAll, entries, borders };
+    return { weekMetricsAll, entries, borders, config };
   });
 
-  const metrics = useMemo(() => dailyMetricOptions(NSSS), []);
+  const metrics = useMemo(
+    () => dailyMetricOptions(NSSS, applyWorkPlanConfig(data?.config)),
+    [data?.config],
+  );
   const today = todayISO();
 
   const derived = useMemo(() => {

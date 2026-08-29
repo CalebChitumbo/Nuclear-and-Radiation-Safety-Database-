@@ -131,8 +131,8 @@ to the seed.
    `seed:fresh` first **deletes** `facilities`, `licenceEvents`,
    `inspections`, `inspectionRequests` and `licenceWorkflows` (the old
    register and the history recorded against it), then seeds the new
-   register. Users, weeks, weekly metrics, the work plan notes and opening
-   balance, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
+   register. Users, weeks, weekly metrics, the work plan notes, opening
+   balance and plan changes, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
    (the mock store's storage key was bumped).
 5. Create the first admin by manually calling the `setUserClaims` callable in
    the Firebase Console, then onboard the rest from `/admin/users`.
@@ -223,6 +223,7 @@ automatically (Production for the production branch, Preview for others).
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
 | `workPlanBaseline/{year}` | The plan year's **opening balance** — what each output had already achieved before the system started counting it. The report is cumulative, so every row counts up from here. Admin-writable only (it moves every section's figures at once) |
+| `workPlanConfig/{year}` | The sections' own changes to the approved plan — reworded outputs, revised targets, rows added or retired, and the register each row counts itself off. An **overlay**: only rows that were actually changed have an entry, so clearing one hands the row back to the workbook. Written a row at a time; wholesale reset is admin-only |
 | `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
 | `borders/{id}` | NSSS border posts (vehicle screening); seeded with the eight inland offices, then managed by NSSS/admins — deactivation keeps history |
 | `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
@@ -455,9 +456,11 @@ split, the same columns the summary bands.
 
 Management's standing instruction is that *"sectional updates in our Monday
 meeting shall be in this format as they appear in the approved 2026 RPA work
-plan"*. `/weekly` **is** that format. The plan itself — every subprogramme,
-output, key indicator and target — lives in `lib/rules/workPlan.ts`, which is
-the single place to change if Management revises the plan.
+plan"*. `/weekly` **is** that format. The approved plan — every subprogramme,
+output, key indicator and target — ships in `lib/rules/workPlan.ts`; the
+sections then keep it up to date **from the report itself** (see
+[Editing the plan](#editing-the-plan--the-report-maintains-itself)), so a
+revised target or a reworded output no longer needs a code change.
 
 Each subprogramme is one table with the workbook's own columns:
 
@@ -512,19 +515,81 @@ touches those outputs — the rest of the grid keeps what it was showing.
 > (vehicles screened) is exactly that case: the inland offices' figures are
 > seeded as daily entries, so it carries **nothing** in.
 
+### How the plan is numbered
+
+Dotted-decimal, like the workbook itself, so a row's number says where it
+belongs:
+
+| Number | What it is |
+|---|---|
+| `1.2` | the subprogramme |
+| `1.2.4` | a plan output — the workbook's own number, never changed |
+| `1.2.9.1` | a **supporting figure that is the detail behind output 1.2.9** — the National Source Inventory team's field figures under the inventory exercise they belong to |
+| `1.2.S1` | a supporting figure the whole subprogramme keeps, with no output of its own to sit under (the sections' stakeholder and TWG counts) |
+
+Rows sort on that number segment by segment and numerically, so 1.1.10 follows
+1.1.9 rather than 1.1.1, and 1.2.9.1 sits with 1.2.9. The NSI figures were
+1.2.S2 … 1.2.S6 before — a flat run that read as siblings of the Inspectorate's
+own 1.2.S1 and told nobody what they were the detail of. They keep those numbers
+as `previousIds`, so notes and opening figures already saved against them still
+count.
+
 ### Nothing on the plan is retyped that the system already knows
 
-| Output | Filled from |
-|---|---|
-| 1.1.4 Issuance of Ionising Radiation Licences | every licence on the `licenceEvents` register — expand the row for the split by licence type |
-| 1.2.4 Routine, follow-up, pre-authorization & investigative inspections | every `inspections` record except enforcement — expand for the routine / follow-up / pre-authorisation / investigation split |
-| 1.2.11 Conduct Enforcement Actions | `inspections` of type *Enforcement Action* |
-| 1.3.12 Monitoring of illicit trafficking (ZRA Asycuda) | the border scan log and the coordinators' daily counts — expand for the split by border post |
+Where a row's figure comes from is a **link** the report holds as data (a
+`SourceBinding`), not something hard-coded — which is what lets a section
+re-point a row without a developer:
 
-Logging an inspection still records **what kind** it was; the work plan reports
-the total the plan asks for and keeps the breakdown one click away. Everything
-else is a figure an officer logs on Daily Updates or types into the row's
-*This week* box, and the quarter, total and % achieved follow from it.
+| Link | What the row counts |
+|---|---|
+| **Licensing register** | licences as they are recorded — all of them, or only the types ticked |
+| **Inspection register** | inspections as they are logged — every visit, or only the types ticked |
+| **Enforcement actions** | inspections that led to an enforcement action, off the same register |
+| **Typed / Daily Updates** | a figure an officer types in the row's *This week* box or logs on Daily Updates — optionally *the same figure as another row*, so two rows report one number with nothing copied across |
+
+As shipped: 1.1.4 counts every licence on `licenceEvents`; 1.2.4 every
+`inspections` record except a bare enforcement action; 1.2.11 the enforcement
+actions recorded against inspections; 1.3.12 the border scan log and the
+coordinators' daily counts. Expanding any row says in words where its figure
+comes from, links straight through to that register, and shows the breakdown
+behind the total.
+
+### Editing the plan — the report maintains itself
+
+Every row can be corrected on the report by the section that owns it (Daily
+Updates picks the change up the same day). Open a row and choose **Edit this
+output**:
+
+- **Wording** — description, key indicator, the note under the description, and
+  the short label Daily Updates uses.
+- **The target** — % Achieved is measured against it; blank is the workbook's
+  own "-".
+- **Reported by** — which section owns the row.
+- **Where the figure comes from** — the link table above. This is the answer to
+  "our licences are already registering, why is anyone typing this?": point the
+  row at the register and it counts itself.
+- **Supporting figure**, and which output it is the detail behind.
+
+At the foot of each subprogramme, the owning section can **add an output** or
+**add a supporting figure** — the report numbers it itself (`nextOutputId`,
+never reusing a number, history included) and gives it its own metric key. A row
+that no longer belongs can be **retired**: it comes off the report but keeps its
+figures, comments and opening balance, and *Changes to the 2026 plan* at the
+foot of the page puts it back. Admins can rename a subprogramme heading and
+**reset the plan**, dropping every change at once.
+
+Nothing here is destructive. Changes are stored as an **overlay**
+(`workPlanConfig/{year}`) holding only what was actually changed, one entry per
+row — so two sections editing their own outputs never overwrite each other, an
+untouched output reports exactly as approved, and clearing an entry hands the
+row straight back to the workbook. Rows that differ from the approved plan carry
+an `edited` (or `added`) chip on the report.
+
+> Editing the plan changes what is **reported**, never what was recorded. The
+> figures stay where they are: retiring a row, rewording it or revising its
+> target leaves every licence, inspection and logged count untouched.
+> Re-pointing a row does change which of them it counts, which is the point —
+> the row's own breakdown shows what the new figure is made of.
 
 ### Quarters, status and the narrative columns
 
@@ -544,20 +609,22 @@ the output stands, not what happened in one week.
 
 **Supporting figures** are listed under their subprogramme, below a divider:
 figures a section tracks that the plan has no output for (the A&S and
-Inspectorate stakeholder/TWG counts, the National Source Inventory team's field
-figures behind 1.2.9). They carry no target, % or status.
+Inspectorate stakeholder/TWG counts as `1.1.S1`/`1.2.S1`, the National Source
+Inventory team's field figures as `1.2.9.1`–`1.2.9.5` behind the exercise they
+belong to). They carry no target, % or status.
 
 **Export sheet** writes the table as CSV in the workbook's own column order, so
 a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**
 produces the printed report with the Zambian-flag cover.
 
-> `workPlanNotes` and `workPlanBaseline` are new collections — **the rules
-> must be deployed** before officers can save a Status, Comment or Action
-> Point, or an admin can re-baseline the year. Firestore denies writes to a
-> collection no deployed rule mentions, admin account or not. Until then the
-> report reads fine — the figures come from collections that already exist,
-> and the opening balance falls back to the approved workbook's — and saving
+> `workPlanNotes`, `workPlanBaseline` and `workPlanConfig` are new collections
+> — **the rules must be deployed** before officers can save a Status, Comment
+> or Action Point, edit an output, or an admin can re-baseline the year.
+> Firestore denies writes to a collection no deployed rule mentions, admin
+> account or not. Until then the report reads fine — the figures come from
+> collections that already exist, the opening balance falls back to the
+> approved workbook's and the plan to the approved workbook — and saving
 > reports the failure. See [Deploying the security rules](#deploying-the-security-rules).
 
 ---
@@ -614,10 +681,10 @@ contribution per output and where that leaves it against the annual target.
 ## Deploying the security rules
 
 Firestore denies every write to a collection **no deployed rule mentions**,
-admin account or not. So any release that adds one — `workPlanNotes` and
-`workPlanBaseline` for the sectional update, `dailyEntries` and `borders` for
-Daily Updates, `truckScans` for the border log — reads fine but cannot save
-until `firestore.rules` is published. Three ways, pick one:
+admin account or not. So any release that adds one — `workPlanNotes`,
+`workPlanBaseline` and `workPlanConfig` for the sectional update, `dailyEntries`
+and `borders` for Daily Updates, `truckScans` for the border log — reads fine
+but cannot save until `firestore.rules` is published. Three ways, pick one:
 
 **From GitHub (nothing to install).** The `Deploy Firestore Rules` workflow
 publishes `firestore.rules` and `firestore.indexes.json` automatically when
@@ -867,6 +934,16 @@ npm test
   actuals, 1.3.12 carrying nothing in, a saved baseline replacing them outright,
   % and status measured on the combined total), the spreadsheet paste parser,
   and the export columns
+- `workPlanConfig` — the plan as something the sections maintain: the numbering
+  (supporting figures under the output they are the detail of, natural sort,
+  a new row numbered without reusing one), each link resolving to what it
+  counts, and the overlay — a revised target reaching % Achieved, a reworded
+  row keeping its figures, a typed row re-pointed at a register counting
+  itself, two rows sharing one figure, a row added in its numbered place and
+  loggable on Daily Updates the same day, a retired row kept and restored, a
+  renumbered row still finding the notes and opening figures saved under its
+  old number, and the mock store saving one row at a time so two sections never
+  overwrite each other
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
 - `screeningSeed` — verifies the seeded daily screening log (1,484 entries,
@@ -1021,6 +1098,10 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
       the year** from its opening balance — with a filter for the week alone;
       typed figures, the opening balance and the Status / Comments / Action
       Points columns persist.
+- [x] The plan is maintained from the report: the owning section rewords an
+      output, revises its target, re-points it at a register, adds a row (the
+      report numbers it) or retires one, all as an overlay that leaves the
+      approved workbook one click away.
 - [x] The Inspectorate tab reproduces the section's inspection database — the
       province Summary with its INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS
       columns, a facility-per-row sheet per round, and the 30-day inspection

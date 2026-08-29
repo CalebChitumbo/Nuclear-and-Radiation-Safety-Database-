@@ -23,6 +23,7 @@ import {
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
 import { norm } from "@/lib/rules/matching";
+import type { Subprogramme } from "@/lib/rules/workPlan";
 import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
@@ -46,6 +47,7 @@ export function QuickLogWizard({
   facilities,
   borders,
   canManageBorders,
+  plan,
   onLogged,
 }: {
   section: Section;
@@ -55,6 +57,8 @@ export function QuickLogWizard({
   facilities: Facility[];
   borders: Border[];
   canManageBorders: boolean;
+  /** The plan in force, so an edited or added row is loggable the same day. */
+  plan?: Subprogramme[];
   onLogged: () => void;
 }) {
   if (section === "Inspectorate") {
@@ -76,6 +80,7 @@ export function QuickLogWizard({
       user={user}
       borders={borders}
       canManageBorders={canManageBorders}
+      plan={plan}
       onLogged={onLogged}
     />
   );
@@ -494,6 +499,7 @@ function CountFlow({
   user,
   borders,
   canManageBorders,
+  plan,
   onLogged,
 }: {
   section: Section;
@@ -502,10 +508,14 @@ function CountFlow({
   user: QuickLogUser;
   borders: Border[];
   canManageBorders: boolean;
+  plan?: Subprogramme[];
   onLogged: () => void;
 }) {
   const toast = useToast();
-  const options = useMemo(() => dailyMetricOptions(section), [section]);
+  const options = useMemo(
+    () => dailyMetricOptions(section, plan),
+    [section, plan],
+  );
 
   type Pick = { key: string; label: string } | "note";
   type Step = "what" | "border" | "amount" | "note" | "done";

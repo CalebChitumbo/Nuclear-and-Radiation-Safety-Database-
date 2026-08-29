@@ -5,6 +5,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -65,7 +66,10 @@ import {
   type WeekDef,
   type WeekMetrics,
   type WorkPlanBaseline,
+  type WorkPlanConfig,
   type WorkPlanNote,
+  type WorkPlanOutputConfig,
+  type WorkPlanSubprogrammeConfig,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
@@ -484,6 +488,81 @@ class FirebaseStore implements DataStore {
         updatedBy: uid,
       }),
     );
+  }
+
+  async getWorkPlanConfig(year: number): Promise<WorkPlanConfig | null> {
+    const db = requireDb();
+    const snap = await getDoc(doc(db, "workPlanConfig", String(year)));
+    return snap.exists() ? (snap.data() as WorkPlanConfig) : null;
+  }
+
+  async setWorkPlanOutputConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    // Merged one row at a time: two sections editing their own outputs in the
+    // same minute must not overwrite each other's row. `null` deletes the
+    // entry, handing the row back to the approved plan.
+    await setDoc(
+      doc(db, "workPlanConfig", String(year)),
+      {
+        year,
+        outputs: {
+          [id]: entry
+            ? stripUndefined({
+                ...entry,
+                updatedAt: new Date().toISOString(),
+                updatedBy: uid,
+              })
+            : deleteField(),
+        },
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      },
+      { merge: true },
+    );
+  }
+
+  async setWorkPlanSubprogrammeConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanSubprogrammeConfig | null,
+    uid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    await setDoc(
+      doc(db, "workPlanConfig", String(year)),
+      {
+        year,
+        subprogrammes: {
+          [id]: entry
+            ? stripUndefined({
+                ...entry,
+                updatedAt: new Date().toISOString(),
+                updatedBy: uid,
+              })
+            : deleteField(),
+        },
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      },
+      { merge: true },
+    );
+  }
+
+  async resetWorkPlanConfig(year: number, uid: string): Promise<void> {
+    const db = requireDb();
+    // Not merged: the whole overlay goes, so every row reports as approved.
+    await setDoc(doc(db, "workPlanConfig", String(year)), {
+      year,
+      outputs: {},
+      subprogrammes: {},
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    });
   }
 
   async setWorkPlanNote(
@@ -943,6 +1022,7 @@ class FirebaseStore implements DataStore {
       truckScans,
       workPlanNotes,
       workPlanBaseline,
+      workPlanConfig,
       inventoryEdits,
     ] = await Promise.all([
       this.listFacilities(),
@@ -957,6 +1037,7 @@ class FirebaseStore implements DataStore {
       this.listTruckScans().catch(() => [] as TruckScan[]),
       this.listWorkPlanNotes().catch(() => [] as WorkPlanNote[]),
       this.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(() => null),
+      this.getWorkPlanConfig(WORK_PLAN_YEAR).catch(() => null),
       this.listInventoryEdits().catch(() => [] as InventoryEdit[]),
     ]);
     const db = requireDb();
@@ -975,6 +1056,7 @@ class FirebaseStore implements DataStore {
       weekMetrics,
       workPlanNotes,
       workPlanBaseline,
+      workPlanConfig,
       dailyEntries,
       borders,
       truckScans,

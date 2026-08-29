@@ -24,7 +24,10 @@ import type {
   WeekMetrics,
   WorkflowNote,
   WorkPlanBaseline,
+  WorkPlanConfig,
   WorkPlanNote,
+  WorkPlanOutputConfig,
+  WorkPlanSubprogrammeConfig,
 } from "../rules/types";
 
 export interface DataStore {
@@ -101,6 +104,32 @@ export interface DataStore {
     uid: string,
     note?: string,
   ): Promise<void>;
+  /**
+   * The sections' own changes to the approved plan — reworded outputs, revised
+   * targets, rows added or retired, and the register each row counts itself
+   * off. Null when nothing has been changed, in which case the plan the code
+   * ships with applies in full.
+   */
+  getWorkPlanConfig(year: number): Promise<WorkPlanConfig | null>;
+  /**
+   * Save (or clear, with `null`) one row's changes. Writes just that row, so
+   * two sections editing their own outputs never overwrite each other.
+   */
+  setWorkPlanOutputConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    uid: string,
+  ): Promise<void>;
+  /** The same for a subprogramme heading. Admins only. */
+  setWorkPlanSubprogrammeConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanSubprogrammeConfig | null,
+    uid: string,
+  ): Promise<void>;
+  /** Drop every change, handing the year back to the approved plan. Admins. */
+  resetWorkPlanConfig(year: number, uid: string): Promise<void>;
   setWorkPlanNote(
     id: string,
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
@@ -215,6 +244,7 @@ export interface DataStore {
     weekMetrics: Record<string, WeekMetrics>;
     workPlanNotes: WorkPlanNote[];
     workPlanBaseline: WorkPlanBaseline | null;
+    workPlanConfig: WorkPlanConfig | null;
     dailyEntries: DailyEntry[];
     borders: Border[];
     truckScans: TruckScan[];

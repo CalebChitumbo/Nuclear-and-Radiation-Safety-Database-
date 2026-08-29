@@ -44,7 +44,10 @@ import {
   type WeekDef,
   type WeekMetrics,
   type WorkPlanBaseline,
+  type WorkPlanConfig,
   type WorkPlanNote,
+  type WorkPlanOutputConfig,
+  type WorkPlanSubprogrammeConfig,
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
@@ -84,6 +87,7 @@ interface State {
   weekMetrics: Record<string, WeekMetrics>;
   workPlanNotes: Record<string, WorkPlanNote>;
   workPlanBaseline: Record<string, WorkPlanBaseline>;
+  workPlanConfig: Record<string, WorkPlanConfig>;
   dailyEntries: DailyEntry[];
   borders: Border[];
   truckScans: TruckScan[];
@@ -102,6 +106,7 @@ function freshState(): State {
     weekMetrics: {},
     workPlanNotes: {},
     workPlanBaseline: {},
+    workPlanConfig: {},
     // The inland offices' 2026 screening log, seeded as daily entries so the
     // NSSS tab and work plan output 1.3.12 read real figures rather than an
     // opening balance — see docs/daily-screening-2026-import.md.
@@ -163,6 +168,8 @@ function load(): State {
     // Back-compat: stores saved before the work plan report existed.
     if (!parsed.workPlanNotes) parsed.workPlanNotes = {};
     if (!parsed.workPlanBaseline) parsed.workPlanBaseline = {};
+    // Back-compat: stores saved before the plan itself could be edited.
+    if (!parsed.workPlanConfig) parsed.workPlanConfig = {};
     // Back-compat: stores saved before border posts existed.
     if (!parsed.borders) {
       parsed.borders = mapSeedBorders(screeningSeed as SeedScreening);
@@ -527,6 +534,80 @@ class MockStore implements DataStore {
       year,
       values,
       note,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    save(s);
+    dispatchChange();
+  }
+
+  async getWorkPlanConfig(year: number): Promise<WorkPlanConfig | null> {
+    return ensure().workPlanConfig[String(year)] || null;
+  }
+
+  async setWorkPlanOutputConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanOutputConfig | null,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    const key = String(year);
+    const current = s.workPlanConfig[key] || { year, outputs: {}, subprogrammes: {} };
+    const outputs = { ...(current.outputs || {}) };
+    // Clearing an entry hands the row back to the approved plan.
+    if (entry) {
+      outputs[id] = { ...entry, updatedAt: new Date().toISOString(), updatedBy: uid };
+    } else {
+      delete outputs[id];
+    }
+    s.workPlanConfig[key] = {
+      ...current,
+      year,
+      outputs,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    save(s);
+    dispatchChange();
+  }
+
+  async setWorkPlanSubprogrammeConfig(
+    year: number,
+    id: string,
+    entry: WorkPlanSubprogrammeConfig | null,
+    uid: string,
+  ): Promise<void> {
+    const s = ensure();
+    const key = String(year);
+    const current = s.workPlanConfig[key] || { year, outputs: {}, subprogrammes: {} };
+    const subprogrammes = { ...(current.subprogrammes || {}) };
+    if (entry) {
+      subprogrammes[id] = {
+        ...entry,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid,
+      };
+    } else {
+      delete subprogrammes[id];
+    }
+    s.workPlanConfig[key] = {
+      ...current,
+      year,
+      subprogrammes,
+      updatedAt: new Date().toISOString(),
+      updatedBy: uid,
+    };
+    save(s);
+    dispatchChange();
+  }
+
+  async resetWorkPlanConfig(year: number, uid: string): Promise<void> {
+    const s = ensure();
+    s.workPlanConfig[String(year)] = {
+      year,
+      outputs: {},
+      subprogrammes: {},
       updatedAt: new Date().toISOString(),
       updatedBy: uid,
     };
@@ -960,6 +1041,7 @@ class MockStore implements DataStore {
       workPlanNotes: Object.values(s.workPlanNotes),
       workPlanBaseline:
         s.workPlanBaseline[String(WORK_PLAN_YEAR)] || null,
+      workPlanConfig: s.workPlanConfig[String(WORK_PLAN_YEAR)] || null,
       dailyEntries: s.dailyEntries,
       inventoryEdits: s.inventoryEdits,
       truckScans: s.truckScans,

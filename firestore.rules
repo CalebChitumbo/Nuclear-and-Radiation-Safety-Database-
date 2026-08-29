@@ -283,6 +283,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // The sections' own changes to the approved plan — reworded outputs,
+    // revised targets, rows added or retired, and the register each row counts
+    // itself off. One document per plan year, holding ONLY the overlay: an
+    // untouched output has no entry here and reports exactly as approved, so
+    // clearing an entry is always a safe undo.
+    //
+    // Any signed-in officer may write it, because a section maintains its own
+    // rows and the report is where they do it. The document is a single map
+    // covering every section, so rules cannot tell whose row moved — the page
+    // gates each row on canEditSection, and every entry carries updatedBy so a
+    // change is always attributable. Wholesale reset stays admin-only, as does
+    // deleting the document.
+    match /workPlanConfig/{year} {
+      allow read:   if signedIn();
+      allow create, update: if signedIn()
+        && (!('outputs' in request.resource.data)
+            || request.resource.data.outputs is map)
+        && (!('subprogrammes' in request.resource.data)
+            || request.resource.data.subprogrammes is map)
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     match /workPlanNotes/{id} {
       allow read:   if signedIn();
       allow create, update: if signedIn()

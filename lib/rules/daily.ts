@@ -10,7 +10,11 @@
  * this module only concerns the manual metrics.
  */
 import type { DailyEntry, Section, WeekMetrics } from "./types";
-import { manualOutputsForSection, metricKeysForOutput } from "./workPlan";
+import {
+  manualOutputsForSection,
+  metricKeysForOutput,
+  type Subprogramme,
+} from "./workPlan";
 import { metricKey } from "./weeklyDerivation";
 
 /** One thing a section can log a number against on the Daily Updates tab. */
@@ -31,12 +35,19 @@ export interface DailyMetricOption {
 
 /**
  * The metric choices a section's daily count form offers — its manual outputs
- * in the approved work plan, then the supporting figures it still tracks. The
- * key is the same one the weekly report reads, so a logged count lands on its
- * work plan row without any further mapping.
+ * in the work plan, then the supporting figures it still tracks. The key is the
+ * same one the weekly report reads, so a logged count lands on its work plan
+ * row without any further mapping.
+ *
+ * Pass the plan in force (the approved workbook with the sections' own changes
+ * laid over it) so a row a section added, reworded or re-pointed on the weekly
+ * report is loggable here the same day. Omit it for the approved plan.
  */
-export function dailyMetricOptions(section: Section): DailyMetricOption[] {
-  return manualOutputsForSection(section).map((o) => {
+export function dailyMetricOptions(
+  section: Section,
+  plan?: Subprogramme[],
+): DailyMetricOption[] {
+  return manualOutputsForSection(section, plan).map((o) => {
     const keys = metricKeysForOutput(o);
     return {
       key: keys[0] || "",
