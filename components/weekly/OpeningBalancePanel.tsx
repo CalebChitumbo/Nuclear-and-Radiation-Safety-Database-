@@ -10,6 +10,8 @@ import {
   WORK_PLAN_OPENING_BALANCE,
   effectiveOpeningBalance,
   parseOpeningBalance,
+  type Subprogramme,
+  type WorkPlanOutput,
 } from "@/lib/rules/workPlan";
 import type { WorkPlanBaseline } from "@/lib/rules/types";
 
@@ -32,12 +34,19 @@ import type { WorkPlanBaseline } from "@/lib/rules/types";
  */
 export function OpeningBalancePanel({
   year,
+  plan,
   baseline,
   canEdit,
   uid,
   onSaved,
 }: {
   year: number;
+  /**
+   * The plan in force — the approved workbook with the sections' own changes
+   * laid over it. A row a section added carries an opening balance like any
+   * other, so this panel lists what the report lists, not what the code ships.
+   */
+  plan?: Subprogramme[];
   /** The saved baseline, or null when the workbook's figures still apply. */
   baseline: WorkPlanBaseline | null;
   canEdit: boolean;
@@ -52,8 +61,8 @@ export function OpeningBalancePanel({
   const [busy, setBusy] = useState(false);
 
   const inForce = useMemo(
-    () => effectiveOpeningBalance(baseline?.values ?? null),
-    [baseline],
+    () => effectiveOpeningBalance(baseline?.values ?? null, plan),
+    [baseline, plan],
   );
   const values = draft ?? inForce;
 
@@ -199,7 +208,7 @@ export function OpeningBalancePanel({
                 </tr>
               </thead>
               <tbody>
-                {WORK_PLAN.map((sub) => (
+                {(plan ?? WORK_PLAN).map((sub) => (
                   <BalanceRows
                     key={sub.id}
                     heading={sub.heading}
@@ -235,14 +244,16 @@ export function OpeningBalancePanel({
               <button
                 className="btn btn-ghost"
                 onClick={() =>
-                  setDraft(effectiveOpeningBalance(WORK_PLAN_OPENING_BALANCE))
+                  setDraft(
+                    effectiveOpeningBalance(WORK_PLAN_OPENING_BALANCE, plan),
+                  )
                 }
               >
                 Reset to the sections' workbooks
               </button>
               <button
                 className="btn btn-ghost"
-                onClick={() => setDraft(effectiveOpeningBalance({}))}
+                onClick={() => setDraft(effectiveOpeningBalance({}, plan))}
               >
                 Clear to zero
               </button>
@@ -262,7 +273,7 @@ function BalanceRows({
   onChange,
 }: {
   heading: string;
-  outputs: (typeof WORK_PLAN)[number]["outputs"];
+  outputs: WorkPlanOutput[];
   values: Record<string, number[]>;
   canEdit: boolean;
   onChange: (id: string, index: number, raw: string) => void;

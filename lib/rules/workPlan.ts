@@ -25,6 +25,12 @@
  * raw date, so an auto row and a manual row logged in the same week always land
  * in the same quarter and the columns reconcile with the weekly figures. (W14
  * runs 30 Mar → 3 Apr; it counts to Q1, the quarter it starts in.)
+ *
+ * WHAT SHIPS HERE IS THE APPROVED PLAN, NOT THE LAST WORD. Every row's wording,
+ * target, section and — most of all — the register it counts itself off is a
+ * `SourceBinding`, a plain value that a saved `WorkPlanConfig` can change (see
+ * `applyWorkPlanConfig`). Sections edit their own rows from the report; the
+ * plan below is what an untouched row, or a row that has been reset, reports as.
  */
 import { ENFORCEMENT_COLUMNS } from "./inspectionDatabase";
 import {
@@ -40,13 +46,17 @@ import {
   type LicenceEvent,
   type LicenceType,
   type Section,
+  type SourceBinding,
   type WeekDef,
+  type WorkPlanConfig,
   type WorkPlanNote,
+  type WorkPlanOutputConfig,
   type WorkPlanStatus,
+  type WorkPlanSubprogrammeConfig,
 } from "./types";
 
 export { WORK_PLAN_STATUSES };
-export type { WorkPlanStatus };
+export type { SourceBinding, WorkPlanConfig, WorkPlanStatus };
 
 /** The plan year these outputs and targets belong to. */
 export const WORK_PLAN_YEAR = 2026;
@@ -78,7 +88,8 @@ export function isEnforcement(i: Inspection): boolean {
 }
 
 /**
- * How an output's actual figure is obtained.
+ * How an output's actual figure is obtained — the runnable form of the row's
+ * `SourceBinding`, built by `resolveSource`.
  *
  * - `licences`    counted off the dated licence register
  * - `inspections` counted off the dated inspection register
@@ -101,7 +112,13 @@ export type BreakdownSpec =
   | { kind: "borders"; key: string };
 
 export interface WorkPlanOutput {
-  /** Work plan output id, e.g. "1.2.4". Stable — it keys the officer's notes. */
+  /**
+   * Work plan output id — the workbook's own numbering for a plan output
+   * ("1.2.4"), and for a supporting figure either the output whose detail it is
+   * plus a sequence ("1.2.9.1") or the subprogramme plus one ("1.2.S1"). Stable:
+   * it keys the officer's notes, the opening balance and, for a manual row, the
+   * metric its figures are stored against.
+   */
   id: string;
   description: string;
   indicator: string;
@@ -109,6 +126,9 @@ export interface WorkPlanOutput {
   target: number | null;
   /** The section that reports this output (and may log against it). */
   section: Section;
+  /** Where the figure comes from, as stored — editable, see `SourceBinding`. */
+  binding: SourceBinding;
+  /** The same link, resolved into the predicates the derivation runs. */
   source: OutputSource;
   /** Shorter wording for the Daily Updates tap targets. */
   logLabel?: string;
@@ -118,8 +138,16 @@ export interface WorkPlanOutput {
    * the subprogramme as supporting detail, with no target, % or status.
    */
   supporting?: boolean;
+  /** For a supporting figure: the output whose detail it is, e.g. "1.2.9". */
+  parentId?: string;
   /** Shown under the description on the report. */
   note?: string;
+  /** Ids this row has been known by — stored figures under them still count. */
+  previousIds?: readonly string[];
+  /** Added by a section rather than shipped in the approved workbook. */
+  added?: boolean;
+  /** True when a saved config changed something about the row. */
+  customised?: boolean;
 }
 
 export interface Subprogramme {
@@ -130,6 +158,116 @@ export interface Subprogramme {
   /** The section that owns the subprogramme (individual outputs may differ). */
   section: Section;
   outputs: WorkPlanOutput[];
+  /** Added by a section rather than shipped in the approved workbook. */
+  added?: boolean;
+  customised?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// The link between a row and the rest of the database
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn a stored link into the predicates the derivation runs.
+ *
+ * An unbound `licences` link counts every recorded licence; an unbound
+ * `inspections` link counts every inspection VISIT — a bare enforcement action
+ * is a separate output (1.2.11), so counting it here as well would report the
+ * same visit twice.
+ */
+export function resolveSource(binding: SourceBinding): OutputSource {
+  switch (binding.kind) {
+    case "licences": {
+      const types = binding.types;
+      return {
+        kind: "licences",
+        match: types?.length ? (t) => types.includes(t) : undefined,
+      };
+    }
+    case "inspections": {
+      const types = binding.types;
+      return {
+        kind: "inspections",
+        match: types?.length
+          ? (i) => types.includes(i.type)
+          : (i) => isInspectionVisit(i.type),
+      };
+    }
+    case "enforcement":
+      return { kind: "inspections", match: isEnforcement };
+    case "manual":
+    default:
+      return {
+        kind: "manual",
+        key: binding.key,
+        alsoCount: binding.alsoCount,
+      };
+  }
+}
+
+/** The detail a linked row can show when it is expanded. */
+export function breakdownForBinding(
+  binding: SourceBinding,
+): BreakdownSpec | undefined {
+  switch (binding.kind) {
+    case "licences":
+      return { kind: "licenceTypes" };
+    case "inspections": {
+      const types = binding.types;
+      return {
+        kind: "inspectionTypes",
+        match: types?.length
+          ? (t) => types.includes(t)
+          : (t) => isInspectionVisit(t),
+      };
+    }
+    case "enforcement":
+      return { kind: "enforcementActions" };
+    case "manual":
+      return binding.splitByBorder
+        ? { kind: "borders", key: binding.key }
+        : undefined;
+  }
+}
+
+/** One line saying where a row's figure comes from, for the report and audit. */
+export function describeBinding(binding: SourceBinding): string {
+  switch (binding.kind) {
+    case "licences":
+      return binding.types?.length
+        ? `Counted off the licensing register — ${binding.types.join(", ")}.`
+        : "Counted off the licensing register as licences are recorded.";
+    case "inspections":
+      return binding.types?.length
+        ? `Counted off the inspection register — ${binding.types.join(", ")}.`
+        : "Counted off the inspection register as inspections are logged.";
+    case "enforcement":
+      return "Counted off the inspection register — inspections that led to an enforcement action.";
+    case "manual":
+      return binding.splitByBorder
+        ? "Summed from the border scan log and the coordinators' daily counts."
+        : "Typed on the weekly report, or summed from the section's Daily Updates.";
+  }
+}
+
+/** Do two links point at the same thing? Used to spot a re-pointed row. */
+export function sameBinding(a: SourceBinding, b: SourceBinding): boolean {
+  if (a.kind !== b.kind) return false;
+  const list = (v?: readonly string[]) => [...(v || [])].sort().join("|");
+  if (a.kind === "manual" && b.kind === "manual") {
+    return (
+      a.key === b.key &&
+      list(a.alsoCount) === list(b.alsoCount) &&
+      !!a.splitByBorder === !!b.splitByBorder
+    );
+  }
+  if (a.kind === "licences" && b.kind === "licences") {
+    return list(a.types) === list(b.types);
+  }
+  if (a.kind === "inspections" && b.kind === "inspections") {
+    return list(a.types) === list(b.types);
+  }
+  return true; // enforcement carries nothing else
 }
 
 // ---------------------------------------------------------------------------
@@ -153,16 +291,51 @@ const LEGACY = {
   nsssTwg: metricKey(NSSS, "TWG Meetings"),
 } as const;
 
-const manual = (
-  id: string,
-  alsoCount?: readonly string[],
-): OutputSource => ({ kind: "manual", key: outputMetricKey(id), alsoCount });
+const manual = (id: string, alsoCount?: string[]): SourceBinding => ({
+  kind: "manual",
+  key: outputMetricKey(id),
+  ...(alsoCount ? { alsoCount } : {}),
+});
+
+/**
+ * A row as it is WRITTEN DOWN — the link as a value. The predicates the
+ * derivation runs (`source`, `breakdown`) are computed from it by `finalise`,
+ * so a row defined here and a row an officer re-points behave identically.
+ */
+type OutputDef = Omit<
+  WorkPlanOutput,
+  "source" | "breakdown" | "customised" | "added"
+>;
+
+interface SubprogrammeDef extends Omit<Subprogramme, "outputs" | "customised" | "added"> {
+  outputs: OutputDef[];
+}
+
+function finaliseOutput(def: OutputDef): WorkPlanOutput {
+  return {
+    ...def,
+    source: resolveSource(def.binding),
+    breakdown: breakdownForBinding(def.binding),
+  };
+}
+
+function finaliseSub(def: SubprogrammeDef): Subprogramme {
+  return {
+    ...def,
+    // In the numbering's own order, so the shipped plan and an edited one read
+    // the same way — a supporting figure sits under the output it belongs to,
+    // and 1.1.10 follows 1.1.9 rather than 1.1.1.
+    outputs: def.outputs
+      .map(finaliseOutput)
+      .sort((a, b) => compareOutputIds(a.id, b.id)),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Subprogramme 1.1 — Authorisation and Standards
 // ---------------------------------------------------------------------------
 
-const SUB_1_1: Subprogramme = {
+const SUB_1_1: SubprogrammeDef = {
   id: "1.1",
   title: "Authorisation and Standards",
   heading: "Subprogramme 1.1 — Authorisation and Standards",
@@ -174,7 +347,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of guidelines developed",
       target: 12,
       section: AS,
-      source: manual("1.1.1"),
+      binding: manual("1.1.1"),
       logLabel: "Safety guides developed/revised",
     },
     {
@@ -183,7 +356,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of guidelines developed",
       target: 4,
       section: AS,
-      source: manual("1.1.2"),
+      binding: manual("1.1.2"),
       logLabel: "Regulations developed",
     },
     {
@@ -192,7 +365,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "SOPs revised",
       target: 1,
       section: AS,
-      source: manual("1.1.3"),
+      binding: manual("1.1.3"),
       logLabel: "Licensing SOPs revised",
     },
     {
@@ -201,8 +374,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number Licenses issued",
       target: 500,
       section: AS,
-      source: { kind: "licences" },
-      breakdown: { kind: "licenceTypes" },
+      binding: { kind: "licences" },
       note: "Every licence recorded on the register — expand for the split by licence type.",
     },
     {
@@ -211,7 +383,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Databases updated",
       target: 2,
       section: AS,
-      source: manual("1.1.5"),
+      binding: manual("1.1.5"),
       logLabel: "RAIS/ARIS databases updated",
     },
     {
@@ -220,7 +392,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of meetings conducted",
       target: 4,
       section: AS,
-      source: manual("1.1.6"),
+      binding: manual("1.1.6"),
       logLabel: "Virtual awareness meetings",
     },
     {
@@ -229,7 +401,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Advert developed",
       target: 1,
       section: AS,
-      source: manual("1.1.7"),
+      binding: manual("1.1.7"),
       logLabel: "Sensitisation adverts developed",
     },
     {
@@ -238,7 +410,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Mobile App developed",
       target: 1,
       section: AS,
-      source: manual("1.1.8"),
+      binding: manual("1.1.8"),
       logLabel: "Mobile app milestones",
     },
     {
@@ -247,7 +419,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of brochures developed",
       target: 4,
       section: AS,
-      source: manual("1.1.9"),
+      binding: manual("1.1.9"),
       logLabel: "Brochures developed",
     },
     {
@@ -256,7 +428,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of newsletters developed",
       target: 4,
       section: AS,
-      source: manual("1.1.10"),
+      binding: manual("1.1.10"),
       logLabel: "Newsletters developed",
     },
     // Figures the section already logs that the plan has no output for.
@@ -266,7 +438,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of engagements",
       target: null,
       section: AS,
-      source: { kind: "manual", key: metricKey(AS, "Stakeholder Engagements") },
+      binding: { kind: "manual", key: metricKey(AS, "Stakeholder Engagements") },
       logLabel: "Stakeholder engagements",
       supporting: true,
     },
@@ -276,7 +448,7 @@ const SUB_1_1: Subprogramme = {
       indicator: "Number of meetings",
       target: null,
       section: AS,
-      source: { kind: "manual", key: metricKey(AS, "TWG Meetings attended") },
+      binding: { kind: "manual", key: metricKey(AS, "TWG Meetings attended") },
       logLabel: "TWG meetings attended",
       supporting: true,
     },
@@ -287,7 +459,7 @@ const SUB_1_1: Subprogramme = {
 // Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
 // ---------------------------------------------------------------------------
 
-const SUB_1_2: Subprogramme = {
+const SUB_1_2: SubprogrammeDef = {
   id: "1.2",
   title: "Nuclear & Radiation Safety Inspections",
   heading: "Subprogramme 1.2 — Nuclear & Radiation Safety Inspections",
@@ -299,7 +471,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of inspection programmes",
       target: 1,
       section: INSP,
-      source: manual("1.2.1"),
+      binding: manual("1.2.1"),
       logLabel: "Inspection programmes developed",
     },
     {
@@ -308,7 +480,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of SOPs",
       target: 1,
       section: INSP,
-      source: manual("1.2.2"),
+      binding: manual("1.2.2"),
       logLabel: "Inspectorate SOPs reviewed",
     },
     {
@@ -318,7 +490,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of trainings",
       target: 4,
       section: INSP,
-      source: manual("1.2.3"),
+      binding: manual("1.2.3"),
       logLabel: "Inspector trainings",
     },
     {
@@ -328,8 +500,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of inspections",
       target: 500,
       section: INSP,
-      source: { kind: "inspections", match: (i) => isInspectionVisit(i.type) },
-      breakdown: { kind: "inspectionTypes", match: isInspectionVisit },
+      binding: { kind: "inspections" },
       note: "Every inspection logged on the register — expand for the routine / follow-up / pre-authorisation / investigation split.",
     },
     {
@@ -338,7 +509,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Enhanced reporting system",
       target: 1,
       section: INSP,
-      source: manual("1.2.5"),
+      binding: manual("1.2.5"),
       logLabel: "Reporting-system enhancements",
     },
     {
@@ -347,7 +518,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of meetings",
       target: 36,
       section: INSP,
-      source: manual("1.2.6", [LEGACY.inspTwg]),
+      binding: manual("1.2.6", [LEGACY.inspTwg]),
       logLabel: "TWG meetings held",
     },
     {
@@ -356,7 +527,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Updated Data",
       target: 4,
       section: INSP,
-      source: manual("1.2.7"),
+      binding: manual("1.2.7"),
       logLabel: "RAIS data updates",
     },
     {
@@ -365,7 +536,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of Enforcement Policy",
       target: 1,
       section: INSP,
-      source: manual("1.2.8"),
+      binding: manual("1.2.8"),
       logLabel: "Enforcement policy milestones",
     },
     {
@@ -374,7 +545,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of exercise",
       target: 1,
       section: NSI,
-      source: manual("1.2.9"),
+      binding: manual("1.2.9"),
       logLabel: "Source inventory exercises",
       note: "The National Source Inventory team's field figures are reported as supporting figures below.",
     },
@@ -384,7 +555,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of Inspection Manual reviewed",
       target: 1,
       section: INSP,
-      source: manual("1.2.10"),
+      binding: manual("1.2.10"),
       logLabel: "Inspection manual reviews",
     },
     {
@@ -393,8 +564,7 @@ const SUB_1_2: Subprogramme = {
       indicator: "# of Enforcement actions",
       target: 50,
       section: INSP,
-      source: { kind: "inspections", match: isEnforcement },
-      breakdown: { kind: "enforcementActions" },
+      binding: { kind: "enforcement" },
       note: "The enforcement action recorded against an inspection — expand for the engagement / suspension / seizure split, the same columns the inspection database summarises.",
     },
     {
@@ -403,11 +573,19 @@ const SUB_1_2: Subprogramme = {
       indicator: "Number of engagements",
       target: null,
       section: INSP,
-      source: { kind: "manual", key: metricKey(INSP, "Stakeholder Engagements") },
+      binding: { kind: "manual", key: metricKey(INSP, "Stakeholder Engagements") },
       logLabel: "Stakeholder engagements",
       supporting: true,
     },
     // The National Source Inventory team's field figures behind output 1.2.9.
+    //
+    // Numbered UNDER the output they are the detail of — 1.2.9.1 … 1.2.9.5 —
+    // so the report says what they belong to. They were 1.2.S2 … 1.2.S6 when
+    // supporting figures were numbered as a flat run per subprogramme, which
+    // read as siblings of the section's own 1.2.S1 and told nobody they were
+    // the National Source Inventory exercise's field figures. The old ids are
+    // kept as `previousIds` so anything already stored against them still
+    // counts (their metric keys are the section's own and never moved).
     ...(
       [
         ["Facilities visited", "Number of facilities"],
@@ -417,14 +595,16 @@ const SUB_1_2: Subprogramme = {
         ["Team meetings held", "Number of meetings"],
       ] as const
     ).map(([label, indicator], i) => ({
-      id: `1.2.S${i + 2}`,
+      id: `1.2.9.${i + 1}`,
+      previousIds: [`1.2.S${i + 2}`],
       description: `${label} (National Source Inventory)`,
       indicator,
       target: null,
       section: NSI,
-      source: { kind: "manual" as const, key: metricKey(NSI, label) },
+      binding: { kind: "manual" as const, key: metricKey(NSI, label) },
       logLabel: label,
       supporting: true,
+      parentId: "1.2.9",
     })),
   ],
 };
@@ -433,7 +613,7 @@ const SUB_1_2: Subprogramme = {
 // Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
 // ---------------------------------------------------------------------------
 
-const SUB_1_3: Subprogramme = {
+const SUB_1_3: SubprogrammeDef = {
   id: "1.3",
   title: "Nuclear Safety, Security and Safeguards / Stakeholder Engagement",
   heading:
@@ -446,7 +626,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of conferences",
       target: 1,
       section: NSSS,
-      source: manual("1.3.1"),
+      binding: manual("1.3.1"),
       logLabel: "RPO conference (Medical)",
     },
     {
@@ -455,7 +635,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of Conferences",
       target: 1,
       section: NSSS,
-      source: manual("1.3.2"),
+      binding: manual("1.3.2"),
       logLabel: "RPO conference (Non-Medical)",
     },
     {
@@ -464,7 +644,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of Offices opened",
       target: 2,
       section: NSSS,
-      source: manual("1.3.3"),
+      binding: manual("1.3.3"),
       logLabel: "Inland offices opened",
     },
     {
@@ -473,7 +653,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of meetings",
       target: 1,
       section: NSSS,
-      source: manual("1.3.4"),
+      binding: manual("1.3.4"),
       logLabel: "INSSERV action plan meetings",
     },
     {
@@ -482,7 +662,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of Facilities inspected",
       target: 10,
       section: NSSS,
-      source: manual("1.3.5"),
+      binding: manual("1.3.5"),
       logLabel: "Physical protection inspections",
     },
     {
@@ -491,7 +671,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of SOPs developed",
       target: 8,
       section: NSSS,
-      source: manual("1.3.6"),
+      binding: manual("1.3.6"),
       logLabel: "NSSS SOPs developed",
     },
     {
@@ -500,7 +680,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "INSSP programme implemented",
       target: 100,
       section: NSSS,
-      source: manual("1.3.7"),
+      binding: manual("1.3.7"),
       logLabel: "INSSP implementation (%)",
       note: "Reported as percentage points of the programme implemented.",
     },
@@ -510,7 +690,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "# of meetings",
       target: 2,
       section: NSSS,
-      source: manual("1.3.8", [LEGACY.nsssIaea]),
+      binding: manual("1.3.8", [LEGACY.nsssIaea]),
       logLabel: "Regional workshops / IAEA meetings",
     },
     {
@@ -519,7 +699,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "# of stakeholders'",
       target: 40,
       section: NSSS,
-      source: manual("1.3.9", [LEGACY.nsssStakeholder]),
+      binding: manual("1.3.9", [LEGACY.nsssStakeholder]),
       logLabel: "Stakeholders engaged",
     },
     {
@@ -528,7 +708,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "# of trainings conducted",
       target: 4,
       section: NSSS,
-      source: manual("1.3.10"),
+      binding: manual("1.3.10"),
       logLabel: "ZRA / responder trainings",
     },
     {
@@ -537,7 +717,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "Number of Monitoring and Evaluation",
       target: null,
       section: NSSS,
-      source: manual("1.3.11"),
+      binding: manual("1.3.11"),
       logLabel: "Inland office M&E visits",
     },
     {
@@ -548,9 +728,12 @@ const SUB_1_3: Subprogramme = {
       section: NSSS,
       // Keyed to the screening metric the border posts already write to, so the
       // scan log and the coordinators' daily figures feed this row untouched.
-      source: { kind: "manual", key: LEGACY.nsssScreening },
+      binding: {
+        kind: "manual",
+        key: LEGACY.nsssScreening,
+        splitByBorder: true,
+      },
       logLabel: "Vehicles screened",
-      breakdown: { kind: "borders", key: LEGACY.nsssScreening },
       note: "Fed by the border scan log and the coordinators' daily counts — expand for the split by border post.",
     },
     {
@@ -559,7 +742,7 @@ const SUB_1_3: Subprogramme = {
       indicator: "# of meetings'",
       target: 5,
       section: NSSS,
-      source: manual("1.3.13", [LEGACY.nsssTwg]),
+      binding: manual("1.3.13", [LEGACY.nsssTwg]),
       logLabel: "Coordinator / TWG meetings",
     },
     {
@@ -568,21 +751,367 @@ const SUB_1_3: Subprogramme = {
       indicator: "# number of detection system",
       target: 1,
       section: NSSS,
-      source: manual("1.3.14"),
+      binding: manual("1.3.14"),
       logLabel: "Detection systems enhanced",
     },
   ],
 };
 
-export const WORK_PLAN: Subprogramme[] = [SUB_1_1, SUB_1_2, SUB_1_3];
+/** The approved plan as the code ships it — what an unedited row reports as. */
+export const WORK_PLAN: Subprogramme[] = [SUB_1_1, SUB_1_2, SUB_1_3].map(
+  finaliseSub,
+);
 
-/** Every output across the plan, in workbook order. */
+/** Every output across the approved plan, in workbook order. */
 export const WORK_PLAN_OUTPUTS: WorkPlanOutput[] = WORK_PLAN.flatMap(
   (s) => s.outputs,
 );
 
-export function findOutput(id: string): WorkPlanOutput | null {
-  return WORK_PLAN_OUTPUTS.find((o) => o.id === id) || null;
+/** Every output of a plan, in its order. */
+export function planOutputs(plan: Subprogramme[] = WORK_PLAN): WorkPlanOutput[] {
+  return plan.flatMap((s) => s.outputs);
+}
+
+/**
+ * One output by id, matching an id the row has been known by as well as its
+ * current one — a renumbered row must not lose the notes and figures already
+ * stored against it.
+ */
+export function findOutput(
+  id: string,
+  plan: Subprogramme[] = WORK_PLAN,
+): WorkPlanOutput | null {
+  const outputs = planOutputs(plan);
+  return (
+    outputs.find((o) => o.id === id) ||
+    outputs.find((o) => o.previousIds?.includes(id)) ||
+    null
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Numbering
+// ---------------------------------------------------------------------------
+
+/**
+ * The numbering the report reads in, dotted-decimal like the workbook itself:
+ *
+ *   1.2        the subprogramme
+ *   1.2.4      a plan output, the workbook's own number
+ *   1.2.9.1    a supporting figure that is the detail behind output 1.2.9
+ *   1.2.S1     a supporting figure the whole subprogramme keeps, with no
+ *              output of its own to sit under
+ *
+ * Sorting on it puts every row where a reader expects it — 1.2.9 then its
+ * 1.2.9.1…, and 1.1.10 after 1.1.9 rather than after 1.1.1 — which is why the
+ * comparison is segment by segment and numeric, never a string compare.
+ */
+export function compareOutputIds(a: string, b: string): number {
+  const left = a.split(".");
+  const right = b.split(".");
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const x = left[i];
+    const y = right[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const nx = Number(x);
+    const ny = Number(y);
+    const xNum = x !== "" && Number.isFinite(nx);
+    const yNum = y !== "" && Number.isFinite(ny);
+    // A numbered row sorts before a lettered one (1.2.9 before 1.2.S1).
+    if (xNum && !yNum) return -1;
+    if (!xNum && yNum) return 1;
+    if (xNum && yNum) {
+      if (nx !== ny) return nx - ny;
+      continue;
+    }
+    if (x !== y) return x.localeCompare(y);
+  }
+  return 0;
+}
+
+/**
+ * The next free number for a row being added, in the scheme above — the report
+ * numbers new rows itself so nobody has to work out what is already taken.
+ */
+export function nextOutputId(
+  plan: Subprogramme[],
+  input: { subprogramme: string; supporting?: boolean; parentId?: string },
+): string {
+  const taken = new Set<string>();
+  for (const o of planOutputs(plan)) {
+    taken.add(o.id);
+    for (const p of o.previousIds || []) taken.add(p);
+  }
+  const prefix = input.supporting
+    ? input.parentId
+      ? `${input.parentId}.`
+      : `${input.subprogramme}.S`
+    : `${input.subprogramme}.`;
+  for (let n = 1; n < 1000; n++) {
+    const id = `${prefix}${n}`;
+    if (!taken.has(id)) return id;
+  }
+  // A subprogramme with a thousand rows is not a numbering problem.
+  return `${prefix}${Date.now()}`;
+}
+
+/** Is this a well-formed row number in the scheme above? */
+export function isValidOutputId(id: string): boolean {
+  return /^\d+\.\d+(\.\d+)*(\.S\d+)?$/.test(id.trim());
+}
+
+// ---------------------------------------------------------------------------
+// The sections' own changes — the plan the report is actually read through
+// ---------------------------------------------------------------------------
+
+const SUBPROGRAMME_ID = /^\d+\.\d+$/;
+
+/** A heading built the way the workbook writes them. */
+export function subprogrammeHeading(id: string, title: string): string {
+  return `Subprogramme ${id} — ${title}`;
+}
+
+function outputConfigFor(
+  output: { id: string; previousIds?: readonly string[] },
+  configured: Record<string, WorkPlanOutputConfig>,
+): WorkPlanOutputConfig | undefined {
+  const direct = configured[output.id];
+  if (direct) return direct;
+  for (const prev of output.previousIds || []) {
+    if (configured[prev]) return configured[prev];
+  }
+  return undefined;
+}
+
+/** Has this entry actually changed anything, or is it an empty husk? */
+function changesSomething(entry: WorkPlanOutputConfig): boolean {
+  return (
+    entry.added === true ||
+    entry.hidden === true ||
+    [
+      "description",
+      "indicator",
+      "target",
+      "note",
+      "logLabel",
+      "section",
+      "supporting",
+      "parentId",
+      "binding",
+    ].some((k) => (entry as Record<string, unknown>)[k] !== undefined)
+  );
+}
+
+function applyOutput(
+  base: WorkPlanOutput,
+  entry: WorkPlanOutputConfig | undefined,
+): WorkPlanOutput {
+  if (!entry || !changesSomething(entry)) return base;
+  const binding = entry.binding ?? base.binding;
+  return {
+    ...base,
+    description: entry.description ?? base.description,
+    indicator: entry.indicator ?? base.indicator,
+    target: entry.target === undefined ? base.target : entry.target,
+    note: entry.note === undefined ? base.note : entry.note || undefined,
+    logLabel: entry.logLabel ?? base.logLabel,
+    section: entry.section ?? base.section,
+    supporting: entry.supporting ?? base.supporting,
+    parentId: entry.parentId === undefined ? base.parentId : entry.parentId || undefined,
+    binding,
+    source: resolveSource(binding),
+    breakdown: breakdownForBinding(binding),
+    customised: true,
+  };
+}
+
+/**
+ * A row a section added for itself. It carries no approved wording to fall back
+ * on, so anything it does not say gets a sane default rather than a blank cell.
+ */
+function buildAddedOutput(
+  id: string,
+  entry: WorkPlanOutputConfig,
+  fallbackSection: Section,
+): WorkPlanOutput {
+  const binding: SourceBinding = entry.binding ?? {
+    kind: "manual",
+    key: outputMetricKey(id),
+  };
+  return {
+    id,
+    description: entry.description || `Output ${id}`,
+    indicator: entry.indicator || "Number",
+    target: entry.target === undefined ? null : entry.target,
+    section: entry.section || fallbackSection,
+    binding,
+    source: resolveSource(binding),
+    breakdown: breakdownForBinding(binding),
+    logLabel: entry.logLabel,
+    note: entry.note || undefined,
+    supporting: entry.supporting,
+    parentId: entry.parentId || undefined,
+    added: true,
+    customised: true,
+  };
+}
+
+/**
+ * The plan the report is read through: the approved workbook, with the
+ * sections' saved changes laid over it.
+ *
+ * Nothing is destructive. An untouched row is the approved row, object for
+ * object; a retired row is hidden but keeps its figures; clearing an entry
+ * hands the row straight back to the workbook. Rows are returned in the
+ * numbering's own order, so a row a section adds appears where its number says
+ * it belongs rather than at the bottom.
+ */
+export function applyWorkPlanConfig(
+  config?: WorkPlanConfig | null,
+  base: Subprogramme[] = WORK_PLAN,
+): Subprogramme[] {
+  const outputEntries = config?.outputs || {};
+  const subEntries = config?.subprogrammes || {};
+
+  const subs = new Map<string, Subprogramme>();
+  for (const sub of base) {
+    subs.set(sub.id, { ...sub, outputs: [] });
+  }
+  // Subprogrammes a section added — a whole new sheet of the plan.
+  for (const [id, entry] of Object.entries(subEntries)) {
+    if (!entry?.added || subs.has(id) || !SUBPROGRAMME_ID.test(id)) continue;
+    const title = entry.title || `Subprogramme ${id}`;
+    subs.set(id, {
+      id,
+      title,
+      heading: entry.heading || subprogrammeHeading(id, title),
+      section: entry.section || base[0]?.section || "Authorisation & Standards",
+      outputs: [],
+      added: true,
+      customised: true,
+    });
+  }
+  // Renamed headings.
+  for (const [id, entry] of Object.entries(subEntries)) {
+    const sub = subs.get(id);
+    if (!sub || entry?.added) continue;
+    const title = entry?.title ?? sub.title;
+    const changed =
+      entry?.title !== undefined ||
+      entry?.heading !== undefined ||
+      entry?.section !== undefined;
+    if (!changed) continue;
+    subs.set(id, {
+      ...sub,
+      title,
+      heading:
+        entry?.heading ??
+        (entry?.title !== undefined ? subprogrammeHeading(id, title) : sub.heading),
+      section: entry?.section ?? sub.section,
+      customised: true,
+    });
+  }
+
+  const place = (output: WorkPlanOutput, subId: string) => {
+    const sub = subs.get(subId);
+    if (sub) sub.outputs.push(output);
+  };
+
+  const seen = new Set<string>();
+  for (const sub of base) {
+    for (const output of sub.outputs) {
+      const entry = outputConfigFor(output, outputEntries);
+      seen.add(output.id);
+      for (const p of output.previousIds || []) seen.add(p);
+      if (entry?.hidden) continue;
+      place(applyOutput(output, entry), entry?.subprogramme ?? sub.id);
+    }
+  }
+  for (const [id, entry] of Object.entries(outputEntries)) {
+    if (!entry?.added || seen.has(id) || entry.hidden) continue;
+    const subId = entry.subprogramme || id.split(".").slice(0, 2).join(".");
+    const sub = subs.get(subId);
+    if (!sub) continue;
+    place(buildAddedOutput(id, entry, sub.section), subId);
+  }
+
+  return [...subs.values()]
+    .filter((sub) => !subEntries[sub.id]?.hidden)
+    .sort((a, b) => compareOutputIds(a.id, b.id))
+    .map((sub) => ({
+      ...sub,
+      outputs: [...sub.outputs].sort((a, b) => compareOutputIds(a.id, b.id)),
+    }));
+}
+
+/**
+ * The rows a saved config has retired — off the report, but not gone. Shown so
+ * an officer can put one back rather than having to remember what was dropped.
+ */
+export function retiredOutputs(
+  config?: WorkPlanConfig | null,
+  base: Subprogramme[] = WORK_PLAN,
+): WorkPlanOutput[] {
+  const entries = config?.outputs || {};
+  const out: WorkPlanOutput[] = [];
+  for (const sub of base) {
+    for (const output of sub.outputs) {
+      const entry = outputConfigFor(output, entries);
+      if (entry?.hidden) out.push(applyOutput(output, { ...entry, hidden: false }));
+    }
+  }
+  const shipped = new Set(planOutputs(base).map((o) => o.id));
+  for (const [id, entry] of Object.entries(entries)) {
+    if (entry?.added && entry.hidden && !shipped.has(id)) {
+      out.push(buildAddedOutput(id, entry, sectionOfId(id, base)));
+    }
+  }
+  return out.sort((a, b) => compareOutputIds(a.id, b.id));
+}
+
+function sectionOfId(id: string, base: Subprogramme[]): Section {
+  const subId = id.split(".").slice(0, 2).join(".");
+  return base.find((s) => s.id === subId)?.section || base[0].section;
+}
+
+/**
+ * What a row must satisfy before it is saved. The numbering and the metric key
+ * are the two things a mistake here would break for good, so both are checked
+ * against the plan the row is going into rather than trusted.
+ */
+export function validateOutputEdit(
+  plan: Subprogramme[],
+  id: string,
+  entry: WorkPlanOutputConfig,
+  opts: { added?: boolean } = {},
+): string | null {
+  if (!isValidOutputId(id)) {
+    return `"${id}" is not a work plan number — use a number like 1.2.4, 1.2.9.1 or 1.2.S1.`;
+  }
+  if (opts.added && findOutput(id, plan)) {
+    return `Output ${id} already exists on the plan.`;
+  }
+  if (entry.description !== undefined && !entry.description.trim()) {
+    return "An output needs a description.";
+  }
+  if (entry.indicator !== undefined && !entry.indicator.trim()) {
+    return "An output needs a key indicator.";
+  }
+  if (
+    entry.target !== undefined &&
+    entry.target !== null &&
+    (!Number.isFinite(entry.target) || entry.target < 0)
+  ) {
+    return "A target must be zero or more, or left blank for no target.";
+  }
+  if (entry.binding?.kind === "manual" && !entry.binding.key.trim()) {
+    return "A typed figure needs a metric key to store it against.";
+  }
+  if (entry.parentId && !findOutput(entry.parentId, plan)) {
+    return `There is no output ${entry.parentId} for this figure to sit under.`;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -678,11 +1207,16 @@ export function normaliseQuarters(input: unknown): number[] {
  */
 export function effectiveOpeningBalance(
   saved?: Record<string, number[]> | null,
+  plan: Subprogramme[] = WORK_PLAN,
 ): Record<string, number[]> {
   const source = saved ?? WORK_PLAN_OPENING_BALANCE;
   const out: Record<string, number[]> = {};
-  for (const o of WORK_PLAN_OUTPUTS) {
-    out[o.id] = normaliseQuarters(source[o.id]);
+  for (const o of planOutputs(plan)) {
+    // A renumbered row keeps the balance saved under the number it had.
+    const stored =
+      source[o.id] ??
+      (o.previousIds || []).map((p) => source[p]).find((v) => v !== undefined);
+    out[o.id] = normaliseQuarters(stored);
   }
   return out;
 }
@@ -743,8 +1277,11 @@ export function parseOpeningBalance(text: string): {
  * The outputs a section may log a figure against — its manual plan outputs and
  * supporting figures, in plan order. This is what the Daily Updates tab offers.
  */
-export function manualOutputsForSection(section: Section): WorkPlanOutput[] {
-  return WORK_PLAN_OUTPUTS.filter(
+export function manualOutputsForSection(
+  section: Section,
+  plan: Subprogramme[] = WORK_PLAN,
+): WorkPlanOutput[] {
+  return planOutputs(plan).filter(
     (o) => o.section === section && o.source.kind === "manual",
   );
 }
@@ -846,6 +1383,12 @@ export interface SubprogrammeReport {
 }
 
 export interface WorkPlanInput {
+  /**
+   * The plan to report against — the approved workbook with the sections'
+   * saved changes laid over it (`applyWorkPlanConfig`). Omit for the approved
+   * plan exactly as the code ships it.
+   */
+  plan?: Subprogramme[];
   /** The reporting calendar — supplies each week's quarter. */
   weeks: WeekDef[];
   /** The week whose column the "this week" figures come from. */
@@ -1051,7 +1594,11 @@ function deriveRow(
   const quarters = tally.quarters.map((v, i) => v + (opening[i] || 0));
   const total = quarters.reduce((a, b) => a + b, 0);
 
-  const note = (input.notes || {})[output.id];
+  // A renumbered row keeps the narrative saved under the number it had.
+  const notes = input.notes || {};
+  const note =
+    notes[output.id] ||
+    (output.previousIds || []).map((p) => notes[p]).find(Boolean);
   const derivedStatus = deriveStatus(total, output.target);
   const key = source.kind === "manual" ? source.key : null;
 
@@ -1083,9 +1630,10 @@ function deriveRow(
  */
 export function deriveWorkPlan(input: WorkPlanInput): SubprogrammeReport[] {
   const year = input.year ?? WORK_PLAN_YEAR;
+  const plan = input.plan ?? WORK_PLAN;
   const quarterByWeek = buildQuarterIndex(input.weeks, year);
-  const opening = effectiveOpeningBalance(input.baseline);
-  return WORK_PLAN.map((sub) => {
+  const opening = effectiveOpeningBalance(input.baseline, plan);
+  return plan.map((sub) => {
     const derived = sub.outputs.map((o) =>
       deriveRow(o, input, quarterByWeek, year, opening[o.id] || emptyQuarters()),
     );

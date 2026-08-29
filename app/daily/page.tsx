@@ -26,6 +26,7 @@ import {
 } from "@/lib/rules/licenceFamily";
 import { parseISO, toISO, todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
+  applyWorkPlanConfig,
   deriveWorkPlan,
   formatPercent,
   WORK_PLAN_YEAR,
@@ -36,6 +37,7 @@ import {
   type DailyEntry,
   type Section,
   type WorkPlanBaseline,
+  type WorkPlanConfig,
 } from "@/lib/rules/types";
 
 /** Short tab labels so the section switcher fits a phone screen. */
@@ -94,6 +96,7 @@ export default function DailyUpdatesPage() {
         borders,
         weekMetricsAll,
         baseline,
+        config,
       ] = await Promise.all([
         s.listFacilities(),
         s.listLicenceEvents(),
@@ -106,6 +109,11 @@ export default function DailyUpdatesPage() {
         s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
           () => null as WorkPlanBaseline | null,
         ),
+        // The sections' own changes to the plan, so a row edited or added on
+        // the weekly report is loggable here the same day.
+        s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
+          () => null as WorkPlanConfig | null,
+        ),
       ]);
       return {
         facilities,
@@ -116,9 +124,15 @@ export default function DailyUpdatesPage() {
         borders,
         weekMetricsAll,
         baseline,
+        config,
       };
     },
     [],
+  );
+
+  const plan = useMemo(
+    () => applyWorkPlanConfig(data?.config),
+    [data?.config],
   );
 
   if (!data) {
@@ -149,6 +163,7 @@ export default function DailyUpdatesPage() {
   // contribution to each 2026 work plan output, and where that leaves the
   // output against its annual target.
   const weekReport = deriveWorkPlan({
+    plan,
     weeks,
     week: weekLabel,
     events,
@@ -279,6 +294,7 @@ export default function DailyUpdatesPage() {
                 user,
                 "Nuclear Safety, Security & Safeguards",
               )}
+              plan={plan}
               onLogged={reload}
             />
           ) : !weekLabel ? (

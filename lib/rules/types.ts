@@ -527,6 +527,107 @@ export interface WorkPlanBaseline {
 }
 
 /**
+ * Where a work plan row's figure comes from — the row's **link** to the rest of
+ * the database, written down in a form that can be stored and changed.
+ *
+ * This is the whole point of the link being data rather than code: a row bound
+ * to `licences` counts itself off the licensing register as licences are
+ * recorded, one bound to `inspections` off the inspection register, one bound
+ * to `manual` is typed on the report or logged on Daily Updates. An officer who
+ * needs a row to count something else re-points it here; nothing is retyped and
+ * no figure is copied between screens.
+ */
+export type SourceBinding =
+  /**
+   * Typed on the weekly report, or summed from the section's Daily Updates.
+   * `key` is the stored metric key — stable by contract, because figures are
+   * already on record against it. `alsoCount` are keys the section used before
+   * the output was reworded, still counted so no history is lost.
+   */
+  | {
+      kind: "manual";
+      key: string;
+      alsoCount?: string[];
+      /** Show the per-border split (the screened-vehicles row). */
+      splitByBorder?: boolean;
+    }
+  /** Counted off the licensing register. Omit `types` for every licence. */
+  | { kind: "licences"; types?: LicenceType[] }
+  /**
+   * Counted off the inspection register. Omit `types` for every inspection
+   * visit (everything but a bare enforcement action).
+   */
+  | { kind: "inspections"; types?: InspectionType[] }
+  /** Inspections that led to an enforcement action, off the same register. */
+  | { kind: "enforcement" };
+
+/**
+ * One officer's change to a work plan row — the overlay the report is read
+ * through. An entry holds only what was actually changed, so an output whose
+ * target was corrected still picks up any other detail from the approved plan.
+ *
+ * `added: true` marks a row that is not in the approved workbook at all: an
+ * output or supporting figure a section added for itself, in which case the
+ * entry carries the whole row rather than a patch.
+ */
+export interface WorkPlanOutputConfig {
+  added?: boolean;
+  /** The subprogramme the row is reported under (required when added). */
+  subprogramme?: string;
+  description?: string;
+  indicator?: string;
+  /** The year's target; null is the workbook's "-" — no numeric target. */
+  target?: number | null;
+  /** The explanatory line under the description on the report. */
+  note?: string;
+  /** Shorter wording for the Daily Updates tap targets. */
+  logLabel?: string;
+  /** The section that reports the row (and may log against it). */
+  section?: Section;
+  /** Supporting figure — reported under the subprogramme with no target. */
+  supporting?: boolean;
+  /** For a supporting figure: the output whose detail it is, e.g. "1.2.9". */
+  parentId?: string;
+  /** Where the figure comes from. Changing this re-links the row. */
+  binding?: SourceBinding;
+  /** Retired: kept for its history, off the report. */
+  hidden?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/** The same, for a subprogramme heading. */
+export interface WorkPlanSubprogrammeConfig {
+  added?: boolean;
+  title?: string;
+  heading?: string;
+  section?: Section;
+  hidden?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
+ * The sections' own changes to the approved plan — one document per plan year,
+ * read as an overlay over the plan the code ships with.
+ *
+ * Nothing here replaces the workbook wholesale: an untouched output reports
+ * exactly as it always did, and clearing an entry hands the row back to the
+ * approved plan. That is what makes the plan safe to edit from the report — a
+ * mistake is one "reset" away from the figures Management approved.
+ */
+export interface WorkPlanConfig {
+  /** The plan year — also the document id. */
+  year: number;
+  /** Output id → what was changed about it. */
+  outputs?: Record<string, WorkPlanOutputConfig>;
+  /** Subprogramme id → what was changed about it. */
+  subprogrammes?: Record<string, WorkPlanSubprogrammeConfig>;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
  * The narrative an officer keeps against one work plan output — the workbook's
  * Status / Comments / Action Points columns. Figures are derived from the
  * registers and the logged metrics; only these three are typed, and they belong
