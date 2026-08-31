@@ -1125,18 +1125,25 @@ export function validateOutputEdit(
  * that was at 357 licences when it moved onto the system reports 358 after the
  * next one is logged, not 1.
  *
- * These are the sections' own actuals as at the August 2026 update, taken from
- * the workbooks each section keeps:
+ * These are the three sections' own cumulative actuals for the plan year, taken
+ * from `SUB_PROGRAMS_1.xlsx` — the one workbook that now carries all three
+ * subprogramme sheets (see docs/subprogrammes-2026-cumulative-update.md).
+ * Every figure below is the workbook's Q1–Q4 row, except where the system
+ * already holds the records behind it:
  *
- * - 1.1.x  the *Licensing Status* workbook (see
- *          docs/licensing-status-2026-import.md) — 1.1.4 is its 357 licences
- *          split by quarter of issue.
- * - 1.2.x  the Inspectorate's *Subprogram 1.2* work plan sheet (see
- *          docs/inspectorate-work-plan-2026-update.md).
- * - 1.3.x  the section's own figures; 1.3.12 is **zero** because the screening
- *          counts are now real daily entries (seed/daily-screening-2026.seed.json,
- *          see docs/daily-screening-2026-import.md), which the row counts
- *          directly — a balance here as well would double count them.
+ * - 1.1.4  the workbook's 357 licences by quarter. The licence register holds
+ *          no dated `licenceEvents` yet (the Licensing Status import seeds
+ *          facilities and their authorisations, not issue events), so the whole
+ *          figure is carried in and every licence logged from here adds on top.
+ * - 1.2.x  carried in whole — the inspection register is empty, so 1.2.4 and
+ *          1.2.11 have nothing behind them the system counts.
+ * - 1.3.12 the ONE row the system part-holds: the inland offices' daily log
+ *          (seed/daily-screening-2026.seed.json, see
+ *          docs/daily-screening-2026-import.md) is counted directly and runs to
+ *          21 Aug 2026 = 331,177 vehicles. The workbook is at 341,009, so only
+ *          the 9,832 the log does not hold is carried in. If those late-August
+ *          days are ever logged on Daily Updates, zero this row or they count
+ *          twice.
  *
  * A saved `workPlanBaseline` document REPLACES these wholesale (it does not
  * add), so an officer can correct or re-baseline the plan without touching the
@@ -1149,16 +1156,16 @@ export function validateOutputEdit(
  */
 export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   // Subprogramme 1.1 — Authorisation and Standards
-  "1.1.1": [0, 3, 0, 0],
-  "1.1.2": [0, 2, 0, 0],
+  "1.1.1": [3, 3, 0, 0],
+  "1.1.2": [1, 2, 0, 0],
   "1.1.3": [0, 1, 0, 0],
-  "1.1.4": [196, 142, 19, 0],
+  "1.1.4": [152, 125, 80, 0],
   "1.1.5": [0, 1, 0, 0],
-  "1.1.6": [0, 3, 0, 0],
-  "1.1.7": [0, 0, 0, 0],
+  "1.1.6": [1, 3, 0, 0],
+  "1.1.7": [0, 1, 0, 0],
   "1.1.8": [0, 0, 0, 0],
-  "1.1.9": [0, 1, 0, 0],
-  "1.1.10": [0, 1, 0, 0],
+  "1.1.9": [1, 1, 0, 0],
+  "1.1.10": [1, 1, 0, 0],
   // Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
   "1.2.1": [1, 0, 0, 0],
   "1.2.2": [1, 0, 0, 0],
@@ -1172,21 +1179,24 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.2.10": [0, 1, 0, 0],
   "1.2.11": [45, 61, 87, 0],
   // Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
-  "1.3.1": [0, 0, 0, 0],
+  "1.3.1": [0, 1, 0, 0],
   "1.3.2": [0, 0, 0, 0],
   "1.3.3": [0, 2, 0, 0],
   "1.3.4": [0, 0, 0, 0],
-  "1.3.5": [0, 0, 0, 0],
-  "1.3.6": [0, 0, 0, 0],
-  "1.3.7": [0, 0, 0, 0],
-  "1.3.8": [0, 0, 0, 0],
+  "1.3.5": [0, 9, 1, 0],
+  "1.3.6": [0, 0, 8, 0],
+  // Percentage points of the INSSP programme implemented, not a count.
+  "1.3.7": [0, 0, 100, 0],
+  "1.3.8": [0, 0, 2, 0],
   "1.3.9": [0, 0, 65, 0],
-  "1.3.10": [0, 0, 0, 0],
+  "1.3.10": [0, 5, 2, 0],
   "1.3.11": [0, 0, 0, 0],
-  // Counted from the seeded daily screening log, not carried in — see above.
-  "1.3.12": [0, 0, 0, 0],
-  "1.3.13": [0, 0, 24, 0],
-  "1.3.14": [0, 0, 0, 0],
+  // Mostly counted from the seeded daily screening log; only the days the log
+  // does not hold are carried in — 341,009 (workbook) − 331,177 (log to
+  // 21 Aug 2026) = 9,832. See the note above before changing this.
+  "1.3.12": [0, 0, 9832, 0],
+  "1.3.13": [0, 0, 26, 0],
+  "1.3.14": [0, 0, 1, 0],
 };
 
 /** A quarter array that is always length 4, with whole non-negative numbers. */
