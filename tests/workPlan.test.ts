@@ -468,22 +468,36 @@ describe("exports", () => {
 });
 
 describe("opening balance — the plan is cumulative for the year", () => {
-  it("ships the sections' own actuals as at the August 2026 update", () => {
-    // The figures each section's workbook showed. Changing them silently
+  it("ships the three sections' cumulative actuals from SUB_PROGRAMS_1.xlsx", () => {
+    // The figures the sections' work plan sheets show. Changing them silently
     // re-states every report, so they are pinned here.
-    // 1.1.4 — the Licensing Status workbook's 357 licences, by quarter.
-    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([196, 142, 19, 0]);
-    // 1.2.x — the Inspectorate's Subprogram 1.2 sheet.
+    // 1.1.x — Authorisation & Standards; 1.1.4 is its 357 licences by quarter.
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.1"]).toEqual([3, 3, 0, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([152, 125, 80, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.6"]).toEqual([1, 3, 0, 0]);
+    // 1.2.x — the Inspectorate's Subprogram 1.2 sheet, unchanged this update.
     expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 123, 121, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.6"]).toEqual([8, 8, 7, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 61, 87, 0]);
+    // 1.3.x — Nuclear Safety, Security & Safeguards.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.5"]).toEqual([0, 9, 1, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.7"]).toEqual([0, 0, 100, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.9"]).toEqual([0, 0, 65, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.10"]).toEqual([0, 5, 2, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 26, 0]);
   });
 
-  it("carries nothing in on 1.3.12 — the screening log is counted, not carried", () => {
-    // The inland offices' figures are seeded as daily entries, so an opening
-    // balance here would count all 331,177 of them a second time.
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([0, 0, 0, 0]);
+  it("carries in only the screening days the daily log does not hold", () => {
+    // The inland offices' log is seeded as daily entries and counted directly,
+    // so carrying the workbook's whole 341,009 would count 331,177 of them
+    // twice. Only the gap — the late-August days the log has yet to reach — is
+    // carried in, which brings the row to the workbook's figure exactly.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([0, 0, 9832, 0]);
+    const carried = WORK_PLAN_OPENING_BALANCE["1.3.12"].reduce(
+      (a, b) => a + b,
+      0,
+    );
+    expect(carried + 331177).toBe(341009);
   });
 
   it("adds what the system records on top of what was carried in", () => {
@@ -501,9 +515,9 @@ describe("opening balance — the plan is cumulative for the year", () => {
       baseline: null,
     });
     const r = row(reports, "1.1.4");
-    expect(r.opening).toEqual([196, 142, 19, 0]);
+    expect(r.opening).toEqual([152, 125, 80, 0]);
     expect(r.recorded).toEqual([0, 2, 1, 0]);
-    expect(r.quarters).toEqual([196, 144, 20, 0]);
+    expect(r.quarters).toEqual([152, 127, 81, 0]);
     expect(r.openingTotal).toBe(357);
     expect(r.recordedTotal).toBe(3);
     expect(r.total).toBe(360);

@@ -80,17 +80,23 @@ describe("§17 — the screening log fills in work plan output 1.3.12", () => {
     inspections: [],
     valuesByWeek: effectiveValuesByWeek([], entries),
     dailyEntries: entries,
-    // No saved baseline — the code's opening balance applies, which is zero
-    // for this output precisely because these entries carry the figures.
+    // No saved baseline — the code's opening balance applies. It carries in
+    // only the late-August days this log has yet to reach; everything the log
+    // does hold is counted from these entries, never carried.
   });
   const row = reports
     .flatMap((s) => s.rows)
     .find((r) => r.output.id === "1.3.12")!;
 
-  it("counts all 331,177 screened vehicles, with nothing carried in", () => {
-    expect(row.openingTotal).toBe(0);
+  /** The workbook's cumulative figure — see docs/subprogrammes-2026-cumulative-update.md. */
+  const WORKBOOK_TOTAL = 341009;
+
+  it("counts all 331,177 screened vehicles off the log itself", () => {
     expect(row.recordedTotal).toBe(GRAND_TOTAL);
-    expect(row.total).toBe(GRAND_TOTAL);
+    // The rest is the gap between the log and the section's workbook — the
+    // only part of 1.3.12 that is carried in.
+    expect(row.openingTotal).toBe(WORKBOOK_TOTAL - GRAND_TOTAL);
+    expect(row.total).toBe(WORKBOOK_TOTAL);
     expect(row.status).toBe("In Progress");
   });
 
@@ -98,7 +104,8 @@ describe("§17 — the screening log fills in work plan output 1.3.12", () => {
     // A week counts to the quarter it starts in, so W14 (30 Mar – 3 Apr) puts
     // three April days into Q1: the quarters differ from the workbook's
     // calendar months by those days, but the year total does not.
-    expect(row.quarters.reduce((a, b) => a + b, 0)).toBe(GRAND_TOTAL);
+    expect(row.quarters.reduce((a, b) => a + b, 0)).toBe(WORKBOOK_TOTAL);
+    expect(row.recorded.reduce((a, b) => a + b, 0)).toBe(GRAND_TOTAL);
     expect(row.quarters[3]).toBe(0); // nothing reported in Q4 yet
     for (const q of row.quarters.slice(0, 3)) expect(q).toBeGreaterThan(0);
   });
