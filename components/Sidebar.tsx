@@ -6,51 +6,7 @@ import { useEffect, useState } from "react";
 
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/auth";
-
-/** Grouped so the twelve destinations read as four short lists, not one wall. */
-const NAV_GROUPS: {
-  heading: string;
-  items: { href: string; label: string; short?: string; icon: string }[];
-}[] = [
-  {
-    heading: "Register",
-    items: [
-      { href: "/", label: "Overview", icon: "▣" },
-      { href: "/facilities", label: "Facilities", icon: "▤" },
-      { href: "/source-inventory", label: "Source Inventory", icon: "⚛" },
-      {
-        href: "/verified-source-inventory",
-        label: "Verified Source Inventory",
-        short: "Verified Sources",
-        icon: "✓",
-      },
-      { href: "/reports", label: "Reports", icon: "▥" },
-      { href: "/licences", label: "Authorisations", icon: "▦" },
-    ],
-  },
-  {
-    heading: "Sections",
-    items: [
-      { href: "/inspectorate", label: "Inspectorate", icon: "✶" },
-      {
-        href: "/nsss",
-        label: "Nuclear Safety, Security & Safeguards",
-        short: "Nuclear Safety (NSSS)",
-        icon: "⬢",
-      },
-      { href: "/border", label: "Border Scan Log", icon: "☢" },
-    ],
-  },
-  {
-    heading: "Workflow",
-    items: [
-      { href: "/licence-status", label: "Smart Status Update", icon: "◑" },
-      { href: "/bulk-approval", label: "Bulk Approval", icon: "▼" },
-      { href: "/inspection-requests", label: "Inspection Requests", icon: "⇄" },
-      { href: "/daily", label: "Daily Updates", icon: "✎" },
-    ],
-  },
-];
+import { canOpen, navFor } from "@/lib/rules/access";
 
 const ADMIN_NAV = [{ href: "/admin/users", label: "Users", icon: "◉" }];
 
@@ -73,7 +29,13 @@ export function Sidebar({
   requestBadge?: number;
 }) {
   const pathname = usePathname();
-  const { isAdmin, signOut, user } = useAuth();
+  const { isAdmin, signOut, user, postedOnly } = useAuth();
+
+  // The navigation is the account's own: the screens its section works in,
+  // grouped as the route table groups them. A posted border officer gets one
+  // link — the scan log is their whole system — and no Settings.
+  const navGroups = navFor(user);
+  const bottomNav = BOTTOM_NAV.filter((n) => canOpen(user, n.href));
 
   // Collapsing to the icon rail is a desktop-only affordance. On phones and
   // tablets the drawer always shows the full navigation, so the narrow rail
@@ -164,7 +126,7 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 px-2 pb-2 overflow-y-auto overscroll-contain">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div key={group.heading} className="mb-3">
               <div
                 className="caps text-[10px] mb-1 px-3"
@@ -229,7 +191,7 @@ export function Sidebar({
             paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          {BOTTOM_NAV.map((n) => (
+          {bottomNav.map((n) => (
             <NavLink
               key={n.href}
               href={n.href}
@@ -251,7 +213,9 @@ export function Sidebar({
                     className="text-[10px] truncate"
                     style={{ color: "rgba(247,244,236,0.55)" }}
                   >
-                    {user.section} · {user.role}
+                    {postedOnly
+                      ? `${user.border} · border post`
+                      : `${user.section} · ${user.role}`}
                   </div>
                 </>
               ) : (

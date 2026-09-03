@@ -14,6 +14,11 @@
  * rows. Posting the day's total to Daily Updates is one tap, and it replaces
  * rather than adds — so the weekly report's "Vehicle Screening (units)" figure
  * is the scan log, not a number typed twice.
+ *
+ * For an officer posted to an inland office this is the whole system: they
+ * sign in and they are here, and every read is their own post's — the shift,
+ * the week, the recent scans behind the pickers. Head office and the NSSS desk
+ * see every post.
  */
 import { useEffect, useMemo, useState } from "react";
 
@@ -30,6 +35,7 @@ import { Segmented } from "@/components/Segmented";
 import { downloadTextFile } from "@/components/downloadFile";
 import { useToast } from "@/components/Toast";
 import { canEditSection, useAuth } from "@/lib/auth";
+import { dailyEntryScope } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { useWeek } from "@/lib/weekContext";
@@ -88,6 +94,11 @@ export default function BorderScanPage() {
     if (border && !postedOffice) window.localStorage.setItem(POST_KEY, border);
   }, [border, postedOffice]);
 
+  // A posted officer reads their own post and nothing else — the security
+  // rules refuse the wider read — so every query carries the posting.
+  const ownPost = postedOffice || undefined;
+  const entryScope = dailyEntryScope(user);
+
   const { data, error, reload } = useStoreData(
     async (s) => {
       const [borders, recentScans, shiftScans, weekScans, entries] =
@@ -95,18 +106,21 @@ export default function BorderScanPage() {
           s.listBorders().catch(() => []),
           // Every read degrades to empty so the tab still renders before the
           // truckScans rules/index are deployed.
-          s.listTruckScans().catch(() => [] as TruckScan[]),
+          s.listTruckScans(ownPost).catch(() => [] as TruckScan[]),
           border
             ? s.listTruckScansFor(border, date).catch(() => [] as TruckScan[])
             : Promise.resolve([] as TruckScan[]),
           weekLabel
-            ? s.listTruckScansForWeek(weekLabel).catch(() => [] as TruckScan[])
+            ? s
+                .listTruckScansForWeek(weekLabel, ownPost)
+                .catch(() => [] as TruckScan[])
             : Promise.resolve([] as TruckScan[]),
-          s.listDailyEntries().catch(() => []),
+          s.listDailyEntries(entryScope).catch(() => []),
         ]);
       return { borders, recentScans, shiftScans, weekScans, entries };
     },
-    [border, date, weekLabel],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [border, date, weekLabel, ownPost, entryScope?.section, entryScope?.border],
   );
 
   // Default to the first active post the first time the tab is opened. Never
@@ -294,7 +308,7 @@ export default function BorderScanPage() {
           caption="nSv/h"
         />
         <Kpi
-          label="This week, all posts"
+          label={postedOffice ? "This week, your post" : "This week, all posts"}
           value={weekSummary.total}
           accent="slate"
           caption={weekLabel || "—"}
@@ -429,7 +443,7 @@ export default function BorderScanPage() {
                 total: d.total,
               }))}
             />
-            <Panel title="By border post" flush>
+            <Panel title={postedOffice ? "Your post" : "By border post"} flush>
               {weekSummary.byBorder.length === 0 ? (
                 <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
                   No posts have logged scans this week.
@@ -466,7 +480,11 @@ export default function BorderScanPage() {
           <ScanTallies
             summary={weekSummary}
             title={weekLabel || "Reporting week"}
-            caption="Every post, this reporting week."
+            caption={
+              postedOffice
+                ? `${postedOffice}, this reporting week.`
+                : "Every post, this reporting week."
+            }
           />
         </div>
       )}

@@ -1,3 +1,4 @@
+import type { DailyEntryScope } from "../rules/access";
 import type {
   InspectionRequestAction,
   NewInspectionRequestInput,
@@ -135,8 +136,14 @@ export interface DataStore {
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
     uid: string,
   ): Promise<void>;
-  /** Every daily log entry (Daily Updates tab), newest date first. */
-  listDailyEntries(): Promise<DailyEntry[]>;
+  /**
+   * Daily log entries (Daily Updates tab), newest date first. Pass the scope
+   * the account is entitled to — its section, and for a posted officer their
+   * post — see dailyEntryScope in lib/rules/access.ts. The security rules
+   * refuse a wider read than the account's claims allow, so a section officer
+   * asking for every entry gets a permission error, not the department's log.
+   */
+  listDailyEntries(scope?: DailyEntryScope): Promise<DailyEntry[]>;
   addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
   deleteDailyEntry(id: string): Promise<void>;
   /**
@@ -147,12 +154,18 @@ export interface DataStore {
    * (see RECENT_SCAN_LIMIT), not the whole history: it backs the pickers and
    * the "last seen" lookups. Anything that must be exact reads a slice —
    * `listTruckScansFor` for a shift, `listTruckScansForWeek` for a report.
+   *
+   * A posted officer reads their own post and no other, so they pass it; the
+   * rules refuse the unscoped read from such an account.
    */
-  listTruckScans(): Promise<TruckScan[]>;
+  listTruckScans(border?: string): Promise<TruckScan[]>;
   /** One post's scans for one day — the shift list on the capture screen. */
   listTruckScansFor(border: string, date: string): Promise<TruckScan[]>;
-  /** Every post's scans for one reporting week — the weekly rollup. */
-  listTruckScansForWeek(week: string): Promise<TruckScan[]>;
+  /**
+   * Scans for one reporting week — every post's for the weekly rollup, or
+   * one post's when the reader is posted there.
+   */
+  listTruckScansForWeek(week: string, border?: string): Promise<TruckScan[]>;
   addTruckScan(s: Omit<TruckScan, "id">): Promise<TruckScan>;
   /**
    * Remove a scan. Correcting one is a remove-and-relog on the capture screen:

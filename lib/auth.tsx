@@ -12,6 +12,16 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 
 import { getFirebaseAuth, isMockMode } from "./firebase";
+import {
+  PENDING_ROUTE,
+  PUBLIC_ROUTES,
+  canOpen,
+  homeFor,
+  isPostedOfficer,
+  sectionsFor,
+  workspaceFor,
+  type Workspace,
+} from "./rules/access";
 import { newAccountRequest, type SignupInput } from "./rules/signup";
 import type { Role, Section, UserDoc } from "./rules/types";
 
@@ -54,6 +64,15 @@ interface AuthState {
    * when it may file for any (head office, "All", an administrator).
    */
   postedOffice: string | null;
+  /** Where the account works from — see lib/rules/access.ts. */
+  workspace: Workspace | null;
+  /** The sections whose records this account is shown. */
+  sections: Section[];
+  /**
+   * An NSSS officer posted to an inland office: the Border Scan Log is their
+   * whole system, and nothing else is shown or reachable.
+   */
+  postedOnly: boolean;
 }
 
 const AuthCtx = createContext<AuthState | null>(null);
@@ -75,10 +94,6 @@ function saveMockSession(u: UserDoc | null) {
   if (u) window.localStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(u));
   else window.localStorage.removeItem(MOCK_SESSION_KEY);
 }
-
-/** Pages a signed-out — or not-yet-approved — visitor is allowed to be on. */
-const PUBLIC_ROUTES = ["/login", "/signup"];
-const PENDING_ROUTE = "/pending";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDoc | null>(null);
@@ -172,16 +187,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Route guard. Three states, three homes: signed out belongs on /login (or
   // /signup), an unapproved account on /pending and nowhere else, and an
-  // officer anywhere but those.
+  // officer on the screens their section works in — and nowhere else. A screen
+  // outside their section sends them to their own front door rather than
+  // showing them a page full of permission errors.
   useEffect(() => {
     if (loading) return;
-    const onPublic = PUBLIC_ROUTES.includes(pathname);
+    const onPublic = (PUBLIC_ROUTES as readonly string[]).includes(pathname);
     if (!user && !pendingAccount) {
       if (!onPublic) router.replace("/login");
     } else if (pendingAccount) {
       if (pathname !== PENDING_ROUTE) router.replace(PENDING_ROUTE);
-    } else if (onPublic || pathname === PENDING_ROUTE) {
-      router.replace("/");
+    } else if (user && (onPublic || pathname === PENDING_ROUTE)) {
+      router.replace(homeFor(user));
+    } else if (user && !canOpen(user, pathname)) {
+      router.replace(homeFor(user));
     }
   }, [user, pendingAccount, loading, pathname, router]);
 
@@ -381,6 +400,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user.section === "All" ||
           user.section === "Inspectorate"),
       postedOffice: user?.border || null,
+      workspace: workspaceFor(user),
+      sections: sectionsFor(user),
+      postedOnly: isPostedOfficer(user),
     }),
     [user, pendingAccount, loading, signIn, signUp, signOut, refresh],
   );

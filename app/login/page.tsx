@@ -12,7 +12,10 @@ const DEMO_ACCOUNTS = [
   { email: "as.officer@rpa.gov.zm", role: "Authorisation & Standards officer" },
   { email: "inspector@rpa.gov.zm", role: "Inspectorate officer" },
   { email: "nsss@rpa.gov.zm", role: "Nuclear Safety, Security & Safeguards officer" },
-  { email: "nakonde@rpa.gov.zm", role: "Border coordinator — posted to Nakonde" },
+  {
+    email: "nakonde@rpa.gov.zm",
+    role: "Border coordinator — posted to Nakonde, sees the scan log only",
+  },
 ];
 
 export default function LoginPage() {

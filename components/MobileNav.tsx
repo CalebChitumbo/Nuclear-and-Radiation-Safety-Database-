@@ -3,19 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useAuth } from "@/lib/auth";
+import { mobileTabsFor } from "@/lib/rules/access";
+
 /**
  * Phone tab bar. The slide-in drawer holds every destination, but reaching a
  * hamburger at the top of the screen one-handed is the whole problem with it —
- * the four screens officers actually live in sit here instead, within thumb
- * reach, and "More" opens the full list.
+ * the four screens an officer actually lives in sit here instead, within thumb
+ * reach, and "More" opens the full list. Which four depends on the section:
+ * see mobileTabsFor. A posted border officer has one screen and gets no bar.
  */
-const TABS = [
-  { href: "/", label: "Overview", icon: "▣" },
-  { href: "/facilities", label: "Register", icon: "▤" },
-  { href: "/daily", label: "Daily", icon: "✎" },
-  { href: "/inspection-requests", label: "Requests", icon: "⇄" },
-];
-
 export function MobileNav({
   onMore,
   badge = 0,
@@ -24,8 +21,12 @@ export function MobileNav({
   badge?: number;
 }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const tabs = mobileTabsFor(user);
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  if (!tabs.length) return null;
 
   return (
     <nav
@@ -36,7 +37,7 @@ export function MobileNav({
       }}
       aria-label="Primary"
     >
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const active = isActive(t.href);
         return (
           <Link

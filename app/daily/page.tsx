@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { canEditSection, useAuth } from "@/lib/auth";
+import { dailyEntryScope, seesRegister } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
@@ -29,10 +30,10 @@ import {
   applyWorkPlanConfig,
   deriveWorkPlan,
   formatPercent,
+  planForSections,
   WORK_PLAN_YEAR,
 } from "@/lib/rules/workPlan";
 import {
-  SECTIONS,
   type Border,
   type DailyEntry,
   type Section,
@@ -66,19 +67,26 @@ function addDays(iso: string, delta: number): string {
  * - NSSS border coordinators pick their border post and enter the vehicles
  *   screened; the senior officer sees the live per-border breakdown and
  *   confirms the official daily total.
+ *
+ * An officer sees their own section here — its wizard, its day, its rows of
+ * the week so far. The section switcher only appears for the department
+ * (an administrator, or the cross-section posting), who see all four.
  */
 export default function DailyUpdatesPage() {
-  const { user, postedOffice } = useAuth();
+  const { user, postedOffice, sections } = useAuth();
   const { weeks, setSelected } = useWeek();
   const toast = useToast();
   const router = useRouter();
 
   const [date, setDate] = useState(() => todayISO());
-  const [section, setSection] = useState<Section>(() =>
-    user && user.section !== "All"
-      ? (user.section as Section)
-      : "Authorisation & Standards",
+  const [section, setSection] = useState<Section>(
+    () => sections[0] ?? "Authorisation & Standards",
   );
+
+  // Only the sections that work the facilities register read it; the others'
+  // wizards never need it, and the rules would refuse them anyway.
+  const register = seesRegister(user);
+  const entryScope = dailyEntryScope(user);
 
   const weekLabel = useMemo(
     () => weekLabelForDate(date, weeks, ""),
@@ -98,12 +106,12 @@ export default function DailyUpdatesPage() {
         baseline,
         config,
       ] = await Promise.all([
-        s.listFacilities(),
-        s.listLicenceEvents(),
-        s.listInspections(),
+        register ? s.listFacilities() : Promise.resolve([]),
+        register ? s.listLicenceEvents() : Promise.resolve([]),
+        register ? s.listInspections() : Promise.resolve([]),
         // Degrade gracefully until the dailyEntries/borders rules are deployed.
-        s.listDailyEntries().catch(() => []),
-        s.listLicenceWorkflows().catch(() => []),
+        s.listDailyEntries(entryScope).catch(() => []),
+        register ? s.listLicenceWorkflows().catch(() => []) : Promise.resolve([]),
         s.listBorders().catch(() => []),
         s.listWeekMetricsAll().catch(() => []),
         s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
@@ -127,12 +135,18 @@ export default function DailyUpdatesPage() {
         config,
       };
     },
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [register, entryScope?.section, entryScope?.border],
   );
 
   const plan = useMemo(
     () => applyWorkPlanConfig(data?.config),
     [data?.config],
+  );
+  // The week-so-far panel shows an officer their own section's rows.
+  const ownPlan = useMemo(
+    () => planForSections(plan, sections),
+    [plan, sections],
   );
 
   if (!data) {
@@ -163,7 +177,7 @@ export default function DailyUpdatesPage() {
   // contribution to each 2026 work plan output, and where that leaves the
   // output against its annual target.
   const weekReport = deriveWorkPlan({
-    plan,
+    plan: ownPlan,
     weeks,
     week: weekLabel,
     events,
@@ -257,9 +271,10 @@ export default function DailyUpdatesPage() {
         </div>
       </Panel>
 
-      {/* Section switcher — scrolls sideways on a phone */}
+      {/* Section switcher — the department's only; scrolls sideways on a phone */}
+      {sections.length > 1 ? (
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {SECTIONS.map((s) => {
+        {sections.map((s) => {
           const active = section === s;
           return (
             <button
@@ -278,6 +293,7 @@ export default function DailyUpdatesPage() {
           );
         })}
       </div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <div className="lg:col-span-2 space-y-4 min-w-0">
@@ -311,7 +327,7 @@ export default function DailyUpdatesPage() {
             <Panel>
               <p className="text-sm text-gunmetal/60">
                 Only {section} officers (or admins) can log entries for this
-                section. Switch to your section above.
+                section.
               </p>
             </Panel>
           )}

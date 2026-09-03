@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { useAuth } from "@/lib/auth";
 import { useWeek } from "@/lib/weekContext";
 
 const TITLES: Record<string, string> = {
@@ -39,6 +40,9 @@ const SHORT_TITLES: Record<string, string> = {
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname();
   const { weeks, selected, setSelected } = useWeek();
+  // The reporting-week picker drives the reports. A posted border officer has
+  // none — the scan log works by date — so the picker would only be a question.
+  const { postedOnly } = useAuth();
 
   let matched = "/";
   for (const key of Object.keys(TITLES)) {
@@ -73,32 +77,36 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
       </div>
 
-      <label
-        className="caps text-[10px] text-gunmetal/55 hidden lg:block shrink-0"
-        htmlFor="reporting-week"
-      >
-        Reporting week
-      </label>
-      {/* Width lives on the wrapper so it overrides the full-width `.input`
-          rule cleanly without an !important fight. */}
-      <div className="w-[112px] sm:w-[200px] shrink-0">
-        <select
-          id="reporting-week"
-          value={selected.label}
-          onChange={(e) => {
-            const next = weeks.find((w) => w.label === e.target.value);
-            if (next) setSelected(next);
-          }}
-          className="input"
-          aria-label="Reporting week"
-        >
-          {weeks.map((w) => (
-            <option key={w.label} value={w.label}>
-              {w.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {postedOnly ? null : (
+        <>
+          <label
+            className="caps text-[10px] text-gunmetal/55 hidden lg:block shrink-0"
+            htmlFor="reporting-week"
+          >
+            Reporting week
+          </label>
+          {/* Width lives on the wrapper so it overrides the full-width `.input`
+              rule cleanly without an !important fight. */}
+          <div className="w-[112px] sm:w-[200px] shrink-0">
+            <select
+              id="reporting-week"
+              value={selected.label}
+              onChange={(e) => {
+                const next = weeks.find((w) => w.label === e.target.value);
+                if (next) setSelected(next);
+              }}
+              className="input"
+              aria-label="Reporting week"
+            >
+              {weeks.map((w) => (
+                <option key={w.label} value={w.label}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
     </header>
   );
 }

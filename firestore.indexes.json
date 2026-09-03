@@ -63,6 +63,14 @@
         { "fieldPath": "sector", "order": "ASCENDING" },
         { "fieldPath": "licensed", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "truckScans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "border", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
