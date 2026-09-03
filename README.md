@@ -66,7 +66,7 @@ and is exercised by `tests/recordLicence.test.ts`. Do not bypass them.
 | Framework | Next.js 14 (App Router) + TypeScript |
 | Styling | Tailwind CSS + CSS variables for the RPA brand tokens |
 | Backend data | Cloud Firestore (Native) |
-| Auth | Firebase Authentication (email/password) + custom claims `{role, section}` |
+| Auth | Firebase Authentication (email/password) + custom claims `{role, section, border}` — self-service sign-up, admin approval |
 | Server logic | Cloud Functions (2nd gen, TypeScript) |
 | Hosting | **Vercel** (Next.js frontend) · Firebase backend (Firestore, Auth, Cloud Functions) |
 | Tests | Vitest |
@@ -96,6 +96,10 @@ Sign in with any of the demo accounts — any non-empty password works:
 | `as.officer@rpa.gov.zm` | Authorisation & Standards officer |
 | `inspector@rpa.gov.zm` | Inspectorate officer |
 | `nsss@rpa.gov.zm` | Nuclear Safety, Security & Safeguards officer |
+| `nakonde@rpa.gov.zm` | Border coordinator **posted to Nakonde** — the Border Scan Log and Daily Updates file everything against that office, with no post picker |
+
+Or ask for an account at `/signup`, then approve it from `/admin/users` as
+`admin@rpa.gov.zm` — the whole flow works in mock mode.
 
 Data persists to `localStorage`. **Settings → Reset mock data** wipes it back
 to the seed.
@@ -135,7 +139,11 @@ to the seed.
    balance and plan changes, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
    (the mock store's storage key was bumped).
 5. Create the first admin by manually calling the `setUserClaims` callable in
-   the Firebase Console, then onboard the rest from `/admin/users`.
+   the Firebase Console. Everyone else asks for their own account at `/signup`
+   and the admin approves them from `/admin/users` — see
+   **[Accounts: sign-up and approval](#accounts-sign-up-and-approval)**.
+   Provisioning an account outright from `/admin/users` still works and is the
+   only way to create another administrator.
 6. Build + deploy the app:
    ```bash
    firebase deploy --only functions,hosting
@@ -149,6 +157,88 @@ firebase emulators:start
 NEXT_PUBLIC_USE_EMULATORS=1 NEXT_PUBLIC_USE_MOCK= npm run dev
 FIRESTORE_EMULATOR_HOST=localhost:8080 npm run seed:emulator
 ```
+
+---
+
+## Accounts: sign-up and approval
+
+Accounts used to be typed in one at a time by an administrator. There are more
+officers than that scales to, so **anyone may ask for an account themselves at
+`/signup`** — what an administrator does now is approve it.
+
+The request carries everything the administrator would otherwise have had to
+ask for: name, work email, **the section the officer falls under**, and — for
+**Nuclear Safety, Security & Safeguards** — **the inland office they are posted
+to**.
+
+### What a request can and cannot ask for
+
+A request is always for an ordinary **officer** of **one** section. There is no
+way to ask for `admin`, and no way to ask for the cross-section `All` posting —
+those stay an administrator's to grant. More importantly, **a request grants
+nothing on its own**:
+
+| | |
+|---|---|
+| The request is stored | `users/{uid}` with `pending: true` |
+| While pending, the Auth account holds | **no claims at all** — no role, no section |
+| Every collection in `firestore.rules` is gated on | `approved()`, i.e. *has a role claim* |
+| So a pending account can read | **nothing** |
+| Clearing `pending` is | an **update**, and updates to `users/` are admin-only |
+
+`onUserDocWrite` is the single gate: it mints `{role, section, border}` onto the
+Auth user **only** for an account that is neither pending, declined nor
+disabled, and strips them again the moment it becomes any of those. Disabling an
+account now also disables the Auth user, so the sign-in itself stops working
+rather than just going quiet.
+
+A person who has signed up can sign in immediately, but the route guard parks
+them on `/pending` until the approval lands. Approval changes claims on the
+server, not the token in their browser, so that page has a **Check again**
+button that mints a fresh token instead of leaving them to wait out the old one.
+
+### The inland office
+
+This is the part that matters beyond access. An NSSS officer registers **which
+inland office they work at**, and from then on:
+
+- The **Border Scan Log** shows their office as *your posting* — there is no
+  post picker for them, so a scan cannot land under another post's name.
+- **Daily Updates** skips the "which border post?" step entirely; a screening
+  figure is filed against their office without being asked.
+- `firestore.rules` enforces the same thing against the `border` claim, so it
+  holds whatever the screen does: a `truckScan` or a `dailyEntry` carrying a
+  different office is rejected.
+
+The result is that the national screening total is the **sum of the offices**
+rather than a number anyone can enter anywhere — which is what makes
+`borderSums` on the NSSS tab and work plan output 1.3.12 add up post by post.
+
+An account with no posting (head office, `All`, an administrator) still picks
+its post and logs for any of them.
+
+Approving an officer at an office the `borders` register has never heard of
+**registers that office** at the same time, so a new post enters the system by
+someone being posted to it. The sign-up form offers the eight offices of the
+2026 screening log (`INLAND_OFFICES` in `lib/rules/types.ts`) plus *Another
+office…* for anything else — it cannot read the live register, because a visitor
+who has not signed in yet may read nothing.
+
+### Working the queue
+
+`/admin/users` opens on **Account requests**, oldest first, and the sidebar's
+**Users** link carries a badge with the count so a sign-up is noticed rather
+than sat on. Each card pre-fills what was asked for and lets the administrator
+settle the role, the section and the office before granting it — approving is
+what mints the claims, so nothing about the request is binding. **Decline**
+keeps the account, disabled, which is also what stops the person simply signing
+up again.
+
+Accounts created before any of this have no `pending` field and are therefore
+read as settled — nothing about an existing officer changes.
+
+The rules live in `lib/rules/signup.ts` and are exercised by
+`tests/signup.test.ts`.
 
 ---
 
@@ -231,11 +321,14 @@ automatically (Production for the production branch, Preview for others).
 | `licenceWorkflows/{ran}` | RAIS licensing-status tracker — one row per application RAN, imported by paste or the email connector (`source`, `reviewStatus`), carrying the application's append-only officer **notes & history** trail (`notes`) |
 | `aggregates/dashboard` | Single rollup document — read by the Overview page so it never scans the full register |
 | `config/referenceLists` | Editable lists (provinces, stages, licence types) |
-| `users/{uid}` | Staff accounts; role + section mirrored into Auth custom claims |
+| `users/{uid}` | Staff accounts. `role`, `section` and (for NSSS) the `border` an officer is posted to are mirrored into Auth custom claims — **but only once the account is approved**: a self-service request is stored `pending: true` and carries no claims, and therefore no access, until an administrator clears it |
 
 Composite indexes are declared in `firestore.indexes.json`. Security rules
 live in `firestore.rules` and enforce all role/section logic — never trust the
-UI.
+UI. Two rules there are worth knowing by name: every collection is gated on
+`approved()` (*holds a role claim*, not merely *signed in*), which is what makes
+self-service sign-up safe; and `filesFor()` pins a posted coordinator's scans
+and daily figures to their own inland office.
 
 ---
 
@@ -919,6 +1012,14 @@ npm test
 - `daily` — daily-entry sums, the daily-over-weekly precedence rule, that
   daily metric keys match the sectional update's exactly, and the per-border
   screening sums + official-total text
+- `signup` — self-service account requests: what the form will and will not
+  accept (never `admin`, never the cross-section `All`, an inland office
+  required of NSSS and of nobody else), the office-name folding that keeps
+  "nakonde" and "Nakonde" one column of the screening report, that a request is
+  always a pending officer of one section, the approval patch an administrator
+  settles it with, the posting lock that pins a coordinator's figures to their
+  own office, the queue read oldest-first, and that an account written before
+  sign-up existed reads as settled
 - `borderScans` — the border capture rules: the workbook's spelling variants
   folding onto canonical commodities, cargo class derived from the commodity,
   the dose typos it rejects and the high reading it lets an officer confirm,
@@ -980,6 +1081,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 .
 ├── app/                    Next.js App Router (one folder per route)
 │   ├── login/
+│   ├── signup/             Ask for an account — section + inland office
+│   ├── pending/            Where a request waits for an administrator
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
 │   ├── source-inventory/   Source Inventory — the RAIS register (read-only)
@@ -994,7 +1097,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── inspection-requests/ Licensing ↔ Inspectorate pre-auth handoff board
 │   ├── daily/              Daily Updates — per-section daily logging
 │   ├── weekly/             Sectional update — the 2026 work plan report
-│   ├── admin/users/
+│   ├── admin/users/        Approval queue + provisioning
 │   └── settings/
 ├── components/weekly/      OpeningBalancePanel — where the cumulative count starts
 ├── components/inspectorate/ InspectionSummaryTable + InspectionDatabaseTable — the
@@ -1006,7 +1109,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── lib/
 │   ├── rules/              PURE business logic — fully unit-tested
 │   ├── store/              DataStore interface + mockStore + firebaseStore
-│   ├── auth.tsx            Auth context (mock + Firebase aware)
+│   ├── auth.tsx            Auth context: signed-in officer vs pending account
 │   ├── firebase.ts         Client init
 │   └── weekContext.tsx     Global reporting-week selector
 ├── functions/              Cloud Functions (separate package)

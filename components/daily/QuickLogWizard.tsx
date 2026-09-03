@@ -37,6 +37,13 @@ import {
 export interface QuickLogUser {
   uid: string;
   name: string;
+  /**
+   * The inland office this officer is posted to, from their account. When set,
+   * a screening figure is filed against it without being asked — the wizard
+   * drops the "which border post?" step, because for them there is only one
+   * answer and the security rules will not accept another.
+   */
+  postedOffice?: string | null;
 }
 
 export function QuickLogWizard({
@@ -521,7 +528,9 @@ function CountFlow({
   type Step = "what" | "border" | "amount" | "note" | "done";
   const [step, setStep] = useState<Step>("what");
   const [pick, setPick] = useState<Pick | null>(null);
-  const [border, setBorder] = useState<string | null>(null);
+  const [border, setBorder] = useState<string | null>(
+    user.postedOffice || null,
+  );
   const [amount, setAmount] = useState("");
   const [remark, setRemark] = useState("");
   const [showRemark, setShowRemark] = useState(false);
@@ -535,14 +544,16 @@ function CountFlow({
   const screeningKey = vehicleScreeningKey();
   const isScreening =
     pick !== null && pick !== "note" && pick.key === screeningKey;
-  const needsBorder = isScreening;
+  // A posted coordinator is never asked which post — theirs is the only one
+  // they may file against, so the wizard is two steps for them too.
+  const needsBorder = isScreening && !user.postedOffice;
   const activeBorders = borders.filter((b) => b.active);
   const steps = needsBorder ? 3 : 2;
 
   const reset = () => {
     setStep("what");
     setPick(null);
-    setBorder(null);
+    setBorder(user.postedOffice || null);
     setAmount("");
     setRemark("");
     setShowRemark(false);
@@ -663,7 +674,11 @@ function CountFlow({
             }
             onClick={() => {
               setPick(o);
-              setStep(o.key === screeningKey ? "border" : "amount");
+              setStep(
+                o.key === screeningKey && !user.postedOffice
+                  ? "border"
+                  : "amount",
+              );
             }}
           />
         ))}

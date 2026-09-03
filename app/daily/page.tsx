@@ -68,7 +68,7 @@ function addDays(iso: string, delta: number): string {
  *   confirms the official daily total.
  */
 export default function DailyUpdatesPage() {
-  const { user } = useAuth();
+  const { user, postedOffice } = useAuth();
   const { weeks, setSelected } = useWeek();
   const toast = useToast();
   const router = useRouter();
@@ -287,13 +287,17 @@ export default function DailyUpdatesPage() {
               section={section}
               date={date}
               weekLabel={weekLabel}
-              user={{ uid: user.uid, name: user.displayName }}
+              user={{
+                uid: user.uid,
+                name: user.displayName,
+                postedOffice,
+              }}
               facilities={facilities}
               borders={borders}
-              canManageBorders={canEditSection(
-                user,
-                "Nuclear Safety, Security & Safeguards",
-              )}
+              canManageBorders={
+                !postedOffice &&
+                canEditSection(user, "Nuclear Safety, Security & Safeguards")
+              }
               plan={plan}
               onLogged={reload}
             />

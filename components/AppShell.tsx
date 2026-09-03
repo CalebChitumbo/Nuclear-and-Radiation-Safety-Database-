@@ -10,25 +10,37 @@ import { Topbar } from "./Topbar";
 import { useAuth } from "@/lib/auth";
 import { useStoreData } from "@/lib/storeHooks";
 import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
+import { pendingRequests } from "@/lib/rules/signup";
+
+const STANDALONE_ROUTES = ["/login", "/signup", "/pending"];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, loading, canEditAS, canEditInsp } = useAuth();
+  const { user, loading, canEditAS, canEditInsp, isAdmin } = useAuth();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // One read for both navigations: the sidebar link badge and the phone tab
-  // bar show the same cross-section handoff count.
-  const { data: inbox } = useStoreData(
+  // bar show the same cross-section handoff count. Administrators also get the
+  // count of account requests waiting on them, so a new officer's sign-up is
+  // noticed rather than sat on.
+  const { data: badges } = useStoreData(
     async (s) => {
       // Never let the badge read break the shell: if the collection isn't
       // readable yet (rules not deployed), just show no badge.
       const requests = await s.listInspectionRequests().catch(() => []);
-      return deriveInspectionInbox(requests, { canEditAS, canEditInsp });
+      const accountRequests = isAdmin
+        ? await s.listUsers().catch(() => [])
+        : [];
+      return {
+        inbox: deriveInspectionInbox(requests, { canEditAS, canEditInsp }),
+        accounts: pendingRequests(accountRequests).length,
+      };
     },
-    [canEditAS, canEditInsp],
+    [canEditAS, canEditInsp, isAdmin],
   );
-  const inspectionBadge = user ? inbox?.count || 0 : 0;
+  const inspectionBadge = user ? badges?.inbox.count || 0 : 0;
+  const requestBadge = user && isAdmin ? badges?.accounts || 0 : 0;
 
   // Close the mobile navigation drawer whenever the route changes.
   useEffect(() => {
@@ -44,7 +56,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [mobileNavOpen]);
 
-  if (pathname === "/login") {
+  // The three pages that stand on their own: signing in, asking for an account,
+  // and waiting for that request to be approved. None of them has a navigation
+  // to show, and the last two belong to accounts that may not read anything the
+  // navigation would try to count.
+  if (STANDALONE_ROUTES.includes(pathname)) {
     return <>{children}</>;
   }
 
@@ -72,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
         inspectionBadge={inspectionBadge}
+        requestBadge={requestBadge}
       />
       {/* Content is full-width on mobile; the fixed sidebar only reserves
           space from the `lg` breakpoint up, where it is always visible. */}

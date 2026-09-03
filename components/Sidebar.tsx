@@ -62,12 +62,15 @@ export function Sidebar({
   mobileOpen,
   onMobileClose,
   inspectionBadge = 0,
+  requestBadge = 0,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
   inspectionBadge?: number;
+  /** Account requests waiting on an administrator (admins only). */
+  requestBadge?: number;
 }) {
   const pathname = usePathname();
   const { isAdmin, signOut, user } = useAuth();
@@ -208,6 +211,9 @@ export function Sidebar({
                     collapsed={showCollapsed}
                     icon={n.icon}
                     label={n.label}
+                    badge={
+                      n.href === "/admin/users" ? requestBadge : undefined
+                    }
                     onNavigate={onMobileClose}
                   />
                 ))}

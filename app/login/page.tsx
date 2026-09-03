@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
@@ -11,6 +12,7 @@ const DEMO_ACCOUNTS = [
   { email: "as.officer@rpa.gov.zm", role: "Authorisation & Standards officer" },
   { email: "inspector@rpa.gov.zm", role: "Inspectorate officer" },
   { email: "nsss@rpa.gov.zm", role: "Nuclear Safety, Security & Safeguards officer" },
+  { email: "nakonde@rpa.gov.zm", role: "Border coordinator — posted to Nakonde" },
 ];
 
 export default function LoginPage() {
@@ -121,8 +123,11 @@ export default function LoginPage() {
         ) : null}
 
         <p className="mt-6 text-[11px] text-gunmetal/55 text-center">
-          Accounts are provisioned by the Authority. Contact your administrator
-          for access.
+          No account yet?{" "}
+          <Link className="link-action" href="/signup">
+            Request one
+          </Link>{" "}
+          — an administrator approves it before you can sign in.
         </p>
       </div>
     </div>

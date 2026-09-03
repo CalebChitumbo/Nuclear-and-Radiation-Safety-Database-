@@ -23,6 +23,11 @@ import {
   workflowLicenceType,
 } from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
+import {
+  approvalPatch,
+  normaliseOfficeName,
+  requiresInlandOffice,
+} from "../rules/signup";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   buildWorkflowComment,
@@ -143,6 +148,17 @@ function freshState(): State {
         role: "officer",
         section: "Nuclear Safety, Security & Safeguards",
       },
+      // A border coordinator posted to one inland office: their screening
+      // figures can only be filed against Nakonde, which is what the sign-up
+      // form asks an NSSS officer for.
+      {
+        uid: "demo-nakonde",
+        email: "nakonde@rpa.gov.zm",
+        displayName: "Nakonde Coordinator",
+        role: "officer",
+        section: "Nuclear Safety, Security & Safeguards",
+        border: "Nakonde",
+      },
     ],
   };
 }
@@ -185,6 +201,17 @@ function load(): State {
         displayName: "NSSS Officer",
         role: "officer",
         section: "Nuclear Safety, Security & Safeguards",
+      });
+    }
+    // Back-compat: the border coordinator posted to one inland office.
+    if (!parsed.users.some((u) => u.uid === "demo-nakonde")) {
+      parsed.users.push({
+        uid: "demo-nakonde",
+        email: "nakonde@rpa.gov.zm",
+        displayName: "Nakonde Coordinator",
+        role: "officer",
+        section: "Nuclear Safety, Security & Safeguards",
+        border: "Nakonde",
       });
     }
     return parsed;
@@ -1008,17 +1035,68 @@ class MockStore implements DataStore {
     role: UserDoc["role"];
     section: UserDoc["section"];
     password: string;
+    border?: string;
+    actorUid: string;
   }): Promise<{ uid: string }> {
     // Demo mode has no real Auth backend — store the account locally and ignore
     // the password. Mirrors what the setUserClaims Cloud Function does in
     // Firebase mode (create the user + persist role/section).
+    const office = requiresInlandOffice(input.section)
+      ? normaliseOfficeName(input.border || "")
+      : "";
+    if (office) await this.addBorder(office, input.actorUid);
     const user = await this.addUser({
       email: input.email,
       displayName: input.displayName,
       role: input.role,
       section: input.section,
+      origin: "provisioned",
+      ...(office ? { border: office } : {}),
     });
     return { uid: user.uid };
+  }
+
+  async getUser(uid: string): Promise<UserDoc | null> {
+    const s = ensure();
+    return s.users.find((u) => u.uid === uid) || null;
+  }
+
+  async requestAccount(request: UserDoc): Promise<UserDoc> {
+    const s = ensure();
+    const existing = s.users.findIndex(
+      (u) => u.email.toLowerCase() === request.email.toLowerCase(),
+    );
+    if (existing >= 0) throw new Error("An account already exists for that email.");
+    s.users.push(request);
+    save(s);
+    dispatchChange();
+    return request;
+  }
+
+  async approveUser(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void> {
+    const patch = approvalPatch(decision, actorUid);
+    if (patch.border) await this.addBorder(patch.border, actorUid);
+    const s = ensure();
+    s.users = s.users.map((u) => (u.uid === uid ? { ...u, ...patch } : u));
+    save(s);
+    dispatchChange();
+  }
+
+  async declineUser(uid: string): Promise<void> {
+    const s = ensure();
+    s.users = s.users.map((u) =>
+      u.uid === uid ? { ...u, pending: false, disabled: true } : u,
+    );
+    save(s);
+    dispatchChange();
   }
 
   async setUserDisabled(uid: string, disabled: boolean): Promise<void> {

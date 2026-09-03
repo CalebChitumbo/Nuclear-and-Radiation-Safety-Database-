@@ -4,7 +4,10 @@
  * 1. onFacilityWrite — maintain aggregates/dashboard.
  * 2. setUserClaims — callable, admin-only: create Auth user + users/{uid} +
  *    custom claims {role, section}.
- * 3. onUserDocWrite — keep custom claims in sync if an admin edits a user.
+ * 3. onUserDocWrite — keep custom claims in sync with the account document, and
+ *    withhold them entirely from an account that is pending approval, declined
+ *    or disabled. This is what lets anyone sign themselves up without that
+ *    granting them anything until an administrator approves it.
  * 4. ingestRaisEmail — inbound-email connector that auto-updates the licensing
  *    status from forwarded RAIS notification emails (see ./rais/ingest).
  */
@@ -137,12 +140,14 @@ export const setUserClaims = onCall(async (request) => {
     displayName,
     role,
     section,
+    border,
   } = request.data as {
     email?: string;
     password?: string;
     displayName?: string;
     role?: string;
     section?: string;
+    border?: string;
   };
   if (!email || !password) {
     throw new HttpsError("invalid-argument", "email + password required");
@@ -160,6 +165,16 @@ export const setUserClaims = onCall(async (request) => {
   }
   if (!section || !allowedSections.includes(section)) {
     throw new HttpsError("invalid-argument", "invalid section");
+  }
+  // The inland office an NSSS officer is posted to. It is a claim, not just a
+  // profile field, because the security rules enforce it: an officer with a
+  // posting may only file screening figures against that office.
+  const office = (border || "").trim().slice(0, 80);
+  if (office && section !== "Nuclear Safety, Security & Safeguards") {
+    throw new HttpsError(
+      "invalid-argument",
+      "only NSSS officers are posted to an inland office",
+    );
   }
 
   const auth = getAuth();
@@ -185,25 +200,54 @@ export const setUserClaims = onCall(async (request) => {
     });
   }
 
-  await auth.setCustomUserClaims(userRecord.uid, { role, section });
+  await auth.setCustomUserClaims(userRecord.uid, {
+    role,
+    section,
+    ...(office ? { border: office } : {}),
+  });
   await db.doc(`users/${userRecord.uid}`).set(
     {
+      uid: userRecord.uid,
       email,
       displayName: displayName || email,
       role,
       section,
+      border: office,
+      // Provisioned accounts are live the moment they are made — the approval
+      // queue is for the requests officers file themselves.
+      pending: false,
+      disabled: false,
+      origin: "provisioned",
     },
     { merge: true },
   );
   return { uid: userRecord.uid };
 });
 
+/**
+ * Mirror an account document onto the Auth user's custom claims — and, just as
+ * importantly, refuse to when it should hold none.
+ *
+ * This is the single gate that makes self-service sign-up safe. A person can
+ * create their own sign-in and file their own account request, but the request
+ * is stored `pending`, and a pending account gets an EMPTY claim set: no role,
+ * no section, and therefore — since every rule in firestore.rules is gated on
+ * approved() — no access to anything. Clearing `pending` is an administrator's
+ * write, and that write is what mints the claims. A disabled account is treated
+ * the same way, and its Auth user is disabled too so it cannot even sign in.
+ */
 export const onUserDocWrite = onDocumentWritten(
   { document: "users/{uid}", region: "us-central1" },
   async (event) => {
     const uid = event.params.uid as string;
     const after = event.data?.after?.data() as
-      | { role?: string; section?: string }
+      | {
+          role?: string;
+          section?: string;
+          border?: string;
+          pending?: boolean;
+          disabled?: boolean;
+        }
       | undefined;
     try {
       if (!after) {
@@ -212,12 +256,21 @@ export const onUserDocWrite = onDocumentWritten(
         await getAuth().setCustomUserClaims(uid, {});
         return;
       }
-      // Fail closed: a doc missing role/section must not inherit the broadest
-      // section ("All" passes both isAS() and isInsp() in firestore.rules).
-      await getAuth().setCustomUserClaims(uid, {
-        role: after.role || "officer",
-        section: after.section || "",
-      });
+      if (after.pending || after.disabled) {
+        // Waiting on approval, declined, or switched off: hold nothing.
+        await getAuth().setCustomUserClaims(uid, {});
+      } else {
+        // Fail closed: a doc missing role/section must not inherit the broadest
+        // section ("All" passes both isAS() and isInsp() in firestore.rules).
+        await getAuth().setCustomUserClaims(uid, {
+          role: after.role || "officer",
+          section: after.section || "",
+          ...(after.border ? { border: after.border } : {}),
+        });
+      }
+      // Disabling an account has to reach Auth as well, or the sign-in itself
+      // keeps working and only the claims go quiet.
+      await getAuth().updateUser(uid, { disabled: !!after.disabled });
     } catch (err) {
       console.error("Failed to sync custom claims for", uid, err);
     }

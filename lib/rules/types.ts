@@ -692,6 +692,25 @@ export interface DailyEntry {
 }
 
 /**
+ * The inland offices the Authority screens vehicles at, as the 2026 daily
+ * screening log records them. This is the list the sign-up form offers an NSSS
+ * officer before they have an account (the `borders` register is only readable
+ * once signed in) — an office that is not on it is typed in, and approving the
+ * request adds it to the register. Keep it in step with the posts in
+ * `seed/daily-screening-2026.seed.json`.
+ */
+export const INLAND_OFFICES = [
+  "Chingola",
+  "Chirundu",
+  "Kapiri Mposhi",
+  "Katete",
+  "Livingstone",
+  "Mongu",
+  "Nakonde",
+  "Ndola",
+] as const;
+
+/**
  * A border post / office the NSSS section screens vehicles at. Coordinators
  * pick their border when logging a daily screening count; deactivated borders
  * keep their history but stop appearing in the picker. Managed by the NSSS
@@ -820,6 +839,12 @@ export interface DashboardAggregate {
   countedAt?: number;
 }
 
+/**
+ * A staff account. Two things create one: an administrator provisioning it, and
+ * an officer asking for one on the sign-up form. The second lands here
+ * `pending` — the account exists and can sign in, but carries no role or
+ * section claims and therefore sees no data until an administrator approves it.
+ */
 export interface UserDoc {
   uid: string;
   email: string;
@@ -827,6 +852,29 @@ export interface UserDoc {
   role: Role;
   section: Section | "All";
   disabled?: boolean;
+  /**
+   * Waiting on an administrator. The account holds no access at all while this
+   * is set — the claims that grant it are only mirrored onto the Auth user once
+   * it clears (see onUserDocWrite). Absent on accounts an admin provisioned and
+   * on every account that predates self-service sign-up, which is what makes
+   * the flag safe to read as "pending unless it says otherwise".
+   */
+  pending?: boolean;
+  /**
+   * The inland office an NSSS officer is posted to, chosen when they signed up.
+   * Their screening figures — every truck scan and every daily count — are
+   * filed against this office and no other, so the national total is the sum of
+   * the offices rather than a number anyone can file anywhere. Empty on
+   * head-office accounts, which log for any post.
+   */
+  border?: string;
+  /** How the account came about — an admin provisioned it, or it was requested. */
+  origin?: "provisioned" | "self";
+  /** When the sign-up was submitted (ISO). */
+  requestedAt?: string;
+  /** When, and by whom, the request was approved (ISO / uid). */
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 export interface WeekDef {
