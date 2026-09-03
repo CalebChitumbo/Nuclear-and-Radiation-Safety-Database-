@@ -245,19 +245,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not configured.");
-    const { createUserWithEmailAndPassword, updateProfile } = await import(
-      "firebase/auth"
-    );
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      input.email.trim(),
-      input.password,
-    );
-    const request = newAccountRequest(input, cred.user.uid);
-    await updateProfile(cred.user, { displayName: request.displayName });
+    const {
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      updateProfile,
+    } = await import("firebase/auth");
     const { store } = await import("./store");
     const s = await store();
-    await s.requestAccount(request);
+    const email = input.email.trim();
+
+    // Signing up is two writes — the sign-in, then the request that says who it
+    // belongs to — and only the first is atomic. If the second fails the person
+    // is left holding a sign-in that can never be approved and an email address
+    // they can never register again, so neither half is allowed to survive
+    // alone.
+    let cred;
+    try {
+      cred = await createUserWithEmailAndPassword(auth, email, input.password);
+    } catch (err) {
+      if ((err as { code?: string }).code !== "auth/email-already-in-use") throw err;
+      // The sign-in exists. Either this is a finished account — in which case
+      // they should be signing in, not signing up — or it is the orphan of an
+      // earlier attempt whose request write failed, which we can now complete
+      // rather than leaving them stuck behind their own half-made account.
+      cred = await signInWithEmailAndPassword(auth, email, input.password).catch(
+        () => {
+          throw new Error(
+            "An account already exists for that email. Sign in instead, or ask an administrator to reset it.",
+          );
+        },
+      );
+      const existing = await s.getUser(cred.user.uid).catch(() => null);
+      if (existing) {
+        throw new Error(
+          existing.pending
+            ? "You have already asked for an account — it is with the administrator."
+            : "An account already exists for that email. Sign in instead.",
+        );
+      }
+    }
+
+    const request = newAccountRequest(input, cred.user.uid);
+    try {
+      await updateProfile(cred.user, { displayName: request.displayName });
+      await s.requestAccount(request);
+    } catch (err) {
+      // Roll the sign-in back so the email is free to try again. Deleting
+      // itself is something the freshly signed-in account can always do.
+      await cred.user.delete().catch(() => {
+        /* leave it to an administrator */
+      });
+      const code = (err as { code?: string }).code;
+      if (code === "permission-denied") {
+        // Far and away the likeliest cause, and invisible from the form: the
+        // sign-up rules have not been deployed to this project yet.
+        throw new Error(
+          "This system is not accepting sign-ups yet — its security rules need deploying. Please tell your administrator.",
+        );
+      }
+      throw err;
+    }
+
     setUser(null);
     setPendingAccount({
       uid: request.uid,
