@@ -41,7 +41,13 @@ jobs:
 
       # The security rules are what actually partition the sections' records,
       # so they are exercised against the Firestore emulator, account by
-      # account (tests/rules). Java is on the runner already.
+      # account (tests/rules). The emulator needs Java 21+, newer than the
+      # runner's default.
+      - name: Set up Java 21 for the Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@15
       - name: Security rules tests (Firestore emulator)
