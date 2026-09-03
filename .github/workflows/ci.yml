@@ -39,6 +39,20 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # The security rules are what actually partition the sections' records,
+      # so they are exercised against the Firestore emulator, account by
+      # account (tests/rules). The emulator needs Java 21+, newer than the
+      # runner's default.
+      - name: Set up Java 21 for the Firestore emulator
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15
+      - name: Security rules tests (Firestore emulator)
+        run: npm run test:rules
+
       - name: Production build (Firebase mode — mirrors Vercel)
         run: npm run build
         env:

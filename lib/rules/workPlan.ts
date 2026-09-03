@@ -831,6 +831,29 @@ export function compareOutputIds(a: string, b: string): number {
 }
 
 /**
+ * The plan as one part of the department sees it: only the outputs the given
+ * sections report, and only the subprogrammes that still have a row. This is
+ * what a section officer's sectional update and daily "week so far" are read
+ * through — their own rows, not the department's — while the department itself
+ * (an administrator, or the cross-section posting) is handed the whole plan.
+ *
+ * Filter at the output, not the subprogramme: a subprogramme belongs to one
+ * section but individual outputs in it may be reported by another.
+ */
+export function planForSections(
+  plan: Subprogramme[],
+  sections: readonly Section[],
+): Subprogramme[] {
+  const keep = new Set(sections);
+  return plan
+    .map((sub) => ({
+      ...sub,
+      outputs: sub.outputs.filter((o) => keep.has(o.section)),
+    }))
+    .filter((sub) => sub.outputs.length > 0);
+}
+
+/**
  * The next free number for a row being added, in the scheme above — the report
  * numbers new rows itself so nobody has to work out what is already taken.
  */

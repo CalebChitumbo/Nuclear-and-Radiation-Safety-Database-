@@ -9,6 +9,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { useAuth } from "@/lib/auth";
 import { useStoreData } from "@/lib/storeHooks";
+import { canOpen, seesRegister } from "@/lib/rules/access";
 import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 import { pendingRequests } from "@/lib/rules/signup";
 
@@ -23,12 +24,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   // One read for both navigations: the sidebar link badge and the phone tab
   // bar show the same cross-section handoff count. Administrators also get the
   // count of account requests waiting on them, so a new officer's sign-up is
-  // noticed rather than sat on.
+  // noticed rather than sat on. Only the sections that work the handoff read
+  // it — the rules refuse everyone else, and the badge is not theirs anyway.
+  const handoff = seesRegister(user);
   const { data: badges } = useStoreData(
     async (s) => {
       // Never let the badge read break the shell: if the collection isn't
       // readable yet (rules not deployed), just show no badge.
-      const requests = await s.listInspectionRequests().catch(() => []);
+      const requests = handoff
+        ? await s.listInspectionRequests().catch(() => [])
+        : [];
       const accountRequests = isAdmin
         ? await s.listUsers().catch(() => [])
         : [];
@@ -37,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         accounts: pendingRequests(accountRequests).length,
       };
     },
-    [canEditAS, canEditInsp, isAdmin],
+    [canEditAS, canEditInsp, isAdmin, handoff],
   );
   const inspectionBadge = user ? badges?.inbox.count || 0 : 0;
   const requestBadge = user && isAdmin ? badges?.accounts || 0 : 0;
@@ -72,7 +77,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) {
+  // A screen outside the account's section is never mounted, not even for the
+  // moment before the route guard moves them on: mounting it would fire its
+  // reads, and the rules would answer each with a permission error.
+  if (!user || !canOpen(user, pathname)) {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="caps text-xs text-gunmetal/60">Redirecting…</div>

@@ -46,7 +46,8 @@ export default function NsssPage() {
       // All reads degrade to empty until their rules/collections exist so the
       // tab always renders.
       s.listWeekMetricsAll().catch(() => []),
-      s.listDailyEntries().catch(() => []),
+      // The section's own log — the only slice an NSSS officer may read.
+      s.listDailyEntries({ section: NSSS }).catch(() => []),
       s.listBorders().catch(() => []),
       // The section's own changes to the plan — a row NSSS added or reworded
       // on the weekly report is one of its metrics here too.

@@ -9,6 +9,12 @@
  * binding: an administrator settles the role, the section and the office before
  * approving, because approving is what mints the account's claims.
  *
+ * The office is also what decides how much of the system an NSSS officer
+ * sees. Posted to an office, they get the Border Scan Log and nothing else;
+ * with the office left blank they are head-office NSSS and see the whole
+ * section. So the office is optional here even though the sign-up form
+ * insists on it — clearing it is how a head-office officer is approved.
+ *
  * Provisioning an account outright is still here — it is the path for someone
  * who cannot sign up themselves, and the one way to create an administrator.
  */
@@ -99,10 +105,6 @@ export default function AdminUsersPage() {
       toast.push("Set a temporary password of at least 6 characters.", "error");
       return;
     }
-    if (requiresInlandOffice(section) && !border.trim()) {
-      toast.push("Name the inland office this officer is posted to.", "error");
-      return;
-    }
     setBusy(true);
     try {
       const s = await store();
@@ -140,7 +142,7 @@ export default function AdminUsersPage() {
         title={`Account requests (${loading && !data ? "…" : requests.length})`}
         note={
           requests.length
-            ? "Each request holds no access until it is approved. Check the section — and, for NSSS, the inland office the officer will log against — before granting it."
+            ? "Each request holds no access until it is approved. Check the section — and, for NSSS, whether the officer is posted to an inland office (scan log only) or works at head office — before granting it."
             : undefined
         }
       >
@@ -244,8 +246,10 @@ export default function AdminUsersPage() {
                 placeholder="e.g. Nakonde"
               />
               <p className="text-[11px] text-gunmetal/60 mt-1.5">
-                This officer will only be able to file screening figures against
-                this office. An office not yet in the register is added.
+                Posted to an office, this officer sees the Border Scan Log only
+                and files screening figures against that office alone. Leave it
+                blank for a head-office officer, who sees the whole section. An
+                office not yet in the register is added.
               </p>
             </div>
           ) : null}
@@ -273,7 +277,6 @@ export default function AdminUsersPage() {
             busy ||
             !email.trim() ||
             !displayName.trim() ||
-            (requiresInlandOffice(section) && !border.trim()) ||
             (!isMockMode && password.length < 6)
           }
           className="btn btn-primary mt-3 w-full sm:w-auto"
@@ -313,7 +316,16 @@ export default function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="text-xs">{u.section}</td>
-                  <td className="text-xs">{u.border || "—"}</td>
+                  <td className="text-xs">
+                    {u.border ? (
+                      <>
+                        {u.border}{" "}
+                        <span className="chip slate">scan log only</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>
                     {u.disabled ? (
                       <span className="chip red">Disabled</span>
@@ -355,7 +367,9 @@ export default function AdminUsersPage() {
                   {u.role}
                 </span>
                 <span className="chip">{u.section}</span>
-                {u.border ? <span className="chip slate">{u.border}</span> : null}
+                {u.border ? (
+                  <span className="chip slate">{u.border} · scan log only</span>
+                ) : null}
                 {u.disabled ? (
                   <span className="chip red">Disabled</span>
                 ) : (
@@ -403,10 +417,6 @@ function RequestCard({
   const needsOffice = requiresInlandOffice(section);
 
   const decide = async (approve: boolean) => {
-    if (approve && needsOffice && !border.trim()) {
-      toast.push("Name the inland office before approving.", "error");
-      return;
-    }
     setBusy(true);
     try {
       const s = await store();
@@ -495,14 +505,15 @@ function RequestCard({
               onChange={(e) => setBorder(e.target.value)}
               placeholder="e.g. Nakonde"
             />
-            {border.trim() &&
-            !offices.some(
-              (o) => o.toLowerCase() === border.trim().toLowerCase(),
-            ) ? (
-              <p className="text-[11px] text-gunmetal/60 mt-1.5">
-                New office — approving registers it.
-              </p>
-            ) : null}
+            <p className="text-[11px] text-gunmetal/60 mt-1.5">
+              {!border.trim()
+                ? "Blank: a head-office officer who sees the whole section. Name an office to post them there — they then see the Border Scan Log only."
+                : !offices.some(
+                      (o) => o.toLowerCase() === border.trim().toLowerCase(),
+                    )
+                  ? "New office — approving registers it. Posted there, this officer sees the Border Scan Log only."
+                  : "Posted here, this officer sees the Border Scan Log only."}
+            </p>
           </div>
         ) : null}
       </div>

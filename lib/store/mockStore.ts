@@ -56,6 +56,7 @@ import {
   type WorkflowNote,
   isUseP,
 } from "../rules/types";
+import type { DailyEntryScope } from "../rules/access";
 import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
@@ -416,10 +417,16 @@ class MockStore implements DataStore {
     return Object.values(ensure().weekMetrics);
   }
 
-  async listDailyEntries(): Promise<DailyEntry[]> {
-    return [...ensure().dailyEntries].sort((a, b) =>
-      b.date.localeCompare(a.date),
-    );
+  async listDailyEntries(scope: DailyEntryScope = {}): Promise<DailyEntry[]> {
+    // The same slice the Firebase store's query returns, so a screen behaves
+    // alike in demo and in production.
+    return ensure()
+      .dailyEntries.filter(
+        (e) =>
+          (!scope.section || e.section === scope.section) &&
+          (!scope.border || e.border === scope.border),
+      )
+      .sort((a, b) => b.date.localeCompare(a.date));
   }
 
   async addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
@@ -442,10 +449,13 @@ class MockStore implements DataStore {
     dispatchChange();
   }
 
-  async listTruckScans(): Promise<TruckScan[]> {
-    return [...ensure().truckScans].sort(
-      (a, b) => b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""),
-    );
+  async listTruckScans(border?: string): Promise<TruckScan[]> {
+    return ensure()
+      .truckScans.filter((s) => !border || s.border === border)
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""),
+      );
   }
 
   async listTruckScansFor(border: string, date: string): Promise<TruckScan[]> {
@@ -454,8 +464,11 @@ class MockStore implements DataStore {
     );
   }
 
-  async listTruckScansForWeek(week: string): Promise<TruckScan[]> {
-    return (await this.listTruckScans()).filter((s) => s.week === week);
+  async listTruckScansForWeek(
+    week: string,
+    border?: string,
+  ): Promise<TruckScan[]> {
+    return (await this.listTruckScans(border)).filter((s) => s.week === week);
   }
 
   async addTruckScan(scan: Omit<TruckScan, "id">): Promise<TruckScan> {

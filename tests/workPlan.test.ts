@@ -10,6 +10,7 @@ import {
   effectiveOpeningBalance,
   normaliseQuarters,
   parseOpeningBalance,
+  planForSections,
   findOutput,
   formatPercent,
   metricKeysForOutput,
@@ -632,5 +633,32 @@ describe("pasting opening figures from the work plan spreadsheet", () => {
     expect(matched).toEqual(["1.1.1"]);
     // The header, the id that is not on the plan, and the prose.
     expect(skipped).toHaveLength(3);
+  });
+});
+
+describe("planForSections — the part of the plan a section is shown", () => {
+  it("keeps only the outputs the sections report, and drops emptied subprogrammes", () => {
+    const nsss = "Nuclear Safety, Security & Safeguards" as const;
+    const own = planForSections(WORK_PLAN, [nsss]);
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.length).toBeLessThan(WORK_PLAN.length);
+    for (const sub of own) {
+      expect(sub.outputs.length).toBeGreaterThan(0);
+      for (const o of sub.outputs) expect(o.section).toBe(nsss);
+    }
+    // Vehicle screening is the section's headline output, so it must survive.
+    expect(own.flatMap((s) => s.outputs).some((o) => o.id === "1.3.12")).toBe(true);
+  });
+
+  it("hands the department the whole plan, untouched", () => {
+    const all = planForSections(WORK_PLAN, [
+      "Authorisation & Standards",
+      "Inspectorate",
+      "Nuclear Safety, Security & Safeguards",
+      "National Source Inventory",
+    ]);
+    expect(all.map((s) => s.outputs.length)).toEqual(
+      WORK_PLAN.map((s) => s.outputs.length),
+    );
   });
 });

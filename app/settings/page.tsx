@@ -10,10 +10,12 @@ import { isMockMode } from "@/lib/firebase";
 import { PROVINCES, type Facility } from "@/lib/rules/types";
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, workspace } = useAuth();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  // A full export reads every collection, which only the department may do.
+  const canExport = workspace?.kind === "department";
 
   const exportJson = async () => {
     setBusy(true);
@@ -93,6 +95,7 @@ export default function SettingsPage() {
         </div>
       </Panel>
 
+      {canExport ? (
       <Panel
         title="Export &amp; backup"
         note="The dated event log is the source of truth. Exports capture the register and the events that produced it, so the database can always be rebuilt."
@@ -121,6 +124,7 @@ export default function SettingsPage() {
           </button>
         </div>
       </Panel>
+      ) : null}
 
       <Panel title="Environment">
         <div className="text-sm">

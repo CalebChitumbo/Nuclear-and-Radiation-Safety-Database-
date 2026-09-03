@@ -17,7 +17,8 @@ counts across the eight posts, 331,177 vehicles assessed — seeded as ordinary
 daily entries so work plan output 1.3.12 counts them post by post rather than
 carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
 
-**Navigation** (sidebar, in order): Overview · Facilities · **Source
+**Navigation** (sidebar, in order — each account sees only the screens its
+section works in; see **[Who sees what](#who-sees-what)**): Overview · Facilities · **Source
 Inventory** (`/source-inventory` — the national RAIS register: 1,752 radiation
 generators and sealed sources, searchable and filterable by machine family,
 nuclide and IAEA source category, with CSV export) · **Verified Source
@@ -95,8 +96,8 @@ Sign in with any of the demo accounts — any non-empty password works:
 | `admin@rpa.gov.zm` | Administrator (full access) |
 | `as.officer@rpa.gov.zm` | Authorisation & Standards officer |
 | `inspector@rpa.gov.zm` | Inspectorate officer |
-| `nsss@rpa.gov.zm` | Nuclear Safety, Security & Safeguards officer |
-| `nakonde@rpa.gov.zm` | Border coordinator **posted to Nakonde** — the Border Scan Log and Daily Updates file everything against that office, with no post picker |
+| `nsss@rpa.gov.zm` | Nuclear Safety, Security & Safeguards officer (head office — the NSSS dashboard and every post's scan log) |
+| `nakonde@rpa.gov.zm` | Border coordinator **posted to Nakonde** — signs in straight onto the Border Scan Log, sees nothing else, and every scan and figure is filed against Nakonde with no post picker |
 
 Or ask for an account at `/signup`, then approve it from `/admin/users` as
 `admin@rpa.gov.zm` — the whole flow works in mock mode.
@@ -223,6 +224,54 @@ someone being posted to it. The sign-up form offers the eight offices of the
 2026 screening log (`INLAND_OFFICES` in `lib/rules/types.ts`) plus *Another
 office…* for anything else — it cannot read the live register, because a visitor
 who has not signed in yet may read nothing.
+
+### Who sees what
+
+Every account works from one of three places, and that place decides which
+screens it can open and whose records it is shown. The partition is stated
+once, in `lib/rules/access.ts` (the route table the sidebar, the phone tab
+bar and the route guard are all built from), and enforced by
+`firestore.rules` against the account's claims — so hiding a link is never
+what keeps a record private.
+
+| Works from | Who | Opens |
+|---|---|---|
+| **The department** | an administrator, or the cross-section `All` posting | everything (the admin desk is administrators' alone) |
+| **Authorisation & Standards** | a Licensing officer | Overview · Facilities · Reports · Authorisations · Smart Status Update · Bulk Approval · Inspection Requests · Daily Updates · the sectional update |
+| **Inspectorate** | an inspector | Inspectorate · Facilities · Inspection Requests · Daily Updates · the sectional update |
+| **NSSS, head office** | an NSSS officer with **no** inland office | NSSS dashboard · Border Scan Log (every post) · Daily Updates · the sectional update |
+| **An inland office** | an NSSS officer **posted** to a border post | **the Border Scan Log, and nothing else** |
+| **National Source Inventory** | an NSI officer | Source Inventory · Verified Source Inventory · Daily Updates · the sectional update |
+
+Signing in lands each account on its own front door (the Overview, the
+Inspectorate, the NSSS dashboard, the scan log, the Source Inventory), and
+asking for any other screen sends it back there. The shared reports are cut
+the same way: **Daily Updates** and the **sectional update** show an officer
+their own section's rows — the section switcher only appears for the
+department — and the daily log is *read* by section (`listDailyEntries` takes
+the scope the account is entitled to, and the rules refuse anything wider).
+
+The posted officer is the case that matters most in the field. Their job is
+scanning trucks, so the system is the capture screen: no sidebar to speak of,
+no reporting-week picker, no phone tab bar, and every read is their own
+post's — the shift, the week, the recent scans behind the pickers. In
+Firestore terms they may read and write `truckScans` and `dailyEntries`
+carrying their own `border`, read `borders`, and nothing else.
+
+On the server the same lines are drawn per collection: the facilities
+register and everything hung off it (`facilities`, `licenceEvents`,
+`inspections`, `inspectionRequests`, `licenceWorkflows`, `aggregates`) is
+Licensing's and the Inspectorate's; `inventoryEdits` is NSI's; `truckScans`
+is NSSS's, a posted officer's own post only; `dailyEntries` is read by section
+(and by post when posted); the weekly report's collections (`weekMetrics`,
+`workPlan*`, `activities`, `config`) are any head-office officer's. **Deploy
+the rules with this release** — see
+[Deploying the security rules](#deploying-the-security-rules).
+
+Whether an NSSS officer is posted is settled at approval: the sign-up form
+insists on an office, but the administrator may **clear it** on the request
+card to approve a head-office officer, and the accounts table marks every
+posted account *scan log only*.
 
 ### Working the queue
 
@@ -777,7 +826,13 @@ Firestore denies every write to a collection **no deployed rule mentions**,
 admin account or not. So any release that adds one — `workPlanNotes`,
 `workPlanBaseline` and `workPlanConfig` for the sectional update, `dailyEntries`
 and `borders` for Daily Updates, `truckScans` for the border log — reads fine
-but cannot save until `firestore.rules` is published. Three ways, pick one:
+but cannot save until `firestore.rules` is published. The same goes for a
+release that **changes who may read what**: the section-scoped access rules
+(see [Who sees what](#who-sees-what)) and the app's scoped queries go
+together — the old rules with the new app still work (they are looser), but
+the new rules with an older app would refuse its unscoped reads. The
+`truckScans` `(border, date desc)` index in `firestore.indexes.json` ships
+with them. Three ways, pick one:
 
 **From GitHub (nothing to install).** The `Deploy Firestore Rules` workflow
 publishes `firestore.rules` and `firestore.indexes.json` automatically when
@@ -992,6 +1047,11 @@ npm test
 
 427 tests across `lib/rules/*` and the seed baseline, including:
 
+- `access` — who sees what: the workspace an account works from (the
+  department, a section, or an inland office), the screens each may open, its
+  front door, its sidebar and phone tabs, and the daily-log scope it may read
+- `accessStore` — the mock store honours the same scopes the security rules
+  demand (a section's daily log, a post's scans)
 - `detectType` — auto-detects all ten licence type codes
 - `matching` — Jaccard + substring + FAC code matching, with short-string guard
 - `recordLicence` — full R1–R6 worked expectation
@@ -1108,6 +1168,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── components/facility/    FacilityDetail — shared by the drawer and /facilities/[id]
 ├── lib/
 │   ├── rules/              PURE business logic — fully unit-tested
+│   │   └── access.ts       Who sees what — the route table and workspaces
 │   ├── store/              DataStore interface + mockStore + firebaseStore
 │   ├── auth.tsx            Auth context: signed-in officer vs pending account
 │   ├── firebase.ts         Client init

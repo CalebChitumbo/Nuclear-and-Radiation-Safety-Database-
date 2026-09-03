@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { canEditSection, useAuth } from "@/lib/auth";
+import { dailyEntryScope, seesRegister } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { downloadTextFile } from "@/components/downloadFile";
@@ -37,6 +38,7 @@ import {
   describeBinding,
   formatPercent,
   nextOutputId,
+  planForSections,
   retiredOutputs,
   subprogrammeHeading,
   workPlanBrief,
@@ -95,9 +97,12 @@ const STATUS_TONE: Record<WorkPlanStatus, string> = {
  * border logs. What an officer types is the figure for outputs the system
  * cannot see (guides written, SOPs revised, trainings held) plus the Status,
  * Comments and Action Points columns.
+ *
+ * An officer is shown their own section's rows of it. The department (an
+ * administrator, or the cross-section posting) sees every section's.
  */
 export default function WeeklyPage() {
-  const { user } = useAuth();
+  const { user, sections } = useAuth();
   const { selected, weeks } = useWeek();
   const toast = useToast();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -124,7 +129,14 @@ export default function WeeklyPage() {
     }
   };
 
-  const { data, error, reload } = useStoreData(async (s) => {
+  // Licences and inspections are counted off the facilities register, which
+  // only Licensing and the Inspectorate read; the other sections' rows never
+  // need it. The daily log is read as narrowly as the account is entitled to.
+  const register = seesRegister(user);
+  const entryScope = dailyEntryScope(user);
+
+  const { data, error, reload } = useStoreData(
+    async (s) => {
     const [
       events,
       inspections,
@@ -135,13 +147,13 @@ export default function WeeklyPage() {
       baseline,
       config,
     ] = await Promise.all([
-      s.listLicenceEvents(),
-      s.listInspections(),
+      register ? s.listLicenceEvents() : Promise.resolve([]),
+      register ? s.listInspections() : Promise.resolve([]),
       s.listActivities(),
       s.listWeekMetricsAll().catch(() => []),
       // Daily Updates roll up into this report; degrade to empty until the
       // dailyEntries rules are deployed.
-      s.listDailyEntries().catch(() => []),
+      s.listDailyEntries(entryScope).catch(() => []),
       s.listWorkPlanNotes().catch(() => []),
       // No saved baseline (or no rules yet) means the approved workbook's
       // figures at handover apply — see effectiveOpeningBalance.
@@ -164,7 +176,10 @@ export default function WeeklyPage() {
       baseline,
       config,
     };
-  });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [register, entryScope?.section, entryScope?.border],
+  );
 
   const derived = useMemo(() => {
     if (!data) return null;
@@ -183,10 +198,14 @@ export default function WeeklyPage() {
     for (const n of data.workPlanNotes) notes[n.id] = n;
 
     // The plan the report is read through: the approved workbook with the
-    // sections' own changes laid over it.
+    // sections' own changes laid over it. The WHOLE plan is kept for numbering
+    // and validating new rows, so an id can never collide with a row another
+    // section holds in the same subprogramme; the report itself is derived
+    // from the account's own part of it.
     const plan = applyWorkPlanConfig(data.config);
+    const ownPlan = planForSections(plan, sections);
     const reports = deriveWorkPlan({
-      plan,
+      plan: ownPlan,
       weeks,
       week: selected.label,
       events: data.events,
@@ -198,9 +217,11 @@ export default function WeeklyPage() {
       baseline: data.baseline?.values ?? null,
     });
     const quarter = buildQuarterIndex(weeks).get(selected.label) ?? null;
-    const retired = retiredOutputs(data.config);
-    return { plan, reports, quarter, retired };
-  }, [data, weeks, selected.label]);
+    const retired = retiredOutputs(data.config).filter((o) =>
+      sections.includes(o.section),
+    );
+    return { plan, ownPlan, reports, quarter, retired };
+  }, [data, weeks, selected.label, sections]);
 
   if (!data || !derived) {
     return error ? (
@@ -210,8 +231,12 @@ export default function WeeklyPage() {
     );
   }
 
-  const { plan, reports, quarter, retired } = derived;
-  const wkActivities = data.activities.filter((a) => a.week === selected.label);
+  const { plan, ownPlan, reports, quarter, retired } = derived;
+  const wkActivities = data.activities.filter(
+    (a) =>
+      a.week === selected.label &&
+      (sections as readonly string[]).includes(a.section),
+  );
   const planRows = reports.flatMap((r) => r.rows);
   const achieved = planRows.filter((r) => r.status === "Achieved").length;
   const notStarted = planRows.filter((r) => r.status === "Not Started").length;
@@ -441,7 +466,7 @@ export default function WeeklyPage() {
 
       <OpeningBalancePanel
         year={WORK_PLAN_YEAR}
-        plan={plan}
+        plan={ownPlan}
         baseline={data.baseline}
         canEdit={user?.role === "admin"}
         uid={user?.uid || ""}
@@ -476,15 +501,17 @@ export default function WeeklyPage() {
         onReset={onResetPlan}
       />
 
-      <InspectionSummaryPanel
-        inspections={data.inspections}
-        weekLabel={selected.label}
-        view={view}
-        onExport={(csv, name) => {
-          downloadTextFile(name, csv);
-          toast.push("Inspection summary exported.", "success");
-        }}
-      />
+      {sections.includes("Inspectorate") ? (
+        <InspectionSummaryPanel
+          inspections={data.inspections}
+          weekLabel={selected.label}
+          view={view}
+          onExport={(csv, name) => {
+            downloadTextFile(name, csv);
+            toast.push("Inspection summary exported.", "success");
+          }}
+        />
+      ) : null}
 
       <ActivitiesPanel
         weekLabel={selected.label}

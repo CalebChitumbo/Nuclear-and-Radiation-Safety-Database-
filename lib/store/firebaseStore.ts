@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 
 import { getDb, getFbFunctions } from "../firebase";
+import type { DailyEntryScope } from "../rules/access";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
 import {
@@ -368,9 +369,15 @@ class FirebaseStore implements DataStore {
     return snap.docs.map((d) => d.data() as WeekMetrics);
   }
 
-  async listDailyEntries(): Promise<DailyEntry[]> {
+  async listDailyEntries(scope: DailyEntryScope = {}): Promise<DailyEntry[]> {
     const db = requireDb();
-    const snap = await getDocs(collection(db, "dailyEntries"));
+    // Equality filters only, so no composite index is needed; the rules require
+    // exactly these clauses from a section or posted account.
+    const clauses = [
+      ...(scope.section ? [where("section", "==", scope.section)] : []),
+      ...(scope.border ? [where("border", "==", scope.border)] : []),
+    ];
+    const snap = await getDocs(query(collection(db, "dailyEntries"), ...clauses));
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<DailyEntry, "id">) }))
       .sort((a, b) => b.date.localeCompare(a.date));
@@ -391,11 +398,14 @@ class FirebaseStore implements DataStore {
     await deleteDoc(doc(db, "dailyEntries", id));
   }
 
-  async listTruckScans(): Promise<TruckScan[]> {
+  async listTruckScans(border?: string): Promise<TruckScan[]> {
     const db = requireDb();
+    // With a post: border == X ordered by date desc — the (border, date desc)
+    // composite index in firestore.indexes.json.
     const snap = await getDocs(
       query(
         collection(db, "truckScans"),
+        ...(border ? [where("border", "==", border)] : []),
         orderBy("date", "desc"),
         limit(RECENT_SCAN_LIMIT),
       ),
@@ -420,10 +430,17 @@ class FirebaseStore implements DataStore {
       .sort((a, b) => (b.time || "").localeCompare(a.time || ""));
   }
 
-  async listTruckScansForWeek(week: string): Promise<TruckScan[]> {
+  async listTruckScansForWeek(
+    week: string,
+    border?: string,
+  ): Promise<TruckScan[]> {
     const db = requireDb();
     const snap = await getDocs(
-      query(collection(db, "truckScans"), where("week", "==", week)),
+      query(
+        collection(db, "truckScans"),
+        where("week", "==", week),
+        ...(border ? [where("border", "==", border)] : []),
+      ),
     );
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<TruckScan, "id">) }))
