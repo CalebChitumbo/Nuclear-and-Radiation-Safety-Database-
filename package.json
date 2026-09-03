@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-rpa-rules \"vitest run --config vitest.rules.config.ts\"",
+    "test:rules": "firebase emulators:exec --config firebase.rules-test.json --only firestore --project demo-rpa-rules \"vitest run --config vitest.rules.config.ts\"",
     "seed": "tsx scripts/seed.ts",
     "seed:fresh": "tsx scripts/seed.ts --fresh",
     "seed:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts",
