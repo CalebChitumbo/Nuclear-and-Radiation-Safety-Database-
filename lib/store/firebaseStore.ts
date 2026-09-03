@@ -45,6 +45,11 @@ import {
   type InventoryKind,
 } from "../rules/inventoryEdits";
 import { recordLicence } from "../rules/recordLicence";
+import {
+  approvalPatch,
+  normaliseOfficeName,
+  requiresInlandOffice,
+} from "../rules/signup";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
   buildWorkflowComment,
@@ -291,6 +296,49 @@ class FirebaseStore implements DataStore {
     const db = requireDb();
     const snap = await getDocs(collection(db, "users"));
     return snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<UserDoc, "uid">) }));
+  }
+
+  async getUser(uid: string): Promise<UserDoc | null> {
+    const db = requireDb();
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) return null;
+    return { uid: snap.id, ...(snap.data() as Omit<UserDoc, "uid">) };
+  }
+
+  async requestAccount(request: UserDoc): Promise<UserDoc> {
+    const db = requireDb();
+    // The rules only accept this write from the account it is about, and only
+    // as a pending officer of one section — see match /users/{uid}.
+    await setDoc(doc(db, "users", request.uid), request);
+    return request;
+  }
+
+  async approveUser(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    const patch = approvalPatch(decision, actorUid);
+    // An officer approved at a post the register has never heard of registers
+    // the post: their figures need an office to be filed against, and the
+    // screening report reads its columns off this list.
+    if (patch.border) await this.addBorder(patch.border, actorUid);
+    await updateDoc(doc(db, "users", uid), { ...patch });
+  }
+
+  async declineUser(uid: string): Promise<void> {
+    const db = requireDb();
+    // Kept rather than deleted: the record is why the person cannot simply
+    // sign up again, and an administrator can still enable it later.
+    await updateDoc(doc(db, "users", uid), {
+      pending: false,
+      disabled: true,
+    });
   }
 
   async getAggregate(): Promise<DashboardAggregate> {
@@ -977,12 +1025,18 @@ class FirebaseStore implements DataStore {
     role: UserDoc["role"];
     section: UserDoc["section"];
     password: string;
+    border?: string;
+    actorUid: string;
   }): Promise<{ uid: string }> {
     // Provisioning a real account needs Admin-SDK privileges (create the Auth
     // user + set custom claims), so it runs in the setUserClaims Cloud Function.
     // The function self-guards: it rejects callers whose token role != "admin".
     const functions = getFbFunctions();
     if (!functions) throw new Error("Firebase Functions are not configured.");
+    const office = requiresInlandOffice(input.section)
+      ? normaliseOfficeName(input.border || "")
+      : "";
+    if (office) await this.addBorder(office, input.actorUid);
     const { httpsCallable } = await import("firebase/functions");
     const callable = httpsCallable<
       {
@@ -991,6 +1045,7 @@ class FirebaseStore implements DataStore {
         displayName: string;
         role: string;
         section: string;
+        border: string;
       },
       { uid: string }
     >(functions, "setUserClaims");
@@ -1000,6 +1055,7 @@ class FirebaseStore implements DataStore {
       displayName: input.displayName,
       role: input.role,
       section: input.section,
+      border: office,
     });
     return res.data;
   }

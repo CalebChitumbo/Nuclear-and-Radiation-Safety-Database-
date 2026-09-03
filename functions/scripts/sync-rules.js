@@ -18,6 +18,9 @@ const path = require("path");
 // adding an entry pulls another file (and its imports) into the function bundle.
 const FILES = [
   "types.ts",
+  // types.ts re-exports the cargo vocabulary from here, so the copy does not
+  // compile without it. Dependency-free itself.
+  "borderCargo.ts",
   "matching.ts",
   "raisTemplates.ts",
   "parseNotifications.ts",

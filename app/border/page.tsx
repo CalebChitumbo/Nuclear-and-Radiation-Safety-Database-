@@ -56,11 +56,11 @@ const NSSS: Section = "Nuclear Safety, Security & Safeguards";
 const POST_KEY = "rpa-border-post";
 
 export default function BorderScanPage() {
-  const { user } = useAuth();
+  const { user, postedOffice } = useAuth();
   const { weeks } = useWeek();
   const toast = useToast();
 
-  const [border, setBorder] = useState("");
+  const [border, setBorder] = useState(postedOffice || "");
   const [date, setDate] = useState(() => todayISO());
   const [direction, setDirection] = useState<ScanDirection>("Inbound");
   const [view, setView] = useState<"day" | "week">("day");
@@ -71,15 +71,22 @@ export default function BorderScanPage() {
     [date, weeks],
   );
 
-  // An officer works one post; remember which so the header is answered once
-  // and not once a day.
+  // An officer works one post. A coordinator registered to an inland office
+  // works THAT post and no other — their account says so, the security rules
+  // enforce it, and the header simply states it. Everyone else (head office,
+  // an administrator) picks, and the choice is remembered so the header is
+  // answered once and not once a day.
   useEffect(() => {
+    if (postedOffice) {
+      setBorder(postedOffice);
+      return;
+    }
     const saved = window.localStorage.getItem(POST_KEY);
     if (saved) setBorder(saved);
-  }, []);
+  }, [postedOffice]);
   useEffect(() => {
-    if (border) window.localStorage.setItem(POST_KEY, border);
-  }, [border]);
+    if (border && !postedOffice) window.localStorage.setItem(POST_KEY, border);
+  }, [border, postedOffice]);
 
   const { data, error, reload } = useStoreData(
     async (s) => {
@@ -102,12 +109,13 @@ export default function BorderScanPage() {
     [border, date, weekLabel],
   );
 
-  // Default to the first active post the first time the tab is opened.
+  // Default to the first active post the first time the tab is opened. Never
+  // for a posted coordinator — their office is not a default, it is the answer.
   useEffect(() => {
-    if (border || !data?.borders.length) return;
+    if (border || postedOffice || !data?.borders.length) return;
     const first = data.borders.find((b) => b.active) || data.borders[0];
     if (first) setBorder(first.name);
-  }, [border, data?.borders]);
+  }, [border, postedOffice, data?.borders]);
 
   const canLog = canEditSection(user, NSSS);
   const isAdmin = user?.role === "admin";
@@ -191,24 +199,32 @@ export default function BorderScanPage() {
       <Panel>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div>
-            <label className="field-label" htmlFor="post">
-              Border post
-            </label>
-            <select
-              id="post"
-              className="input"
-              value={border}
-              onChange={(e) => setBorder(e.target.value)}
-            >
-              {!activeBorders.length ? (
-                <option value="">No posts yet</option>
-              ) : null}
-              {activeBorders.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            <span className="field-label">Border post</span>
+            {postedOffice ? (
+              <>
+                <div className="text-sm font-black pt-1.5">{postedOffice}</div>
+                <div className="caps text-[10px] text-gunmetal/55">
+                  Your posting
+                </div>
+              </>
+            ) : (
+              <select
+                id="post"
+                aria-label="Border post"
+                className="input"
+                value={border}
+                onChange={(e) => setBorder(e.target.value)}
+              >
+                {!activeBorders.length ? (
+                  <option value="">No posts yet</option>
+                ) : null}
+                {activeBorders.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -244,7 +260,7 @@ export default function BorderScanPage() {
           </div>
         </div>
 
-        {!activeBorders.length ? (
+        {!activeBorders.length && !postedOffice ? (
           <p className="text-xs text-gunmetal/60 mt-3">
             No border posts are configured yet — add them on the{" "}
             <Link className="link-action" href="/nsss">

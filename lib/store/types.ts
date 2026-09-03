@@ -232,7 +232,41 @@ export interface DataStore {
     role: UserDoc["role"];
     section: UserDoc["section"];
     password: string;
+    /** Inland office an NSSS officer is posted to. */
+    border?: string;
+    /** The administrator doing the provisioning (registers the office, if new). */
+    actorUid: string;
   }): Promise<{ uid: string }>;
+  /**
+   * One account document. An officer may read their own (that is how the
+   * "waiting for approval" screen knows what was asked for); everything else is
+   * admin-only, so this is not a way around listUsers.
+   */
+  getUser(uid: string): Promise<UserDoc | null>;
+  /**
+   * File a self-service account request against an already-created sign-in.
+   * The document is written `pending`, which is what withholds every claim —
+   * see newAccountRequest in lib/rules/signup.ts.
+   */
+  requestAccount(request: UserDoc): Promise<UserDoc>;
+  /**
+   * Approve a pending request, with whatever the administrator settled on for
+   * its role, section and inland office. Granting the claims is the Cloud
+   * Function's job (onUserDocWrite) — this only clears `pending`. When the
+   * office named is not yet in the border register it is added, so approving an
+   * officer at a new post registers the post at the same time.
+   */
+  approveUser(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void>;
+  /** Turn a request down. The account stays, disabled, so it cannot re-apply. */
+  declineUser(uid: string): Promise<void>;
   setUserDisabled(uid: string, disabled: boolean): Promise<void>;
   exportAll(): Promise<{
     facilities: Facility[];
