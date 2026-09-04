@@ -32,7 +32,7 @@
  * `applyWorkPlanConfig`). Sections edit their own rows from the report; the
  * plan below is what an untouched row, or a row that has been reset, reports as.
  */
-import { ENFORCEMENT_COLUMNS } from "./inspectionDatabase";
+import { ENFORCEMENT_COLUMNS, ENGAGEMENT_ACTIONS } from "./inspectionDatabase";
 import {
   INSPECTION_BREAKDOWN,
   LICENCE_BREAKDOWN,
@@ -565,7 +565,7 @@ const SUB_1_2: SubprogrammeDef = {
       target: 50,
       section: INSP,
       binding: { kind: "enforcement" },
-      note: "The enforcement action recorded against an inspection — expand for the engagement / suspension / seizure split, the same columns the inspection database summarises.",
+      note: "The enforcement action recorded against an inspection — expand for the split by action, the same six columns the inspection database summarises, with engagements shown as one line.",
     },
     {
       id: "1.2.S1",
@@ -1159,7 +1159,10 @@ export function validateOutputEdit(
  *          facilities and their authorisations, not issue events), so the whole
  *          figure is carried in and every licence logged from here adds on top.
  * - 1.2.x  carried in whole — the inspection register is empty, so 1.2.4 and
- *          1.2.11 have nothing behind them the system counts.
+ *          1.2.11 have nothing behind them the system counts. 1.2.4 was
+ *          re-baselined to 295 on 4 Sep 2026 (was 284); the Inspectorate adds
+ *          on top of it from the daily inspections log — see CLAUDE.md for the
+ *          routine.
  * - 1.3.12 the ONE row the system part-holds: the inland offices' daily log
  *          (seed/daily-screening-2026.seed.json, see
  *          docs/daily-screening-2026-import.md) is counted directly and runs to
@@ -1193,7 +1196,10 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.2.1": [1, 0, 0, 0],
   "1.2.2": [1, 0, 0, 0],
   "1.2.3": [0, 2, 0, 0],
-  "1.2.4": [40, 123, 121, 0],
+  // 295 routine & follow-up inspections at 4 Sep 2026 — the Q3 figure carries
+  // the difference from the 284 first imported. Change only the last quarter
+  // that has work in it when the section gives a new total.
+  "1.2.4": [40, 123, 132, 0],
   "1.2.5": [1, 1, 0, 0],
   "1.2.6": [8, 8, 7, 0],
   "1.2.7": [1, 1, 0, 0],
@@ -1559,6 +1565,14 @@ function buildBreakdown(
     const rows = ENFORCEMENT_COLUMNS.map((c) =>
       count(c.label, input.inspections.filter((i) => i.enforcement === c.key)),
     ).filter((r) => r.total > 0 || r.week > 0);
+    // Engagements are not summary columns any more, but the output still
+    // counts them, so the split reconciles by carrying them as one line.
+    const engagements = input.inspections.filter(
+      (i) =>
+        !!i.enforcement &&
+        (ENGAGEMENT_ACTIONS as readonly string[]).includes(i.enforcement),
+    );
+    if (engagements.length) rows.push(count("Engagements", engagements));
     // Records logged as an "Enforcement Action" type before the action itself
     // was recorded have no column to sit in, but they are still in the figure.
     const untyped = input.inspections.filter(

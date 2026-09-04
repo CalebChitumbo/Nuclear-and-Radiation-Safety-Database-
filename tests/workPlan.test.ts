@@ -296,9 +296,11 @@ describe("outputs 1.2.4 and 1.2.11 — inspections and enforcement", () => {
     const reports = derive({ week: Q2, inspections: withAction });
     const r = row(reports, "1.2.11");
     expect(r.total).toBe(4);
+    // The six summary columns first, then engagements as one line (they
+    // count toward the output but are not summary columns), then the untyped.
     expect(r.breakdown.map((b) => [b.label, b.week, b.total])).toEqual([
-      ["Facility Level", 1, 2],
-      ["Devices Seized", 1, 1],
+      ["Seizure of Device", 1, 1],
+      ["Engagements", 1, 2],
       ["Action not recorded", 1, 1],
     ]);
   });
@@ -477,7 +479,8 @@ describe("opening balance — the plan is cumulative for the year", () => {
     expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([152, 125, 80, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.1.6"]).toEqual([1, 3, 0, 0]);
     // 1.2.x — the Inspectorate's Subprogram 1.2 sheet, unchanged this update.
-    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 123, 121, 0]);
+    // 1.2.4 re-baselined to 295 on 4 Sep 2026 (was 284) — Q3 carries the change.
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 123, 132, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.6"]).toEqual([8, 8, 7, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 61, 87, 0]);
     // 1.3.x — Nuclear Safety, Security & Safeguards.

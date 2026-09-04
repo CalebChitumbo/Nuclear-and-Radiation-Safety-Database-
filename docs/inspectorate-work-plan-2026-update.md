@@ -60,3 +60,19 @@ The workbook shows *Pending* against every 1.2.x row. The report derives status
 from the figures instead (*Achieved* at or over target, *In Progress* below it),
 because an officer can override it per output on `/weekly` — that override is
 what the workbook's Status column becomes here, and nobody has set one yet.
+
+## Re-baselines
+
+The section gives a new *total routine and follow-up inspections conducted*
+figure from time to time; it goes into the opening balance and the daily
+inspections log keeps adding on top. The routine is in `CLAUDE.md`.
+
+| Date | Output | Was | Now | Quarters |
+|---|---|---|---|---|
+| 2026-09-04 | 1.2.4 | 284 | **295** | 40 / 123 / 132 / — |
+
+The same change swapped the Summary sheet's ENGAGEMENTS / OTHER ENFORCEMENTS
+bands for Management's single ENFORCEMENT ACTIONS band (Written Notice ·
+Suspension of Practice · Seizure of Device · Enforcement Notice · Suspension of
+License · Cancellation of License). Engagements are still recordable and still
+show on the province sheet, but no longer count toward *Total Enforcements*.

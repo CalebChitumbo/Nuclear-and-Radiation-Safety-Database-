@@ -9,8 +9,9 @@ import {
 
 /**
  * The Inspectorate workbook's Summary sheet: one row per province round, the
- * INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS bands across the top, and the
- * Total row underneath.
+ * INSPECTIONS / ENFORCEMENT ACTIONS bands across the top, and the Total row
+ * underneath. The enforcement band is Management's six-column format; the
+ * engagements an inspector may still record are not summarised here.
  *
  * The dashboard shows it for the year and the weekly report shows it for the
  * reporting week — same table, different slice of the register, which is the
@@ -44,10 +45,7 @@ export function InspectionSummaryTable({
       ))}
       <td className="num font-black">{s.inspectionsTotal || "—"}</td>
       {ENFORCEMENT_COLUMNS.map((c, idx) => (
-        <td
-          key={c.key}
-          className={`num${idx === 0 || c.group !== ENFORCEMENT_COLUMNS[idx - 1].group ? " grp" : ""}`}
-        >
+        <td key={c.key} className={`num${idx === 0 ? " grp" : ""}`}>
           {s.enforcement[c.key] || "—"}
         </td>
       ))}
@@ -62,15 +60,9 @@ export function InspectionSummaryTable({
           <tr className="band">
             <th />
             <th colSpan={INSPECTION_COLUMNS.length + 1}>Inspections</th>
-            {["ENGAGEMENTS", "OTHER ENFORCEMENTS"].map((g) => (
-              <th
-                key={g}
-                className="grp"
-                colSpan={ENFORCEMENT_COLUMNS.filter((c) => c.group === g).length}
-              >
-                {g === "ENGAGEMENTS" ? "Engagements" : "Other enforcements"}
-              </th>
-            ))}
+            <th className="grp" colSpan={ENFORCEMENT_COLUMNS.length}>
+              Enforcement actions
+            </th>
             <th className="grp" />
           </tr>
           <tr>
@@ -82,10 +74,7 @@ export function InspectionSummaryTable({
             ))}
             <th className="num">Total</th>
             {ENFORCEMENT_COLUMNS.map((c, idx) => (
-              <th
-                key={c.key}
-                className={`num${idx === 0 || c.group !== ENFORCEMENT_COLUMNS[idx - 1].group ? " grp" : ""}`}
-              >
+              <th key={c.key} className={`num${idx === 0 ? " grp" : ""}`}>
                 {c.label}
               </th>
             ))}
