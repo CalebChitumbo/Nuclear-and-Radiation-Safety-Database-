@@ -31,7 +31,7 @@ breakdowns, every count deep-linking into the filtered register, CSV export)
 (`/licences` — authorisation statistics built from the register) ·
 **Inspectorate** (`/inspectorate` — the section's inspection database, in the
 format of its own workbook: the province summary with its INSPECTIONS /
-ENGAGEMENTS / OTHER ENFORCEMENTS columns, a facility-per-row sheet per province
+ENFORCEMENT ACTIONS columns, a facility-per-row sheet per province
 round, inspection cards falling due, the forward schedule, and the log) · **Nuclear Safety, Security &
 Safeguards** (`/nsss` — the NSSS section's metrics dashboard: vehicle
 screening, IAEA meetings, engagements, TWG) · **Smart Status Update**
@@ -542,15 +542,18 @@ headline figures — except that nothing in it is typed twice. Every figure is
 derived from the dated inspection register, so logging one inspection moves the
 facility row, the province summary, the card list and the weekly report at once.
 
-**The Summary sheet.** One row per province round, with the workbook's three
-bands across the top:
+**The Summary sheet.** One row per province round, with two bands across the
+top — the inspections, then Management's six enforcement actions:
 
-| | INSPECTIONS | | | | | ENGAGEMENTS | | | OTHER ENFORCEMENTS | | | | | | |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Province** | Pre-Auth | Planned | Follow-Up | Investigative | **Total** | Facility Level | District Level | Provincial Level | Practices Suspended | Devices Seized | Written Warnings | Enforcement Notices | License Suspensions | License Cancellations | **Total** |
+| | INSPECTIONS | | | | | ENFORCEMENT ACTIONS | | | | | | |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Province** | Pre-Auth | Planned | Follow-Up | Investigative | **Total** | Written Notice | Suspension of Practice | Seizure of Device | Enforcement Notice | Suspension of License | Cancellation of License | **Total** |
 
 with a **Total** row and, underneath, *Total Inspections Conducted* and *Total
-Enforcements*. Tapping a province opens its sheet.
+Enforcements*. Tapping a province opens its sheet. The three engagement actions
+(facility / district / provincial level) can still be recorded and show on the
+province sheet, but the summary does not band them and *Total Enforcements*
+counts the six actions only.
 
 **A province sheet.** One row per facility — `NO. · FACILITY NAME · DISTRICT ·
 PRACTICE · PRE-AUTH · PLANNED · FOLLOW-UP · INVESTIGATIVE · TOTAL · ENFORCEMENT
@@ -589,8 +592,8 @@ the Database with its thirteen columns.
 **On the weekly report.** The sectional update carries the same summary under
 the work plan (following the report's own Year-to-date / This-week switch), so
 the Monday pack reads exactly as it always has. Output **1.2.11** counts every
-inspection that led to an enforcement action — expand it for the nine-action
-split, the same columns the summary bands.
+inspection that led to an enforcement action — expand it for the split by
+action, the same six columns the summary bands, with engagements as one line.
 
 ---
 
@@ -1267,8 +1270,8 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
       report numbers it) or retires one, all as an overlay that leaves the
       approved workbook one click away.
 - [x] The Inspectorate tab reproduces the section's inspection database — the
-      province Summary with its INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS
-      columns, a facility-per-row sheet per round, and the 30-day inspection
+      province Summary with its INSPECTIONS / ENFORCEMENT ACTIONS columns, a
+      facility-per-row sheet per round, and the 30-day inspection
       card's expiry and status — all derived from the dated register, exported
       in the workbook's own layouts, and carried onto the weekly report.
 - [x] Security rules enforce that Inspectorate officers cannot flip licensed

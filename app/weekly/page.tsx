@@ -549,8 +549,8 @@ function printPdf() {
 
 /**
  * The Inspectorate's own summary, in the format of its inspection database —
- * province rounds down the side, INSPECTIONS / ENGAGEMENTS / OTHER ENFORCEMENTS
- * across the top. Behind output 1.2.4 the report gives one national figure; the
+ * province rounds down the side, INSPECTIONS / ENFORCEMENT ACTIONS across the
+ * top. Behind output 1.2.4 the report gives one national figure; the
  * section's Monday update has always carried this table underneath it, so it is
  * reproduced here from the same register rather than kept in a workbook.
  *

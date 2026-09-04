@@ -44,6 +44,10 @@ Every 1.2.x row already matched the workbook — the August update
 forward unchanged: 1.2.4 at **284** inspections (40 / 123 / 121) and 1.2.11 at
 **193** enforcement actions (45 / 61 / 87).
 
+*4 Sep 2026:* 1.2.4 re-baselined to **295** (40 / 123 / 132) — the section's
+routine and follow-up inspections conducted to date. See
+[the Inspectorate update](./inspectorate-work-plan-2026-update.md#re-baselines).
+
 ## Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
 
 | Output | Description | Target | Q1 | Q2 | Q3 | Q4 | Total | Was |

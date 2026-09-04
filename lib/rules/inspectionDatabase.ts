@@ -13,10 +13,16 @@
  *    that is how the sheet doubles as the round's coverage list.
  * 2. **The consolidated Database sheet**: every province sheet stacked, with
  *    PROVINCE as the leading column.
- * 3. **The Summary sheet**: one row per province round, with INSPECTIONS,
- *    ENGAGEMENTS and OTHER ENFORCEMENTS grouped across the top, a Total row,
- *    and the two headline figures — Total Inspections Conducted and Total
- *    Enforcements.
+ * 3. **The Summary sheet**: one row per province round, with INSPECTIONS and
+ *    ENFORCEMENT ACTIONS grouped across the top, a Total row, and the two
+ *    headline figures — Total Inspections Conducted and Total Enforcements.
+ *
+ *    The enforcement band is Management's six-column format (Written Notice ·
+ *    Suspension of Practice · Seizure of Device · Enforcement Notice ·
+ *    Suspension of License · Cancellation of License). Engagements are still
+ *    recorded against an inspection and still show on the province sheet's
+ *    ENFORCEMENT ACTION TAKEN column, but the summary no longer bands them and
+ *    they do not count toward its Total Enforcements.
  *
  * Everything here is pure: the caller filters the register to a period (a
  * reporting week, a month, the year) and passes it in, which is what lets the
@@ -91,73 +97,75 @@ export function inspectionColumn(t: InspectionType): InspectionColumnKey | null 
 }
 
 /**
- * The Summary sheet's enforcement columns: three ENGAGEMENTS, then six OTHER
- * ENFORCEMENTS. Label and action are separate because the summary heads them
- * in the plural ("Devices Seized") while the register stores the action taken
- * ("Seizure of Device").
+ * The Summary sheet's enforcement band — the six ENFORCEMENT ACTIONS in the
+ * order Management's summary prints them. Label and action are separate
+ * because the summary heads the register's "Written Warning" as "Written
+ * Notice"; the stored value is left alone so existing records keep counting.
+ *
+ * The three engagements are deliberately not columns here: they stay in the
+ * vocabulary (the province sheet shows them), but the summary reports
+ * enforcement actions only.
  */
 export const ENFORCEMENT_COLUMNS = [
   {
-    key: "Engagement at Facility Level",
-    label: "Facility Level",
-    group: "ENGAGEMENTS",
-  },
-  {
-    key: "Engagement at District Level",
-    label: "District Level",
-    group: "ENGAGEMENTS",
-  },
-  {
-    key: "Engagement at Provincial Level",
-    label: "Provincial Level",
-    group: "ENGAGEMENTS",
+    key: "Written Warning",
+    label: "Written Notice",
+    group: "ENFORCEMENT ACTIONS",
   },
   {
     key: "Suspension of Practice",
-    label: "Practices Suspended",
-    group: "OTHER ENFORCEMENTS",
+    label: "Suspension of Practice",
+    group: "ENFORCEMENT ACTIONS",
   },
   {
     key: "Seizure of Device",
-    label: "Devices Seized",
-    group: "OTHER ENFORCEMENTS",
-  },
-  {
-    key: "Written Warning",
-    label: "Written Warnings",
-    group: "OTHER ENFORCEMENTS",
+    label: "Seizure of Device",
+    group: "ENFORCEMENT ACTIONS",
   },
   {
     key: "Enforcement Notice",
-    label: "Enforcement Notices",
-    group: "OTHER ENFORCEMENTS",
+    label: "Enforcement Notice",
+    group: "ENFORCEMENT ACTIONS",
   },
   {
     key: "Suspension of License",
-    label: "License Suspensions",
-    group: "OTHER ENFORCEMENTS",
+    label: "Suspension of License",
+    group: "ENFORCEMENT ACTIONS",
   },
   {
     key: "Cancellation of License",
-    label: "License Cancellations",
-    group: "OTHER ENFORCEMENTS",
+    label: "Cancellation of License",
+    group: "ENFORCEMENT ACTIONS",
   },
 ] as const satisfies ReadonlyArray<{
   key: EnforcementAction;
   label: string;
-  group: "ENGAGEMENTS" | "OTHER ENFORCEMENTS";
+  group: "ENFORCEMENT ACTIONS";
 }>;
 
 export type EnforcementCounts = Record<EnforcementAction, number>;
 
-const ENGAGEMENTS = new Set<string>(
-  ENFORCEMENT_COLUMNS.filter((c) => c.group === "ENGAGEMENTS").map((c) => c.key),
+/** The actions the Summary sheet bands and totals. */
+const SUMMARISED_ENFORCEMENTS = new Set<string>(
+  ENFORCEMENT_COLUMNS.map((c) => c.key),
 );
 
+/** Whether an action is one of the summary's six enforcement columns. */
+export function isSummarisedEnforcement(action: string): boolean {
+  return SUMMARISED_ENFORCEMENTS.has(action);
+}
+
+/** The Authority talking to a facility — recorded, but not an enforcement. */
+export const ENGAGEMENT_ACTIONS = ENFORCEMENT_ACTIONS.filter((a) =>
+  a.startsWith("Engagement at "),
+);
+
+const ENGAGEMENTS = new Set<string>(ENGAGEMENT_ACTIONS);
+
 /**
- * How firmly an action reads on screen. The workbook's own split: an engagement
- * is the Authority talking to a facility, so it is amber; the six other actions
- * take something away from it, so they are red.
+ * How firmly an action reads on screen: an engagement is the Authority talking
+ * to a facility, so it is amber; the six enforcement actions take something
+ * away from it, so they are red.
  */
 export function enforcementTone(action: string): "amber" | "red" {
   return ENGAGEMENTS.has(action) ? "amber" : "red";
@@ -443,8 +451,9 @@ export interface SummaryRow {
   inspections: InspectionCounts;
   /** The INSPECTIONS group's TOTAL. */
   inspectionsTotal: number;
+  /** Every action taken, engagements included — the province sheet needs them. */
   enforcement: EnforcementCounts;
-  /** The trailing TOTAL — every enforcement action taken. */
+  /** The trailing TOTAL — the six banded enforcement actions only. */
   enforcementTotal: number;
   /** Distinct facilities with at least one inspection in the period. */
   facilities: number;
@@ -502,8 +511,9 @@ export function summariseInspectionDatabase(rows: DatabaseRow[]): InspectionSumm
     total.inspectionsTotal += r.total;
     for (const a of r.enforcements) {
       s.enforcement[a] += 1;
-      s.enforcementTotal += 1;
       total.enforcement[a] += 1;
+      if (!isSummarisedEnforcement(a)) continue;
+      s.enforcementTotal += 1;
       total.enforcementTotal += 1;
     }
     if (r.total > 0) {
@@ -562,8 +572,8 @@ export function databaseCsvRows(rows: DatabaseRow[]): string[][] {
 
 /**
  * The Summary sheet, including its two-tier head (the INSPECTIONS /
- * ENGAGEMENTS / OTHER ENFORCEMENTS band above the column names) and the two
- * headline figures underneath.
+ * ENFORCEMENT ACTIONS band above the column names) and the two headline
+ * figures underneath.
  */
 export function summaryCsvRows(summary: InspectionSummary): string[][] {
   const band = ["", "INSPECTIONS", "", "", "", ""];

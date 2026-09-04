@@ -74,7 +74,7 @@ const SHEET_PAGE = 100;
 /**
  * The Inspectorate dashboard, in the shape of the section's own inspection
  * database: the Summary sheet's province rounds and their INSPECTIONS /
- * ENGAGEMENTS / OTHER ENFORCEMENTS columns, and under it the province sheet —
+ * ENFORCEMENT ACTIONS columns, and under it the province sheet —
  * a facility per row with its inspection-type counts, the enforcement action
  * taken and the inspection card's issue date, expiry and status.
  *
@@ -247,7 +247,7 @@ export default function InspectoratePage() {
           label="Total enforcements"
           value={summary.total.enforcementTotal}
           accent="red"
-          caption="Engagements + other enforcement actions"
+          caption="Written notices, suspensions, seizures, enforcement notices and cancellations"
         />
         <Kpi
           label="Cards due"
@@ -816,7 +816,8 @@ function LogInspectionPanel({
             ))}
           </select>
           <p className="text-[11px] text-gunmetal/55 mt-1">
-            Counts on the summary’s engagement and enforcement columns.
+            The six enforcement actions count on the summary; an engagement
+            shows on the province sheet only.
           </p>
         </div>
         <div>

@@ -173,14 +173,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const unsub = auth.onAuthStateChanged(async (fbUser) => {
-      if (!fbUser) {
+      try {
+        if (!fbUser) {
+          setUser(null);
+          setPendingAccount(null);
+          return;
+        }
+        await resolveAccount(fbUser);
+      } catch (e) {
+        // A saved sign-in whose token cannot be refreshed (network down, the
+        // account disabled or its session revoked) used to throw out of here
+        // and leave the whole app on "Loading…" for good. Treat it as signed
+        // out instead: the route guard takes them to /login, and signing in
+        // again mints a fresh token.
+        console.error("Could not resolve the signed-in account", e);
         setUser(null);
         setPendingAccount(null);
+        await auth.signOut().catch(() => undefined);
+      } finally {
         setLoading(false);
-        return;
       }
-      await resolveAccount(fbUser);
-      setLoading(false);
     });
     return () => unsub();
   }, [resolveAccount]);

@@ -255,17 +255,32 @@ describe("summariseInspectionDatabase", () => {
       investigative: 0,
     });
     expect(lusaka?.inspectionsTotal).toBe(3);
+    // The engagement is still counted per action (the province sheet shows
+    // it) but it is not one of the summary's six enforcement columns, so the
+    // trailing TOTAL counts the seizure alone.
     expect(lusaka?.enforcement["Engagement at Facility Level"]).toBe(1);
     expect(lusaka?.enforcement["Seizure of Device"]).toBe(1);
-    expect(lusaka?.enforcementTotal).toBe(2);
+    expect(lusaka?.enforcementTotal).toBe(1);
     expect(lusaka?.facilities).toBe(2);
   });
 
   it("totals the two headline figures the workbook prints", () => {
     const s = summariseInspectionDatabase(rows());
     expect(s.total.inspectionsTotal).toBe(4);
-    expect(s.total.enforcementTotal).toBe(2);
+    expect(s.total.enforcementTotal).toBe(1);
     expect(s.total.facilities).toBe(3);
+  });
+
+  it("bands Management's six enforcement actions and no engagements", () => {
+    expect(ENFORCEMENT_COLUMNS.map((c) => c.label)).toEqual([
+      "Written Notice",
+      "Suspension of Practice",
+      "Seizure of Device",
+      "Enforcement Notice",
+      "Suspension of License",
+      "Cancellation of License",
+    ]);
+    expect(ENFORCEMENT_COLUMNS.some((c) => c.key.startsWith("Engagement"))).toBe(false);
   });
 
   it("drops rounds with nothing recorded", () => {
@@ -322,8 +337,8 @@ describe("exports", () => {
     const lines = summaryCsvRows(s);
     // Band row, header row, one province, Total, blank, headline figures.
     expect(lines[0][1]).toBe("INSPECTIONS");
-    expect(lines[0]).toContain("ENGAGEMENTS");
-    expect(lines[0]).toContain("OTHER ENFORCEMENTS");
+    expect(lines[0]).toContain("ENFORCEMENT ACTIONS");
+    expect(lines[0]).not.toContain("ENGAGEMENTS");
     expect(lines[1]).toEqual([
       "PROVINCE",
       ...INSPECTION_COLUMNS.map((c) => c.label),
