@@ -806,6 +806,14 @@ the admin under Users), and each account lands directly on its own flow.
 - A border post that logs **truck by truck** on the Border Scan Log (below)
   does not type its daily figure at all — it posts the count of what it
   scanned.
+- **One post, one day, one figure.** A screening figure goes to that post-day's
+  own document (`screeningEntryId`), so logging the same post-day again — by a
+  later shift, from the scan log, or over the workbook import — replaces the
+  figure instead of adding a second one to the year's total. The form shows
+  what it is about to replace. It is the one way a cumulative figure drifts
+  upward without anyone typing a wrong number, and it is now structurally
+  impossible; `npm run fix:duplicate-screening` collapses post-days doubled
+  before the rule existed.
 
 Every choice on the count flow is a **work plan output** — it says which one
 (*"Work plan output 1.1.6"*) right under the label — and the entry is stored in
@@ -823,19 +831,46 @@ contribution per output and where that leaves it against the annual target.
 
 ---
 
+## Who changed which figure — the audit log
+
+The cumulative figures are read as single numbers by people who did not enter
+them, so every change to one is recorded in `auditLog`: who made it, when, and
+what the figure was before. Screening counts, truck scans and the work plan's
+opening balances are all watched.
+
+It is written by **Cloud Functions triggers**, never by the app
+(`functions/src/audit.ts`, with the meaning of each change in
+`lib/rules/auditLog.ts` and shared into the functions bundle at build time). An
+audit entry the app writes alongside its own change is skippable — by a client
+that fails halfway, by a script, by an edit typed into the console — and the
+trigger sees all of those. The rules then deny every client write to the
+collection, an administrator's included: a log a person can edit is not a log.
+
+Officers read it on the **What changed** panel of the NSSS tab, which shows
+figures replaced, removed or moved by a lot and hides routine logging. For the
+deeper question — what the total stood at last Tuesday, and every figure written
+since — `npm run audit:screening -- --since <date>` reconstructs it from the
+entries themselves.
+
+Full detail: [docs/audit-log.md](docs/audit-log.md) and
+[docs/screening-figure-audit.md](docs/screening-figure-audit.md).
+
+---
+
 ## Deploying the security rules
 
 Firestore denies every write to a collection **no deployed rule mentions**,
 admin account or not. So any release that adds one — `workPlanNotes`,
 `workPlanBaseline` and `workPlanConfig` for the sectional update, `dailyEntries`
-and `borders` for Daily Updates, `truckScans` for the border log — reads fine
+and `borders` for Daily Updates, `truckScans` for the border log, `auditLog`
+for the audit trail — reads fine
 but cannot save until `firestore.rules` is published. The same goes for a
 release that **changes who may read what**: the section-scoped access rules
 (see [Who sees what](#who-sees-what)) and the app's scoped queries go
 together — the old rules with the new app still work (they are looser), but
 the new rules with an older app would refuse its unscoped reads. The
-`truckScans` `(border, date desc)` index in `firestore.indexes.json` ships
-with them. Three ways, pick one:
+`truckScans` `(border, date desc)` and `auditLog` `(section, at desc)` indexes
+in `firestore.indexes.json` ship with them. Three ways, pick one:
 
 **From GitHub (nothing to install).** The `Deploy Firestore Rules` workflow
 publishes `firestore.rules` and `firestore.indexes.json` automatically when

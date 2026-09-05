@@ -14,6 +14,7 @@
     "test:rules": "firebase emulators:exec --config firebase.rules-test.json --only firestore --project demo-rpa-rules \"vitest run --config vitest.rules.config.ts\"",
     "seed": "tsx scripts/seed.ts",
     "audit:screening": "tsx scripts/screening-audit.ts",
+    "fix:duplicate-screening": "tsx scripts/collapse-duplicate-screening.ts",
     "seed:fresh": "tsx scripts/seed.ts --fresh",
     "seed:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts",
     "seed:fresh:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts --fresh",

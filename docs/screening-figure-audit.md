@@ -74,10 +74,35 @@ Beyond the `--since` window it always reports:
    script prints the saved baseline's `updatedBy`, `updatedAt` and note whenever
    one exists.
 
+Since the [audit log](audit-log.md), all four leave a row recording who did it
+and what the figure was before — readable in the app on the *What changed* panel
+of the NSSS tab, without a service account or a terminal. This script stays the
+deeper instrument: it reconstructs the total at any past moment, and it reads
+figures the audit log predates.
+
+## One post, one day, one figure
+
+A post's screening figure is written to that post-day's own document
+(`screeningEntryId(date, border)` in `lib/rules/daily.ts`), so logging the same
+post-day again REPLACES the figure instead of adding a second one beside it. The
+capture form shows what it is about to replace, and the workbook import writes
+the same ids, so correcting an imported day corrects it rather than doubling it.
+
+That rule cannot reach backwards. Post-days that were already doubled before it
+existed keep counting both figures:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run fix:duplicate-screening
+```
+
+It reports and writes nothing until you add `--apply`. For each doubled post-day
+it keeps the most recently written figure — the correction somebody made last —
+and removes the rest.
+
 ## What the audit cannot see
 
-`deleteDailyEntry` is a hard delete: a removed entry leaves nothing behind, so a
-total that went **down** cannot be traced this way. Nor can a figure that was
-corrected by deleting and re-adding — only the new entry survives. Closing that
-gap needs an append-only audit log written on every change; until there is one,
-this script works from what the surviving entries remember about themselves.
+`deleteDailyEntry` is a hard delete: a removed entry leaves nothing behind in the
+daily log, so this script alone cannot explain a total that went **down**. That
+is what the [audit log](audit-log.md) is for — every change to a figure is
+recorded there with what it was before, including its removal. The one thing
+even that cannot say is *who* deleted something, only who last wrote it.

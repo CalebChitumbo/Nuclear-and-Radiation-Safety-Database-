@@ -1,4 +1,5 @@
 import { computeAggregate } from "../rules/aggregate";
+import { buildAuditEntry, type AuditedCollection } from "../rules/auditLog";
 import { detectType } from "../rules/detectType";
 import {
   applyInspectionRequestAction,
@@ -35,6 +36,7 @@ import {
 } from "../rules/workflowNotes";
 import {
   type Activity,
+  type AuditEntry,
   type Border,
   type DailyEntry,
   type DashboardAggregate,
@@ -95,6 +97,7 @@ interface State {
   workPlanBaseline: Record<string, WorkPlanBaseline>;
   workPlanConfig: Record<string, WorkPlanConfig>;
   dailyEntries: DailyEntry[];
+  auditLog: AuditEntry[];
   borders: Border[];
   truckScans: TruckScan[];
   inventoryEdits: InventoryEdit[];
@@ -117,6 +120,9 @@ function freshState(): State {
     // NSSS tab and work plan output 1.3.12 read real figures rather than an
     // opening balance — see docs/daily-screening-2026-import.md.
     dailyEntries: mapSeedScreening(screeningSeed as SeedScreening, weeksSeed),
+    // The seeded workbook figures are not "changes somebody made", so the demo
+    // log starts empty and fills as the demo is used.
+    auditLog: [],
     borders: mapSeedBorders(screeningSeed as SeedScreening),
     truckScans: [],
     inventoryEdits: [],
@@ -241,6 +247,30 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
+}
+
+/**
+ * The demo store's own audit trail.
+ *
+ * Against Firebase these rows are written by a Cloud Function trigger, which
+ * is the point of them — nothing can change a figure without leaving one. The
+ * demo has no functions behind it, so it records its own using the same shared
+ * builder, and the panel behaves the way it does in the real thing.
+ */
+function audit(
+  state: State,
+  collection: AuditedCollection,
+  docId: string,
+  before: object | null,
+  after: object | null,
+): void {
+  const entry = buildAuditEntry(
+    collection,
+    docId,
+    (before as Record<string, unknown>) || null,
+    (after as Record<string, unknown>) || null,
+  );
+  if (entry) state.auditLog.push({ ...entry, id: newId("audit") });
 }
 
 function dispatchChange() {
@@ -437,6 +467,18 @@ class MockStore implements DataStore {
       createdAt: new Date().toISOString(),
     };
     s.dailyEntries.push(entry);
+    audit(s, "dailyEntries", entry.id, null, entry);
+    save(s);
+    dispatchChange();
+    return entry;
+  }
+
+  async setDailyEntry(id: string, e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
+    const s = ensure();
+    const previous = s.dailyEntries.find((x) => x.id === id) || null;
+    const entry: DailyEntry = { ...e, id, createdAt: new Date().toISOString() };
+    s.dailyEntries = [...s.dailyEntries.filter((x) => x.id !== id), entry];
+    audit(s, "dailyEntries", id, previous, entry);
     save(s);
     dispatchChange();
     return entry;
@@ -444,9 +486,25 @@ class MockStore implements DataStore {
 
   async deleteDailyEntry(id: string): Promise<void> {
     const s = ensure();
+    const previous = s.dailyEntries.find((e) => e.id === id) || null;
     s.dailyEntries = s.dailyEntries.filter((e) => e.id !== id);
+    audit(s, "dailyEntries", id, previous, null);
     save(s);
     dispatchChange();
+  }
+
+  async listAuditLog(
+    scope: DailyEntryScope = {},
+    max = 300,
+  ): Promise<AuditEntry[]> {
+    return ensure()
+      .auditLog.filter(
+        (e) =>
+          (!scope.section || e.section === scope.section) &&
+          (!scope.border || e.border === scope.border),
+      )
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .slice(0, max);
   }
 
   async listTruckScans(border?: string): Promise<TruckScan[]> {
@@ -479,6 +537,7 @@ class MockStore implements DataStore {
       createdAt: new Date().toISOString(),
     };
     s.truckScans.push(record);
+    audit(s, "truckScans", record.id, null, record);
     save(s);
     dispatchChange();
     return record;
@@ -486,7 +545,9 @@ class MockStore implements DataStore {
 
   async deleteTruckScan(id: string): Promise<void> {
     const s = ensure();
+    const previous = s.truckScans.find((r) => r.id === id) || null;
     s.truckScans = s.truckScans.filter((r) => r.id !== id);
+    audit(s, "truckScans", id, previous, null);
     save(s);
     dispatchChange();
   }

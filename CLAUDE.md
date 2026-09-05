@@ -40,6 +40,33 @@ Opening balance panel on `/weekly` instead (or as well). Never back-import the
 same inspections as dated records without zeroing 1.2.4's balance, or they
 count twice.
 
+## Routine: a reporting figure moved and nobody knows why
+
+Usually the screened-vehicles total (output 1.3.12). It is not stored anywhere —
+it is opening balance + the workbook import + every `dailyEntries` count, added
+up fresh each time the report is drawn. Only two things move it: somebody
+writing a daily entry, or an admin re-saving the opening balance on `/weekly`.
+
+1. Officers answer it themselves on the **What changed** panel of `/nsss`
+   (the audit log). Point them there first.
+2. For "it read X on Tuesday and Y on Wednesday", run the tracer with `--since`
+   set to Tuesday — it gives the total before that moment and every figure
+   written since, with the officer and the minute:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json      npm run audit:screening -- --since 2026-09-03
+   ```
+
+   It also flags post-days counted twice, figures far above that post's usual
+   day, late back-fills, and prints a saved `workPlanBaseline` if there is one.
+3. `npm run fix:duplicate-screening` collapses post-days that hold more than one
+   figure (dry-run; `--apply` to write).
+
+Watch out: Mongu and Ndola have thin workbook data (Mongu from July only, Ndola
+40 scattered days), so a real back-fill from those two posts can legitimately
+add thousands. `docs/screening-figure-audit.md` and `docs/audit-log.md` have the
+detail.
+
 ## Routine: the Summary sheet's enforcement columns
 
 The Inspectorate tab's Summary (`components/inspectorate/InspectionSummaryTable.tsx`,

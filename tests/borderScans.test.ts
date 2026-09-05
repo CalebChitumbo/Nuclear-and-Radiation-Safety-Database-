@@ -24,7 +24,11 @@ import {
   weeklyNarrative,
   type ScanDraft,
 } from "../lib/rules/borderScans";
-import { scanLogCountEntry, scanLogEntriesFor } from "../lib/rules/daily";
+import {
+  existingScreeningEntry,
+  scanLogCountEntry,
+  screeningEntryId,
+} from "../lib/rules/daily";
 import type { DailyEntry, TruckScan } from "../lib/rules/types";
 
 const WEEK = "W23 — wk of 01 Jun 2026";
@@ -459,7 +463,7 @@ describe("posting the day total to the daily log", () => {
     expect(posted.label).toBe("Vehicle Screening (units)");
   });
 
-  it("finds only this post's own scan-log count for the day", () => {
+  it("finds whatever figure the post-day already holds, however it got there", () => {
     const posted = scanLogCountEntry({
       date: "2026-06-01",
       week: WEEK,
@@ -467,14 +471,23 @@ describe("posting the day total to the daily log", () => {
       total: 367,
     });
     const entries: DailyEntry[] = [
-      entry({ id: "a", ...posted }),
       entry({ id: "b", ...posted, border: "Chirundu" }),
       entry({ id: "c", ...posted, date: "2026-06-02" }),
-      // A figure typed by hand is left alone — only scan-log counts are replaced.
+      // Typed by hand rather than counted - re-posting still replaces it, so
+      // the day is never held twice.
       entry({ id: "d", ...posted, source: undefined }),
     ];
-    expect(scanLogEntriesFor(entries, "Nakonde", "2026-06-01").map((e) => e.id)).toEqual([
-      "a",
-    ]);
+    expect(existingScreeningEntry(entries, "Nakonde", "2026-06-01")?.id).toBe("d");
+    expect(existingScreeningEntry(entries, "Katete", "2026-06-01")).toBeNull();
+  });
+
+  it("keys a post-day figure on the post and the day", () => {
+    expect(screeningEntryId("2026-06-01", "Kapiri Mposhi")).toBe(
+      "screen-2026-06-01-kapiri-mposhi",
+    );
+    // The same day at the same post is the same document, whoever writes it.
+    expect(screeningEntryId("2026-06-01", "Nakonde")).toBe(
+      screeningEntryId("2026-06-01", "nakonde"),
+    );
   });
 });

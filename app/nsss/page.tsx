@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Bars } from "@/components/Bars";
+import { FigureChangesPanel } from "@/components/nsss/FigureChangesPanel";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
@@ -23,6 +24,7 @@ import {
 import { todayISO } from "@/lib/rules/week";
 import { applyWorkPlanConfig, WORK_PLAN_YEAR } from "@/lib/rules/workPlan";
 import type {
+  AuditEntry,
   Border,
   DailyEntry,
   Section,
@@ -42,7 +44,7 @@ export default function NsssPage() {
   const { weeks, selected } = useWeek();
   const { user } = useAuth();
   const { data, error, reload } = useStoreData(async (s) => {
-    const [weekMetricsAll, entries, borders, config] = await Promise.all([
+    const [weekMetricsAll, entries, borders, config, auditLog] = await Promise.all([
       // All reads degrade to empty until their rules/collections exist so the
       // tab always renders.
       s.listWeekMetricsAll().catch(() => []),
@@ -54,8 +56,11 @@ export default function NsssPage() {
       s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
         () => null as WorkPlanConfig | null,
       ),
+      // Who changed which figure, and what it was before. Empty until the
+      // auditLog rules and the Cloud Function triggers are deployed.
+      s.listAuditLog({ section: NSSS }).catch(() => [] as AuditEntry[]),
     ]);
-    return { weekMetricsAll, entries, borders, config };
+    return { weekMetricsAll, entries, borders, config, auditLog };
   });
 
   const metrics = useMemo(
@@ -236,6 +241,8 @@ export default function NsssPage() {
           onChanged={reload}
         />
       </section>
+
+      <FigureChangesPanel entries={data?.auditLog || []} />
 
       <Panel
         title={`Recent daily log — latest ${sectionEntries.length}`}
