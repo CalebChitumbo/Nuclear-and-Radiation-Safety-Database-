@@ -149,6 +149,15 @@ Mobrin Solutions Limited — appear nowhere in the document, and are inside the
 section's 295 all the same: the register's 298 rows never did add up to the
 307 records its own heading claims.
 
+The clearest case is Luapula. Nine of the typed records are a round run between
+30 March and 2 April 2026, and the register carries that same round as eleven
+undated rows. Seven facilities are on both lists. The register adds four the
+typing never reached (Chiengi, Lubwe, Mwense, Samfya); the typing adds two the
+register never reached (Mansa Airport, Nchelenge District Hospital). Two partial
+accounts of one round, and the register's is the one the reported 295 was built
+on — which is exactly why the register wins, and why the rule cannot be a name
+match.
+
 So the rule is the date, not the name:
 
 > An inspection **typed in the app** and dated **on or before the hand-over** is
