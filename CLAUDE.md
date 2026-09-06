@@ -79,6 +79,33 @@ adding to it.
 6. Confirm with `npm run audit:screening`: opening balance 0, the workbook total
    as "imported", and "no post-day holds more than one figure".
 
+## Routine: the posts send their detailed monthly assessment books
+
+Separate from the daily summary: a folder per post of monthly workbooks, one
+sheet per day, one row per truck (`INLAND DAILY ASSESSMENTS`, git-ignored —
+190MB of workbooks and scanned returns). These are the Border Scan Log's data,
+not the reported figure's.
+
+```bash
+python3 scripts/reconcile-inland-detail.py "INLAND DAILY ASSESSMENTS" \
+  --report docs/inland-detail-reconciliation.md
+python3 scripts/import-inland-detail.py "INLAND DAILY ASSESSMENTS"
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run import:scans -- --apply
+```
+
+- Reconciling first is the point: it says which of the summary's days the detail
+  actually evidences, and separates a blank day sheet from a genuine
+  disagreement. At the 6 Sep 2026 hand-over, 510 days matched to the truck
+  (127,562 vehicles), 287 day sheets were blank, 79 genuinely disagreed, and
+  739 days had no workbook at all.
+- Only the shared template is read (REG. NUMBER / GOODS OF INTEREST / FOOD /
+  OTHER / TRANSPORTER / DOSE, sheets named 1st, 2nd …). Livingstone's early
+  plate lists, Chirundu's "ASSESSEMENTS" books and the Monthly Summary/Master
+  Data layouts are reported as unread rather than guessed at.
+- **Importing scans moves no reported figure** — 1.3.12 counts `dailyEntries`.
+  Scans carry `officerUid: "import"`, which the audit log treats as a bulk load
+  rather than 146,000 people changing figures.
+
 ## Routine: a reporting figure moved and nobody knows why
 
 Usually the screened-vehicles total (output 1.3.12). It is not stored anywhere —

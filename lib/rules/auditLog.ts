@@ -26,6 +26,23 @@ export type DocData = Record<string, unknown> | null;
 /** Fields that say nothing about what a person changed. */
 const NOISE = new Set(["createdAt", "updatedAt"]);
 
+/**
+ * Writers whose rows are not "somebody changed a figure".
+ *
+ * A bulk import is the baseline arriving, not an edit: the 2026 workbooks land
+ * 1,615 screening figures and ~146,000 truck scans in one run, and auditing
+ * each would bury the handful of rows a person actually needs to see under a
+ * hundred thousand that say "the import imported something". What the import
+ * did is recorded where it belongs — the generated report in docs/ and the
+ * commit that carried the seed.
+ *
+ * Only the Admin SDK can write these: the security rules force `updatedBy` and
+ * `officerUid` to equal the signed-in account on every client write, and no
+ * account has one of these ids. A DELETE of an imported row is still audited,
+ * because the row being deleted is not what identifies the person deleting it.
+ */
+const BULK_IMPORT_ACTORS = new Set(["seed", "import"]);
+
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
@@ -149,6 +166,9 @@ export function buildAuditEntry(
   if (changed && Object.keys(changed).length === 0) return null;
 
   const source = after || before;
+  // A row the import wrote or rewrote. A delete still counts: `after` is null
+  // there, so this only skips creates and updates made BY the importer.
+  if (after && BULK_IMPORT_ACTORS.has(actorOf(after).actor)) return null;
   const entry: Omit<AuditEntry, "id"> = {
     at,
     collection,

@@ -15,6 +15,7 @@
     "seed": "tsx scripts/seed.ts",
     "audit:screening": "tsx scripts/screening-audit.ts",
     "fix:duplicate-screening": "tsx scripts/collapse-duplicate-screening.ts",
+    "import:scans": "tsx scripts/upload-truck-scans.ts",
     "seed:fresh": "tsx scripts/seed.ts --fresh",
     "seed:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts",
     "seed:fresh:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts --fresh",

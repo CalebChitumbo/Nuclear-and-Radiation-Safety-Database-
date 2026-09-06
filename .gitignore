@@ -52,3 +52,10 @@ ui-debug.log
 
 # vercel
 .vercel
+
+# Source workbooks the sections hand over (190MB+ of monthly assessments and
+# scanned returns). The IMPORT of them is what belongs in git - seed/ and the
+# generated report in docs/ - not the originals.
+/INLAND DAILY ASSESSMENTS
+# Derived from them: tens of MB of per-truck rows, regenerated on demand.
+/.import
