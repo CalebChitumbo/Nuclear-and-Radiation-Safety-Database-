@@ -12,10 +12,10 @@ accounts for (238 use/possession, 82 import, 18 variation, 7 transfer,
 (see `docs/licensing-status-2026-import.md` for the full import log, and
 `docs/register-2026-import.md` for the July 2026 register it replaced).
 
-It also ships the inland offices' **2026 daily screening log** — 1,484 daily
-counts across the eight posts, 331,177 vehicles assessed — seeded as ordinary
-daily entries so work plan output 1.3.12 counts them post by post rather than
-carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
+It also ships the inland offices' **2026 daily screening log** — 1,615 daily
+counts across the eight posts, 356,372 vehicles assessed to 6 Sep 2026 — seeded
+as ordinary daily entries so work plan output 1.3.12 counts them post by post
+and carries nothing at all (see `docs/daily-screening-2026-import.md`).
 
 **Navigation** (sidebar, in order — each account sees only the screens its
 section works in; see **[Who sees what](#who-sees-what)**): Overview · Facilities · **Source
@@ -117,7 +117,14 @@ to the seed.
    ```bash
    firebase deploy --only firestore:rules,firestore:indexes
    ```
-4. Seed the project:
+4. Get a **service account key** — every script below authenticates with one.
+   Firebase console → **Project settings → Service accounts → Generate new
+   private key**; save the downloaded JSON in the repo root as
+   `service-account.json`. It is git-ignored, and it is full administrative
+   access to the live database: keep it on your machine, off email and shared
+   drives, and revoke it in the console if it ever leaves. Run a script without
+   it and it says all this again.
+5. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
    # verify the dashboard reads 538 / 220 / 318 / 401 functional
@@ -139,13 +146,13 @@ to the seed.
    register. Users, weeks, weekly metrics, the work plan notes, opening
    balance and plan changes, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
    (the mock store's storage key was bumped).
-5. Create the first admin by manually calling the `setUserClaims` callable in
+6. Create the first admin by manually calling the `setUserClaims` callable in
    the Firebase Console. Everyone else asks for their own account at `/signup`
    and the admin approves them from `/admin/users` — see
    **[Accounts: sign-up and approval](#accounts-sign-up-and-approval)**.
    Provisioning an account outright from `/admin/users` still works and is the
    only way to create another administrator.
-6. Build + deploy the app:
+7. Build + deploy the app:
    ```bash
    firebase deploy --only functions,hosting
    ```
@@ -806,6 +813,14 @@ the admin under Users), and each account lands directly on its own flow.
 - A border post that logs **truck by truck** on the Border Scan Log (below)
   does not type its daily figure at all — it posts the count of what it
   scanned.
+- **One post, one day, one figure.** A screening figure goes to that post-day's
+  own document (`screeningEntryId`), so logging the same post-day again — by a
+  later shift, from the scan log, or over the workbook import — replaces the
+  figure instead of adding a second one to the year's total. The form shows
+  what it is about to replace. It is the one way a cumulative figure drifts
+  upward without anyone typing a wrong number, and it is now structurally
+  impossible; `npm run fix:duplicate-screening` collapses post-days doubled
+  before the rule existed.
 
 Every choice on the count flow is a **work plan output** — it says which one
 (*"Work plan output 1.1.6"*) right under the label — and the entry is stored in
@@ -823,19 +838,46 @@ contribution per output and where that leaves it against the annual target.
 
 ---
 
+## Who changed which figure — the audit log
+
+The cumulative figures are read as single numbers by people who did not enter
+them, so every change to one is recorded in `auditLog`: who made it, when, and
+what the figure was before. Screening counts, truck scans and the work plan's
+opening balances are all watched.
+
+It is written by **Cloud Functions triggers**, never by the app
+(`functions/src/audit.ts`, with the meaning of each change in
+`lib/rules/auditLog.ts` and shared into the functions bundle at build time). An
+audit entry the app writes alongside its own change is skippable — by a client
+that fails halfway, by a script, by an edit typed into the console — and the
+trigger sees all of those. The rules then deny every client write to the
+collection, an administrator's included: a log a person can edit is not a log.
+
+Officers read it on the **What changed** panel of the NSSS tab, which shows
+figures replaced, removed or moved by a lot and hides routine logging. For the
+deeper question — what the total stood at last Tuesday, and every figure written
+since — `npm run audit:screening -- --since <date>` reconstructs it from the
+entries themselves.
+
+Full detail: [docs/audit-log.md](docs/audit-log.md) and
+[docs/screening-figure-audit.md](docs/screening-figure-audit.md).
+
+---
+
 ## Deploying the security rules
 
 Firestore denies every write to a collection **no deployed rule mentions**,
 admin account or not. So any release that adds one — `workPlanNotes`,
 `workPlanBaseline` and `workPlanConfig` for the sectional update, `dailyEntries`
-and `borders` for Daily Updates, `truckScans` for the border log — reads fine
+and `borders` for Daily Updates, `truckScans` for the border log, `auditLog`
+for the audit trail — reads fine
 but cannot save until `firestore.rules` is published. The same goes for a
 release that **changes who may read what**: the section-scoped access rules
 (see [Who sees what](#who-sees-what)) and the app's scoped queries go
 together — the old rules with the new app still work (they are looser), but
 the new rules with an older app would refuse its unscoped reads. The
-`truckScans` `(border, date desc)` index in `firestore.indexes.json` ships
-with them. Three ways, pick one:
+`truckScans` `(border, date desc)` and `auditLog` `(section, at desc)` indexes
+in `firestore.indexes.json` ship with them. Three ways, pick one:
 
 **From GitHub (nothing to install).** The `Deploy Firestore Rules` workflow
 publishes `firestore.rules` and `firestore.indexes.json` automatically when
@@ -1110,8 +1152,8 @@ npm test
   overwrite each other
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
-- `screeningSeed` — verifies the seeded daily screening log (1,484 entries,
-  331,177 vehicles, reconciled post by post against the workbook's Summary
+- `screeningSeed` — verifies the seeded daily screening log (1,615 entries,
+  356,372 vehicles, reconciled post by post against the workbook's Summary
   sheet) and that it fills in work plan output 1.3.12 with nothing carried in
 - `seedBaseline` — verifies the register baseline (538 / 220 / 318 / 401 functional /
   Medical 350) and that the licences on record reconcile with the Licensing

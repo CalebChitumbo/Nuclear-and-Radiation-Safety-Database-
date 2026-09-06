@@ -310,6 +310,7 @@ export default function DailyUpdatesPage() {
               }}
               facilities={facilities}
               borders={borders}
+              dayEntries={dayEntries}
               canManageBorders={
                 !postedOffice &&
                 canEditSection(user, "Nuclear Safety, Security & Safeguards")

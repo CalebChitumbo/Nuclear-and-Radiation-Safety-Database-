@@ -10,6 +10,8 @@
  *    granting them anything until an administrator approves it.
  * 4. ingestRaisEmail — inbound-email connector that auto-updates the licensing
  *    status from forwarded RAIS notification emails (see ./rais/ingest).
+ * 5. onDailyEntryWrite / onTruckScanWrite / onWorkPlanBaselineWrite — the
+ *    append-only audit log behind the reporting figures (see ./audit).
  */
 
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -25,6 +27,11 @@ initializeApp();
 getFirestore().settings({ ignoreUndefinedProperties: true });
 
 export { ingestRaisEmail } from "./rais/ingest";
+export {
+  onDailyEntryWrite,
+  onTruckScanWrite,
+  onWorkPlanBaselineWrite,
+} from "./audit";
 
 // Single source of truth for the province list: lib/rules/types.ts, copied in
 // by functions/scripts/sync-rules.js at build time. A locally re-declared copy

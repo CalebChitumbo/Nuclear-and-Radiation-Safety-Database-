@@ -515,6 +515,42 @@ export type WorkPlanStatus = (typeof WORK_PLAN_STATUSES)[number];
  * recorded since. Saving one REPLACES the figures the code ships with (the
  * approved workbook's actuals at handover) rather than adding to them.
  */
+/**
+ * One row of the append-only audit log — who changed a reporting figure, when,
+ * and what it was before.
+ *
+ * Written only by the Cloud Functions triggers in `functions/src/audit.ts`;
+ * the security rules deny every client write, an administrator's included. A
+ * log a person can edit is not a log.
+ */
+export interface AuditEntry {
+  id: string;
+  /** ISO instant the change landed. */
+  at: string;
+  collection: "dailyEntries" | "truckScans" | "workPlanBaseline";
+  docId: string;
+  action: "created" | "updated" | "deleted";
+  /** The account the document names as its writer. */
+  actor: string;
+  actorName: string;
+  /**
+   * False on a delete: the removed document names its author, not whoever
+   * removed it, so `actor` there is the last person known to have written it.
+   */
+  actorIsAuthor: boolean;
+  /** One line a person can read without opening the documents. */
+  summary: string;
+  changed?: Record<string, { from: unknown; to: unknown }>;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  section?: Section;
+  border?: string;
+  date?: string;
+  metricKey?: string;
+  /** Movement in the reported figure (after − before), on count entries. */
+  delta?: number;
+}
+
 export interface WorkPlanBaseline {
   /** The plan year — also the document id. */
   year: number;

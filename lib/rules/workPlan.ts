@@ -1163,13 +1163,17 @@ export function validateOutputEdit(
  *          re-baselined to 295 on 4 Sep 2026 (was 284); the Inspectorate adds
  *          on top of it from the daily inspections log — see CLAUDE.md for the
  *          routine.
- * - 1.3.12 the ONE row the system part-holds: the inland offices' daily log
+ * - 1.3.12 the ONE row the system holds in full: the inland offices' daily log
  *          (seed/daily-screening-2026.seed.json, see
  *          docs/daily-screening-2026-import.md) is counted directly and runs to
- *          21 Aug 2026 = 331,177 vehicles. The workbook is at 341,009, so only
- *          the 9,832 the log does not hold is carried in. If those late-August
- *          days are ever logged on Daily Updates, zero this row or they count
- *          twice.
+ *          6 Sep 2026 = 356,372 vehicles, every one of them a dated post-day.
+ *          It carries in NOTHING, and must not: the workbook's Summary sheet
+ *          and its dated rows now agree post by post, so anything carried here
+ *          would count vehicles the log already holds. The earlier import
+ *          stopped at 21 Aug and left a 9,832 gap between the workbook's
+ *          headline and its own rows, which was carried here until the section
+ *          supplied the complete book on 6 Sep 2026 — see the Re-baselines note
+ *          in docs/daily-screening-2026-import.md.
  *
  * A saved `workPlanBaseline` document REPLACES these wholesale (it does not
  * add), so an officer can correct or re-baseline the plan without touching the
@@ -1220,10 +1224,10 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.3.9": [0, 0, 65, 0],
   "1.3.10": [0, 5, 2, 0],
   "1.3.11": [0, 0, 0, 0],
-  // Mostly counted from the seeded daily screening log; only the days the log
-  // does not hold are carried in — 341,009 (workbook) − 331,177 (log to
-  // 21 Aug 2026) = 9,832. See the note above before changing this.
-  "1.3.12": [0, 0, 9832, 0],
+  // Counted in full from the seeded daily screening log (356,372 to
+  // 6 Sep 2026), so nothing is carried in. See the note above before
+  // changing this: a figure here would double count the log.
+  "1.3.12": [0, 0, 0, 0],
   "1.3.13": [0, 0, 26, 0],
   "1.3.14": [0, 0, 1, 0],
 };

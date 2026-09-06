@@ -61,6 +61,10 @@ const insp = () =>
   env.authenticatedContext("u-insp", { role: "officer", section: INSP }).firestore();
 const nsssDesk = () =>
   env.authenticatedContext("u-nsss", { role: "officer", section: NSSS }).firestore();
+// A second NSSS officer at head office - for the rules that turn on WHICH
+// account in a section wrote a record, not just which section.
+const nsssOther = () =>
+  env.authenticatedContext("u-other", { role: "officer", section: NSSS }).firestore();
 const nakonde = () =>
   env
     .authenticatedContext("u-nak", { role: "officer", section: NSSS, border: "Nakonde" })
@@ -93,6 +97,19 @@ const entry = (section: string, border?: string, updatedBy = "u-nak") => ({
   kind: "count",
   value: 12,
   updatedBy,
+  ...(border ? { border } : {}),
+});
+
+const auditRow = (section: string, border?: string) => ({
+  at: "2026-09-04T16:20:00.000Z",
+  collection: "dailyEntries",
+  docId: "d1",
+  action: "updated",
+  actor: "u-nak",
+  actorName: "A. Phiri",
+  actorIsAuthor: true,
+  summary: "changed Vehicle Screening (units) from 180 to 6400",
+  section,
   ...(border ? { border } : {}),
 });
 
@@ -143,6 +160,21 @@ beforeEach(async () => {
     await setDoc(doc(db, "weekMetrics/W36 2026"), { week: "W36 2026", values: {} });
     await setDoc(doc(db, "borders/nakonde"), { name: "Nakonde", active: true });
     await setDoc(doc(db, "workPlanNotes/1.3.12"), { id: "1.3.12", status: "In Progress" });
+    await setDoc(doc(db, "auditLog/a-nak"), auditRow(NSSS, "Nakonde"));
+    await setDoc(doc(db, "auditLog/a-chi"), auditRow(NSSS, "Chirundu"));
+    await setDoc(doc(db, "auditLog/a-nsss"), auditRow(NSSS));
+    await setDoc(doc(db, "auditLog/a-as"), auditRow(AS));
+    // A row about something no one section owns - the work plan's baseline.
+    await setDoc(doc(db, "auditLog/a-dept"), {
+      at: "2026-09-04T16:20:00.000Z",
+      collection: "workPlanBaseline",
+      docId: "2026",
+      action: "updated",
+      actor: "u-admin",
+      actorName: "Demo Administrator",
+      actorIsAuthor: true,
+      summary: "saved the work plan opening balance",
+    });
   });
 });
 
@@ -348,6 +380,52 @@ describe("the daily log", () => {
     );
     await assertFails(setDoc(doc(pending(), "dailyEntries/n8"), entry(AS, undefined, "u-pending")));
   });
+
+  it("lets the section correct a post-day figure somebody else wrote", async () => {
+    // d-nak is Nakonde's 2026-09-01 figure, written by u-nak. A later shift,
+    // the desk, or a correction over the workbook import must be able to
+    // replace it - one post, one day, one figure.
+    await assertSucceeds(
+      setDoc(doc(nsssDesk(), "dailyEntries/d-nak"), entry(NSSS, "Nakonde", "u-nsss")),
+    );
+    await assertSucceeds(
+      setDoc(doc(nakonde(), "dailyEntries/d-nak"), entry(NSSS, "Nakonde", "u-nak")),
+    );
+  });
+
+  it("will not let a correction move somebody's figure to another post or day", async () => {
+    await assertFails(
+      setDoc(doc(nsssDesk(), "dailyEntries/d-nak"), entry(NSSS, "Chirundu", "u-nsss")),
+    );
+    await assertFails(
+      setDoc(doc(nsssDesk(), "dailyEntries/d-nak"), {
+        ...entry(NSSS, "Nakonde", "u-nsss"),
+        date: "2026-09-02",
+      }),
+    );
+    // Nor may it be signed as somebody else, or reach outside the section.
+    await assertFails(
+      setDoc(doc(nsssDesk(), "dailyEntries/d-nak"), entry(NSSS, "Nakonde", "u-nak")),
+    );
+    await assertFails(
+      setDoc(doc(as(), "dailyEntries/d-nak"), entry(NSSS, "Nakonde", "u-as")),
+    );
+    // A posted officer still cannot reach another post's document.
+    await assertFails(
+      setDoc(doc(nakonde(), "dailyEntries/d-chi"), entry(NSSS, "Chirundu", "u-nak")),
+    );
+  });
+
+  it("still keeps an entry with no post the author's own to edit", async () => {
+    // d-nsss carries no border, so it is not a post-day figure: only u-nsss,
+    // who wrote it, may change it.
+    await assertSucceeds(
+      setDoc(doc(nsssDesk(), "dailyEntries/d-nsss"), entry(NSSS, undefined, "u-nsss")),
+    );
+    await assertFails(
+      setDoc(doc(nsssOther(), "dailyEntries/d-nsss"), entry(NSSS, undefined, "u-other")),
+    );
+  });
 });
 
 // --- the weekly report and the section's own desk -----------------------------------
@@ -374,6 +452,63 @@ describe("the weekly report's collections", () => {
       }),
     );
     await assertFails(getDoc(doc(pending(), "weekMetrics/W36 2026")));
+  });
+});
+
+describe("the audit log", () => {
+  it("is read by the section whose figures it describes", async () => {
+    await assertSucceeds(
+      getDocs(query(collection(nsssDesk(), "auditLog"), where("section", "==", NSSS))),
+    );
+    await assertSucceeds(getDoc(doc(nsssDesk(), "auditLog/a-chi")));
+    await assertSucceeds(getDocs(collection(admin(), "auditLog")));
+    // Another section's rows, either way round.
+    await assertFails(getDoc(doc(as(), "auditLog/a-nak")));
+    await assertFails(getDoc(doc(nsssDesk(), "auditLog/a-as")));
+    // An unscoped list, which would otherwise come back holding every
+    // section's rows - the reason the read rule compares the section field
+    // plainly rather than through .get() with a default.
+    await assertFails(getDocs(collection(nsssDesk(), "auditLog")));
+    await assertFails(
+      getDocs(query(collection(nsssDesk(), "auditLog"), where("section", "==", AS))),
+    );
+    await assertFails(getDocs(collection(pending(), "auditLog")));
+  });
+
+  it("gives a posted officer their own post's rows and no others", async () => {
+    const db = nakonde();
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, "auditLog"),
+          where("section", "==", NSSS),
+          where("border", "==", "Nakonde"),
+        ),
+      ),
+    );
+    await assertSucceeds(getDoc(doc(db, "auditLog/a-nak")));
+    await assertFails(getDoc(doc(db, "auditLog/a-chi")));
+    // A row with no post is the section desk's, not a posted officer's.
+    await assertFails(getDoc(doc(db, "auditLog/a-nsss")));
+  });
+
+  it("keeps the rows that belong to no section with the department", async () => {
+    // Only a re-baseline of the work plan makes one. A section account's read
+    // is a plain section comparison - which is what forces its list query to
+    // be scoped - so a row with no section field is the department's alone.
+    await assertSucceeds(getDoc(doc(admin(), "auditLog/a-dept")));
+    await assertFails(getDoc(doc(nsssDesk(), "auditLog/a-dept")));
+    await assertFails(getDoc(doc(nakonde(), "auditLog/a-dept")));
+  });
+
+  it("is written by nobody at all — a log a person can edit is not a log", async () => {
+    for (const db of [admin(), nsssDesk(), nakonde(), as()]) {
+      await assertFails(setDoc(doc(db, "auditLog/new"), auditRow(NSSS, "Nakonde")));
+      await assertFails(
+        updateDoc(doc(db, "auditLog/a-nak"), { summary: "nothing happened" }),
+      );
+      await assertFails(deleteDoc(doc(db, "auditLog/a-nak")));
+    }
   });
 });
 

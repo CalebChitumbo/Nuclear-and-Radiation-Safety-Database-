@@ -59,6 +59,7 @@ import {
 import {
   type Activity,
   type Border,
+  type AuditEntry,
   type DailyEntry,
   type DashboardAggregate,
   type Facility,
@@ -98,6 +99,14 @@ function requireDb(): Firestore {
  * exact figures come from the per-shift and per-week queries instead.
  */
 const RECENT_SCAN_LIMIT = 4000;
+
+/**
+ * How many audit rows a panel reads by default. Every scan writes one, so the
+ * log outgrows every other collection: it is read newest-first in a window,
+ * never whole. A few hundred rows covers the "what moved this week?" question
+ * the panel exists to answer.
+ */
+const AUDIT_LOG_LIMIT = 300;
 
 /**
  * Drop keys whose value is `undefined`. The web Firestore SDK rejects undefined
@@ -391,6 +400,37 @@ class FirebaseStore implements DataStore {
       stripUndefined({ ...e, createdAt }),
     );
     return { ...e, id: ref.id, createdAt };
+  }
+
+  async setDailyEntry(id: string, e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
+    const db = requireDb();
+    // `createdAt` is when this FIGURE was written, not when the post-day was
+    // first reported: an entry replaced today entered today's total today, and
+    // the audit log holds the figure it replaced.
+    const createdAt = new Date().toISOString();
+    await setDoc(doc(db, "dailyEntries", id), stripUndefined({ ...e, createdAt }));
+    return { ...e, id, createdAt };
+  }
+
+  async listAuditLog(
+    scope: DailyEntryScope = {},
+    max = AUDIT_LOG_LIMIT,
+  ): Promise<AuditEntry[]> {
+    const db = requireDb();
+    // The log grows with every scan, so this is always a bounded, ordered read
+    // - unlike the daily log, it can never be pulled down whole. The (section,
+    // at desc) and (section, border, at desc) composite indexes are in
+    // firestore.indexes.json.
+    const snap = await getDocs(
+      query(
+        collection(db, "auditLog"),
+        ...(scope.section ? [where("section", "==", scope.section)] : []),
+        ...(scope.border ? [where("border", "==", scope.border)] : []),
+        orderBy("at", "desc"),
+        limit(max),
+      ),
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, "id">) }));
   }
 
   async deleteDailyEntry(id: string): Promise<void> {

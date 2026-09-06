@@ -18,6 +18,9 @@ const path = require("path");
 // adding an entry pulls another file (and its imports) into the function bundle.
 const FILES = [
   "types.ts",
+  // The audit trigger writes the same summaries the app reads back, so the
+  // line an officer sees in the panel is written by this exact code.
+  "auditLog.ts",
   // types.ts re-exports the cargo vocabulary from here, so the copy does not
   // compile without it. Dependency-free itself.
   "borderCargo.ts",
