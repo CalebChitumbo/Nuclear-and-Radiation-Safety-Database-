@@ -88,35 +88,3 @@ Read only the shared template (REG. NUMBER / GOODS OF INTEREST / FOOD / OTHER / 
 | `Livingstone/LIV ASSESSMENT JULY 2026.xlsx` | no day sheets in the shared template |
 | `Livingstone/LIV ASSESSMENT JUNE 2026.xlsx` | no day sheets in the shared template |
 | `Livingstone/LIV ASSESSMENT March.xlsx` | no day sheets in the shared template |
-
-## Loading the detail into the Border Scan Log
-
-The rows that ARE readable belong in `truckScans` — the log
-`lib/rules/borderScans.ts` was written for. Two steps, the second reporting
-before it writes:
-
-```bash
-python3 scripts/import-inland-detail.py "INLAND DAILY ASSESSMENTS"
-```
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run import:scans -- --apply
-```
-
-The python half only reads the books; the records are built through the app's
-own rules, so an imported scan is indistinguishable from one an officer
-captures — same canonical commodity and transporter spellings, same
-plate/chassis classification, same dose triage, same reporting week. Ids are
-derived from the post, day and row, so re-running updates in place.
-
-**It moves no reported figure.** Output 1.3.12 counts `dailyEntries`, not
-scans. What it adds is history: search a plate, pull a post's day back up, and
-see the doses across a year.
-
-Loaded in full it is **146,434 scans**, and the hand-typed tally blocks stop
-being necessary — Nakonde's 4 August sheet computes to IT 238, Sulphur 85,
-Manganese 14, which is exactly what the officer typed beside the rows. It also
-answers a question the summary cannot: **59 readings above background across
-2026**, 21 of them at alarm level, none of which had ever been counted in one
-place.
-

@@ -40,7 +40,17 @@ import importlib.util
 try:
     import openpyxl
 except ImportError:  # pragma: no cover - operator-facing message
-    sys.exit("openpyxl is required:  pip install openpyxl")
+    sys.exit(
+        "openpyxl is missing, so nothing was read.\n\n"
+        "The repo keeps a local Python environment for the workbook importers -\n"
+        "macOS's own Python does not have openpyxl and should not be installed into.\n"
+        "Use it:\n\n"
+        "  .venv/bin/python "
+        + " ".join(a if " " not in a else f'"{a}"' for a in sys.argv)
+        + "\n\n"
+        "or, if .venv is not there yet (one-off, ~20 seconds):\n\n"
+        "  python3 -m venv .venv && .venv/bin/pip install openpyxl\n"
+    )
 
 # The reconciler already knows how to find a post, a month and a day sheet, and
 # how to tell the shared template from anything else. Load it rather than

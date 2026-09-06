@@ -48,12 +48,11 @@ row per day, plus a Summary sheet. It is the authoritative source for output
 **1.3.12** (screened vehicles), and it replaces the previous import rather than
 adding to it.
 
-1. Convert it (needs `openpyxl`; the repo's python may not have it, so use a
-   venv). It rewrites the seed AND the import doc, and reconciles every post
-   against the Summary sheet — a mismatch is reported, never absorbed:
+1. Convert it. This rewrites the seed AND the import doc, and reconciles every
+   post against the Summary sheet — a mismatch is reported, never absorbed:
 
    ```bash
-   python3 scripts/convert-daily-summary-xlsx.py <workbook>.xlsx
+   npm run convert:summary -- <workbook>.xlsx
    ```
 
 2. Update the pinned figures in `tests/screeningSeed.test.ts` (per-post
@@ -87,11 +86,14 @@ sheet per day, one row per truck (`INLAND DAILY ASSESSMENTS`, git-ignored —
 not the reported figure's.
 
 ```bash
-python3 scripts/reconcile-inland-detail.py "INLAND DAILY ASSESSMENTS" \
-  --report docs/inland-detail-reconciliation.md
-python3 scripts/import-inland-detail.py "INLAND DAILY ASSESSMENTS"
+npm run reconcile:inland
+npm run extract:inland
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run import:scans -- --apply
 ```
+
+These wrap a project-local `.venv` (`npm run py` makes it) because the
+workbook importers need `openpyxl` and macOS's own Python has neither it nor
+any business being installed into.
 
 - Reconciling first is the point: it says which of the summary's days the detail
   actually evidences, and separates a blank day sheet from a genuine
