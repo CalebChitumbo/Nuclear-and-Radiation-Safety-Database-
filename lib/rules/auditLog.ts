@@ -107,8 +107,14 @@ export function summariseChange(
     }
     const value = num(doc.value);
     const figure = value === null ? "" : ` = ${value}`;
-    const verb = action === "created" ? "logged" : "removed";
-    return `${who} ${verb} ${what}${figure}${where}${when}`;
+    // A delete does not name who did it - see actorIsAuthor - so the line must
+    // not read as though the author removed their own figure. They usually did
+    // not: a re-import supersedes a typed figure, and the officer who wrote it
+    // is the last person who should be blamed for its removal.
+    if (action === "deleted") {
+      return `${what}${figure}${where}${when} was removed — last written by ${who}`;
+    }
+    return `${who} logged ${what}${figure}${where}${when}`;
   }
 
   if (collection === "truckScans") {
@@ -116,8 +122,10 @@ export function summariseChange(
     const where = doc.border ? ` at ${str(doc.border)}` : "";
     const dose = num(doc.doseNSvH);
     const reading = dose === null ? "" : ` (${dose} nSv/h)`;
-    const verb = action === "deleted" ? "removed the scan of" : "scanned";
-    return `${who} ${verb} ${id}${reading}${where}`;
+    if (action === "deleted") {
+      return `the scan of ${id}${reading}${where} was removed — last logged by ${who}`;
+    }
+    return `${who} scanned ${id}${reading}${where}`;
   }
 
   // workPlanBaseline: the opening balances, which move every cumulative figure
