@@ -5,6 +5,7 @@ import {
   auditScreening,
   backdatedEntries,
   byActor,
+  carryInCheck,
   changesBetween,
   duplicatePostDays,
   outlyingEntries,
@@ -236,5 +237,57 @@ describe("screeningEntriesToCsv", () => {
     expect(csv[1]).toContain("Typed in");
     expect(csv[2]).toContain("(imported)");
     expect(csv[2]).toContain("Workbook import");
+  });
+});
+
+describe("carryInCheck", () => {
+  const imported = (border: string, date: string, value: number) =>
+    entry({
+      border,
+      date,
+      value,
+      updatedBy: "seed",
+      updatedByName: "2026 workbook",
+      createdAt: undefined,
+    });
+
+  it("finds the last day the import holds, per post", () => {
+    const check = carryInCheck([
+      imported("Nakonde", "2026-08-20", 300),
+      imported("Nakonde", "2026-08-21", 320),
+      imported("Kapiri Mposhi", "2026-08-16", 380),
+    ]);
+    expect(check.importEndsAt).toEqual({
+      Nakonde: "2026-08-21",
+      "Kapiri Mposhi": "2026-08-16",
+    });
+    expect(check.afterImport).toEqual([]);
+  });
+
+  it("catches the days logged by hand after the import ends", () => {
+    const check = carryInCheck([
+      imported("Nakonde", "2026-08-21", 320),
+      // Inside the imported range: this is a correction, not a new day.
+      entry({ border: "Nakonde", date: "2026-08-20", value: 310 }),
+      // After it: the days the carried-in balance was standing in for.
+      entry({ border: "Nakonde", date: "2026-08-22", value: 522 }),
+      entry({ border: "Nakonde", date: "2026-08-23", value: 315 }),
+    ]);
+    expect(check.afterImport.map((e) => e.date)).toEqual([
+      "2026-08-22",
+      "2026-08-23",
+    ]);
+    expect(check.afterImportTotal).toBe(837);
+    expect(check.postsOverlapping).toEqual(["Nakonde"]);
+  });
+
+  it("says nothing about a post the import never covered", () => {
+    // No imported day for this post, so there is no carry-in to overlap with
+    // and every figure it logs is simply new work.
+    const check = carryInCheck([
+      imported("Nakonde", "2026-08-21", 320),
+      entry({ border: "Chipata", date: "2026-08-30", value: 140 }),
+    ]);
+    expect(check.afterImport).toEqual([]);
   });
 });
