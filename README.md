@@ -82,12 +82,13 @@ demoed and developed without Firebase credentials.
 ## Running locally (mock mode — no Firebase needed)
 
 ```bash
-cp .env.local.example .env.local
-# set NEXT_PUBLIC_USE_MOCK=1 in .env.local to run the no-Firebase demo
 npm install
-npm run dev
+npm run dev:mock
 # open http://localhost:3000
 ```
+
+`dev:mock` sets `NEXT_PUBLIC_USE_MOCK=1` for you; to keep it on permanently,
+`cp .env.local.example .env.local`, set it there and use `npm run dev`.
 
 Sign in with any of the demo accounts — any non-empty password works:
 
@@ -364,7 +365,7 @@ automatically (Production for the production branch, Preview for others).
 |---|---|
 | `facilities/{id}` | Master register row — projection of all licences held by that facility, plus its register-import axes: `functional`, `category` (Medical/Non-Medical, veterinary counts as Medical), `stalled`, `needsReview`/`reviewNote`, `statusDetail` |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
-| `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these |
+| `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these. `date` is empty only on rows back-imported from the 2026 register, where the section recorded the visit but not the day |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
@@ -549,6 +550,14 @@ headline figures — except that nothing in it is typed twice. Every figure is
 derived from the dated inspection register, so logging one inspection moves the
 facility row, the province summary, the card list and the weekly report at once.
 
+The division's own 2026 register was imported on 7 September 2026 — **297
+inspections** across the ten provinces (211 routine, 64 pre-authorisation, 19
+follow-up, 3 investigative), which is what the tab opens on. 42 of those rows
+carry the date the section recorded; the other 255 record the visit but not the
+day, so they show under *All time* and on the province sheets and are counted by
+no reporting period. See
+[docs/inspection-register-2026-import.md](docs/inspection-register-2026-import.md).
+
 **The Summary sheet.** One row per province round, with two bands across the
 top — the inspections, then Management's six enforcement actions:
 
@@ -660,12 +669,16 @@ them, so an output an officer zeroed stays zero. Pasting a few rows only
 touches those outputs — the rest of the grid keeps what it was showing.
 
 > The opening balance covers work the registers do **not** hold. Back-importing
-> the same licences or inspections would count them twice; zero that output's
-> opening figures first if you ever do. Expanding a row shows the split —
+> the same licences or inspections would count them twice; take them off that
+> output's opening figures if you ever do. Expanding a row shows the split —
 > *Total actual = opening balance + recorded since* — so the two are always
 > separable, and the CSV carries them as trailing columns. Output **1.3.12**
-> (vehicles screened) is exactly that case: the inland offices' figures are
-> seeded as daily entries, so it carries **nothing** in.
+> (vehicles screened) is the clearest case: the inland offices' figures are
+> seeded as daily entries, so it carries **nothing** in. Output **1.2.4** is the
+> partial one — the 2026 inspection register gave it 42 dated inspections of its
+> own, so its balance sheds exactly those (253 carried + 42 counted = the 295
+> the section reported, quarters included) while the register's 255 undated
+> rows, which belong to no quarter, stay inside the carried figure.
 
 ### How the plan is numbered
 
@@ -1224,6 +1237,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── scripts/convert-rais-inventory.py   Flattens the two RAIS exports into one register seed
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
 │                           daily-screening-2026.seed.json (8 posts, 1,484 days),
+│                           inspections-2026.seed.json (298 register rows),
 │                           rais-source-inventory.seed.json (1,752 RAIS items),
 │                           verified-source-inventory-2026.seed.json (215, Annex I)
 ├── public/                 favicon, manifest

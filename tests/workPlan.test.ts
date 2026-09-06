@@ -478,9 +478,16 @@ describe("opening balance — the plan is cumulative for the year", () => {
     expect(WORK_PLAN_OPENING_BALANCE["1.1.1"]).toEqual([3, 3, 0, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([152, 125, 80, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.1.6"]).toEqual([1, 3, 0, 0]);
-    // 1.2.x — the Inspectorate's Subprogram 1.2 sheet, unchanged this update.
-    // 1.2.4 re-baselined to 295 on 4 Sep 2026 (was 284) — Q3 carries the change.
-    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 123, 132, 0]);
+    // 1.2.x — the Inspectorate's Subprogram 1.2 sheet.
+    // 1.2.4 was re-baselined to 295 on 4 Sep 2026 (was 284). The 7 Sep 2026
+    // register import then shed the 42 rows the register dates for itself
+    // (21 in Q2, 21 in Q3 as the report attributes them), so what is carried is
+    // 253 and both the reported total (295) and its 40/123/132 split are
+    // unchanged — see docs/inspection-register-2026-import.md.
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.4"]).toEqual([40, 102, 111, 0]);
+    expect(
+      WORK_PLAN_OPENING_BALANCE["1.2.4"].reduce((a, b) => a + b, 0),
+    ).toBe(253);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.6"]).toEqual([8, 8, 7, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 61, 87, 0]);
     // 1.3.x — Nuclear Safety, Security & Safeguards.

@@ -97,8 +97,16 @@ service cloud.firestore {
     }
 
     function validInspection(d) {
-      return d.date is string && d.date.matches('\\d{4}-\\d{2}-\\d{2}')
-        && d.week is string && d.week.size() > 0
+      // An empty date is allowed, and only for the back-imported register: the
+      // Inspectorate's 2026 hand-over records the visit but not the day for
+      // most of its rows, and an inspection nobody can date is a real state of
+      // that register — inventing a day would put it in a reporting period it
+      // may not belong to. A dated inspection still carries its reporting week.
+      // The Log inspection form always sends a date, so the app never creates
+      // one; see docs/inspection-register-2026-import.md.
+      return d.date is string
+        && (d.date == '' || d.date.matches('\\d{4}-\\d{2}-\\d{2}'))
+        && d.week is string && (d.date == '' || d.week.size() > 0)
         && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
         && d.outcome in ['Compliant','Minor findings','Major findings','Non-compliant','N/A']
         // Inspection-database columns — optional for docs written before them.

@@ -287,7 +287,9 @@ function InspectionFlow({
   };
 
   const submit = async () => {
-    if (!facilityName.trim() || !type || !outcome || busy) return;
+    // An inspection logged here always carries the day it happened; only the
+    // back-imported 2026 register holds undated rows.
+    if (!facilityName.trim() || !type || !outcome || !date || busy) return;
     setBusy(true);
     try {
       const s = await store();

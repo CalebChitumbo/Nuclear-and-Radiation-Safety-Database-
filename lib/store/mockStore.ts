@@ -64,25 +64,31 @@ import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import facilitiesSeed from "../../seed/facilities.seed.json";
 import screeningSeed from "../../seed/daily-screening-2026.seed.json";
+import registerSeed from "../../seed/inspections-2026.seed.json";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 import {
   mapAllSeed,
+  mapAllSeedInspections,
   mapSeedBorders,
   mapSeedScreening,
   type SeedFacility,
+  type SeedInspection,
   type SeedScreening,
 } from "./seeding";
 import type { DataStore } from "./types";
 
+// v5: the Inspectorate's 2026 facility inspection register, so the demo opens
+// on the same 297 inspections production does.
 // v4: the August 2026 data refresh — the updated Licensing Status register and
-// the inland offices' seeded daily screening log. Bumping the key makes every
-// mock/demo browser start fresh from the new seed (the old register AND the
-// history recorded against it are gone by design).
-const STORAGE_KEY = "rpa-mock-store-v4";
+// the inland offices' seeded daily screening log.
+// Bumping the key makes every mock/demo browser start fresh from the new seed
+// (the old register AND the history recorded against it are gone by design).
+const STORAGE_KEY = "rpa-mock-store-v5";
 const OLD_STORAGE_KEYS = [
   "rpa-mock-store-v1",
   "rpa-mock-store-v2",
   "rpa-mock-store-v3",
+  "rpa-mock-store-v4",
 ];
 
 interface State {
@@ -105,10 +111,18 @@ interface State {
 }
 
 function freshState(): State {
+  const facilities = mapAllSeed(facilitiesSeed as SeedFacility[]);
   return {
-    facilities: mapAllSeed(facilitiesSeed as SeedFacility[]),
+    facilities,
     licenceEvents: [],
-    inspections: [],
+    // The Inspectorate's 2026 facility inspection register, so the tab opens on
+    // the section's own year rather than empty — see
+    // docs/inspection-register-2026-import.md.
+    inspections: mapAllSeedInspections(
+      registerSeed as SeedInspection[],
+      facilities,
+      weeksSeed,
+    ).inspections,
     inspectionRequests: [],
     activities: [],
     licenceWorkflows: [],

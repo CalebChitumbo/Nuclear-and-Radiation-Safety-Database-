@@ -633,6 +633,13 @@ function LogInspectionPanel({
       toastPush("Please choose or type a facility name.", "error");
       return;
     }
+    // The back-imported 2026 register carries rows nobody can date, so an
+    // inspection may be stored undated — but a visit being logged now has a
+    // day, and without one it would count toward no reporting period.
+    if (!date) {
+      toastPush("Please give the date the inspection was carried out.", "error");
+      return;
+    }
     setBusy(true);
     try {
       const s = await store();

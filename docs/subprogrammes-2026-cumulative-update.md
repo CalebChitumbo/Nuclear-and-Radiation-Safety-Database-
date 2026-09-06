@@ -48,6 +48,13 @@ forward unchanged: 1.2.4 at **284** inspections (40 / 123 / 121) and 1.2.11 at
 routine and follow-up inspections conducted to date. See
 [the Inspectorate update](./inspectorate-work-plan-2026-update.md#re-baselines).
 
+*7 Sep 2026:* the division's facility inspection register was imported — 297
+inspections, 42 of them dated. 1.2.4 still reports **295** (40 / 123 / 132), but
+it is now 253 carried (40 / 102 / 111) plus the 42 the register dates for itself,
+rather than 295 carried and nothing recorded. 1.2.11 is untouched at **193**: the register
+has no enforcement column. See
+[the register import](./inspection-register-2026-import.md).
+
 ## Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
 
 | Output | Description | Target | Q1 | Q2 | Q3 | Q4 | Total | Was |
