@@ -25,10 +25,10 @@
  *                               outlier listing (they are left out by
  *                               default - they are history, not suspects).
  */
-import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
+import { initAdminApp } from "./adminApp";
 import { vehicleScreeningKey } from "../lib/rules/daily";
 import {
   auditScreening,
@@ -46,15 +46,6 @@ const SCREENING_OUTPUT = "1.3.12";
 function arg(name: string): string | null {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
-}
-
-function init() {
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
-    initializeApp({ credential: cert(JSON.parse(readFileSync(credPath, "utf-8"))) });
-  } else {
-    initializeApp();
-  }
 }
 
 /** A bare date means the start of that day, in the local (Zambia) clock. */
@@ -94,7 +85,7 @@ const HEADER = [
 ].join("  ");
 
 async function main() {
-  init();
+  initAdminApp();
   const db = getFirestore();
   const limit = Number(arg("limit") || 40);
   const post = arg("post");
@@ -172,6 +163,57 @@ async function main() {
       console.log(`\n${HEADER}`);
       for (const e of c.added.slice(0, limit)) console.log(describe(e));
       if (c.added.length > limit) console.log(`  … ${c.added.length - limit} more`);
+    }
+  }
+
+  // The question the opening balance raises once anyone back-fills: is it
+  // still standing in for records the system does not have?
+  const ci = audit.carryIn;
+  if (audit.openingBalance > 0) {
+    rule("Is the carried-in balance still carrying anything?");
+    console.log(
+      `  The opening balance carries ${n(audit.openingBalance)} vehicles for days the\n` +
+        `  workbook import does not hold - the days after each post's import ends.`,
+    );
+    const ends = Object.entries(ci.importEndsAt).sort();
+    console.log(`\n  The import ends at:`);
+    for (const [border, date] of ends) {
+      console.log(`    ${border.padEnd(16)}${date}`);
+    }
+    if (!ci.afterImport.length) {
+      console.log(
+        `\n  Nothing has been logged past those dates, so the balance is still\n` +
+          `  standing in for records the system does not have. Leave it alone.`,
+      );
+    } else {
+      console.log(
+        `\n  ${ci.afterImport.length} figures totalling ${n(ci.afterImportTotal)} have since been\n` +
+          `  logged by hand for days AFTER the import ends, at ${ci.postsOverlapping.length} posts:\n` +
+          `    ${ci.postsOverlapping.join(", ")}\n\n` +
+          `  If those are the same days the ${n(audit.openingBalance)} was carrying, output 1.3.12\n` +
+          `  is counting them TWICE and the opening balance should be zeroed -\n` +
+          `  the total would then read ${n(audit.grandTotal - audit.openingBalance)} instead of ${n(audit.grandTotal)}.\n` +
+          `  Check the dates below against the period the workbook's headline figure\n` +
+          `  covered; the section will know it.`,
+      );
+      const byDate = new Map<string, number>();
+      for (const e of ci.afterImport) {
+        byDate.set(
+          e.date,
+          (byDate.get(e.date) || 0) + (typeof e.value === "number" ? e.value : 0),
+        );
+      }
+      console.log(`\n  day          logged   running`);
+      let running = 0;
+      for (const [date, total] of [...byDate.entries()].sort()) {
+        running += total;
+        console.log(
+          `  ${date}  ${String(total).padStart(7)}  ${String(running).padStart(8)}` +
+            (running >= audit.openingBalance && running - total < audit.openingBalance
+              ? `  <- passes the ${n(audit.openingBalance)} carried in here`
+              : ""),
+        );
+      }
     }
   }
 

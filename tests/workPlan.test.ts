@@ -491,17 +491,12 @@ describe("opening balance — the plan is cumulative for the year", () => {
     expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 26, 0]);
   });
 
-  it("carries in only the screening days the daily log does not hold", () => {
+  it("carries in nothing for screening — the daily log holds all of it", () => {
     // The inland offices' log is seeded as daily entries and counted directly,
-    // so carrying the workbook's whole 341,009 would count 331,177 of them
-    // twice. Only the gap — the late-August days the log has yet to reach — is
-    // carried in, which brings the row to the workbook's figure exactly.
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([0, 0, 9832, 0]);
-    const carried = WORK_PLAN_OPENING_BALANCE["1.3.12"].reduce(
-      (a, b) => a + b,
-      0,
-    );
-    expect(carried + 331177).toBe(341009);
+    // and since the 6 Sep 2026 workbook the Summary sheet and its dated rows
+    // agree post by post: there is no gap left to carry. Any figure here would
+    // count vehicles the log already holds a dated post-day for.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.12"]).toEqual([0, 0, 0, 0]);
   });
 
   it("adds what the system records on top of what was carried in", () => {

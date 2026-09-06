@@ -1,6 +1,7 @@
 import {
   borderId,
   NSSS_SECTION,
+  screeningEntryId,
   VEHICLE_SCREENING_LABEL,
   vehicleScreeningKey,
 } from "../rules/daily";
@@ -216,17 +217,16 @@ export interface SeedScreening {
   posts: SeedScreeningPost[];
 }
 
-/** Stable id for a seeded screening count — one per post per day. */
-export function screeningEntryId(date: string, border: string): string {
-  return `screen-${date}-${borderId(border)}`;
-}
-
 /**
  * Shown as the author of a seeded screening count, in place of an officer's
  * name — the figure came from the section's workbook, not from someone typing
  * it into the Daily Updates tab.
  */
 export const SCREENING_SEED_AUTHOR = "Daily summary workbook";
+
+// One post, one day, one figure - the id rule lives with the daily rules now,
+// re-exported here because the seed is one of the two writers that depend on it.
+export { screeningEntryId };
 
 /** The border posts the daily summary workbook reports, in name order. */
 export function mapSeedBorders(seed: SeedScreening): Border[] {

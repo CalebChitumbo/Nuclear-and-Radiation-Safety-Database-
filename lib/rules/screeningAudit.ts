@@ -266,6 +266,63 @@ export function backdatedEntries(
 }
 
 // ---------------------------------------------------------------------------
+// Is the carried-in balance still carrying anything?
+// ---------------------------------------------------------------------------
+
+export interface CarryInCheck {
+  /** The last day the workbook import holds, per post. */
+  importEndsAt: Record<string, string>;
+  /** Figures logged by hand for days after their post's import ends. */
+  afterImport: DailyEntry[];
+  afterImportTotal: number;
+  /** Posts whose days have since been logged past the end of the import. */
+  postsOverlapping: string[];
+}
+
+/**
+ * Whether the opening balance is still carrying work the system does not hold.
+ *
+ * Output 1.3.12's opening balance exists for ONE reason: the workbook reported
+ * a higher total than its own dated rows added up to, and the difference was
+ * days the imported log does not hold — the late-August days after the import
+ * ends. It is a stand-in for records that were missing.
+ *
+ * The moment somebody logs those days by hand, the stand-in and the real
+ * records are both in the total and the vehicles are counted twice. That is
+ * written into `WORK_PLAN_OPENING_BALANCE` as a warning ("zero this row or they
+ * count twice"), and this is how to find out whether it has happened: for each
+ * post, the last day the import holds, and everything logged for that post
+ * since.
+ *
+ * It reports; it does not conclude. Whether those days are the SAME days the
+ * balance was carrying is a question for the section, not for arithmetic.
+ */
+export function carryInCheck(entries: DailyEntry[]): CarryInCheck {
+  const importEndsAt: Record<string, string> = {};
+  for (const e of entries) {
+    if (!isSeeded(e) || !e.border) continue;
+    const seen = importEndsAt[e.border];
+    if (!seen || e.date > seen) importEndsAt[e.border] = e.date;
+  }
+
+  const afterImport = entries
+    .filter((e) => {
+      if (isSeeded(e) || !e.border) return false;
+      const ends = importEndsAt[e.border];
+      // A post the import never covered has no carry-in to overlap with.
+      return !!ends && e.date > ends;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    importEndsAt,
+    afterImport,
+    afterImportTotal: sumEntries(afterImport),
+    postsOverlapping: [...new Set(afterImport.map((e) => e.border || ""))].sort(),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Who wrote what
 // ---------------------------------------------------------------------------
 
@@ -324,6 +381,7 @@ export interface ScreeningAudit {
   duplicateExcess: number;
   outliers: OutlyingEntry[];
   backdated: BackdatedEntry[];
+  carryIn: CarryInCheck;
   /** Set when a window was asked for. */
   change: ScreeningChange | null;
 }
@@ -363,6 +421,7 @@ export function auditScreening(input: {
     duplicateExcess: duplicates.reduce((a, d) => a + d.excess, 0),
     outliers: outlyingEntries(entries, input.outlierFactor),
     backdated: backdatedEntries(entries, input.backdatedLagDays),
+    carryIn: carryInCheck(entries),
     change: input.since ? changesBetween(entries, input.since) : null,
   };
 }

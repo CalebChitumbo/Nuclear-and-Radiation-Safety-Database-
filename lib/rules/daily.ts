@@ -78,11 +78,49 @@ export function vehicleScreeningKey(): string {
 }
 
 /**
+ * The document id a post's screening figure for one day is stored under.
+ *
+ * One post, one day, one figure. Deriving the id rather than letting Firestore
+ * allocate one is what makes that true: logging the same post-day again
+ * REPLACES the figure instead of adding a second one beside it, so the
+ * cumulative total cannot drift upward through repeated entry. The 2026
+ * workbook import writes the same ids, so a coordinator correcting an imported
+ * day corrects it rather than doubling it.
+ */
+export function screeningEntryId(date: string, border: string): string {
+  return `screen-${date}-${borderId(border)}`;
+}
+
+/**
+ * The figure already on file for one post on one day, if there is one — the
+ * workbook's, an earlier shift's, or one posted from the scan log. The capture
+ * form shows it before it overwrites it, so replacing a figure is always a
+ * decision somebody made rather than something that happened to them.
+ */
+export function existingScreeningEntry(
+  entries: DailyEntry[],
+  border: string,
+  date: string,
+): DailyEntry | null {
+  const key = vehicleScreeningKey();
+  return (
+    entries.find(
+      (e) =>
+        e.kind === "count" &&
+        e.metricKey === key &&
+        e.border === border &&
+        e.date === date,
+    ) || null
+  );
+}
+
+/**
  * A post that logs truck by truck does not type a daily figure — it posts the
- * count of what it scanned. That count is one `count` entry per border per day,
- * marked `source: "scan-log"` so posting again REPLACES it (see
- * `scanLogEntriesFor`): the same day can never be added to the week twice, and
- * the weekly report keeps reading the same metric it always has.
+ * count of what it scanned. It goes to the post-day's own document
+ * (`screeningEntryId`), so posting again REPLACES whatever figure the day held,
+ * whoever put it there: the same day can never be added to the week twice, and
+ * the weekly report keeps reading the same metric it always has. `source`
+ * records that the figure was counted rather than typed.
  */
 export function scanLogCountEntry(input: {
   date: string;
@@ -108,23 +146,6 @@ export function scanLogCountEntry(input: {
     updatedBy: input.uid,
     updatedByName: input.name,
   };
-}
-
-/** The scan-log counts already posted for one post on one day, if any. */
-export function scanLogEntriesFor(
-  entries: DailyEntry[],
-  border: string,
-  date: string,
-): DailyEntry[] {
-  const key = vehicleScreeningKey();
-  return entries.filter(
-    (e) =>
-      e.source === "scan-log" &&
-      e.kind === "count" &&
-      e.metricKey === key &&
-      e.border === border &&
-      e.date === date,
-  );
 }
 
 export interface BorderSums {

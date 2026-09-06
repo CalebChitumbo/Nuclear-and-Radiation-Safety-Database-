@@ -205,6 +205,18 @@ service cloud.firestore {
     function ownSectionEntry(d) {
       return isAdmin() || section() == 'All' || d.section == section();
     }
+    // The one kind of daily entry anyone in the section may overwrite: a count
+    // filed against a named post for a named day, replaced by a count for the
+    // SAME post and day. The post-day cannot be re-pointed at another post or
+    // another date on the way through, so this never becomes a way to move
+    // somebody else's figure somewhere it was not reported.
+    function isPostDayFigure(before, after) {
+      return before.kind == 'count' && after.kind == 'count'
+        && ('border' in before) && ('border' in after)
+        && before.border == after.border
+        && before.date == after.date
+        && before.get('metricKey', '') == after.get('metricKey', '');
+    }
 
     match /dailyEntries/{id} {
       allow read: if approved()
@@ -217,13 +229,21 @@ service cloud.firestore {
         // A coordinator posted to one inland office posts that office's
         // figure and no other's.
         && filedAtOwnPost(request.resource.data);
+      // A post's screening figure lives in ONE document per post per day
+      // (screeningEntryId), so correcting it is an update, not a second entry -
+      // and the officer correcting it is often not the one who wrote it first
+      // (a later shift, or the workbook import). The account doing the writing
+      // stamps itself as updatedBy, its own section and its own post, and the
+      // audit log keeps the figure that was replaced. Anything else in the
+      // daily log stays the author's own to edit.
       allow update:
         if isAdmin() || (approved()
           && validDailyEntry(request.resource.data)
           && ownSectionEntry(request.resource.data)
-          && resource.data.updatedBy == request.auth.uid
-          && request.resource.data.updatedBy == resource.data.updatedBy
-          && filedAtOwnPost(request.resource.data));
+          && request.resource.data.updatedBy == request.auth.uid
+          && filedAtOwnPost(request.resource.data)
+          && (resource.data.updatedBy == request.auth.uid
+              || isPostDayFigure(resource.data, request.resource.data)));
       allow delete:
         if isAdmin() || (approved() && resource.data.updatedBy == request.auth.uid);
     }
@@ -351,6 +371,33 @@ service cloud.firestore {
         && request.resource.data.values is map
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if isAdmin();
+    }
+
+    // The audit log: who changed which figure, when, and what it was before.
+    // Written ONLY by the Cloud Functions triggers in functions/src/audit.ts,
+    // which run with Admin credentials and bypass these rules entirely - so
+    // every write here is denied, including an administrator's. A log a person
+    // can edit is not a log.
+    //
+    // Read scoping is deliberately the SAME SHAPE as the daily log's: a plain
+    // `resource.data.section == section()`, which is what forces a section
+    // account's list query to filter on section. Writing it as a
+    // `.get('section', '')` with a default reads as more forgiving but is not:
+    // it stops the engine turning the clause into a required query constraint,
+    // and an unscoped list then comes back holding every section's rows.
+    //
+    // A row with no section is departmental - only the work plan's opening
+    // balances produce those - and stays with the department, because the same
+    // plain comparison errors on the missing field and denies. The screening
+    // audit script (scripts/screening-audit.ts) is where a re-baseline is
+    // traced from.
+    match /auditLog/{id} {
+      allow read: if approved()
+        && (isAdmin()
+            || section() == 'All'
+            || resource.data.section == section())
+        && filesFor(resource.data.get('border', ''));
+      allow create, update, delete: if false;
     }
 
     // The sections' own changes to the approved plan — reworded outputs,

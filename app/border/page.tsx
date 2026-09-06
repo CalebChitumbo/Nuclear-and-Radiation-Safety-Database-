@@ -40,8 +40,9 @@ import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { useWeek } from "@/lib/weekContext";
 import {
+  existingScreeningEntry,
   scanLogCountEntry,
-  scanLogEntriesFor,
+  screeningEntryId,
 } from "@/lib/rules/daily";
 import {
   scansToCsv,
@@ -143,9 +144,12 @@ export default function BorderScanPage() {
     [data?.weekScans, weekLabel],
   );
 
+  // Whatever figure Daily Updates holds for this post-day, whoever put it
+  // there. Posting overwrites that one document, so a figure a coordinator
+  // typed by hand is what re-posting replaces - it is worth showing.
   const alreadyPosted = useMemo(() => {
     if (!data || !border) return null;
-    return scanLogEntriesFor(data.entries, border, date)[0] || null;
+    return existingScreeningEntry(data.entries, border, date);
   }, [data, border, date]);
 
   if (!data) {
@@ -161,19 +165,20 @@ export default function BorderScanPage() {
     daySummary.byResult.Elevated + daySummary.byResult.Alarm;
 
   /**
-   * Post the day's figure to the section's daily log — replacing any figure
-   * this post already posted for the day, so re-posting after a late scan
-   * corrects the number instead of doubling it.
+   * Post the day's figure to the section's daily log.
+   *
+   * It goes to this post-day's own document, so re-posting after a late scan
+   * corrects the figure rather than adding a second one — and so does a figure
+   * a coordinator had typed by hand for the same day, or the workbook import's.
+   * The audit log keeps whatever was replaced.
    */
   const postDayTotal = async () => {
     if (!weekLabel || !border || posting) return;
     setPosting(true);
     try {
       const s = await store();
-      for (const stale of scanLogEntriesFor(data.entries, border, date)) {
-        await s.deleteDailyEntry(stale.id);
-      }
-      await s.addDailyEntry(
+      await s.setDailyEntry(
+        screeningEntryId(date, border),
         scanLogCountEntry({
           date,
           week: weekLabel,
@@ -409,7 +414,11 @@ export default function BorderScanPage() {
           <p className="text-xs text-gunmetal/55 mt-3">
             {alreadyPosted.value === daySummary.total
               ? `Daily Updates has this day's figure (${alreadyPosted.value}) from the scan log.`
-              : `Daily Updates still shows ${alreadyPosted.value} for this post — the log now holds ${daySummary.total}. Re-post to correct it.`}
+              : `Daily Updates shows ${alreadyPosted.value} for this post${
+                  alreadyPosted.source === "scan-log"
+                    ? ""
+                    : ` (${alreadyPosted.updatedByName || "typed in"})`
+                } — the log now holds ${daySummary.total}. Re-post to correct it.`}
           </p>
         ) : null}
       </Panel>

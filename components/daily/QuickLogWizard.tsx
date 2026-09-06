@@ -16,7 +16,12 @@ import { useMemo, useState } from "react";
 
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import { dailyMetricOptions, vehicleScreeningKey } from "@/lib/rules/daily";
+import {
+  dailyMetricOptions,
+  existingScreeningEntry,
+  screeningEntryId,
+  vehicleScreeningKey,
+} from "@/lib/rules/daily";
 import {
   cardExpiry,
   ENFORCEMENT_ACTIONS,
@@ -28,6 +33,7 @@ import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
   type Border,
+  type DailyEntry,
   type Facility,
   type InspectionOutcome,
   type InspectionType,
@@ -54,6 +60,7 @@ export function QuickLogWizard({
   facilities,
   borders,
   canManageBorders,
+  dayEntries,
   plan,
   onLogged,
 }: {
@@ -64,6 +71,11 @@ export function QuickLogWizard({
   facilities: Facility[];
   borders: Border[];
   canManageBorders: boolean;
+  /**
+   * Everything already logged for this day, so a screening figure can show the
+   * post-day figure it is about to replace instead of quietly overwriting it.
+   */
+  dayEntries: DailyEntry[];
   /** The plan in force, so an edited or added row is loggable the same day. */
   plan?: Subprogramme[];
   onLogged: () => void;
@@ -87,6 +99,7 @@ export function QuickLogWizard({
       user={user}
       borders={borders}
       canManageBorders={canManageBorders}
+      dayEntries={dayEntries}
       plan={plan}
       onLogged={onLogged}
     />
@@ -506,6 +519,7 @@ function CountFlow({
   user,
   borders,
   canManageBorders,
+  dayEntries,
   plan,
   onLogged,
 }: {
@@ -515,6 +529,7 @@ function CountFlow({
   user: QuickLogUser;
   borders: Border[];
   canManageBorders: boolean;
+  dayEntries: DailyEntry[];
   plan?: Subprogramme[];
   onLogged: () => void;
 }) {
@@ -550,6 +565,13 @@ function CountFlow({
   const activeBorders = borders.filter((b) => b.active);
   const steps = needsBorder ? 3 : 2;
 
+  // One post, one day, one figure: a screening count for a post is written to
+  // an id derived from the post and the day, so logging the same post-day again
+  // corrects the figure instead of adding a second one to the year's total.
+  // Shown before it happens - replacing a figure should be a decision.
+  const existing =
+    isScreening && border ? existingScreeningEntry(dayEntries, border, date) : null;
+
   const reset = () => {
     setStep("what");
     setPick(null);
@@ -570,11 +592,11 @@ function CountFlow({
     setBusy(true);
     try {
       const s = await store();
-      await s.addDailyEntry({
+      const entry = {
         date,
         week: weekLabel,
         section,
-        kind: "count",
+        kind: "count" as const,
         metricKey: pick.key,
         label: pick.label,
         value: Math.floor(n),
@@ -582,9 +604,17 @@ function CountFlow({
         border: border || undefined,
         updatedBy: user.uid,
         updatedByName: user.name,
-      });
+      };
+      // A post's screening figure goes to its own post-day document; anything
+      // else (including a head-office figure with no post) is a new entry.
+      if (isScreening && border) {
+        await s.setDailyEntry(screeningEntryId(date, border), entry);
+      } else {
+        await s.addDailyEntry(entry);
+      }
       setDoneMessage(
-        `${border ? `${border}: ` : ""}${Math.floor(n)} — ${pick.label.toLowerCase()}`,
+        `${border ? `${border}: ` : ""}${Math.floor(n)} — ${pick.label.toLowerCase()}` +
+          (existing ? ` (replaced ${existing.value})` : ""),
       );
       setStep("done");
       onLogged();
@@ -827,6 +857,17 @@ function CountFlow({
           +10
         </button>
       </div>
+      {existing ? (
+        <div
+          className="rounded-xl px-3 py-2 text-sm"
+          style={{ background: "rgba(240,170,0,0.12)" }}
+        >
+          <span className="font-bold tabular">{existing.value}</span> is already
+          on file for {existing.border} on {existing.date}
+          {existing.updatedByName ? ` (${existing.updatedByName})` : ""}. Saving
+          replaces it — the day is counted once, not twice.
+        </div>
+      ) : null}
       {showRemark ? (
         <input
           className="input"
@@ -843,7 +884,13 @@ function CountFlow({
         </button>
       )}
       <BigSubmit onClick={saveCount} disabled={busy || !valid}>
-        {busy ? "Saving…" : valid ? `Log ${Math.floor(n)} ✓` : "Enter a number"}
+        {busy
+          ? "Saving…"
+          : !valid
+            ? "Enter a number"
+            : existing
+              ? `Replace ${existing.value} with ${Math.floor(n)} ✓`
+              : `Log ${Math.floor(n)} ✓`}
       </BigSubmit>
     </StepShell>
   );

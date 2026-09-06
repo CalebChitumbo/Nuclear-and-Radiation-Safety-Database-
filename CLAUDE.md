@@ -40,6 +40,101 @@ Opening balance panel on `/weekly` instead (or as well). Never back-import the
 same inspections as dated records without zeroing 1.2.4's balance, or they
 count twice.
 
+## Routine: the section supplies a new daily summary workbook
+
+The NSSS section periodically hands over a fresh
+`2026 Daily Summary - All Inland Offices.xlsx` — one sheet per inland office, a
+row per day, plus a Summary sheet. It is the authoritative source for output
+**1.3.12** (screened vehicles), and it replaces the previous import rather than
+adding to it.
+
+1. Convert it. This rewrites the seed AND the import doc, and reconciles every
+   post against the Summary sheet — a mismatch is reported, never absorbed:
+
+   ```bash
+   npm run convert:summary -- <workbook>.xlsx
+   ```
+
+2. Update the pinned figures in `tests/screeningSeed.test.ts` (per-post
+   `SUMMARY` map, `GRAND_TOTAL`, the entry count, and the status if the total
+   has crossed the 350,000 target).
+3. **Check `WORK_PLAN_OPENING_BALANCE["1.3.12"]` is still `[0, 0, 0, 0]`.** It
+   is zero because the workbook's Summary sheet and its dated rows now agree:
+   every vehicle is a dated post-day the log holds. Carry a figure here only if
+   a future workbook's headline again exceeds its own rows, and say why.
+4. Update the totals in `README.md` and
+   `docs/subprogrammes-2026-cumulative-update.md` (1.3.12 row + its section).
+5. Deploy, then re-seed the live project. **Use `--prune`**: coordinators will
+   have typed figures by hand for days the new book now covers, and those were
+   written with random ids, so they sit BESIDE the workbook's rather than under
+   them. The seed reports them on every run and deletes them only with the flag:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
+   ```
+
+   Figures for days the workbook does not reach (a post that reported after the
+   book was cut) are left alone — they are new work, not duplicates.
+6. Confirm with `npm run audit:screening`: opening balance 0, the workbook total
+   as "imported", and "no post-day holds more than one figure".
+
+## Routine: the posts send their detailed monthly assessment books
+
+Separate from the daily summary: a folder per post of monthly workbooks, one
+sheet per day, one row per truck (`INLAND DAILY ASSESSMENTS`, git-ignored —
+190MB of workbooks and scanned returns). These are the Border Scan Log's data,
+not the reported figure's.
+
+```bash
+npm run reconcile:inland
+npm run extract:inland
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run import:scans -- --apply
+```
+
+These wrap a project-local `.venv` (`npm run py` makes it) because the
+workbook importers need `openpyxl` and macOS's own Python has neither it nor
+any business being installed into.
+
+- Reconciling first is the point: it says which of the summary's days the detail
+  actually evidences, and separates a blank day sheet from a genuine
+  disagreement. At the 6 Sep 2026 hand-over, 510 days matched to the truck
+  (127,562 vehicles), 287 day sheets were blank, 79 genuinely disagreed, and
+  739 days had no workbook at all.
+- Only the shared template is read (REG. NUMBER / GOODS OF INTEREST / FOOD /
+  OTHER / TRANSPORTER / DOSE, sheets named 1st, 2nd …). Livingstone's early
+  plate lists, Chirundu's "ASSESSEMENTS" books and the Monthly Summary/Master
+  Data layouts are reported as unread rather than guessed at.
+- **Importing scans moves no reported figure** — 1.3.12 counts `dailyEntries`.
+  Scans carry `officerUid: "import"`, which the audit log treats as a bulk load
+  rather than 146,000 people changing figures.
+
+## Routine: a reporting figure moved and nobody knows why
+
+Usually the screened-vehicles total (output 1.3.12). It is not stored anywhere —
+it is opening balance + the workbook import + every `dailyEntries` count, added
+up fresh each time the report is drawn. Only two things move it: somebody
+writing a daily entry, or an admin re-saving the opening balance on `/weekly`.
+
+1. Officers answer it themselves on the **What changed** panel of `/nsss`
+   (the audit log). Point them there first.
+2. For "it read X on Tuesday and Y on Wednesday", run the tracer with `--since`
+   set to Tuesday — it gives the total before that moment and every figure
+   written since, with the officer and the minute:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json      npm run audit:screening -- --since 2026-09-03
+   ```
+
+   It also flags post-days counted twice, figures far above that post's usual
+   day, late back-fills, and prints a saved `workPlanBaseline` if there is one.
+3. `npm run fix:duplicate-screening` collapses post-days that hold more than one
+   figure (dry-run; `--apply` to write).
+
+Watch out: Mongu and Ndola have thin workbook data (Mongu from July only, Ndola
+40 scattered days), so a real back-fill from those two posts can legitimately
+add thousands. `docs/screening-figure-audit.md` and `docs/audit-log.md` have the
+detail.
+
 ## Routine: the Summary sheet's enforcement columns
 
 The Inspectorate tab's Summary (`components/inspectorate/InspectionSummaryTable.tsx`,

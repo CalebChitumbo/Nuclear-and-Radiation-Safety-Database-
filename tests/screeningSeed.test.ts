@@ -26,26 +26,26 @@ const entries = mapSeedScreening(SEED, WEEKS);
 
 /** The Summary sheet's per-post totals for the year to date. */
 const SUMMARY: Record<string, number> = {
-  Chingola: 58521,
-  Chirundu: 32966,
-  "Kapiri Mposhi": 87990,
-  Katete: 15032,
-  Livingstone: 48719,
-  Mongu: 3296,
-  Nakonde: 77640,
-  Ndola: 7013,
+  Chingola: 62245,
+  Chirundu: 35146,
+  "Kapiri Mposhi": 92517,
+  Katete: 16342,
+  Livingstone: 51237,
+  Mongu: 4602,
+  Nakonde: 83612,
+  Ndola: 10671,
 };
-const GRAND_TOTAL = 331177;
+const GRAND_TOTAL = 356372;
 
 describe("§17 — seeded daily screening log (2026 daily summary workbook)", () => {
-  it("loads 1,484 daily counts across the 8 inland offices", () => {
-    expect(entries.length).toBe(1484);
+  it("loads 1,615 daily counts across the 8 inland offices", () => {
+    expect(entries.length).toBe(1615);
     expect(mapSeedBorders(SEED).map((b) => b.name)).toEqual(
       Object.keys(SUMMARY).sort((a, b) => a.localeCompare(b)),
     );
   });
 
-  it("totals 331,177 vehicles, and matches the workbook post by post", () => {
+  it("totals 356,372 vehicles, and matches the workbook post by post", () => {
     const sums = borderSums(entries, vehicleScreeningKey());
     expect(sums.total).toBe(GRAND_TOTAL);
     expect(sums.unspecified).toBe(0);
@@ -88,23 +88,23 @@ describe("§17 — the screening log fills in work plan output 1.3.12", () => {
     .flatMap((s) => s.rows)
     .find((r) => r.output.id === "1.3.12")!;
 
-  /** The workbook's cumulative figure — see docs/subprogrammes-2026-cumulative-update.md. */
-  const WORKBOOK_TOTAL = 341009;
-
-  it("counts all 331,177 screened vehicles off the log itself", () => {
+  it("counts all 356,372 screened vehicles off the log itself", () => {
     expect(row.recordedTotal).toBe(GRAND_TOTAL);
-    // The rest is the gap between the log and the section's workbook — the
-    // only part of 1.3.12 that is carried in.
-    expect(row.openingTotal).toBe(WORKBOOK_TOTAL - GRAND_TOTAL);
-    expect(row.total).toBe(WORKBOOK_TOTAL);
-    expect(row.status).toBe("In Progress");
+    // Nothing is carried in: the workbook's Summary sheet and its dated rows
+    // agree post by post, so every vehicle in the figure is a dated post-day
+    // the log holds. A carried-in figure here would count them twice.
+    expect(row.openingTotal).toBe(0);
+    expect(row.total).toBe(GRAND_TOTAL);
+    // 356,372 against a 350,000 target: the output is past its year's figure.
+    expect(row.output.target).toBe(350000);
+    expect(row.status).toBe("Achieved");
   });
 
   it("splits the quarters by reporting week", () => {
     // A week counts to the quarter it starts in, so W14 (30 Mar – 3 Apr) puts
     // three April days into Q1: the quarters differ from the workbook's
     // calendar months by those days, but the year total does not.
-    expect(row.quarters.reduce((a, b) => a + b, 0)).toBe(WORKBOOK_TOTAL);
+    expect(row.quarters.reduce((a, b) => a + b, 0)).toBe(GRAND_TOTAL);
     expect(row.recorded.reduce((a, b) => a + b, 0)).toBe(GRAND_TOTAL);
     expect(row.quarters[3]).toBe(0); // nothing reported in Q4 yet
     for (const q of row.quarters.slice(0, 3)) expect(q).toBeGreaterThan(0);

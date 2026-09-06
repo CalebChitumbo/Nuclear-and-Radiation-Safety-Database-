@@ -11,6 +11,7 @@ import type {
 } from "../rules/inventoryEdits";
 import type {
   Activity,
+  AuditEntry,
   Border,
   DailyEntry,
   DashboardAggregate,
@@ -145,6 +146,25 @@ export interface DataStore {
    */
   listDailyEntries(scope?: DailyEntryScope): Promise<DailyEntry[]>;
   addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
+  /**
+   * Write a daily entry to a KNOWN id, replacing whatever is there.
+   *
+   * Screening counts use it with `screeningEntryId(date, border)`: one post,
+   * one day, one figure. Logging a post-day twice then corrects the figure
+   * rather than adding a second one beside it, which is the only way the
+   * cumulative screened total drifts upward on its own. The audit log keeps
+   * what the figure was before, so nothing is lost by overwriting.
+   */
+  setDailyEntry(id: string, e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
+  /**
+   * The audit log, newest change first — who changed a reporting figure, when,
+   * and what it was before. Pass the same scope the daily log takes; the rules
+   * refuse a wider read than the account's claims allow.
+   *
+   * The rows are written by a Cloud Function, never by the app, so a store with
+   * no functions behind it (the demo store) keeps its own local trail instead.
+   */
+  listAuditLog(scope?: DailyEntryScope, max?: number): Promise<AuditEntry[]>;
   deleteDailyEntry(id: string): Promise<void>;
   /**
    * Recent truck scans across the border posts, newest date first. One record
