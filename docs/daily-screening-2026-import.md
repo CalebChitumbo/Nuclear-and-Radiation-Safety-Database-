@@ -1,6 +1,6 @@
 # Daily screening import â€” 2026 inland offices
 
-Imported 2026-08-22 from `2026_Daily_Summary__All_Inland_Offices.xlsx` (the Nuclear Safety, Security & Safeguards section's daily summary workbook). Regenerate with:
+Imported 2026-09-06 from `2026_Daily_Summary__All_Inland_Offices.xlsx` (the Nuclear Safety, Security & Safeguards section's daily summary workbook). Regenerate with:
 
 ```
 python3 scripts/convert-daily-summary-xlsx.py <Daily_Summary.xlsx>
@@ -13,22 +13,22 @@ Each row becomes one daily `count` entry against **Vehicle Screening (units)** â
 | Metric | Count |
 |---|---|
 | Border posts | **8** |
-| Daily entries | **1,484** |
-| Vehicles assessed | **331,177** |
+| Daily entries | **1,615** |
+| Vehicles assessed | **356,372** |
 
 ## Reconciled against the workbook's Summary sheet
 
 | Post | Summary total | Imported | Days reported |
 |---|---|---|---|
-| Chingola | 58,521 | 58,521 | 233 |
-| Chirundu | 32,966 | 32,966 | 233 |
-| Kapiri Mposhi | 87,990 | 87,990 | 228 |
-| Katete | 15,032 | 15,032 | 232 |
-| Livingstone | 48,719 | 48,719 | 233 |
-| Mongu | 3,296 | 3,296 | 52 |
-| Nakonde | 77,640 | 77,640 | 233 |
-| Ndola | 7,013 | 7,013 | 40 |
-| **All posts** | **331,177** | **331,177** | 1484 |
+| Chingola | 62,245 | 62,245 | 249 |
+| Chirundu | 35,146 | 35,146 | 249 |
+| Kapiri Mposhi | 92,517 | 92,517 | 249 |
+| Katete | 16,342 | 16,342 | 248 |
+| Livingstone | 51,237 | 51,237 | 248 |
+| Mongu | 4,602 | 4,602 | 68 |
+| Nakonde | 83,612 | 83,612 | 248 |
+| Ndola | 10,671 | 10,671 | 56 |
+| **All posts** | **356,372** | **356,372** | 1615 |
 
 By month, across all posts:
 
@@ -41,7 +41,8 @@ By month, across all posts:
 | May | 33,597 | 33,597 |
 | June | 37,232 | 37,232 |
 | July | 42,171 | 42,171 |
-| August | 29,984 | 29,984 |
+| August | 47,150 | 47,150 |
+| September | 8,029 | 8,029 |
 
 ## Quarters
 

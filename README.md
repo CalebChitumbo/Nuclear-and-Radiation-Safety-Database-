@@ -12,10 +12,10 @@ accounts for (238 use/possession, 82 import, 18 variation, 7 transfer,
 (see `docs/licensing-status-2026-import.md` for the full import log, and
 `docs/register-2026-import.md` for the July 2026 register it replaced).
 
-It also ships the inland offices' **2026 daily screening log** — 1,484 daily
-counts across the eight posts, 331,177 vehicles assessed — seeded as ordinary
-daily entries so work plan output 1.3.12 counts them post by post rather than
-carrying a lump-sum figure (see `docs/daily-screening-2026-import.md`).
+It also ships the inland offices' **2026 daily screening log** — 1,615 daily
+counts across the eight posts, 356,372 vehicles assessed to 6 Sep 2026 — seeded
+as ordinary daily entries so work plan output 1.3.12 counts them post by post
+and carries nothing at all (see `docs/daily-screening-2026-import.md`).
 
 **Navigation** (sidebar, in order — each account sees only the screens its
 section works in; see **[Who sees what](#who-sees-what)**): Overview · Facilities · **Source
@@ -1152,8 +1152,8 @@ npm test
   overwrite each other
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
-- `screeningSeed` — verifies the seeded daily screening log (1,484 entries,
-  331,177 vehicles, reconciled post by post against the workbook's Summary
+- `screeningSeed` — verifies the seeded daily screening log (1,615 entries,
+  356,372 vehicles, reconciled post by post against the workbook's Summary
   sheet) and that it fills in work plan output 1.3.12 with nothing carried in
 - `seedBaseline` — verifies the register baseline (538 / 220 / 318 / 401 functional /
   Medical 350) and that the licences on record reconcile with the Licensing

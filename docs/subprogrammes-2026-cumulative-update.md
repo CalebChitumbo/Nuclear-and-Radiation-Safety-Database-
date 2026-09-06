@@ -63,39 +63,52 @@ routine and follow-up inspections conducted to date. See
 | 1.3.9 | Stakeholder Engagement and Sensitisation | 40 | — | — | 65 | — | 65 | 65 |
 | 1.3.10 | Training for ZRA Inspectors/Responders/FLO | 4 | — | 5 | 2 | — | **7** | 0 |
 | 1.3.11 | Monitoring & Evaluation of Inland Offices | — | — | — | — | — | 0 | 0 |
-| 1.3.12 | Monitoring of illicit trafficking (ZRA Asycuda) | 350,000 | 152,909 | 106,113 | 81,987 | — | **341,009** | 331,177 |
+| 1.3.12 | Monitoring of illicit trafficking (ZRA Asycuda) | 350,000 | 152,909 | 106,113 | 81,987 | — | **356,372** | 356,372 |
 | 1.3.13 | Quarterly Meetings for Coordinators and TWG | 5 | — | — | 26 | — | **26** | 24 |
 | 1.3.14 | Enhance detection capacity system | 1 | — | — | 1 | — | **1** | 0 |
 
 1.3.7 is percentage points of the INSSP programme implemented, not a count —
 100 against a target of 100.
 
-## 1.3.12 — the one row that is only part carried in
+## 1.3.12 — the one row carried in nowhere
 
 Screened vehicles is the single output whose history the system actually holds:
 the inland offices' daily log is seeded as real dated `dailyEntries`
 ([docs](./daily-screening-2026-import.md)) and output 1.3.12 counts them
-directly. Carrying the workbook's whole 341,009 in as an opening balance would
-count 331,177 of them a second time.
-
-So only the gap is carried in:
+directly. Its opening balance is **zero**, and must stay zero — a figure there
+would count vehicles the log already holds a dated post-day for.
 
 | | Vehicles |
 |---|---|
-| Counted from the daily log (1 Jan – 21 Aug 2026) | 331,177 |
-| Carried in as opening balance (Q3) | **9,832** |
-| **Reported total** | **341,009** |
+| Counted from the daily log (1 Jan – 6 Sep 2026) | 356,372 |
+| Carried in as opening balance | **0** |
+| **Reported total** | **356,372** |
 
-The 9,832 is the late-August days the workbook has and the log has yet to
-reach. **If those days are ever logged on Daily Updates or re-imported, zero
-1.3.12's opening balance first** — on `/weekly` → *Opening balance* → *Clear to
-zero* for that row — or they will be counted twice.
+Against a target of 350,000, the output reads **Achieved**.
+
+### History — why it was 341,009 until 6 September 2026
+
+The first import (June 2026 workbook) ran only to 21 Aug and its dated rows
+summed to 331,177 while the workbook's own headline said 341,009. The 9,832
+difference was late-August days the sheets did not list, so it was carried in
+as an opening balance to make the row read 341,009.
+
+That made the figure fragile in two ways, and both bit:
+
+- The NSSS tab summed the daily entries alone while the sectional update added
+  the carry-in, so the same output read 353,624 on one screen and 363,456 on
+  the other — 9,832 apart, with nothing saying why. A coordinator reasonably
+  read that as 9,000 vehicles appearing from nowhere. Both screens now carry
+  the opening balance and show the split.
+- Coordinators began logging those same late-August days by hand, which the
+  carry-in was already standing in for. The complete 6 Sep workbook settles it:
+  every vehicle is now a dated post-day, the Summary sheet and the dated rows
+  agree post by post, and there is no gap left to carry.
 
 One consequence to expect: the report buckets by REPORTING WEEK and the
-workbook by CALENDAR quarter, so the quarter columns for 1.3.12 read
-158,640 / 105,975 / 76,394 rather than the workbook's
-152,909 / 106,113 / 81,987. The year total — the figure the target and the
-percentage are measured on — is 341,009 either way.
+workbook by CALENDAR quarter, so 1.3.12's quarter columns differ from the
+workbook's 152,909 / 106,113 / 81,987. The year total — the figure the target
+and the percentage are measured on — is the same either way.
 
 ## Comments on the workbook the report does not carry
 

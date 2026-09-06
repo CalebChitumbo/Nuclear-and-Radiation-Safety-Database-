@@ -38,6 +38,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { initAdminApp } from "./adminApp";
+import { vehicleScreeningKey } from "../lib/rules/daily";
+import type { DailyEntry } from "../lib/rules/types";
 import {
   mapAllSeed,
   mapSeedBorders,
@@ -148,6 +150,68 @@ async function reportSupersededFacilities(seededIds: Set<string>) {
   console.log(`  pruned ${stale.length} superseded facility document(s)`);
 }
 
+/**
+ * Figures an officer typed for a post-day the workbook now covers.
+ *
+ * The seed writes each post-day to its own document, so re-importing a day
+ * REPLACES it. That only holds for figures written to the same id — and every
+ * figure typed before the app derived its ids got a random one, so it sits
+ * BESIDE the workbook's rather than under it, and the post-day is counted
+ * twice. The 6 Sep 2026 book brought 25,195 vehicles of late-August and
+ * September days that coordinators had already been entering by hand, so this
+ * is not a corner case.
+ *
+ * The workbook wins where the two overlap: it is reconciled against its own
+ * Summary sheet post by post, which a typed figure is not. Reported on every
+ * run and deleted only with --prune, the way a superseded facility is.
+ */
+async function reportSupersededScreening(seeded: DailyEntry[]) {
+  const db = getFirestore();
+  const key = vehicleScreeningKey();
+  const covered = new Set(seeded.map((e) => `${e.border}|${e.date}`));
+  const seededIds = new Set(seeded.map((e) => e.id));
+
+  const snap = await db.collection("dailyEntries").where("metricKey", "==", key).get();
+  const superseded = snap.docs.filter((d) => {
+    if (seededIds.has(d.id)) return false;
+    const e = d.data() as DailyEntry;
+    return (
+      e.kind === "count" && !!e.border && covered.has(`${e.border}|${e.date}`)
+    );
+  });
+
+  if (!superseded.length) {
+    console.log("  no typed screening figures superseded by the workbook");
+    return;
+  }
+  const total = superseded.reduce(
+    (sum, d) => sum + (Number((d.data() as DailyEntry).value) || 0),
+    0,
+  );
+  console.log(
+    `  ${superseded.length} typed screening figure(s) cover post-days the ` +
+      `workbook now holds, totalling ${total.toLocaleString()} vehicles:`,
+  );
+  for (const d of superseded.slice(0, 10)) {
+    const e = d.data() as DailyEntry;
+    console.log(
+      `    ${e.date}  ${String(e.border).padEnd(15)}${String(e.value).padStart(6)}` +
+        `  ${e.updatedByName || e.updatedBy || "?"}`,
+    );
+  }
+  if (superseded.length > 10) console.log(`    … ${superseded.length - 10} more`);
+
+  if (!PRUNE) {
+    console.log(
+      "  Left in place - they are counted ON TOP of the workbook's figures " +
+        "until removed. Re-run with --prune to delete them.",
+    );
+    return;
+  }
+  await chunkedBatchWrite(superseded, 400, (d, batch) => batch.delete(d.ref));
+  console.log(`  pruned ${superseded.length} superseded screening figure(s)`);
+}
+
 async function main() {
   initAdminApp();
   const db = getFirestore();
@@ -200,6 +264,7 @@ async function main() {
     const { id, ...rest } = e;
     batch.set(db.doc(`dailyEntries/${id}`), rest);
   });
+  await reportSupersededScreening(screeningEntries);
 
   console.log("Writing reference lists + week calendar…");
   // Single source of truth: lib/rules/types.ts — hardcoding these here once

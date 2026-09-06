@@ -40,6 +40,45 @@ Opening balance panel on `/weekly` instead (or as well). Never back-import the
 same inspections as dated records without zeroing 1.2.4's balance, or they
 count twice.
 
+## Routine: the section supplies a new daily summary workbook
+
+The NSSS section periodically hands over a fresh
+`2026 Daily Summary - All Inland Offices.xlsx` — one sheet per inland office, a
+row per day, plus a Summary sheet. It is the authoritative source for output
+**1.3.12** (screened vehicles), and it replaces the previous import rather than
+adding to it.
+
+1. Convert it (needs `openpyxl`; the repo's python may not have it, so use a
+   venv). It rewrites the seed AND the import doc, and reconciles every post
+   against the Summary sheet — a mismatch is reported, never absorbed:
+
+   ```bash
+   python3 scripts/convert-daily-summary-xlsx.py <workbook>.xlsx
+   ```
+
+2. Update the pinned figures in `tests/screeningSeed.test.ts` (per-post
+   `SUMMARY` map, `GRAND_TOTAL`, the entry count, and the status if the total
+   has crossed the 350,000 target).
+3. **Check `WORK_PLAN_OPENING_BALANCE["1.3.12"]` is still `[0, 0, 0, 0]`.** It
+   is zero because the workbook's Summary sheet and its dated rows now agree:
+   every vehicle is a dated post-day the log holds. Carry a figure here only if
+   a future workbook's headline again exceeds its own rows, and say why.
+4. Update the totals in `README.md` and
+   `docs/subprogrammes-2026-cumulative-update.md` (1.3.12 row + its section).
+5. Deploy, then re-seed the live project. **Use `--prune`**: coordinators will
+   have typed figures by hand for days the new book now covers, and those were
+   written with random ids, so they sit BESIDE the workbook's rather than under
+   them. The seed reports them on every run and deletes them only with the flag:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
+   ```
+
+   Figures for days the workbook does not reach (a post that reported after the
+   book was cut) are left alone — they are new work, not duplicates.
+6. Confirm with `npm run audit:screening`: opening balance 0, the workbook total
+   as "imported", and "no post-day holds more than one figure".
+
 ## Routine: a reporting figure moved and nobody knows why
 
 Usually the screened-vehicles total (output 1.3.12). It is not stored anywhere —

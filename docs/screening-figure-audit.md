@@ -9,12 +9,12 @@ opening balance carried in   +   the 2026 workbook import   +   what the app has
 ```
 
 - **Opening balance** — `WORK_PLAN_OPENING_BALANCE["1.3.12"]` in
-  `lib/rules/workPlan.ts` (9,832 at handover), *unless* a
-  `workPlanBaseline/2026` document exists in Firestore, which replaces the code
-  figures wholesale.
-- **The workbook import** — 1,484 `dailyEntries` documents seeded from
-  `2026_Daily_Summary__All_Inland_Offices.xlsx`, 331,177 vehicles to
-  21 Aug 2026. They carry `updatedBy: "seed"` and no `createdAt`. See
+  `lib/rules/workPlan.ts` — **zero** for screening since the complete 6 Sep 2026
+  workbook, and it must stay zero — *unless* a `workPlanBaseline/2026` document
+  exists in Firestore, which replaces the code figures wholesale.
+- **The workbook import** — 1,615 `dailyEntries` documents seeded from
+  `2026_Daily_Summary__All_Inland_Offices.xlsx`, 356,372 vehicles to
+  6 Sep 2026. They carry `updatedBy: "seed"` and no `createdAt`. See
   [daily-screening-2026-import.md](daily-screening-2026-import.md).
 - **What the app has logged** — one `dailyEntries` count per post per day,
   either typed on Daily Updates or posted from the border scan log. Each one
