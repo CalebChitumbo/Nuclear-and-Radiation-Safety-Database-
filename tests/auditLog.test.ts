@@ -70,8 +70,11 @@ describe("summariseChange", () => {
     expect(summariseChange("dailyEntries", "created", null, figure)).toBe(
       "M. Zulu logged Vehicle Screening (units) = 180 at Ndola for 2026-09-04",
     );
+    // A delete never names who did it, so the line must not read as though the
+    // author removed their own figure — a re-import supersedes typed figures,
+    // and 114 of Luuma Michelo's read "Luuma Michelo removed…" before this.
     expect(summariseChange("dailyEntries", "deleted", figure, null)).toBe(
-      "M. Zulu removed Vehicle Screening (units) = 180 at Ndola for 2026-09-04",
+      "Vehicle Screening (units) = 180 at Ndola for 2026-09-04 was removed — last written by M. Zulu",
     );
   });
 
