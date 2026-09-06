@@ -45,14 +45,18 @@ tab (`/inspectorate`) is the section's **inspection database** — a facility pe
 row, with its inspection-type counts, the enforcement action taken and the
 inspection card's issue date, expiry and status — and every one of those rows
 is derived from a dated `inspections` record. A work plan total cannot be
-decomposed back into them, so the database stays empty until either:
+decomposed back into them, so the database stayed empty until either:
 
-- the section's own inspection database workbook (the province sheets) is
+- the section's own inspection database workbook (the province sheets) was
   imported the way the licensing register was, or
-- inspections are logged from `/inspectorate` as they are carried out.
+- inspections were logged from `/inspectorate` as they are carried out.
 
-Until then output 1.2.4 reports 284 with all 284 as opening balance and none
-recorded, which is exactly what the row's expanded split shows.
+*7 Sep 2026:* the first of those happened — the division's *COMPLETE FACILITY
+INSPECTION REGISTER* was imported, 297 inspections across the ten provinces. 42
+of its rows carry a date and are counted off the register; the other 255 record
+the visit but not the day, so they show on the database and its province sheets
+but belong to no quarter and stay inside the opening balance. See
+[the register import](./inspection-register-2026-import.md).
 
 ## Status column
 
@@ -70,6 +74,13 @@ inspections log keeps adding on top. The routine is in `CLAUDE.md`.
 | Date | Output | Was | Now | Quarters |
 |---|---|---|---|---|
 | 2026-09-04 | 1.2.4 | 284 | **295** | 40 / 123 / 132 / — |
+| 2026-09-07 | 1.2.4 | 295 carried | **253** carried | 40 / 102 / 111 / — |
+
+The 7 Sep change is not a new figure from the section: the register import gave
+1.2.4 42 dated inspections of its own, so the balance shed exactly those (Q2
+−21, Q3 −21, as the report attributes them — a week counts to the quarter it
+starts in). The reported figure stays **295**, split 40 / 123 / 132 as before.
+Carrying the 42 as well would have reported them twice.
 
 The same change swapped the Summary sheet's ENGAGEMENTS / OTHER ENFORCEMENTS
 bands for Management's single ENFORCEMENT ACTIONS band (Written Notice ·

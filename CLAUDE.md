@@ -36,9 +36,58 @@ it. Nothing is imported — the figure is a constant.
 **Watch out:** a saved `workPlanBaseline/{year}` document in Firestore
 *replaces* the code constant wholesale. If the report still shows the old
 figure after deploy, an officer has saved a baseline — correct 1.2.4 on the
-Opening balance panel on `/weekly` instead (or as well). Never back-import the
-same inspections as dated records without zeroing 1.2.4's balance, or they
-count twice.
+Opening balance panel on `/weekly` instead (or as well).
+
+**Watch out:** 1.2.4 is now part carried, part counted. The 2026 facility
+inspection register (below) gave it 42 dated inspections of its own, and the
+balance was reduced by exactly those. Never back-import the same inspections as
+dated records without taking them off 1.2.4's balance, or they count twice —
+and if an officer dates one of the register's 255 undated rows, take one off the
+balance's latest quarter with work in it, because the balance is still carrying
+that row.
+
+## Routine: the Inspectorate hands over its facility inspection register
+
+The division periodically hands over `inspected facilities.docx` — the *COMPLETE
+FACILITY INSPECTION REGISTER*, one row per inspection with province, facility,
+type and (where the section still has it) date. A repeated facility name is a
+separate visit, never a duplicate to collapse. It **replaces** the previous
+import rather than adding to it.
+
+1. Put the document's rows into `seed/inspections-2026.seed.json` verbatim —
+   its own province spellings, its own type wordings, its own DD/MM/YYYY dates.
+   Everything is normalised in `mapAllSeedInspections`
+   (`lib/store/seeding.ts`), so the seed file stays checkable against the
+   document. A cell the document leaves blank stays blank; where the section
+   fills one in later, put the answer in and say where it came from in `note`.
+2. Update the pinned figures in `tests/inspectionSeed.test.ts` (row count,
+   imported count, per-type split, dated count and quarters, linked/unlinked).
+3. **Re-balance 1.2.4.** Its opening balance carries the work the register does
+   NOT hold, so subtract the newly dated rows in `WORK_PLAN_OPENING_BALANCE
+   ["1.2.4"]` and update the pinned assertion in `tests/workPlan.test.ts`.
+   Subtract from the quarter each row's **reporting week** starts in, not the
+   one its date falls in — that is how the report counts it — and neither the
+   reported total nor its quarterly split should move.
+4. Note the change in `docs/inspection-register-2026-import.md` under
+   **Re-baselines**, and in `docs/inspectorate-work-plan-2026-update.md` and
+   `docs/subprogrammes-2026-cumulative-update.md` if 1.2.4 moved.
+5. Deploy, then re-seed the live project. **Use `--prune`**: ids are the
+   facility + type + which repeat a row is, so a corrected spelling or type
+   re-keys that row and the old document would report the same visit twice.
+   Only documents the seed itself wrote are ever considered, so an inspection an
+   officer logged in the app is never touched.
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
+   ```
+
+**Watch out:** most of the register's rows have no date, and they are stored
+undated on purpose — a placeholder day would file the inspection into a
+reporting period at random. They show on the Inspectorate tab under *All time*
+and on the province sheets, and are counted by no week, month, year or quarter.
+That is also why `validInspection` in `firestore.rules` accepts `date: ""`; the
+Log inspection form and the Daily Updates wizard both require one, so only this
+import creates them.
 
 ## Routine: the section supplies a new daily summary workbook
 

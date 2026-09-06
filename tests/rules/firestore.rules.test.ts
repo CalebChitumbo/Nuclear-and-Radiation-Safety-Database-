@@ -238,6 +238,53 @@ describe("the facilities register and what hangs off it", () => {
       }),
     );
   });
+
+  it("takes an undated inspection, but only from the Inspectorate", async () => {
+    // The 2026 register hand-over records the visit but not the day for most of
+    // its rows, so an inspection may be stored with no date and no week.
+    const undated = {
+      date: "",
+      week: "",
+      facilityName: "Ndola Teaching Hospital",
+      type: "Routine Inspection",
+      outcome: "N/A" as const,
+    };
+    await assertSucceeds(setDoc(doc(insp(), "inspections/i-undated"), undated));
+    await assertFails(setDoc(doc(as(), "inspections/i-as"), undated));
+    await assertFails(setDoc(doc(nsssDesk(), "inspections/i-nsss"), undated));
+  });
+
+  it("still insists a dated inspection is properly dated and filed", async () => {
+    const base = {
+      facilityName: "Ndola Teaching Hospital",
+      type: "Routine Inspection",
+      outcome: "N/A" as const,
+    };
+    // A date the calendar cannot read is not "no date" — it is a typo.
+    await assertFails(
+      setDoc(doc(insp(), "inspections/i-bad"), {
+        ...base,
+        date: "02/08/2026",
+        week: "",
+      }),
+    );
+    // And a dated inspection still has to name the week it is reported in, or
+    // it would fall out of the weekly rollup.
+    await assertFails(
+      setDoc(doc(insp(), "inspections/i-noweek"), {
+        ...base,
+        date: "2026-08-02",
+        week: "",
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(insp(), "inspections/i-ok"), {
+        ...base,
+        date: "2026-08-02",
+        week: "W31 2026",
+      }),
+    );
+  });
 });
 
 describe("the source inventories' corrections", () => {
