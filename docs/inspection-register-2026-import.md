@@ -29,7 +29,17 @@ keeps every one of them.
 | Rows the document dates | **42** |
 
 The document's own heading says "307 facility records"; its table holds 298
-rows. The count is the section's, reported here rather than reconciled away.
+rows; the section's reported figure is 295. All three are the section's, and
+they are reported here rather than reconciled away.
+
+The 297 imported and the reported 295 therefore differ by two, and nothing in
+the document explains which two. It is not the repeated rows: five pairs are
+fully identical — same facility, same type, both undated — but the document's
+own note says a repeat is a second visit, so all five are kept, and five is not
+two. **The reported figure is unaffected.** Output 1.2.4 reads exactly 295,
+because it is the opening balance plus the dated rows, not a count of documents;
+only the Inspectorate tab's ALL TIME headline, which counts records, shows 297.
+Resolving the two would mean the section saying which rows they are.
 
 ### By province and type
 
