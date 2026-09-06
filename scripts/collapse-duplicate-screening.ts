@@ -28,10 +28,8 @@
  * record with the figure it removed — run scripts/screening-audit.ts afterwards
  * to see the collapse itself in the trail.
  */
-import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync } from "node:fs";
-
+import { initAdminApp } from "./adminApp";
 import { screeningEntryId, vehicleScreeningKey } from "../lib/rules/daily";
 import { duplicatePostDays, screeningEntries } from "../lib/rules/screeningAudit";
 import type { DailyEntry } from "../lib/rules/types";
@@ -41,15 +39,6 @@ const APPLY = process.argv.includes("--apply");
 function arg(name: string): string | null {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
-}
-
-function init() {
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
-    initializeApp({ credential: cert(JSON.parse(readFileSync(credPath, "utf-8"))) });
-  } else {
-    initializeApp();
-  }
 }
 
 /**
@@ -64,7 +53,7 @@ function keeper(entries: DailyEntry[]): DailyEntry {
 }
 
 async function main() {
-  init();
+  initAdminApp();
   const db = getFirestore();
   const post = arg("post");
 

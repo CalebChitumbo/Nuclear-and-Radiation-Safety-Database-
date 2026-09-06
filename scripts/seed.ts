@@ -33,11 +33,11 @@
  * kept.
  */
 
-import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { initAdminApp } from "./adminApp";
 import {
   mapAllSeed,
   mapSeedBorders,
@@ -80,16 +80,6 @@ async function wipeCollection(name: string) {
     deleted += snap.size;
   }
   console.log(`  wiped ${name} (${deleted} docs)`);
-}
-
-function init() {
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
-    const sa = JSON.parse(readFileSync(credPath, "utf-8"));
-    initializeApp({ credential: cert(sa) });
-  } else {
-    initializeApp();
-  }
 }
 
 async function chunkedBatchWrite<T>(
@@ -159,7 +149,7 @@ async function reportSupersededFacilities(seededIds: Set<string>) {
 }
 
 async function main() {
-  init();
+  initAdminApp();
   const db = getFirestore();
 
   const facilitiesRaw = JSON.parse(

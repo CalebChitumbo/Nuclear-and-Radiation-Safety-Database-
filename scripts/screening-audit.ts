@@ -25,10 +25,10 @@
  *                               outlier listing (they are left out by
  *                               default - they are history, not suspects).
  */
-import { cert, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
+import { initAdminApp } from "./adminApp";
 import { vehicleScreeningKey } from "../lib/rules/daily";
 import {
   auditScreening,
@@ -46,15 +46,6 @@ const SCREENING_OUTPUT = "1.3.12";
 function arg(name: string): string | null {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
-}
-
-function init() {
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
-    initializeApp({ credential: cert(JSON.parse(readFileSync(credPath, "utf-8"))) });
-  } else {
-    initializeApp();
-  }
 }
 
 /** A bare date means the start of that day, in the local (Zambia) clock. */
@@ -94,7 +85,7 @@ const HEADER = [
 ].join("  ");
 
 async function main() {
-  init();
+  initAdminApp();
   const db = getFirestore();
   const limit = Number(arg("limit") || 40);
   const post = arg("post");

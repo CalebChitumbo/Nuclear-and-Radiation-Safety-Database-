@@ -117,7 +117,14 @@ to the seed.
    ```bash
    firebase deploy --only firestore:rules,firestore:indexes
    ```
-4. Seed the project:
+4. Get a **service account key** — every script below authenticates with one.
+   Firebase console → **Project settings → Service accounts → Generate new
+   private key**; save the downloaded JSON in the repo root as
+   `service-account.json`. It is git-ignored, and it is full administrative
+   access to the live database: keep it on your machine, off email and shared
+   drives, and revoke it in the console if it ever leaves. Run a script without
+   it and it says all this again.
+5. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
    # verify the dashboard reads 538 / 220 / 318 / 401 functional
@@ -139,13 +146,13 @@ to the seed.
    register. Users, weeks, weekly metrics, the work plan notes, opening
    balance and plan changes, daily entries, borders and activities are kept. Mock/demo browsers reset themselves automatically
    (the mock store's storage key was bumped).
-5. Create the first admin by manually calling the `setUserClaims` callable in
+6. Create the first admin by manually calling the `setUserClaims` callable in
    the Firebase Console. Everyone else asks for their own account at `/signup`
    and the admin approves them from `/admin/users` — see
    **[Accounts: sign-up and approval](#accounts-sign-up-and-approval)**.
    Provisioning an account outright from `/admin/users` still works and is the
    only way to create another administrator.
-6. Build + deploy the app:
+7. Build + deploy the app:
    ```bash
    firebase deploy --only functions,hosting
    ```
