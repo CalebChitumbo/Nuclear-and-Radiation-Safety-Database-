@@ -22,12 +22,17 @@ import {
   vehicleScreeningKey,
 } from "@/lib/rules/daily";
 import { todayISO } from "@/lib/rules/week";
-import { applyWorkPlanConfig, WORK_PLAN_YEAR } from "@/lib/rules/workPlan";
+import {
+  applyWorkPlanConfig,
+  effectiveOpeningBalance,
+  WORK_PLAN_YEAR,
+} from "@/lib/rules/workPlan";
 import type {
   AuditEntry,
   Border,
   DailyEntry,
   Section,
+  WorkPlanBaseline,
   WorkPlanConfig,
 } from "@/lib/rules/types";
 
@@ -44,7 +49,8 @@ export default function NsssPage() {
   const { weeks, selected } = useWeek();
   const { user } = useAuth();
   const { data, error, reload } = useStoreData(async (s) => {
-    const [weekMetricsAll, entries, borders, config, auditLog] = await Promise.all([
+    const [weekMetricsAll, entries, borders, config, auditLog, baseline] =
+      await Promise.all([
       // All reads degrade to empty until their rules/collections exist so the
       // tab always renders.
       s.listWeekMetricsAll().catch(() => []),
@@ -59,8 +65,13 @@ export default function NsssPage() {
       // Who changed which figure, and what it was before. Empty until the
       // auditLog rules and the Cloud Function triggers are deployed.
       s.listAuditLog({ section: NSSS }).catch(() => [] as AuditEntry[]),
+      // The opening balances, so this tab's cumulative figures are the SAME
+      // figures the sectional update reports - see the note by `openingFor`.
+      s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanBaseline | null,
+      ),
     ]);
-    return { weekMetricsAll, entries, borders, config, auditLog };
+    return { weekMetricsAll, entries, borders, config, auditLog, baseline };
   });
 
   const metrics = useMemo(
@@ -72,6 +83,22 @@ export default function NsssPage() {
   const derived = useMemo(() => {
     if (!data) return null;
     const byWeek = effectiveValuesByWeek(data.weekMetricsAll, data.entries);
+
+    /**
+     * What an output had already achieved when it came onto the system.
+     *
+     * The sectional update adds this to every cumulative figure; this tab used
+     * to leave it out, so the same output read two different totals on two
+     * screens of the same app — 9,832 apart for vehicle screening. That gap is
+     * how a figure comes to look like it moved on its own when nothing was
+     * logged at all, so the two now agree by construction.
+     */
+    const opening = effectiveOpeningBalance(
+      data.baseline?.values,
+      applyWorkPlanConfig(data.config),
+    );
+    const openingFor = (outputId: string) =>
+      (opening[outputId] || []).reduce((a, b) => a + b, 0);
     const weekByLabel = new Map(weeks.map((w) => [w.label, w]));
     // A reporting week counts toward the calendar month/year it STARTS in.
     const inMonth = (label: string) =>
@@ -79,13 +106,21 @@ export default function NsssPage() {
     const inYear = (label: string) =>
       (weekByLabel.get(label)?.start || "").slice(0, 4) === today.slice(0, 4);
 
-    const totals = metrics.map((m) => ({
-      ...m,
-      week: sumMetricsAcrossWeeks(byWeek, m.keys, (w) => w === selected.label),
-      month: sumMetricsAcrossWeeks(byWeek, m.keys, inMonth),
-      year: sumMetricsAcrossWeeks(byWeek, m.keys, inYear),
-      all: sumMetricsAcrossWeeks(byWeek, m.keys),
-    }));
+    const totals = metrics.map((m) => {
+      // Week and month are what was logged in that period. The cumulative
+      // columns carry the opening balance, the way the work plan row does.
+      const carriedIn = openingFor(m.outputId);
+      const loggedThisYear = sumMetricsAcrossWeeks(byWeek, m.keys, inYear);
+      return {
+        ...m,
+        carriedIn,
+        loggedThisYear,
+        week: sumMetricsAcrossWeeks(byWeek, m.keys, (w) => w === selected.label),
+        month: sumMetricsAcrossWeeks(byWeek, m.keys, inMonth),
+        year: carriedIn + loggedThisYear,
+        all: carriedIn + sumMetricsAcrossWeeks(byWeek, m.keys),
+      };
+    });
 
     // Screening trend: the last 8 reporting weeks up to today.
     const screeningKey = vehicleScreeningKey();
@@ -167,6 +202,11 @@ export default function NsssPage() {
         <Kpi
           label={`Vehicles screened — ${year}`}
           value={screening ? screening.year : 0}
+          caption={
+            screening && screening.carriedIn
+              ? `${screening.loggedThisYear.toLocaleString()} logged + ${screening.carriedIn.toLocaleString()} carried in`
+              : undefined
+          }
         />
         <Kpi
           label={`Regional / IAEA meetings — ${year}`}
@@ -184,7 +224,12 @@ export default function NsssPage() {
         <Bars title="Vehicle screening — last 8 weeks" rows={trend} />
         <Panel
           title="Section metrics"
-          note="A reporting week counts toward the month it starts in."
+          note={
+            "A reporting week counts toward the month it starts in. The " +
+            "cumulative columns include what each output had already achieved " +
+            "when it came onto the system, so they read as the sectional " +
+            "update reports them."
+          }
           flush
         >
           <div className="table-wrap">
@@ -195,6 +240,7 @@ export default function NsssPage() {
                   <th>Metric</th>
                   <th className="num">Week</th>
                   <th className="num">Month</th>
+                  <th className="num">Carried in</th>
                   <th className="num">{year}</th>
                   <th className="num">All</th>
                 </tr>
@@ -208,6 +254,9 @@ export default function NsssPage() {
                     <td>{m.label}</td>
                     <td className="num">{m.week}</td>
                     <td className="num">{m.month}</td>
+                    <td className="num text-gunmetal/55">
+                      {m.carriedIn || ""}
+                    </td>
                     <td className="num font-black">{m.year}</td>
                     <td className="num">{m.all}</td>
                   </tr>

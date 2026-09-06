@@ -12,6 +12,11 @@
  * somebody made last — moves it to the post-day's own document id, and removes
  * the rest.
  *
+ * Except when "written last" is plainly not a correction: a two-truck scan-log
+ * post landing on a day the workbook recorded 167 is a test, and keeping it
+ * would throw 165 real vehicles away. Those days are reported and left alone
+ * for a person to settle.
+ *
  * Usage — LOOK FIRST. Nothing is written without --apply:
  *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
  *     npx tsx scripts/collapse-duplicate-screening.ts
@@ -52,6 +57,28 @@ function keeper(entries: DailyEntry[]): DailyEntry {
   )[entries.length - 1];
 }
 
+/** How much the day is worth, at most, across the figures it holds. */
+function largestValue(entries: DailyEntry[]): number {
+  return Math.max(
+    ...entries.map((e) => (typeof e.value === "number" ? e.value : 0)),
+  );
+}
+
+/**
+ * "Written last" is the right keeper for a correction, and the wrong one for a
+ * test: a two-truck scan-log post landing on a day the workbook recorded 167
+ * would throw 165 real vehicles away. So a keeper worth less than a third of
+ * the figure it would replace is treated as the suspicious thing it is —
+ * reported, and left alone unless the caller insists.
+ */
+const SHRINK_LIMIT = 3;
+
+function shrinksSharply(keep: DailyEntry, all: DailyEntry[]): boolean {
+  const kept = typeof keep.value === "number" ? keep.value : 0;
+  const largest = largestValue(all);
+  return largest > 0 && kept * SHRINK_LIMIT < largest;
+}
+
 async function main() {
   initAdminApp();
   const db = getFirestore();
@@ -76,13 +103,20 @@ async function main() {
 
   let removed = 0;
   let reclaimed = 0;
-  const plan: Array<{ keep: DailyEntry; drop: DailyEntry[]; targetId: string }> = [];
+  const plan: Array<{
+    keep: DailyEntry;
+    drop: DailyEntry[];
+    targetId: string;
+    suspicious: boolean;
+  }> = [];
 
   for (const dup of duplicates) {
     const keep = keeper(dup.entries);
     const targetId = screeningEntryId(dup.date, dup.border);
     const drop = dup.entries.filter((e) => e.id !== keep.id);
-    plan.push({ keep, drop, targetId });
+    const suspicious = shrinksSharply(keep, dup.entries);
+    plan.push({ keep, drop, targetId, suspicious });
+    if (suspicious) continue;
     removed += drop.length;
     reclaimed += drop.reduce(
       (total, e) => total + (typeof e.value === "number" ? e.value : 0),
@@ -90,13 +124,34 @@ async function main() {
     );
   }
 
+  const held = plan.filter((p) => p.suspicious);
   console.log(
     `${duplicates.length} post-days hold more than one figure.\n` +
       `Keeping the most recent of each, removing ${removed} others, ` +
-      `taking ${reclaimed.toLocaleString()} off the cumulative total.\n`,
+      `taking ${reclaimed.toLocaleString()} off the cumulative total.` +
+      (held.length
+        ? `\n${held.length} more are LEFT ALONE - the figure written last is a ` +
+          `fraction of the one it would replace, which is the shape of a test ` +
+          `or a part-day rather than a correction. Fix those by hand.`
+        : "") +
+      "\n",
   );
 
-  for (const { keep, drop, targetId } of plan) {
+  for (const { keep, drop, targetId, suspicious } of plan) {
+    if (suspicious) {
+      console.log(
+        `${keep.border} ${keep.date}: LEFT ALONE - keeping ${keep.value} would ` +
+          `discard ${largestValue(drop)}. Delete the wrong entry by hand:`,
+      );
+      for (const e of [keep, ...drop]) {
+        console.log(
+          `        ${String(e.value).padStart(6)}  ${e.id}  ${
+            e.updatedByName || e.updatedBy || "?"
+          }`,
+        );
+      }
+      continue;
+    }
     const at = keep.createdAt ? ` written ${keep.createdAt.slice(0, 16).replace("T", " ")}` : " (imported)";
     console.log(
       `${keep.border} ${keep.date}: keep ${keep.value}${at} by ${
@@ -121,7 +176,8 @@ async function main() {
     return;
   }
 
-  for (const { keep, drop, targetId } of plan) {
+  for (const { keep, drop, targetId, suspicious } of plan) {
+    if (suspicious) continue;
     // Write the keeper to the post-day's own id first, so a failure part way
     // through can only ever leave the day counted twice - never zero.
     if (keep.id !== targetId) {
