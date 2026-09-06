@@ -311,6 +311,35 @@ def main() -> None:
             out(f"| `{rel}` | {why} |")
         out("")
 
+    # Everything the report says has to be written HERE. The file is
+    # regenerated on every run, so a section added to it by hand survives until
+    # the next person runs the script and then quietly vanishes.
+    out("## Loading the detail into the Border Scan Log\n")
+    out(
+        "The rows that ARE readable belong in `truckScans` — the log "
+        "`lib/rules/borderScans.ts` was written for. Two steps, the second "
+        "reporting before it writes:\n"
+    )
+    out("```bash\nnpm run extract:inland\n```\n")
+    out(
+        "```bash\nGOOGLE_APPLICATION_CREDENTIALS=./service-account.json "
+        "npm run import:scans -- --apply\n```\n"
+    )
+    out(
+        "The python half only reads the books; the records are built through the "
+        "app's own rules, so an imported scan is indistinguishable from one an "
+        "officer captures — same canonical commodity and transporter spellings, "
+        "same plate/chassis classification, same dose triage, same reporting "
+        "week. Ids are derived from the post, day and row, so re-running updates "
+        "in place.\n"
+    )
+    out(
+        "**It moves no reported figure.** Output 1.3.12 counts `dailyEntries`, "
+        "not scans. What it adds is history: search a plate, pull a post's day "
+        f"back up, and see the doses across a year — {rows_total:,} scans of "
+        "them, and the hand-typed tally blocks stop being necessary.\n"
+    )
+
     report = "\n".join(lines)
     if args.report:
         with open(args.report, "w", encoding="utf-8") as fh:
