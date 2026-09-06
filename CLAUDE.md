@@ -62,24 +62,32 @@ import rather than adding to it.
    fills one in later, put the answer in and say where it came from in `note`.
 2. Update the pinned figures in `tests/inspectionSeed.test.ts` (row count,
    imported count, per-type split, dated count and quarters, linked/unlinked).
-3. **Re-balance 1.2.4.** Its opening balance carries the work the register does
+3. **Move `INSPECTION_REGISTER_HANDOVER`** (`lib/store/seeding.ts`) to the day
+   the new register was handed over. It is the date the supersession rule turns
+   on — see step 5.
+4. **Re-balance 1.2.4.** Its opening balance carries the work the register does
    NOT hold, so subtract the newly dated rows in `WORK_PLAN_OPENING_BALANCE
    ["1.2.4"]` and update the pinned assertion in `tests/workPlan.test.ts`.
    Subtract from the quarter each row's **reporting week** starts in, not the
    one its date falls in — that is how the report counts it — and neither the
    reported total nor its quarterly split should move.
-4. Note the change in `docs/inspection-register-2026-import.md` under
+5. Note the change in `docs/inspection-register-2026-import.md` under
    **Re-baselines**, and in `docs/inspectorate-work-plan-2026-update.md` and
    `docs/subprogrammes-2026-cumulative-update.md` if 1.2.4 moved.
-5. Deploy, then re-seed the live project. **Use `--prune`**: ids are the
-   facility + type + which repeat a row is, so a corrected spelling or type
-   re-keys that row and the old document would report the same visit twice.
-   Only documents the seed itself wrote are ever considered, so an inspection an
-   officer logged in the app is never touched.
+6. Deploy, then re-seed the live project. Run it once WITHOUT `--prune` and read
+   the two lists it prints, then re-run with the flag:
 
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
    ```
+
+   It prunes two things. **Superseded register rows** — ids are the facility +
+   type + which repeat a row is, so a corrected spelling or type re-keys that
+   row and the old document would report the same visit twice. And
+   **inspections officers typed before the hand-over**, which the register
+   accounts for as well; without this 1.2.4 reads high by exactly the overlap
+   (it read 309 instead of 295 at the first import). Work logged after the
+   hand-over is kept — that is work the register never reached.
 
 **Watch out:** most of the register's rows have no date, and they are stored
 undated on purpose — a placeholder day would file the inspection into a
@@ -88,6 +96,12 @@ and on the province sheets, and are counted by no week, month, year or quarter.
 That is also why `validInspection` in `firestore.rules` accepts `date: ""`; the
 Log inspection form and the Daily Updates wizard both require one, so only this
 import creates them.
+
+**Watch out:** pruning the typed inspections takes their enforcement actions
+with them, so 1.2.11 moves too — it returned to its carried 193 from 203 at the
+first import. That is the same correction (the section reported both figures in
+one breath), but say so when it happens, because the register has no enforcement
+column and nothing replaces those records row by row.
 
 ## Routine: the section supplies a new daily summary workbook
 

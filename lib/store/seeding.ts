@@ -306,6 +306,40 @@ export interface SeedInspection {
 export const INSPECTION_SEED_AUTHOR = "2026 inspection register";
 
 /**
+ * The day the division handed the register over.
+ *
+ * The register is the section's account of everything it had inspected by this
+ * date, so an inspection an officer typed into the app ON OR BEFORE it is work
+ * the register now carries — the same visit, entered twice. Anything logged
+ * after it is new work the register never reached, and is left alone. `npm run
+ * seed` reports the overlap on every run and deletes it with --prune, the way
+ * the screening seed treats a post-day the workbook has since covered.
+ */
+export const INSPECTION_REGISTER_HANDOVER = "2026-09-07";
+
+/** Register documents are the only ones this prefix belongs to. */
+export const INSPECTION_REGISTER_ID_PREFIX = "reg2026-";
+
+/**
+ * Whether an inspection document in the project is work the register now
+ * carries, and so should not also be counted on its own.
+ *
+ * True only for a record typed in the app — a register document is identified
+ * by its id and is never its own duplicate — and only when it is dated on or
+ * before the hand-over. An inspection logged after that date is work the
+ * register never reached; an undated one predates nothing we can be sure of.
+ * Both are left alone.
+ */
+export function supersededByRegister(
+  id: string,
+  date: string | undefined,
+  handover = INSPECTION_REGISTER_HANDOVER,
+): boolean {
+  if (id.startsWith(INSPECTION_REGISTER_ID_PREFIX)) return false;
+  return !!date && date <= handover;
+}
+
+/**
  * The register's inspection-type wording mapped onto the system's five types.
  * The document spells pre-authorisation five ways (American -ization, British
  * -isation, with and without the word "Inspection", and lower case), which is
@@ -359,7 +393,7 @@ export function seedInspectionId(
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   const kind = norm(type).replace(/[^a-z0-9]+/g, "-");
-  return `reg2026-${slug}-${kind}-${occurrence}`;
+  return `${INSPECTION_REGISTER_ID_PREFIX}${slug}-${kind}-${occurrence}`;
 }
 
 /**

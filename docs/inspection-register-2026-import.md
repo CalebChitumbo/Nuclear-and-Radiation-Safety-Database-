@@ -128,7 +128,47 @@ quarter with work in it whenever a register row is dated after the fact. The
 A saved `workPlanBaseline/{year}` document in Firestore **replaces** the code
 constant wholesale. If 1.2.4 still reads 337 (295 + 42) after this is deployed,
 an officer has saved a baseline — correct 1.2.4 on the Opening balance panel on
-`/weekly` to the same [40, 105, 108, 0].
+`/weekly` to the same [40, 102, 111, 0].
+
+## The inspections the section had already typed
+
+The register is not the section's first record of its year. Officers had been
+logging inspections on `/inspectorate` for months before it arrived — 15 of them
+on the live project, dated 28 March to 11 August 2026 — and the register
+accounts for that work as well. Counted alongside it, the same visit is reported
+twice: at the first seeding 1.2.4 read **309** rather than 295, over by exactly
+the 14 inspection visits among those 15 records.
+
+Eleven of the fifteen are plainly the same visit as a register row, several by
+an exact name match (Mambilima, Mansa General, Senama, Mbereshi, St. Pauls,
+Kawambwa, Zambezi, Chama District Hospital) and the rest under a different
+spelling ("Makeni Islamic Society Clinic" for the register's "Makeni Islami
+hospital", "Ng'anga Bilonda" for "Nganda Bilonda"). The other four — Mansa
+Airport, China Civil Engineering Construction Corp, Nchelenge District Hospital,
+Mobrin Solutions Limited — appear nowhere in the document, and are inside the
+section's 295 all the same: the register's 298 rows never did add up to the
+307 records its own heading claims.
+
+So the rule is the date, not the name:
+
+> An inspection **typed in the app** and dated **on or before the hand-over** is
+> work the register carries. An inspection dated after it is work the register
+> never reached, and is kept. An undated one predates nothing we can be sure of,
+> and is kept.
+
+Matching record to row by name would only be a guess, and would have missed
+those four. `supersededByRegister` in `lib/store/seeding.ts` is the rule;
+`npm run seed` reports what it finds on every run and deletes it with `--prune`,
+exactly as the screening seed treats a post-day the workbook has since covered.
+
+**This takes output 1.2.11 with it.** Those records carry the only ten
+enforcement actions in the project, so pruning them returns 1.2.11 to its
+carried 193 from 203. That is the same correction, not a loss: the section
+reported 193 enforcement actions in the same breath as the 295 inspections, and
+these ten written warnings are March and April work sitting inside it. The
+register has no enforcement column, so nothing replaces them row by row — if the
+193 turns out **not** to include them, the ten need re-entering after the prune,
+or 1.2.11's balance dropping to 183.
 
 ## Left for the section
 
@@ -220,6 +260,7 @@ hospital" is not Mkushi) — which is why none of them was attached automaticall
 | Date | Was | Now | Note |
 |---|---|---|---|
 | 2026-09-07 | — | 297 inspections | First import of the 2026 facility inspection register. 1.2.4's opening balance shed the 42 dated rows (Q2 −21, Q3 −21, as the report attributes them); the reported figure stays 295, split 40 / 123 / 132. |
+| 2026-09-07 | 309 | **295** | The 15 inspections officers had typed before the hand-over were pruned as work the register carries. No balance moved — the figure was over by exactly those records. 1.2.11 returned from 203 to its carried 193 with them. |
 
 ## Re-importing
 
@@ -230,13 +271,20 @@ middle of the next document does not re-key every row below it.
 
 A corrected spelling or a corrected type does re-key its own row, and the old
 document would then report the same visit twice. `npm run seed` reports those on
-every run and deletes them with `--prune`, and only ever considers documents it
-wrote itself (`updatedBy: "seed"`), so an inspection an officer logged in the app
-is never touched:
+every run and deletes them with `--prune`:
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
 ```
+
+The same run reports the typed inspections the register supersedes (above).
+Both lists print on every run whether or not `--prune` is given, so a plain
+`npm run seed` is the dry run — read the list, then re-run with the flag.
+
+**Move `INSPECTION_REGISTER_HANDOVER` when a new register arrives.** It is the
+date the supersession rule turns on, so leaving it behind would keep every
+inspection the section logged since the last hand-over, and re-importing would
+count them twice.
 
 The figures pinned in `tests/inspectionSeed.test.ts` are this document's own —
 update them with the register.
