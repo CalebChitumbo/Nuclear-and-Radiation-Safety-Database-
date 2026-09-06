@@ -71,6 +71,36 @@ export const DOSE_IMPLAUSIBLE_NSV = 100_000;
 /** The dose readings the monitors produce most often, as one-tap chips. */
 export const DOSE_QUICK_VALUES = [20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 
+/**
+ * Does this reading look like two readings typed into one cell?
+ *
+ * The commonest bad dose in the 2026 books by a distance. Of the 21 readings
+ * that triaged as alarms across the whole year, 19 are a background reading
+ * repeated: 9090 on a sheet whose every other truck reads 80 or 90, 7060 among
+ * 70s and 60s, and one 707070 on a Chingola sheet where all 376 trucks read 60
+ * to 90. An officer tabs into the cell, the previous value is still there, and
+ * the new one lands beside it.
+ *
+ * Returns the reading it most likely was, or null. A WARNING and never an
+ * error: a genuine detection can be any number, and the form must never make a
+ * real alarm harder to record than a routine pass. Only ever fires at or above
+ * the alarm threshold, so ordinary readings are untouched.
+ */
+export function runTogetherReading(raw: string): string | null {
+  const digits = String(raw ?? "").trim();
+  if (!/^\d+$/.test(digits) || digits.length < 4 || digits.length % 2 !== 0) {
+    return null;
+  }
+  if (Number(digits) < DOSE_ALARM_NSV) return null;
+
+  const chunks: string[] = [];
+  for (let i = 0; i < digits.length; i += 2) chunks.push(digits.slice(i, i + 2));
+  // Every pair has to read as a plausible reading on its own — "1300" splits
+  // into 13 and 00, which does not, and stays a reading of 1300.
+  if (chunks.some((c) => Number(c) < 10)) return null;
+  return chunks[0];
+}
+
 /** Triage one reading. */
 export function doseResult(nSvH: number): ScanResult {
   if (!Number.isFinite(nSvH)) return "Normal";
@@ -211,6 +241,13 @@ export function validateScan(
     } else if (doseNSvH >= DOSE_IMPLAUSIBLE_NSV && !opts.confirmedImplausible) {
       errors.dose = `${doseNSvH.toLocaleString()} nSv/h is unusually high — confirm the reading and the unit (nSv/h, not µSv/h).`;
     }
+  }
+
+  const runTogether = runTogetherReading(raw);
+  if (runTogether) {
+    warnings.dose =
+      `${raw} reads like two readings typed into one cell — did you mean ` +
+      `${runTogether}? Save it as it stands if the meter really said ${raw}.`;
   }
 
   const result = doseResult(doseNSvH);

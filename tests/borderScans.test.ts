@@ -14,6 +14,7 @@ import {
   knownTransporters,
   lastSeenDetails,
   normaliseVehicleId,
+  runTogetherReading,
   scanWriteErrorMessage,
   scansToCsv,
   summariseScans,
@@ -309,6 +310,46 @@ describe("summariseScans", () => {
     const s = summariseScans([]);
     expect(s.total).toBe(0);
     expect(s.dose).toEqual({ min: 0, max: 0, mean: 0, median: 0 });
+  });
+});
+
+describe("run-together dose readings", () => {
+  it("spots a background reading typed twice", () => {
+    // The 2026 books' commonest bad dose: 19 of the year's 21 "alarms".
+    expect(runTogetherReading("9090")).toBe("90");
+    expect(runTogetherReading("8090")).toBe("80");
+    expect(runTogetherReading("7060")).toBe("70");
+    expect(runTogetherReading("2020")).toBe("20");
+    expect(runTogetherReading("707070")).toBe("70");
+  });
+
+  it("leaves ordinary readings alone", () => {
+    for (const dose of ["20", "90", "150", "404", "999"]) {
+      expect(runTogetherReading(dose)).toBeNull();
+    }
+  });
+
+  it("does not explain away a reading its digits cannot account for", () => {
+    // 1300 splits into 13 and 00, and 00 is not a reading — so it stands, and
+    // it is one of the two the 2026 books could not explain.
+    expect(runTogetherReading("1300")).toBeNull();
+    expect(runTogetherReading("10000")).toBeNull();
+  });
+
+  it("warns without blocking, so a real alarm is never harder to record", () => {
+    const draft: ScanDraft = {
+      ...emptyDraft(),
+      vehicleId: "T361DVG",
+      commodity: "Maize",
+      transporter: "Simba",
+      dose: "9090",
+      action: "Re-scanned & released",
+    };
+    const v = validateScan(draft);
+    expect(v.ok).toBe(true);
+    expect(v.errors.dose).toBeUndefined();
+    expect(v.warnings.dose).toContain("did you mean 90?");
+    expect(v.result).toBe("Alarm");
   });
 });
 
