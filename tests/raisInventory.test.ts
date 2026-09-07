@@ -6,6 +6,7 @@ import {
   SEALED_CATEGORY_LABELS,
   UNCATEGORISED,
   generatorFamily,
+  generatorFamilyOf,
   isSecuritySignificant,
   isSerialRecorded,
   loadRaisInventory,
@@ -17,6 +18,7 @@ import {
   type RaisInventorySeed,
   type RaisRecord,
 } from "../lib/rules/raisInventory";
+import { XRF_FORM_BY_RAN } from "../lib/rules/xrfDeterminations";
 import seed from "../seed/rais-source-inventory.seed.json";
 
 /**
@@ -133,9 +135,9 @@ describe("summary figures reconcile to the detail rows", () => {
       "Cargo Scanners": 10,
       "Baggage Scanners": 36,
       "Portal Monitors": 0,
-      "Portable XRF": 0,
-      "Fixed XRF": 0,
-      "XRF (Type Not Specified)": 64,
+      "Portable XRF": 18,
+      "Fixed XRF": 23,
+      "XRF (Type Not Specified)": 23,
       "Industrial X-Ray & Gauging": 29,
       "Other Specialised Equipment": 13,
       "Type Not Recorded": 109,
@@ -197,7 +199,7 @@ describe("summary figures reconcile to the detail rows", () => {
     expect(SUMMARY.dataQuality).toEqual({
       missingSerial: 110,
       missingType: 109,
-      xrfTypeUnspecified: 64,
+      xrfTypeUnspecified: 23,
       missingNuclide: 69,
       missingActivity: 345,
       uncategorisedSources: 591,
@@ -294,6 +296,77 @@ describe("generatorFamily", () => {
       if (r.kind !== "Radiation Generator") continue;
       expect(GENERATOR_FAMILIES).toContain(generatorFamily(r.type));
     }
+  });
+});
+
+describe("the XRF determinations", () => {
+  /** Every RAIS generator whose own type text says no more than "XRF". */
+  const xrf = INVENTORY.filter(
+    (r) =>
+      r.kind === "Radiation Generator" &&
+      generatorFamily(r.type) === "XRF (Type Not Specified)",
+  );
+
+  it("covers 41 of the register's 64 unqualified XRF analysers", () => {
+    expect(xrf.length).toBe(64);
+    expect(Object.keys(XRF_FORM_BY_RAN).length).toBe(41);
+    expect(SUMMARY.xrfDetermined).toEqual({ portable: 18, fixed: 23 });
+  });
+
+  it("determines nothing but an unqualified XRF analyser", () => {
+    const byRan = new Map(INVENTORY.map((r) => [r.ran, r]));
+    for (const ran of Object.keys(XRF_FORM_BY_RAN)) {
+      const record = byRan.get(ran);
+      expect(record, `${ran} is not in the register`).toBeDefined();
+      expect(generatorFamily((record as RaisRecord).type)).toBe(
+        "XRF (Type Not Specified)",
+      );
+    }
+  });
+
+  it("leaves the 23 the register gives nothing to read as a worklist", () => {
+    const undetermined = xrf.filter((r) => !XRF_FORM_BY_RAN[r.ran]);
+    expect(undetermined.length).toBe(23);
+    for (const r of undetermined) {
+      expect(generatorFamilyOf(r)).toBe("XRF (Type Not Specified)");
+    }
+    expect(SUMMARY.dataQuality.xrfTypeUnspecified).toBe(undetermined.length);
+  });
+
+  it("fills a gap and never overrides what a record says", () => {
+    const determined = {
+      no: 1,
+      ran: "RG/0128",
+      kind: "Radiation Generator" as const,
+      type: "XRF",
+      manufacturer: "Oxford Instruments",
+      model: "X – MET 7000",
+      serialNumber: "721493",
+    };
+    expect(generatorFamilyOf(determined)).toBe("Portable XRF");
+    // A correction, or a later export that spells the type out, wins.
+    expect(
+      generatorFamilyOf({ ...determined, type: "Fixed XRF" }),
+    ).toBe("Fixed XRF");
+    // A RAN with no determination stays in the worklist.
+    expect(generatorFamilyOf({ ...determined, ran: "RG/0177" })).toBe(
+      "XRF (Type Not Specified)",
+    );
+  });
+
+  it("reports the determined family on the CSV, not the bare type", () => {
+    const csv = raisInventoryToCsv([
+      {
+        no: 1,
+        ran: "RG/0817",
+        kind: "Radiation Generator",
+        type: "XRF",
+        manufacturer: "Malvern Panalytical",
+        model: "ZETIUM",
+        serialNumber: "",
+      },
+    ]);
+    expect(csv.split("\r\n")[1]).toContain("Fixed XRF");
   });
 });
 

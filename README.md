@@ -1023,7 +1023,7 @@ reconciles with a filter of the table:
   click-to-filter;
 - sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
-  (110 with no serial, 109 generators with no type, 64 XRF analysers the
+  (110 with no serial, 109 generators with no type, 23 XRF analysers the
   register does not call portable or fixed, 69 sources with no nuclide, 345 with
   no activity, 591 never categorised, 5 conflicting categories); and
 - search across RAN, manufacturer, model, serial and nuclide, with CSV export
@@ -1080,12 +1080,21 @@ Seniors' Monday Briefing of September 2026:
 
 One classifier reads both registers' vocabularies, and **order is the logic**:
 each specific machine claims its rows before the generic X-ray word they also
-contain. Two rules are worth repeating — a category is never inferred from a
-manufacturer's model name, so the 64 generators RAIS records as plain `XRF` wait
-in *XRF (Type Not Specified)* rather than being guessed into portable or fixed;
-and a category the briefing asked for exists whether or not anything is
-registered under it yet (Dental CBCT, SPECT-CT and Portal Monitors are empty
-today, and are named under the breakdown rather than hidden).
+contain. A category the briefing asked for exists whether or not anything is
+registered under it yet — Dental CBCT, SPECT-CT and Portal Monitors are empty
+today, and are named under the breakdown rather than hidden.
+
+**The XRF split** cannot come from the type column: RAIS types all 64 analysers
+as the bare word `XRF`. It comes from the instrument — the model the register
+names, read against that manufacturer's product line (an `X – MET 7000` is
+hand-held; a `Courier 5X SL` is bolted over a slurry line). 41 are determined
+that way, 18 portable and 23 fixed; the remaining 23 name no model and come from
+makers who sell both forms, so they stay in *XRF (Type Not Specified)* and are
+counted as a register gap. The determinations are a table keyed by **RAN** in
+`lib/rules/xrfDeterminations.ts`, never an edit to the seed, and
+`generatorFamilyOf` consults it only for a record whose own text still says
+nothing but `XRF` — so a correction, or a later export that spells the type out,
+wins over the determination. The tab says so on the two XRF rows.
 
 *Other Specialised Equipment* lists what it holds under its own row — calibration
 sets, a bone densitometer, a cyclotron — so the catch-all says what is in it.

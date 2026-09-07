@@ -20,7 +20,7 @@ import {
   RAIS_KINDS,
   SEALED_CATEGORY_LABELS,
   UNCATEGORISED,
-  generatorFamily,
+  generatorFamilyOf,
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
@@ -151,10 +151,22 @@ export default function SourceInventoryPage() {
   const emptyFamilies = summary.byFamily
     .filter((f) => f.count === 0 && !GAP_CATEGORIES.includes(f.family))
     .map((f) => f.family);
-  // The briefing asked for the catch-all to say what it holds.
+  // The briefing asked for the catch-all to say what it holds, and the XRF
+  // rows to say how much of them the register did not itself supply.
   const otherSpecialised = summary.otherSpecialised
     .map((t) => `${t.type} (${t.count})`)
     .join(" · ");
+  const familyDetail = (family: GeneratorFamily): string | undefined => {
+    if (family === "Other Specialised Equipment") return otherSpecialised;
+    const determined =
+      family === "Portable XRF"
+        ? summary.xrfDetermined.portable
+        : family === "Fixed XRF"
+          ? summary.xrfDetermined.fixed
+          : 0;
+    if (!determined) return undefined;
+    return `${determined} determined from the instrument's model — RAIS types them only as "XRF"`;
+  };
   const maxNuclide = Math.max(1, ...summary.byNuclide.map((n) => n.count));
 
   const editByRan = useMemo(
@@ -172,7 +184,7 @@ export default function SourceInventoryPage() {
       inventory.map((r) => ({
         r,
         family:
-          r.kind === "Radiation Generator" ? generatorFamily(r.type) : null,
+          r.kind === "Radiation Generator" ? generatorFamilyOf(r) : null,
         nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
         category: r.kind === "Sealed Source" ? sealedCategoryLabel(r) : null,
         hay: [
@@ -360,11 +372,7 @@ export default function SourceInventoryPage() {
                 label={family}
                 count={count}
                 max={maxFamily}
-                detail={
-                  family === "Other Specialised Equipment"
-                    ? otherSpecialised
-                    : undefined
-                }
+                detail={familyDetail(family)}
                 active={grouping === `family:${family}`}
                 muted={GAP_CATEGORIES.includes(family)}
                 onClick={() => pickFamily(family)}
@@ -855,7 +863,7 @@ function ItemCell({ r }: { r: RaisRecord }) {
         {r.type || "Type not recorded"}
       </div>
       <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-        {generatorFamily(r.type)}
+        {generatorFamilyOf(r)}
       </div>
     </>
   );
@@ -956,7 +964,7 @@ const RaisCard = memo(function RaisCard({
           {/* Only sources earn the right-hand chip, so the generator's family
               rides in the sub-line rather than squeezing the title. */}
           <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-            {source ? "Sealed source" : generatorFamily(r.type)}
+            {source ? "Sealed source" : generatorFamilyOf(r)}
           </div>
         </div>
         {source ? <CategoryChip r={r} /> : null}

@@ -8,6 +8,7 @@ import {
   typesInCategory,
   type SourceCategory,
 } from "./sourceCategories";
+import { XRF_FORM_BY_RAN } from "./xrfDeterminations";
 
 /**
  * The Source Inventory tab — the national register of radiation generators and
@@ -106,6 +107,24 @@ export type GeneratorFamily = SourceCategory;
  */
 export function generatorFamily(type: string): GeneratorFamily {
   return sourceCategory(type);
+}
+
+/**
+ * The family for a whole record rather than for its type text alone. Identical
+ * to `generatorFamily` except for the register's XRF analysers, which RAIS
+ * types only as "XRF": for those the Authority's own determination of portable
+ * against fixed (`XRF_FORM_BY_RAN`, keyed by RAN) fills the gap.
+ *
+ * A determination never overrides what a record says. Once the type text
+ * classifies as anything more specific than an unqualified XRF — because an
+ * officer corrected it, or a later export spells it out — that wins, and the
+ * table is not consulted. Every figure on the tab reads a record, so this is
+ * the function to use; `generatorFamily` remains for a bare piece of text.
+ */
+export function generatorFamilyOf(record: RaisRecord): GeneratorFamily {
+  const family = sourceCategory(record.type);
+  if (family !== XRF_UNSPECIFIED) return family;
+  return XRF_FORM_BY_RAN[record.ran.trim()] || family;
 }
 
 /** The five IAEA source categories, most significant first. */
@@ -235,6 +254,12 @@ export interface RaisSummary {
    * than left to the label.
    */
   otherSpecialised: { type: string; count: number }[];
+  /**
+   * How many of the Portable / Fixed XRF counts come from the Authority's
+   * determination rather than from the register's own words, so the tab can
+   * say so where it reports them.
+   */
+  xrfDetermined: { portable: number; fixed: number };
   byNuclide: { nuclide: string; count: number }[];
   byCategory: { category: SealedCategoryLabel; count: number }[];
   dataQuality: RaisDataQuality;
@@ -252,6 +277,7 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
 
   let generators = 0;
   let sealedSources = 0;
+  const determined = { portable: 0, fixed: 0 };
   let securitySignificant = 0;
   const quality: RaisDataQuality = {
     missingSerial: 0,
@@ -268,10 +294,16 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
 
     if (r.kind === "Radiation Generator") {
       generators += 1;
-      const family = generatorFamily(r.type);
+      const family = generatorFamilyOf(r);
       familyCounts.set(family, (familyCounts.get(family) || 0) + 1);
       if (family === TYPE_NOT_RECORDED) quality.missingType += 1;
       if (family === XRF_UNSPECIFIED) quality.xrfTypeUnspecified += 1;
+      // Counted where the family came from the determination table, not from
+      // the record's own text.
+      if (sourceCategory(r.type) === XRF_UNSPECIFIED) {
+        if (family === "Portable XRF") determined.portable += 1;
+        if (family === "Fixed XRF") determined.fixed += 1;
+      }
       continue;
     }
 
@@ -306,6 +338,7 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
         .map((r) => r.type),
       "Other Specialised Equipment",
     ),
+    xrfDetermined: determined,
     // Commonest nuclide first; the not-recorded bucket always sits last so it
     // reads as a gap rather than as one more nuclide in the register.
     byNuclide: [...nuclideCounts.entries()]
@@ -372,7 +405,7 @@ export function raisInventoryToCsv(records: RaisRecord[]): string {
       r.ran,
       r.kind,
       r.type,
-      source ? "" : generatorFamily(r.type),
+      source ? "" : generatorFamilyOf(r),
       r.manufacturer,
       r.model,
       r.serialNumber,

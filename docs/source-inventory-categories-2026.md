@@ -48,7 +48,9 @@ XRF became its own family).
 | Fixed X-Ray Machines | 172 | Fixed Xray radiography 138 · Conventional Xray generator 34 |
 | Type Not Recorded | 109 | *(blank)* |
 | Conventional Fixed Digital Radiography | 108 | Digital radiography DR x-ray 108 |
-| XRF (Type Not Specified) | 64 | XRF 64 |
+| Fixed XRF | 23 | XRF 23 — determined from the model, see below |
+| Portable XRF | 18 | XRF 18 — determined from the model, see below |
+| XRF (Type Not Specified) | 23 | XRF 23 |
 | General Dental X-Ray | 53 | Conventional dental 27 · Panoramic 15 · Portable Dental 9 · Cephalometric 2 |
 | C-Arm Units | 52 | C-arm Xray generator 40 · Digital C-arm X-ray 12 |
 | General CT | 50 | CT scanner 50 |
@@ -80,26 +82,78 @@ Its 14 sealed sources now break down by type of source as well: Co-57 5 ·
 Cs-137 4 · Co-60 2 · Ba-133 1 · I-129 1 · I-131 1. *Other Specialised* holds a
 `Dexter` and an `X-ray Tube` — both as the annex wrote them.
 
-## Two categories that are worklists, not machine families
+## The XRF split, and the one worklist left
 
-The finer split asks the registers questions they cannot yet answer, and the
-tabs say so rather than guessing:
+The briefing wants portable and fixed XRF counted apart. RAIS types all 64
+analysers the same way — the bare word `XRF` — so the split cannot come from the
+type column. It comes from the **instrument**: the model the register names,
+read against that manufacturer's own product line. An `X – MET 7000` is a
+hand-held alloy analyser; a `Courier 5X SL` is bolted over a slurry line.
 
-- **XRF (Type Not Specified) — 64 generators.** The briefing wants portable and
-  fixed XRF counted apart, and RAIS records all 64 as plain `XRF`. Some model
-  names hint at it (an Oxford X-MET or an Olympus Vanta is handheld, a Panalytical
-  ZETIUM or a Courier 5X SL is not), but a category is not inferred from a
-  manufacturer's model name. The 64 sit here until the register says which they
-  are; classify a row and it moves on its own.
-- **Type Not Recorded — 109 generators.** As before: a registered generator whose
-  type RAIS never captured.
+**41 of the 64 are determined this way** — 18 portable, 23 fixed:
 
-Both are shown muted, and both are counted on the *register gaps* panel.
+| Determined | Read from |
+| --- | --- |
+| **Portable, 18** | Oxford Instruments `X – MET 7000` ×14 · Olympus `Vanta` ×2 · Niton `XL2` (the model is in the serial, not the model column) · SciAps (hand-helds only) |
+| **Fixed, 23** | Malvern Panalytical `ZETIUM`, `PW 4400/25`, `EPSILON 3X` and four more on the same DY-prefixed serials · Thermo `ARL 9900`, `Quant'X` · Spectro `Xepos` ×3 · Oxford `X-SUPREME 8000` · Rigaku `MiniFlex` · Outotec `Courier 5X SL` ×3 and Dutotel `Courier 6X SL` · Baltic Scientific `CON-X` ×2 · IMA `con 100` · Outotec and Thermo Gamma-Metrics on-line analysers |
+
+The determinations are a table keyed by **RAN** in
+[`lib/rules/xrfDeterminations.ts`](../lib/rules/xrfDeterminations.ts), not an
+edit to the seed. The distinction matters:
+
+- the seed stays checkable against the RAIS export, line for line — this is the
+  Authority's determination, not something RAIS said;
+- a determination only ever **fills a gap**. `generatorFamilyOf` consults the
+  table only for a record whose own text still says nothing but `XRF`, so an
+  officer's correction, or a future export that spells the type out, wins over
+  it; and
+- keyed by RAN, it survives a re-export, and an item whose RAN is gone simply
+  stops being consulted.
+
+The tab says where the figure came from: the Portable and Fixed XRF rows carry
+*"n determined from the instrument's model — RAIS types them only as XRF"*, and
+the CSV's Family column reports the determined family beside the verbatim `XRF`
+type.
+
+### The 23 still unspecified
+
+Their entry names no model, and their manufacturer sells both forms — Thermo
+Scientific sell the Niton hand-helds and the ARL benchtops alike — so there is
+nothing to read. They stay in *XRF (Type Not Specified)* and are counted on the
+register-gaps panel until the register itself says which they are; classify one
+and it moves on its own.
+
+| Manufacturer / model | RANs |
+| --- | --- |
+| Thermo Scientific — no model (8) | RG/0336–RG/0340, RG/0373, RG/0374, RG/0375 |
+| Jiangsu Kyray — no model (3) | RG/0399, RG/0400, RG/0401 |
+| Thermofisher — no model (2) | RG/0366, RG/0368 |
+| Bruker — no model | RG/0177 |
+| Scanray `DOP-200/242` | RG/0201 |
+| Varian — no model | RG/0208 |
+| Oxford Instruments Analytical Systems — no model | RG/0209 |
+| Innovex Olympus `VMR GE2` | RG/0210 |
+| Philips `MRS` | RG/0556 |
+| Sias — no model | RG/0593 |
+| Nuctech — no model | RG/0794 |
+| Olympus Corp `VMR` | RG/0840 |
+| No manufacturer, no model | RG/1014 |
+
+The field annex's one XRF row (`XRF-3000`) is undetermined for the same reason:
+a bare model number with no manufacturer behind it. The annex is keyed by row
+number rather than RAN, so it has no determination table of its own.
+
+**Type Not Recorded — 109 generators** is the other worklist: a registered
+generator whose type RAIS never captured at all. Both buckets are shown muted
+and counted on the register-gaps panel.
 
 ## Judgement calls worth knowing
 
 - **"Deep Xray treatment" → Teletherapy.** Orthovoltage external-beam treatment.
   The two rows are RAIS' own wording and are not corrected.
+- **The XRF forms are determined, not guessed at random, and never overwrite.**
+  See the section above: model first, manufacturer only where that maker's whole
+  XRF line is one form, and the record's own words always win.
 - **A cyclotron is not a linac.** Item 4 made linear accelerators standalone; a
   cyclotron and RAIS' "Other type of particle radiation generators" are named
   under *Other Specialised Equipment* rather than counted as radiotherapy, which
@@ -124,8 +178,12 @@ Both are shown muted, and both are counted on the *register gaps* panel.
 2. Update `tests/sourceCategories.test.ts` (the pinned list, and a case for each
    new split), then the pinned per-category counts in
    `tests/raisInventory.test.ts` and `tests/verifiedInventory.test.ts`.
-3. Update the tables above, and the Source Inventory section of the README.
-4. `npm run typecheck && npm test`.
+3. If a new RAIS export names a model for one of the 23 undetermined analysers,
+   nothing needs doing: the type text wins on its own. If it names one for a row
+   the table already covers, drop that row from `XRF_FORM_BY_RAN` — a
+   determination should not sit under an answer the register now gives.
+4. Update the tables above, and the Source Inventory section of the README.
+5. `npm run typecheck && npm test`.
 
 Nothing is stored per category — every figure is derived from the registers'
 own text at read time — so a category change needs no re-seed and no migration,

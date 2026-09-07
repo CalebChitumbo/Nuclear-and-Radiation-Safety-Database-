@@ -221,10 +221,14 @@ counts.
 page is read — so a category change needs no re-seed and no migration, and the
 `inventoryEdits` overlay is untouched by it.
 
-**Watch out:** a category is never inferred from a manufacturer's model name.
-The 64 generators RAIS records as plain `XRF` sit in *XRF (Type Not Specified)*
-until the register itself says portable or fixed; that bucket and *Type Not
-Recorded* are worklists, and both are counted on the register-gaps panel.
+**Watch out:** RAIS types all 64 XRF analysers as the bare word `XRF`, so the
+portable/fixed split comes from a RAN-keyed determination table,
+`XRF_FORM_BY_RAN` in `lib/rules/xrfDeterminations.ts` — never from an edit to
+the seed, which stays checkable against the export. `generatorFamilyOf` consults
+it only for a record whose own text still says nothing but `XRF`, so a
+correction or a later export wins over it; if an export names the model for a
+row the table covers, drop that row. The 23 it cannot read, and the 109 with no
+type at all, are worklists counted on the register-gaps panel.
 
 ## Routine: the Summary sheet's enforcement columns
 
