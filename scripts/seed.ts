@@ -42,6 +42,8 @@ import { initAdminApp } from "./adminApp";
 import { vehicleScreeningKey } from "../lib/rules/daily";
 import type { DailyEntry, Inspection, WeekDef } from "../lib/rules/types";
 import {
+  INSPECTION_REGISTER_HANDOVER,
+  supersededByRegister,
   mapAllSeed,
   mapAllSeedInspections,
   mapSeedBorders,
@@ -258,6 +260,65 @@ async function reportSupersededInspections(seeded: Inspection[]) {
   console.log(`  pruned ${stale.length} superseded register inspection(s)`);
 }
 
+/**
+ * Inspections an officer typed for work the register now carries.
+ *
+ * The register is the division's account of everything it had inspected by the
+ * hand-over, so a visit logged in the app on or before that date is in the
+ * system twice — once as the officer's record and once as a register row. Both
+ * are counted, and output 1.2.4 reads high by exactly the overlap. This is not
+ * a corner case: the section had been logging inspections for months before
+ * the register arrived.
+ *
+ * The register wins where the two meet. It is the section's own reconciled
+ * account, and it is what the reported figure was re-baselined against.
+ * Matching record to row by name would only be a guess, and would miss the
+ * visits the register counts without itemising — the officer's "Mansa Airport"
+ * and "Nchelenge District Hospital" are inside the section's 295 even though no
+ * row of the document names them.
+ *
+ * An inspection dated AFTER the hand-over is left alone: that is work the
+ * register never reached, not a duplicate. So is an undated one, which predates
+ * nothing we can be sure of, and anything carrying a register id — those are
+ * `reportSupersededInspections`'s business.
+ */
+async function reportSupersededTypedInspections() {
+  const db = getFirestore();
+  const snap = await db.collection("inspections").get();
+  const superseded = snap.docs.filter((d) =>
+    supersededByRegister(d.id, String(d.get("date") || "")),
+  );
+
+  if (!superseded.length) {
+    console.log("  no typed inspections superseded by the register");
+    return;
+  }
+  console.log(
+    `  ${superseded.length} inspection(s) typed in the app cover work the ` +
+      `register carries (dated on or before ${INSPECTION_REGISTER_HANDOVER}):`,
+  );
+  for (const d of superseded.slice(0, 15)) {
+    const action = d.get("enforcement");
+    console.log(
+      `    ${d.get("date")}  ${String(d.get("type")).padEnd(19)}` +
+        `${d.get("facilityName") || ""}${action ? `  [${action}]` : ""}`,
+    );
+  }
+  if (superseded.length > 15) {
+    console.log(`    … ${superseded.length - 15} more`);
+  }
+
+  if (!PRUNE) {
+    console.log(
+      "  Left in place - they are counted ON TOP of the register until " +
+        "removed. Re-run with --prune to delete them.",
+    );
+    return;
+  }
+  await chunkedBatchWrite(superseded, 400, (d, batch) => batch.delete(d.ref));
+  console.log(`  pruned ${superseded.length} superseded typed inspection(s)`);
+}
+
 async function main() {
   initAdminApp();
   const db = getFirestore();
@@ -339,6 +400,7 @@ async function main() {
     batch.set(db.doc(`inspections/${id}`), rest);
   });
   await reportSupersededInspections(register.inspections);
+  await reportSupersededTypedInspections();
 
   console.log("Writing reference lists + week calendar…");
   // Single source of truth: lib/rules/types.ts — hardcoding these here once

@@ -12,9 +12,11 @@ import {
   type SubprogrammeReport,
 } from "../lib/rules/workPlan";
 import {
+  INSPECTION_REGISTER_HANDOVER,
   mapAllSeed,
   mapAllSeedInspections,
   seedInspectionId,
+  supersededByRegister,
   type SeedFacility,
   type SeedInspection,
 } from "../lib/store/seeding";
@@ -179,5 +181,25 @@ describe("§18 — seeded 2026 inspection register", () => {
       .find((r) => r.output.id === "1.2.4");
     expect(row?.total).toBe(295);
     expect(row?.quarters).toEqual([40, 123, 132, 0]);
+  });
+
+  it("treats an inspection typed before the hand-over as the register's", () => {
+    // The section logged inspections in the app for months before it handed the
+    // register over, and the register accounts for that work too — counting
+    // both reports the same visit twice, which is what took 1.2.4 to 309.
+    const typed = "insp-typed-by-an-officer";
+    expect(supersededByRegister(typed, "2026-03-30")).toBe(true);
+    expect(supersededByRegister(typed, INSPECTION_REGISTER_HANDOVER)).toBe(true);
+
+    // Work logged after the hand-over is work the register never reached.
+    expect(supersededByRegister(typed, "2026-09-08")).toBe(false);
+    // An undated record predates nothing we can be sure of.
+    expect(supersededByRegister(typed, "")).toBe(false);
+    expect(supersededByRegister(typed, undefined)).toBe(false);
+
+    // A register row is never its own duplicate, dated or not.
+    for (const i of inspections.slice(0, 50)) {
+      expect(supersededByRegister(i.id, i.date)).toBe(false);
+    }
   });
 });
