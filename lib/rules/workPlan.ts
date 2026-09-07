@@ -1158,11 +1158,16 @@ export function validateOutputEdit(
  *          no dated `licenceEvents` yet (the Licensing Status import seeds
  *          facilities and their authorisations, not issue events), so the whole
  *          figure is carried in and every licence logged from here adds on top.
- * - 1.2.x  carried in whole — the inspection register is empty, so 1.2.4 and
- *          1.2.11 have nothing behind them the system counts. 1.2.4 was
- *          re-baselined to 295 on 4 Sep 2026 (was 284); the Inspectorate adds
- *          on top of it from the daily inspections log — see CLAUDE.md for the
- *          routine.
+ * - 1.2.4  part carried, part counted. The section's 2026 facility inspection
+ *          register was imported on 7 Sep 2026 (297 inspections), and 42 of its
+ *          rows carry a date, so those are counted off the register and the
+ *          balance sheds them, quarter for quarter as the report attributes
+ *          them — 253 carried + 42 counted = the 295 the section re-baselined
+ *          to on 4 Sep 2026, split as before. The register's other 255 rows are
+ *          undated and belong to no quarter, so they stay inside the carried
+ *          figure. See docs/inspection-register-2026-import.md.
+ * - 1.2.11 carried in whole — the register records no enforcement actions, so
+ *          1.2.11 has nothing behind it the system counts.
  * - 1.3.12 the ONE row the system holds in full: the inland offices' daily log
  *          (seed/daily-screening-2026.seed.json, see
  *          docs/daily-screening-2026-import.md) is counted directly and runs to
@@ -1200,10 +1205,18 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.2.1": [1, 0, 0, 0],
   "1.2.2": [1, 0, 0, 0],
   "1.2.3": [0, 2, 0, 0],
-  // 295 routine & follow-up inspections at 4 Sep 2026 — the Q3 figure carries
-  // the difference from the 284 first imported. Change only the last quarter
-  // that has work in it when the section gives a new total.
-  "1.2.4": [40, 123, 132, 0],
+  // The 295 inspections the section reported at 4 Sep 2026, LESS the 42 the
+  // inspection register now evidences with a date of their own: those are
+  // counted off the register, so carrying them here as well would report them
+  // twice. 253 + 42 = 295, and the split stays the section's own 40/123/132 —
+  // the 21/21 taken out of Q2 and Q3 is how the REPORT attributes those rows
+  // (a week counts to the quarter it starts in, so the three inspections of
+  // 1 Jul fall in the week of 29 Jun and are Q2 here), not how the calendar
+  // does. The rest of the register — 255 rows the section could not date — is
+  // still carried, because nothing can say which quarter those belong to. See
+  // docs/inspection-register-2026-import.md; when the section gives a new
+  // total, change only the last quarter that has work in it.
+  "1.2.4": [40, 102, 111, 0],
   "1.2.5": [1, 1, 0, 0],
   "1.2.6": [8, 8, 7, 0],
   "1.2.7": [1, 1, 0, 0],

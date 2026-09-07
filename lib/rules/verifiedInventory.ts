@@ -1,4 +1,11 @@
 import { toCsv } from "./exportCsv";
+import {
+  SEALED_SOURCES,
+  SOURCE_CATEGORIES,
+  sourceCategory,
+  typesInCategory,
+  type SourceCategory,
+} from "./sourceCategories";
 
 /**
  * The Verified Source Inventory tab — the radiation sources and radiation-
@@ -17,7 +24,9 @@ import { toCsv } from "./exportCsv";
  * a dozen real machine families), so every helper here derives its groupings
  * from that text rather than trusting a stored category — the detail rows stay
  * the single source of truth, and every figure on the page reconciles with a
- * filter of the table.
+ * filter of the table. The categories themselves are shared with the RAIS tab
+ * (`sourceCategories.ts`), which is what lets the register and the field
+ * exercise be read against each other line by line.
  */
 
 /** One inventoried item, exactly as recorded in Annex I. */
@@ -53,60 +62,51 @@ export interface VerifiedInventorySeed {
 }
 
 /**
- * The nine machine families the exercise reports against (Annex summary order).
- * Every equipment type maps to exactly one of these.
+ * The categories the exercise reports against — the shared inventory list
+ * (`sourceCategories.ts`), so a machine is named here exactly as the RAIS
+ * register names it and the two tabs can be read side by side. Every equipment
+ * type maps to exactly one of them.
  */
-export const SOURCE_CATEGORIES = [
-  "Fixed X-Ray Machines",
-  "Dental X-Ray & OPG Systems",
-  "Mobile & Portable X-Ray Units",
-  "C-Arm Units",
-  "CT Scanners",
-  "Radioactive Sources",
-  "Mammography Systems",
-  "Fluoroscopy Units",
-  "Other Specialized / Gauge Equipment",
-] as const;
-
-export type SourceCategory = (typeof SOURCE_CATEGORIES)[number];
+export { SOURCE_CATEGORIES, SEALED_SOURCES };
+export type { SourceCategory };
 
 /**
- * Bucket a free-form equipment type into one of the nine machine families.
- * Order matters: the sealed-source and specialised checks run before the plain
- * X-ray ones so a "Source: Cs-137" or an "Industrial Nuclear Gauge" is never
- * swept into "Fixed X-Ray".
+ * Bucket a free-form equipment type into one of the categories above. The annex
+ * writes a sealed source as "Source: <nuclide>"; those land in Sealed Sources
+ * and are broken down by nuclide in `sourceTypeBreakdown` below.
  */
 export function categorizeEquipment(equipmentType: string): SourceCategory {
-  const s = equipmentType.toLowerCase().trim();
+  return sourceCategory(equipmentType);
+}
 
-  // Sealed radioactive sources are written "Source: <nuclide>"; gauges use the
-  // sealed source but are reported with the specialised equipment.
-  if (s.includes("gauge")) return "Other Specialized / Gauge Equipment";
-  if (s.startsWith("source:")) return "Radioactive Sources";
+/**
+ * The nuclide an annex row names, for a row that records a sealed source —
+ * "Source: Cs-137" reads as "Cs-137". Returns null for a machine.
+ *
+ * The Seniors' Briefing asked for sealed sources to be split by the type of
+ * source rather than counted as one line; the nuclide as recorded is what the
+ * annex gives, and it is taken verbatim, the way the RAIS tab takes its own.
+ */
+export function sealedSourceNuclide(equipmentType: string): string | null {
+  const text = equipmentType.trim();
+  if (sourceCategory(text) !== SEALED_SOURCES) return null;
+  const nuclide = text.replace(/^sources?\s*:\s*/i, "").trim();
+  return nuclide || "Not recorded";
+}
 
-  // Specialised / non-imaging kit before the generic X-ray families.
-  if (
-    s.includes("xrf") ||
-    s.includes("baggage") ||
-    s.includes("dexter") ||
-    s.includes("tube")
-  ) {
-    return "Other Specialized / Gauge Equipment";
+/** Sealed sources by nuclide, commonest first. */
+export function sourceTypeBreakdown(
+  records: VerifiedRecord[],
+): { nuclide: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of records) {
+    const nuclide = sealedSourceNuclide(r.equipmentType);
+    if (!nuclide) continue;
+    counts.set(nuclide, (counts.get(nuclide) || 0) + 1);
   }
-
-  if (s.includes("mammograph")) return "Mammography Systems";
-  if (s.includes("fluoro")) return "Fluoroscopy Units";
-  if (s.includes("c-arm") || s.includes("c arm")) return "C-Arm Units";
-  if (/\bct\b/.test(s) || s.includes("ct-") || s === "scanners") {
-    return "CT Scanners";
-  }
-  if (s.includes("dental") || s.includes("opg") || s === "opd" || s === "dpg") {
-    return "Dental X-Ray & OPG Systems";
-  }
-  if (s.includes("mobile") || s.includes("portable")) {
-    return "Mobile & Portable X-Ray Units";
-  }
-  return "Fixed X-Ray Machines";
+  return [...counts.entries()]
+    .map(([nuclide, count]) => ({ nuclide, count }))
+    .sort((a, b) => b.count - a.count || a.nuclide.localeCompare(b.nuclide));
 }
 
 /**
@@ -153,6 +153,10 @@ export interface VerifiedInventorySummary {
   facilities: number;
   serialsProvided: number;
   byCategory: { category: SourceCategory; count: number }[];
+  /** Sealed sources by nuclide — the type-of-source split. */
+  bySourceType: { nuclide: string; count: number }[];
+  /** What the catch-all category actually holds, commonest first. */
+  otherSpecialised: { type: string; count: number }[];
   byStatus: { group: StatusGroup; count: number }[];
   radioactiveSources: number;
   inUse: number;
@@ -188,11 +192,16 @@ export function summarizeVerifiedInventory(records: VerifiedRecord[]): VerifiedI
       category,
       count: catCounts.get(category) || 0,
     })),
+    bySourceType: sourceTypeBreakdown(records),
+    otherSpecialised: typesInCategory(
+      records.map((r) => r.equipmentType),
+      "Other Specialised Equipment",
+    ),
     byStatus: STATUS_GROUPS.map((group) => ({
       group,
       count: statusCounts.get(group) || 0,
     })),
-    radioactiveSources: catCounts.get("Radioactive Sources") || 0,
+    radioactiveSources: catCounts.get(SEALED_SOURCES) || 0,
     inUse: statusCounts.get("In Use") || 0,
   };
 }

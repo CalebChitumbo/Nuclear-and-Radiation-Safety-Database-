@@ -1,4 +1,14 @@
 import { toCsv } from "./exportCsv";
+import {
+  SEALED_SOURCES,
+  SOURCE_CATEGORIES,
+  TYPE_NOT_RECORDED,
+  XRF_UNSPECIFIED,
+  sourceCategory,
+  typesInCategory,
+  type SourceCategory,
+} from "./sourceCategories";
+import { XRF_FORM_BY_RAN } from "./xrfDeterminations";
 
 /**
  * The Source Inventory tab — the national register of radiation generators and
@@ -75,90 +85,46 @@ export interface RaisInventorySeed {
 }
 
 /**
- * The families the generator register reports against. RAIS records a free-form
- * `Type` (33 spellings across the export, plus 109 rows with none), so the tab
- * groups them into the families an inspector plans around.
+ * The families the generator register reports against — the shared inventory
+ * categories (`sourceCategories.ts`) less the sealed-source bucket, which no
+ * generator can land in. RAIS records a free-form `Type` (33 spellings across
+ * the export, plus 109 rows with none), and the shared classifier folds those
+ * into the categories the Seniors' Briefing asked the inventory to report
+ * against, so this tab and the field-verified one now name a machine the same
+ * way.
  */
-export const GENERATOR_FAMILIES = [
-  "Fixed & Digital Radiography",
-  "Mobile & Portable X-Ray",
-  "Dental & OPG Systems",
-  "CT & PET-CT Scanners",
-  "C-Arm Units",
-  "Fluoroscopy, Angiography & Cathlab",
-  "Mammography Systems",
-  "Radiotherapy & Accelerators",
-  "Industrial & Analytical X-Ray",
-  "Security Screening Scanners",
-  "Other Specialised",
-  "Type Not Recorded",
-] as const;
+export const GENERATOR_FAMILIES = SOURCE_CATEGORIES.filter(
+  (c) => c !== SEALED_SOURCES,
+) as readonly SourceCategory[];
 
-export type GeneratorFamily = (typeof GENERATOR_FAMILIES)[number];
+export type GeneratorFamily = SourceCategory;
 
 /**
- * Bucket a RAIS generator type into one of the families above.
- *
- * Order matters throughout. The specific machines are tested before the generic
- * X-ray words they contain, so a "Digital Mammography" is not swept into
- * radiography by its "Digital", a "Panoramic dental X-ray generator" is dental
- * rather than fixed, and a "Digital Mobile X-ray" is mobile rather than
- * digital radiography.
+ * Bucket a RAIS generator type into one of the families above. The rules are
+ * shared with the field annex — see `sourceCategory` for the ordering that
+ * keeps a "Digital Mammography" out of digital radiography and a "Baggage
+ * Scanner" out of CT.
  */
 export function generatorFamily(type: string): GeneratorFamily {
-  const s = type.toLowerCase().trim();
-  if (s === "") return "Type Not Recorded";
+  return sourceCategory(type);
+}
 
-  // Treatment and particle machines first — a linac is not a radiography set.
-  if (
-    s.includes("linear accelerator") ||
-    s.includes("brachytherapy") ||
-    s.includes("afterloader") ||
-    s.includes("cyclotron") ||
-    s.includes("deep xray treatment") ||
-    s.includes("deep x-ray treatment")
-  ) {
-    return "Radiotherapy & Accelerators";
-  }
-
-  // Screening portals, before "scanner" can pull them to CT.
-  if (s.includes("baggage") || s.includes("cargo")) {
-    return "Security Screening Scanners";
-  }
-
-  if (s.includes("mammograph")) return "Mammography Systems";
-  if (s.includes("dental") || s.includes("opg") || s.includes("cephalometric")) {
-    return "Dental & OPG Systems";
-  }
-  if (s.includes("c-arm") || s.includes("c arm")) return "C-Arm Units";
-  if (s.includes("cathlab") || s.includes("cath lab") || s.includes("angiograph")) {
-    return "Fluoroscopy, Angiography & Cathlab";
-  }
-
-  // Industrial fluoroscopy is a non-destructive-testing set, not a cathlab, so
-  // it is claimed before the medical fluoroscopy test below.
-  if (
-    s.includes("xrf") ||
-    s.includes("thickness gauge") ||
-    s.includes("industrial")
-  ) {
-    return "Industrial & Analytical X-Ray";
-  }
-  if (s.includes("fluoro")) return "Fluoroscopy, Angiography & Cathlab";
-
-  if (/\bct\b/.test(s) || s.includes("pet-ct") || s.includes("ct scanner")) {
-    return "CT & PET-CT Scanners";
-  }
-  if (s.includes("mobile") || s.includes("portable")) {
-    return "Mobile & Portable X-Ray";
-  }
-  if (s.includes("calibration") || s.includes("densitometer")) {
-    return "Other Specialised";
-  }
-  if (s.includes("radiograph") || s.includes("conventional xray")) {
-    return "Fixed & Digital Radiography";
-  }
-  return "Other Specialised";
+/**
+ * The family for a whole record rather than for its type text alone. Identical
+ * to `generatorFamily` except for the register's XRF analysers, which RAIS
+ * types only as "XRF": for those the Authority's own determination of portable
+ * against fixed (`XRF_FORM_BY_RAN`, keyed by RAN) fills the gap.
+ *
+ * A determination never overrides what a record says. Once the type text
+ * classifies as anything more specific than an unqualified XRF — because an
+ * officer corrected it, or a later export spells it out — that wins, and the
+ * table is not consulted. Every figure on the tab reads a record, so this is
+ * the function to use; `generatorFamily` remains for a bare piece of text.
+ */
+export function generatorFamilyOf(record: RaisRecord): GeneratorFamily {
+  const family = sourceCategory(record.type);
+  if (family !== XRF_UNSPECIFIED) return family;
+  return XRF_FORM_BY_RAN[record.ran.trim()] || family;
 }
 
 /** The five IAEA source categories, most significant first. */
@@ -261,6 +227,12 @@ export function isSerialRecorded(serial: string): boolean {
 export interface RaisDataQuality {
   missingSerial: number;
   missingType: number;
+  /**
+   * Generators the register calls "XRF" without saying whether they are
+   * portable or fixed. The two are counted apart now, so an unqualified entry
+   * is a row for an officer to resolve rather than a family of its own.
+   */
+  xrfTypeUnspecified: number;
   missingNuclide: number;
   missingActivity: number;
   uncategorisedSources: number;
@@ -276,6 +248,18 @@ export interface RaisSummary {
   /** Named nuclides in the register — the not-recorded bucket is not one. */
   distinctNuclides: number;
   byFamily: { family: GeneratorFamily; count: number }[];
+  /**
+   * What the catch-all family actually holds, commonest first — the briefing
+   * asked for the equipment under "Other Specialised" to be spelled out rather
+   * than left to the label.
+   */
+  otherSpecialised: { type: string; count: number }[];
+  /**
+   * How many of the Portable / Fixed XRF counts come from the Authority's
+   * determination rather than from the register's own words, so the tab can
+   * say so where it reports them.
+   */
+  xrfDetermined: { portable: number; fixed: number };
   byNuclide: { nuclide: string; count: number }[];
   byCategory: { category: SealedCategoryLabel; count: number }[];
   dataQuality: RaisDataQuality;
@@ -293,10 +277,12 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
 
   let generators = 0;
   let sealedSources = 0;
+  const determined = { portable: 0, fixed: 0 };
   let securitySignificant = 0;
   const quality: RaisDataQuality = {
     missingSerial: 0,
     missingType: 0,
+    xrfTypeUnspecified: 0,
     missingNuclide: 0,
     missingActivity: 0,
     uncategorisedSources: 0,
@@ -308,9 +294,16 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
 
     if (r.kind === "Radiation Generator") {
       generators += 1;
-      const family = generatorFamily(r.type);
+      const family = generatorFamilyOf(r);
       familyCounts.set(family, (familyCounts.get(family) || 0) + 1);
-      if (family === "Type Not Recorded") quality.missingType += 1;
+      if (family === TYPE_NOT_RECORDED) quality.missingType += 1;
+      if (family === XRF_UNSPECIFIED) quality.xrfTypeUnspecified += 1;
+      // Counted where the family came from the determination table, not from
+      // the record's own text.
+      if (sourceCategory(r.type) === XRF_UNSPECIFIED) {
+        if (family === "Portable XRF") determined.portable += 1;
+        if (family === "Fixed XRF") determined.fixed += 1;
+      }
       continue;
     }
 
@@ -339,6 +332,13 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
       family,
       count: familyCounts.get(family) || 0,
     })),
+    otherSpecialised: typesInCategory(
+      records
+        .filter((r) => r.kind === "Radiation Generator")
+        .map((r) => r.type),
+      "Other Specialised Equipment",
+    ),
+    xrfDetermined: determined,
     // Commonest nuclide first; the not-recorded bucket always sits last so it
     // reads as a gap rather than as one more nuclide in the register.
     byNuclide: [...nuclideCounts.entries()]
@@ -405,7 +405,7 @@ export function raisInventoryToCsv(records: RaisRecord[]): string {
       r.ran,
       r.kind,
       r.type,
-      source ? "" : generatorFamily(r.type),
+      source ? "" : generatorFamilyOf(r),
       r.manufacturer,
       r.model,
       r.serialNumber,

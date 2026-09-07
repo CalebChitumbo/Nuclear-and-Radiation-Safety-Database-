@@ -12,6 +12,7 @@ import {
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
+import { GAP_CATEGORIES } from "@/lib/rules/sourceCategories";
 import { mergeRaisInventory } from "@/lib/rules/inventoryEdits";
 import {
   GENERATOR_FAMILIES,
@@ -19,7 +20,7 @@ import {
   RAIS_KINDS,
   SEALED_CATEGORY_LABELS,
   UNCATEGORISED,
-  generatorFamily,
+  generatorFamilyOf,
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
@@ -144,6 +145,28 @@ export default function SourceInventoryPage() {
     [inventory],
   );
   const maxFamily = Math.max(1, ...summary.byFamily.map((f) => f.count));
+  // A category with nothing in it is still a category the inventory reports
+  // against, so it is named under the breakdown rather than dropped from it.
+  const familiesInUse = summary.byFamily.filter((f) => f.count > 0);
+  const emptyFamilies = summary.byFamily
+    .filter((f) => f.count === 0 && !GAP_CATEGORIES.includes(f.family))
+    .map((f) => f.family);
+  // The briefing asked for the catch-all to say what it holds, and the XRF
+  // rows to say how much of them the register did not itself supply.
+  const otherSpecialised = summary.otherSpecialised
+    .map((t) => `${t.type} (${t.count})`)
+    .join(" · ");
+  const familyDetail = (family: GeneratorFamily): string | undefined => {
+    if (family === "Other Specialised Equipment") return otherSpecialised;
+    const determined =
+      family === "Portable XRF"
+        ? summary.xrfDetermined.portable
+        : family === "Fixed XRF"
+          ? summary.xrfDetermined.fixed
+          : 0;
+    if (!determined) return undefined;
+    return `${determined} determined from the instrument's model — RAIS types them only as "XRF"`;
+  };
   const maxNuclide = Math.max(1, ...summary.byNuclide.map((n) => n.count));
 
   const editByRan = useMemo(
@@ -161,7 +184,7 @@ export default function SourceInventoryPage() {
       inventory.map((r) => ({
         r,
         family:
-          r.kind === "Radiation Generator" ? generatorFamily(r.type) : null,
+          r.kind === "Radiation Generator" ? generatorFamilyOf(r) : null,
         nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
         category: r.kind === "Sealed Source" ? sealedCategoryLabel(r) : null,
         hay: [
@@ -343,18 +366,24 @@ export default function SourceInventoryPage() {
           note="Tap a family to filter the list below."
         >
           <ul className="mt-1 space-y-1.5">
-            {summary.byFamily.map(({ family, count }) => (
+            {familiesInUse.map(({ family, count }) => (
               <BreakdownRow
                 key={family}
                 label={family}
                 count={count}
                 max={maxFamily}
+                detail={familyDetail(family)}
                 active={grouping === `family:${family}`}
-                muted={family === "Type Not Recorded"}
+                muted={GAP_CATEGORIES.includes(family)}
                 onClick={() => pickFamily(family)}
               />
             ))}
           </ul>
+          {emptyFamilies.length > 0 ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
+              Nothing registered yet under {emptyFamilies.join(" · ")}.
+            </p>
+          ) : null}
         </Panel>
       ) : null}
 
@@ -422,6 +451,11 @@ export default function SourceInventoryPage() {
           <GapRow
             label="Generator type not recorded"
             count={gaps.missingType}
+            of={summary.generators}
+          />
+          <GapRow
+            label="XRF analyser not recorded as portable or fixed"
+            count={gaps.xrfTypeUnspecified}
             of={summary.generators}
           />
           <GapRow
@@ -702,6 +736,7 @@ function BreakdownRow({
   max,
   active,
   muted,
+  detail,
   onClick,
 }: {
   label: string;
@@ -709,6 +744,8 @@ function BreakdownRow({
   max: number;
   active: boolean;
   muted?: boolean;
+  /** What a catch-all row actually holds, spelled out under its label. */
+  detail?: string;
   onClick: () => void;
 }) {
   return (
@@ -730,6 +767,11 @@ function BreakdownRow({
           </span>
           <span className="tabular font-black shrink-0">{count}</span>
         </div>
+        {detail ? (
+          <div className="text-[11px] leading-relaxed text-gunmetal/55">
+            {detail}
+          </div>
+        ) : null}
         <div
           className="mt-1 h-1.5 rounded-full overflow-hidden"
           style={{ background: "rgba(26,27,29,0.06)" }}
@@ -821,7 +863,7 @@ function ItemCell({ r }: { r: RaisRecord }) {
         {r.type || "Type not recorded"}
       </div>
       <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-        {generatorFamily(r.type)}
+        {generatorFamilyOf(r)}
       </div>
     </>
   );
@@ -922,7 +964,7 @@ const RaisCard = memo(function RaisCard({
           {/* Only sources earn the right-hand chip, so the generator's family
               rides in the sub-line rather than squeezing the title. */}
           <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-            {source ? "Sealed source" : generatorFamily(r.type)}
+            {source ? "Sealed source" : generatorFamilyOf(r)}
           </div>
         </div>
         {source ? <CategoryChip r={r} /> : null}

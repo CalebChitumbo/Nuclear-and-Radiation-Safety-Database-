@@ -36,9 +36,72 @@ it. Nothing is imported — the figure is a constant.
 **Watch out:** a saved `workPlanBaseline/{year}` document in Firestore
 *replaces* the code constant wholesale. If the report still shows the old
 figure after deploy, an officer has saved a baseline — correct 1.2.4 on the
-Opening balance panel on `/weekly` instead (or as well). Never back-import the
-same inspections as dated records without zeroing 1.2.4's balance, or they
-count twice.
+Opening balance panel on `/weekly` instead (or as well).
+
+**Watch out:** 1.2.4 is now part carried, part counted. The 2026 facility
+inspection register (below) gave it 42 dated inspections of its own, and the
+balance was reduced by exactly those. Never back-import the same inspections as
+dated records without taking them off 1.2.4's balance, or they count twice —
+and if an officer dates one of the register's 255 undated rows, take one off the
+balance's latest quarter with work in it, because the balance is still carrying
+that row.
+
+## Routine: the Inspectorate hands over its facility inspection register
+
+The division periodically hands over `inspected facilities.docx` — the *COMPLETE
+FACILITY INSPECTION REGISTER*, one row per inspection with province, facility,
+type and (where the section still has it) date. A repeated facility name is a
+separate visit, never a duplicate to collapse. It **replaces** the previous
+import rather than adding to it.
+
+1. Put the document's rows into `seed/inspections-2026.seed.json` verbatim —
+   its own province spellings, its own type wordings, its own DD/MM/YYYY dates.
+   Everything is normalised in `mapAllSeedInspections`
+   (`lib/store/seeding.ts`), so the seed file stays checkable against the
+   document. A cell the document leaves blank stays blank; where the section
+   fills one in later, put the answer in and say where it came from in `note`.
+2. Update the pinned figures in `tests/inspectionSeed.test.ts` (row count,
+   imported count, per-type split, dated count and quarters, linked/unlinked).
+3. **Move `INSPECTION_REGISTER_HANDOVER`** (`lib/store/seeding.ts`) to the day
+   the new register was handed over. It is the date the supersession rule turns
+   on — see step 5.
+4. **Re-balance 1.2.4.** Its opening balance carries the work the register does
+   NOT hold, so subtract the newly dated rows in `WORK_PLAN_OPENING_BALANCE
+   ["1.2.4"]` and update the pinned assertion in `tests/workPlan.test.ts`.
+   Subtract from the quarter each row's **reporting week** starts in, not the
+   one its date falls in — that is how the report counts it — and neither the
+   reported total nor its quarterly split should move.
+5. Note the change in `docs/inspection-register-2026-import.md` under
+   **Re-baselines**, and in `docs/inspectorate-work-plan-2026-update.md` and
+   `docs/subprogrammes-2026-cumulative-update.md` if 1.2.4 moved.
+6. Deploy, then re-seed the live project. Run it once WITHOUT `--prune` and read
+   the two lists it prints, then re-run with the flag:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --prune
+   ```
+
+   It prunes two things. **Superseded register rows** — ids are the facility +
+   type + which repeat a row is, so a corrected spelling or type re-keys that
+   row and the old document would report the same visit twice. And
+   **inspections officers typed before the hand-over**, which the register
+   accounts for as well; without this 1.2.4 reads high by exactly the overlap
+   (it read 309 instead of 295 at the first import). Work logged after the
+   hand-over is kept — that is work the register never reached.
+
+**Watch out:** most of the register's rows have no date, and they are stored
+undated on purpose — a placeholder day would file the inspection into a
+reporting period at random. They show on the Inspectorate tab under *All time*
+and on the province sheets, and are counted by no week, month, year or quarter.
+That is also why `validInspection` in `firestore.rules` accepts `date: ""`; the
+Log inspection form and the Daily Updates wizard both require one, so only this
+import creates them.
+
+**Watch out:** pruning the typed inspections takes their enforcement actions
+with them, so 1.2.11 moves too — it returned to its carried 193 from 203 at the
+first import. That is the same correction (the section reported both figures in
+one breath), but say so when it happens, because the register has no enforcement
+column and nothing replaces those records row by row.
 
 ## Routine: the section supplies a new daily summary workbook
 
@@ -134,6 +197,38 @@ Watch out: Mongu and Ndola have thin workbook data (Mongu from July only, Ndola
 40 scattered days), so a real back-fill from those two posts can legitimately
 add thousands. `docs/screening-figure-audit.md` and `docs/audit-log.md` have the
 detail.
+
+## Routine: the source inventory's equipment categories
+
+Both inventory tabs — Source Inventory (RAIS) and Verified Source Inventory
+(the field annex) — report against **one list**, `SOURCE_CATEGORIES` in
+`lib/rules/sourceCategories.ts`, folded from each register's free-form text by
+`sourceCategory`. The split follows the Seniors' Monday Briefing of Sep 2026;
+`docs/source-inventory-categories-2026.md` holds the memo, the mapping and the
+counts.
+
+1. Edit the list and the classifier in `lib/rules/sourceCategories.ts`. **Order
+   is the logic** — nearly every entry contains a generic X-ray word, so each
+   specific machine must be tested before the generic test that would also
+   match it.
+2. Update `tests/sourceCategories.test.ts` (the pinned list, a case per split),
+   then the pinned per-category counts in `tests/raisInventory.test.ts` and
+   `tests/verifiedInventory.test.ts`.
+3. Update the tables in `docs/source-inventory-categories-2026.md` and the
+   Source Inventory section of the README.
+
+**Watch out:** nothing is stored per category — every figure is derived when the
+page is read — so a category change needs no re-seed and no migration, and the
+`inventoryEdits` overlay is untouched by it.
+
+**Watch out:** RAIS types all 64 XRF analysers as the bare word `XRF`, so the
+portable/fixed split comes from a RAN-keyed determination table,
+`XRF_FORM_BY_RAN` in `lib/rules/xrfDeterminations.ts` — never from an edit to
+the seed, which stays checkable against the export. `generatorFamilyOf` consults
+it only for a record whose own text still says nothing but `XRF`, so a
+correction or a later export wins over it; if an export names the model for a
+row the table covers, drop that row. The 23 it cannot read, and the 109 with no
+type at all, are worklists counted on the register-gaps panel.
 
 ## Routine: the Summary sheet's enforcement columns
 

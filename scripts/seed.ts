@@ -1,7 +1,8 @@
 /**
  * Seed script — writes the facility register (2026 Licensing Status), the
  * 2026 reporting-week calendar, the inland offices and their 2026 daily
- * screening log, and the initial aggregates/dashboard document to Firestore.
+ * screening log, the Inspectorate's 2026 facility inspection register, and the
+ * initial aggregates/dashboard document to Firestore.
  *
  * Usage (Admin SDK against the live project):
  *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
@@ -14,8 +15,8 @@
  *
  * The script is idempotent — facility doc IDs are stable (the FAC/#### code, or
  * the facility's name where RAIS has issued none), and so are the border and
- * daily screening IDs (post name, and post + date), so re-running updates in
- * place. A screening figure an officer has since corrected is overwritten by
+ * daily screening IDs (post name, and post + date) and the register inspection
+ * IDs (facility + type + which repeat), so re-running updates in place. A screening figure an officer has since corrected is overwritten by
  * the workbook's; nothing is ever added twice.
  *
  * PRUNING (`--prune`): a register re-import can supersede a facility document
@@ -39,12 +40,16 @@ import { join } from "node:path";
 
 import { initAdminApp } from "./adminApp";
 import { vehicleScreeningKey } from "../lib/rules/daily";
-import type { DailyEntry } from "../lib/rules/types";
+import type { DailyEntry, Inspection, WeekDef } from "../lib/rules/types";
 import {
+  INSPECTION_REGISTER_HANDOVER,
+  supersededByRegister,
   mapAllSeed,
+  mapAllSeedInspections,
   mapSeedBorders,
   mapSeedScreening,
   type SeedFacility,
+  type SeedInspection,
   type SeedScreening,
 } from "../lib/store/seeding";
 import { computeAggregate } from "../lib/rules/aggregate";
@@ -212,6 +217,108 @@ async function reportSupersededScreening(seeded: DailyEntry[]) {
   console.log(`  pruned ${superseded.length} superseded screening figure(s)`);
 }
 
+/**
+ * Register inspections the project holds that this seed does not produce.
+ *
+ * The ids are derived from the facility, the type and which repeat a row is, so
+ * a corrected spelling or a corrected type in the next hand-over re-keys that
+ * row: left behind, the old document reports the same visit a second time.
+ *
+ * Only ever considers documents this seed wrote (`updatedBy: "seed"`), so an
+ * inspection an officer logged in the app is never touched. Reported on every
+ * run and deleted only with --prune, the way a superseded facility is.
+ */
+async function reportSupersededInspections(seeded: Inspection[]) {
+  const db = getFirestore();
+  const seededIds = new Set(seeded.map((i) => i.id));
+  const snap = await db
+    .collection("inspections")
+    .where("updatedBy", "==", "seed")
+    .get();
+  const stale = snap.docs.filter((d) => !seededIds.has(d.id));
+
+  if (!stale.length) {
+    console.log("  no superseded register inspections");
+    return;
+  }
+  console.log(
+    `  ${stale.length} seeded inspection(s) superseded by this register:`,
+  );
+  for (const d of stale.slice(0, 10)) {
+    console.log(`    ${d.id}  ${d.get("facilityName") || ""}`);
+  }
+  if (stale.length > 10) console.log(`    … ${stale.length - 10} more`);
+
+  if (!PRUNE) {
+    console.log(
+      "  Left in place - they are counted ON TOP of this register until " +
+        "removed. Re-run with --prune to delete them.",
+    );
+    return;
+  }
+  await chunkedBatchWrite(stale, 400, (d, batch) => batch.delete(d.ref));
+  console.log(`  pruned ${stale.length} superseded register inspection(s)`);
+}
+
+/**
+ * Inspections an officer typed for work the register now carries.
+ *
+ * The register is the division's account of everything it had inspected by the
+ * hand-over, so a visit logged in the app on or before that date is in the
+ * system twice — once as the officer's record and once as a register row. Both
+ * are counted, and output 1.2.4 reads high by exactly the overlap. This is not
+ * a corner case: the section had been logging inspections for months before
+ * the register arrived.
+ *
+ * The register wins where the two meet. It is the section's own reconciled
+ * account, and it is what the reported figure was re-baselined against.
+ * Matching record to row by name would only be a guess, and would miss the
+ * visits the register counts without itemising — the officer's "Mansa Airport"
+ * and "Nchelenge District Hospital" are inside the section's 295 even though no
+ * row of the document names them.
+ *
+ * An inspection dated AFTER the hand-over is left alone: that is work the
+ * register never reached, not a duplicate. So is an undated one, which predates
+ * nothing we can be sure of, and anything carrying a register id — those are
+ * `reportSupersededInspections`'s business.
+ */
+async function reportSupersededTypedInspections() {
+  const db = getFirestore();
+  const snap = await db.collection("inspections").get();
+  const superseded = snap.docs.filter((d) =>
+    supersededByRegister(d.id, String(d.get("date") || "")),
+  );
+
+  if (!superseded.length) {
+    console.log("  no typed inspections superseded by the register");
+    return;
+  }
+  console.log(
+    `  ${superseded.length} inspection(s) typed in the app cover work the ` +
+      `register carries (dated on or before ${INSPECTION_REGISTER_HANDOVER}):`,
+  );
+  for (const d of superseded.slice(0, 15)) {
+    const action = d.get("enforcement");
+    console.log(
+      `    ${d.get("date")}  ${String(d.get("type")).padEnd(19)}` +
+        `${d.get("facilityName") || ""}${action ? `  [${action}]` : ""}`,
+    );
+  }
+  if (superseded.length > 15) {
+    console.log(`    … ${superseded.length - 15} more`);
+  }
+
+  if (!PRUNE) {
+    console.log(
+      "  Left in place - they are counted ON TOP of the register until " +
+        "removed. Re-run with --prune to delete them.",
+    );
+    return;
+  }
+  await chunkedBatchWrite(superseded, 400, (d, batch) => batch.delete(d.ref));
+  console.log(`  pruned ${superseded.length} superseded typed inspection(s)`);
+}
+
 async function main() {
   initAdminApp();
   const db = getFirestore();
@@ -225,6 +332,9 @@ async function main() {
   const screening = JSON.parse(
     readFileSync(join(SEED_DIR, "daily-screening-2026.seed.json"), "utf-8"),
   ) as SeedScreening;
+  const registerRows = JSON.parse(
+    readFileSync(join(SEED_DIR, "inspections-2026.seed.json"), "utf-8"),
+  ) as SeedInspection[];
 
   if (FRESH) {
     console.log(
@@ -265,6 +375,32 @@ async function main() {
     batch.set(db.doc(`dailyEntries/${id}`), rest);
   });
   await reportSupersededScreening(screeningEntries);
+
+  // The Inspectorate's 2026 facility inspection register. Seeded as ordinary
+  // inspections so the Inspectorate tab, its database and summary sheets and the
+  // weekly report all read them, and officers log new ones on top — see
+  // docs/inspection-register-2026-import.md.
+  const register = mapAllSeedInspections(
+    registerRows,
+    facilities,
+    weeks as WeekDef[],
+  );
+  console.log(
+    `Seeding ${register.inspections.length} register inspections ` +
+      `(${register.inspections.length - register.unlinked} matched to a ` +
+      `facility, ${register.unlinked} by name only)…`,
+  );
+  for (const held of register.skipped) {
+    console.log(
+      `  row ${held.row.n} "${held.row.name}" not imported — ${held.reason}`,
+    );
+  }
+  await chunkedBatchWrite(register.inspections, 400, (i, batch) => {
+    const { id, ...rest } = i;
+    batch.set(db.doc(`inspections/${id}`), rest);
+  });
+  await reportSupersededInspections(register.inspections);
+  await reportSupersededTypedInspections();
 
   console.log("Writing reference lists + week calendar…");
   // Single source of truth: lib/rules/types.ts — hardcoding these here once

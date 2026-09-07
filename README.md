@@ -82,12 +82,13 @@ demoed and developed without Firebase credentials.
 ## Running locally (mock mode — no Firebase needed)
 
 ```bash
-cp .env.local.example .env.local
-# set NEXT_PUBLIC_USE_MOCK=1 in .env.local to run the no-Firebase demo
 npm install
-npm run dev
+npm run dev:mock
 # open http://localhost:3000
 ```
+
+`dev:mock` sets `NEXT_PUBLIC_USE_MOCK=1` for you; to keep it on permanently,
+`cp .env.local.example .env.local`, set it there and use `npm run dev`.
 
 Sign in with any of the demo accounts — any non-empty password works:
 
@@ -364,7 +365,7 @@ automatically (Production for the production branch, Preview for others).
 |---|---|
 | `facilities/{id}` | Master register row — projection of all licences held by that facility, plus its register-import axes: `functional`, `category` (Medical/Non-Medical, veterinary counts as Medical), `stalled`, `needsReview`/`reviewNote`, `statusDetail` |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
-| `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these |
+| `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these. `date` is empty only on rows back-imported from the 2026 register, where the section recorded the visit but not the day |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
@@ -549,6 +550,14 @@ headline figures — except that nothing in it is typed twice. Every figure is
 derived from the dated inspection register, so logging one inspection moves the
 facility row, the province summary, the card list and the weekly report at once.
 
+The division's own 2026 register was imported on 7 September 2026 — **297
+inspections** across the ten provinces (211 routine, 64 pre-authorisation, 19
+follow-up, 3 investigative), which is what the tab opens on. 42 of those rows
+carry the date the section recorded; the other 255 record the visit but not the
+day, so they show under *All time* and on the province sheets and are counted by
+no reporting period. See
+[docs/inspection-register-2026-import.md](docs/inspection-register-2026-import.md).
+
 **The Summary sheet.** One row per province round, with two bands across the
 top — the inspections, then Management's six enforcement actions:
 
@@ -660,12 +669,16 @@ them, so an output an officer zeroed stays zero. Pasting a few rows only
 touches those outputs — the rest of the grid keeps what it was showing.
 
 > The opening balance covers work the registers do **not** hold. Back-importing
-> the same licences or inspections would count them twice; zero that output's
-> opening figures first if you ever do. Expanding a row shows the split —
+> the same licences or inspections would count them twice; take them off that
+> output's opening figures if you ever do. Expanding a row shows the split —
 > *Total actual = opening balance + recorded since* — so the two are always
 > separable, and the CSV carries them as trailing columns. Output **1.3.12**
-> (vehicles screened) is exactly that case: the inland offices' figures are
-> seeded as daily entries, so it carries **nothing** in.
+> (vehicles screened) is the clearest case: the inland offices' figures are
+> seeded as daily entries, so it carries **nothing** in. Output **1.2.4** is the
+> partial one — the 2026 inspection register gave it 42 dated inspections of its
+> own, so its balance sheds exactly those (253 carried + 42 counted = the 295
+> the section reported, quarters included) while the register's 255 undated
+> rows, which belong to no quarter, stay inside the carried figure.
 
 ### How the plan is numbered
 
@@ -1002,15 +1015,17 @@ reconciles with a filter of the table:
 - four KPIs — registered items · generators · sealed sources · **security
   significant** (IAEA Category 1–3, the sources the Code of Conduct expects to
   be tracked individually: 150 of 789);
-- generators by **machine family** (`generatorFamily` folds the 33 free-form
-  `Type` spellings into twelve buckets, reading the specific machine before the
-  generic word it contains so a `Digital Mammography` is not swept into digital
-  radiography, an `Industrial Xray fluoroscopy` is NDT kit rather than a
-  cathlab, and a `Baggage Scanner` never lands in CT), each click-to-filter;
+- generators by **equipment category** (`generatorFamily` folds the 33 free-form
+  `Type` spellings into the shared categories below, reading the specific machine
+  before the generic word it contains so a `Digital Mammography` is not swept
+  into digital radiography, an `Industrial Xray fluoroscopy` is NDT kit rather
+  than a fluoroscopy suite, and a `Baggage Scanner` never lands in CT), each
+  click-to-filter;
 - sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
-  (110 with no serial, 109 generators with no type, 69 sources with no nuclide,
-  345 with no activity, 591 never categorised, 5 conflicting categories); and
+  (110 with no serial, 109 generators with no type, 23 XRF analysers the
+  register does not call portable or fixed, 69 sources with no nuclide, 345 with
+  no activity, 591 never categorised, 5 conflicting categories); and
 - search across RAN, manufacturer, model, serial and nuclide, with CSV export
   of the current view.
 
@@ -1030,10 +1045,12 @@ recorded: establishment, equipment type, serial number and the field status.
 These carry a facility and a field status that RAIS cannot supply.
 
 - four KPIs (sources & devices · facilities · in use · radioactive sources);
-- a breakdown by the nine **machine families** the exercise reports against
+- a breakdown by the same **equipment categories** the RAIS tab uses
   (`categorizeEquipment` folds the fifty-odd free-form spellings — `Fixed Xray`,
   `CT-Scan`, `C-arm (Mini)`, `Source: Cs-137`, `Industrial Nuclear Gauge` … —
-  into one of nine buckets), each a click-to-filter row;
+  into one of them), each a click-to-filter row;
+- the annex's **sealed sources by type of source** — the nuclide as recorded
+  (Co-57 5 · Cs-137 4 · Co-60 2 · Ba-133 · I-129 · I-131);
 - a **status** filter (`statusGroup` collapses the field statuses to In use /
   Not in use / Unspecified, reading the negatives before the positives they
   contain so `Expired (Inactive)` and `Not Yet In Use` are not counted as in
@@ -1042,6 +1059,52 @@ These carry a facility and a field status that RAIS cannot supply.
 
 The rules live in `lib/rules/verifiedInventory.ts` (pure and unit-tested); the
 page is `app/verified-source-inventory/page.tsx`.
+
+### The equipment categories
+
+Both tabs report against **one list of categories**, `SOURCE_CATEGORIES` in
+`lib/rules/sourceCategories.ts`, so the register and the field exercise name a
+machine the same way and can be read line against line. The split follows the
+Seniors' Monday Briefing of September 2026:
+
+| | |
+| --- | --- |
+| **Radiography** | Fixed X-Ray Machines · Conventional Fixed Digital Radiography · Mobile & Portable X-Ray |
+| **Dental** | General Dental X-Ray · Dental CBCT |
+| **Other imaging** | Mammography Systems · C-Arm Units · Fluoroscopy · Angiography & Cath Lab |
+| **CT** | General CT · PET-CT · SPECT-CT |
+| **Radiotherapy** | Brachytherapy · Teletherapy · Linear Accelerators |
+| **Screening** | Cargo Scanners · Baggage Scanners · Portal Monitors |
+| **Analytical & industrial** | Portable XRF · Fixed XRF · *XRF (Type Not Specified)* · Industrial X-Ray & Gauging |
+| **The rest** | Other Specialised Equipment · Sealed Sources · *Type Not Recorded* |
+
+One classifier reads both registers' vocabularies, and **order is the logic**:
+each specific machine claims its rows before the generic X-ray word they also
+contain. A category the briefing asked for exists whether or not anything is
+registered under it yet — Dental CBCT, SPECT-CT and Portal Monitors are empty
+today, and are named under the breakdown rather than hidden.
+
+**The XRF split** cannot come from the type column: RAIS types all 64 analysers
+as the bare word `XRF`. It comes from the instrument — the model the register
+names, read against that manufacturer's product line (an `X – MET 7000` is
+hand-held; a `Courier 5X SL` is bolted over a slurry line). 41 are determined
+that way, 18 portable and 23 fixed; the remaining 23 name no model and come from
+makers who sell both forms, so they stay in *XRF (Type Not Specified)* and are
+counted as a register gap. The determinations are a table keyed by **RAN** in
+`lib/rules/xrfDeterminations.ts`, never an edit to the seed, and
+`generatorFamilyOf` consults it only for a record whose own text still says
+nothing but `XRF` — so a correction, or a later export that spells the type out,
+wins over the determination. The tab says so on the two XRF rows.
+
+*Other Specialised Equipment* lists what it holds under its own row — calibration
+sets, a bone densitometer, a cyclotron — so the catch-all says what is in it.
+Sealed sources are split by **type of source**, i.e. the nuclide as recorded, on
+both tabs.
+
+Nothing is stored per category: every figure is derived from the registers' own
+text when the page is read, so a category change needs no re-seed and leaves
+officers' corrections alone. The mapping, the counts and the judgement calls are
+in [`docs/source-inventory-categories-2026.md`](docs/source-inventory-categories-2026.md).
 
 ### Correcting a record
 
@@ -1159,14 +1222,19 @@ npm test
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
+- `sourceCategories` — the equipment categories both inventory tabs report
+  against: that every split the Seniors' Briefing asked for exists, and that the
+  classifier reads the specific machine before the generic X-ray word its
+  entries also carry (a portable dental set is dental, an industrial fluoroscopy
+  is NDT kit, a plain `XRF` is neither portable nor fixed)
 - `verifiedInventory` — verifies the seeded Annex I inventory (215 items numbered
   1…215, 75 facilities) and that every derived grouping reconciles to it: the
-  nine machine-family buckets, the status groups (reading the negatives first),
-  the serial-provided count, and the CSV columns
+  equipment categories, the sealed sources by type of source, the status groups
+  (reading the negatives first), the serial-provided count, and the CSV columns
 - `raisInventory` — verifies the seeded RAIS register (1,752 items, 963
   generators then 789 sources, each in accession order with a unique RAN) and
-  that every derived grouping reconciles to it: the twelve family buckets, the
-  IAEA categories and the 150 security-significant sources, the nuclide
+  that every derived grouping reconciles to it: the equipment categories and
+  what the catch-all among them holds, the IAEA categories and the 150 security-significant sources, the nuclide
   breakdown with its gap bucket sorted last, the register-gap counts against
   the right denominator, activity parsing in Bq/Ci, and the CSV columns
 - `inventoryEdits` — the correction overlay both inventories share: that a patch
@@ -1224,6 +1292,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── scripts/convert-rais-inventory.py   Flattens the two RAIS exports into one register seed
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
 │                           daily-screening-2026.seed.json (8 posts, 1,484 days),
+│                           inspections-2026.seed.json (298 register rows),
 │                           rais-source-inventory.seed.json (1,752 RAIS items),
 │                           verified-source-inventory-2026.seed.json (215, Annex I)
 ├── public/                 favicon, manifest

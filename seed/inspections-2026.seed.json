@@ -1,0 +1,2093 @@
+[
+ {
+  "n": 1,
+  "prov": "Lusaka",
+  "name": "Levy Mwanawasa Hospital",
+  "type": "Preauthorisation",
+  "date": "",
+  "note": "Supplied by the section on WhatsApp, 7 Sep 2026."
+ },
+ {
+  "n": 2,
+  "prov": "Lusaka",
+  "name": "Pearl of Health",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 3,
+  "prov": "Lusaka",
+  "name": "Royal Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 4,
+  "prov": "Lusaka",
+  "name": "Forest Park Specialised",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 5,
+  "prov": "Lusaka",
+  "name": "St Johns hospital-lusaka",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 6,
+  "prov": "Lusaka",
+  "name": "Hilltop – Lusaka",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 7,
+  "prov": "Lusaka",
+  "name": "Elite Dental clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 8,
+  "prov": "Lusaka",
+  "name": "Maxcare Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 9,
+  "prov": "Lusaka",
+  "name": "Reliance dental clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 10,
+  "prov": "Lusaka",
+  "name": "Dazzling dental clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 11,
+  "prov": "Lusaka",
+  "name": "Levy Mwanawasa",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 12,
+  "prov": "Lusaka",
+  "name": "National Heart",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 13,
+  "prov": "Lusaka",
+  "name": "Hitech health centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 14,
+  "prov": "Lusaka",
+  "name": "Chipata Level 1",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 15,
+  "prov": "Lusaka",
+  "name": "Belt Care",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 16,
+  "prov": "Lusaka",
+  "name": "Green Cross Laboratory",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 17,
+  "prov": "Lusaka",
+  "name": "Lifescаn diagnostic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 18,
+  "prov": "Lusaka",
+  "name": "South Point – Avondale",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 19,
+  "prov": "Lusaka",
+  "name": "PHI – Closed",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 20,
+  "prov": "Lusaka",
+  "name": "Sandersoni – Closed",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 21,
+  "prov": "Lusaka",
+  "name": "Care for You – Closed",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 22,
+  "prov": "Lusaka",
+  "name": "Sunshine dental clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 23,
+  "prov": "Lusaka",
+  "name": "Makeni Islami hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 24,
+  "prov": "Copperbelt",
+  "name": "Wilmar",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 25,
+  "prov": "Copperbelt",
+  "name": "Zambia Breweries",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 26,
+  "prov": "Copperbelt",
+  "name": "Ndola Teaching Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 27,
+  "prov": "Copperbelt",
+  "name": "St. Dominic’s",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 28,
+  "prov": "Copperbelt",
+  "name": "St. Theresa",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 29,
+  "prov": "Copperbelt",
+  "name": "Mpongwe Mission",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 30,
+  "prov": "Copperbelt",
+  "name": "Roan Antelope",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 31,
+  "prov": "Copperbelt",
+  "name": "Luanshya Mine Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 32,
+  "prov": "Copperbelt",
+  "name": "Kitwe Central Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 33,
+  "prov": "Copperbelt",
+  "name": "Springs of Life",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 34,
+  "prov": "Copperbelt",
+  "name": "Sunsol Kitwe",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 35,
+  "prov": "Copperbelt",
+  "name": "Ivory Dental",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 36,
+  "prov": "Copperbelt",
+  "name": "Progress Medical Centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 37,
+  "prov": "Copperbelt",
+  "name": "Ultra Dental",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 38,
+  "prov": "Copperbelt",
+  "name": "Wusakile",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 39,
+  "prov": "Copperbelt",
+  "name": "Kakoso Level 1",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 40,
+  "prov": "Copperbelt",
+  "name": "Chililabombwe Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 41,
+  "prov": "Copperbelt",
+  "name": "Nchanga South",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 42,
+  "prov": "Copperbelt",
+  "name": "Nchanga North",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 43,
+  "prov": "Copperbelt",
+  "name": "Konkola Mine Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 44,
+  "prov": "Copperbelt",
+  "name": "African Medical Care",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 45,
+  "prov": "Copperbelt",
+  "name": "Sinozam",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 46,
+  "prov": "Copperbelt",
+  "name": "Thompson",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 47,
+  "prov": "Copperbelt",
+  "name": "Kalulushi Government Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 48,
+  "prov": "Lusaka",
+  "name": "Ruth Kaluluma",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 49,
+  "prov": "Southern",
+  "name": "ZAF – (Livingstone)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 50,
+  "prov": "Copperbelt",
+  "name": "ZA Tug Angan - (Ndola)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 51,
+  "prov": "Copperbelt",
+  "name": "ZA 1 Commando - (Ndola)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 52,
+  "prov": "Copperbelt",
+  "name": "ZA Northern Command - (Ndola)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 53,
+  "prov": "Copperbelt",
+  "name": "ZA0 kalewa-ndola",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 54,
+  "prov": "Copperbelt",
+  "name": "ZA ZCCF (Kitwe)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 55,
+  "prov": "Copperbelt",
+  "name": "ZNS (Kitwe)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 56,
+  "prov": "North Western",
+  "name": "Kansashi mine hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 57,
+  "prov": "North Western",
+  "name": "Hilltop Solwezi",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 58,
+  "prov": "North Western",
+  "name": "St johns Solwezi",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 59,
+  "prov": "North Western",
+  "name": "UNILABS -solwezi",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 60,
+  "prov": "North Western",
+  "name": "Bumi clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 61,
+  "prov": "North Western",
+  "name": "Tandem construction",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 62,
+  "prov": "North Western",
+  "name": "Angels heart",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 63,
+  "prov": "Copperbelt",
+  "name": "ZNS Kamitonte (Solwezi)",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 64,
+  "prov": "Lusaka",
+  "name": "Lusaka IVF",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 65,
+  "prov": "Lusaka",
+  "name": "Mary Begg Lusala",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 66,
+  "prov": "Copperbelt",
+  "name": "Mingomba Mining",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 67,
+  "prov": "",
+  "name": "Hightech Diagnostic Center",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 68,
+  "prov": "",
+  "name": "Katondo Mission Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 69,
+  "prov": "Copperbelt",
+  "name": "Progress Medical Center Kitwe",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 70,
+  "prov": "",
+  "name": "Thomson District Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 71,
+  "prov": "",
+  "name": "Northway Dental",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 72,
+  "prov": "Central",
+  "name": "ZA Gondar Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 73,
+  "prov": "Central",
+  "name": "ZA Kabwe Chindwin Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 74,
+  "prov": "Central",
+  "name": "ZA Kanona Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 75,
+  "prov": "Copperbelt",
+  "name": "ZA Luena Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 76,
+  "prov": "Central",
+  "name": "ZAF Kabwe Mini",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 77,
+  "prov": "Central",
+  "name": "ZAF Mumbwa Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 78,
+  "prov": "Central",
+  "name": "ZAF Samora Machel AFB Clinic",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 79,
+  "prov": "Western",
+  "name": "ZNS AS Yeta Clinic",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 80,
+  "prov": "Lusaka",
+  "name": "ZNS CHiwoko Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 81,
+  "prov": "Central",
+  "name": "ZNS Kabwe WJ Funjika Training",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 82,
+  "prov": "Lusaka",
+  "name": "Arakan Garrison Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 83,
+  "prov": "Lusaka",
+  "name": "Defence School of Health Science",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 84,
+  "prov": "Lusaka",
+  "name": "Mina Soko Medical Centre",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 85,
+  "prov": "",
+  "name": "ZA L 85",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 86,
+  "prov": "Central",
+  "name": "ZA Mikango Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 87,
+  "prov": "Lusaka",
+  "name": "ZAF Lusaka Rural Health",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 88,
+  "prov": "",
+  "name": "ZAF MT Euginia",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 89,
+  "prov": "Lusaka",
+  "name": "ZNS Chamba Valley",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 90,
+  "prov": "",
+  "name": "ZNS CJ Nyirenda Camp",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 91,
+  "prov": "Lusaka",
+  "name": "Cancer Diseases Hospital",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 92,
+  "prov": "Lusaka",
+  "name": "Mother of Mercy Hospice",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 93,
+  "prov": "North Western",
+  "name": "Trident Town Clinic Kalumbila",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 94,
+  "prov": "North Western",
+  "name": "Occupational Health Solwezi",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 95,
+  "prov": "Copperbelt",
+  "name": "Zambart Ndola",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 96,
+  "prov": "",
+  "name": "Tiina Medical Center",
+  "type": "Pre-Authorization Inspection",
+  "date": ""
+ },
+ {
+  "n": 97,
+  "prov": "Copperbelt",
+  "name": "Altaf Memorial Hospital Limited",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 98,
+  "prov": "",
+  "name": "Tusekelemo Community",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 99,
+  "prov": "Central",
+  "name": "Mukushi District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 100,
+  "prov": "Luapula",
+  "name": "Chiengi District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 101,
+  "prov": "Luapula",
+  "name": "Kawambwa District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 102,
+  "prov": "Luapula",
+  "name": "Lubwe Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 103,
+  "prov": "Luapula",
+  "name": "Mambilima Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 104,
+  "prov": "Luapula",
+  "name": "Mansa General Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 105,
+  "prov": "Luapula",
+  "name": "Mbereshi Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 106,
+  "prov": "Luapula",
+  "name": "Mwense District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 107,
+  "prov": "Luapula",
+  "name": "Nganda Bilonda Level 1 Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 108,
+  "prov": "Luapula",
+  "name": "Samfya District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 109,
+  "prov": "Luapula",
+  "name": "Senama Rural Health Centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 110,
+  "prov": "Luapula",
+  "name": "St. Pauls Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 111,
+  "prov": "Muchinga",
+  "name": "Chilonga Mission General Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 112,
+  "prov": "Muchinga",
+  "name": "Chinsali District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 113,
+  "prov": "Muchinga",
+  "name": "Chinsali General Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 114,
+  "prov": "Muchinga",
+  "name": "Isoka District Hosptal",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 115,
+  "prov": "Muchinga",
+  "name": "Mafinga District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 116,
+  "prov": "",
+  "name": "Micheal Chilufya Sata Hospita",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 117,
+  "prov": "Muchinga",
+  "name": "Mpika District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 118,
+  "prov": "Muchinga",
+  "name": "Muyombe Level 1 Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 119,
+  "prov": "Muchinga",
+  "name": "Nakonde District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 120,
+  "prov": "Muchinga",
+  "name": "ZRA Nakonde",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 121,
+  "prov": "Copperbelt",
+  "name": "Arthur Davison Childrens Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 122,
+  "prov": "Copperbelt",
+  "name": "Mpongwe Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 123,
+  "prov": "Copperbelt",
+  "name": "Unilabs-Ndola",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 124,
+  "prov": "",
+  "name": "Art Dental Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 125,
+  "prov": "Copperbelt",
+  "name": "Chifubu District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 126,
+  "prov": "",
+  "name": "Dr. Mary Begg Community Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 127,
+  "prov": "",
+  "name": "Hermes Radiology Center",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 128,
+  "prov": "Copperbelt",
+  "name": "Luanshya Mine Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 129,
+  "prov": "",
+  "name": "Micheal Chilufya Sata Dental Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 130,
+  "prov": "",
+  "name": "National Health Research and Training Institute",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 131,
+  "prov": "Copperbelt",
+  "name": "Ndola Diagnostic and Imaging Centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 132,
+  "prov": "Copperbelt",
+  "name": "Ndola Teaching Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 133,
+  "prov": "Copperbelt",
+  "name": "Northern Command Millitary Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 134,
+  "prov": "",
+  "name": "Premium Health Medical Centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 135,
+  "prov": "Copperbelt",
+  "name": "Roan Antelope General Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 136,
+  "prov": "Copperbelt",
+  "name": "St Theresa Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 137,
+  "prov": "Copperbelt",
+  "name": "St.Dominics Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 138,
+  "prov": "Lusaka",
+  "name": "Occupation Health Lusaka",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 139,
+  "prov": "Lusaka",
+  "name": "Chilenje Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 140,
+  "prov": "Lusaka",
+  "name": "Biet Cure Chirldrens Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 141,
+  "prov": "",
+  "name": "Victoria Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 142,
+  "prov": "Western",
+  "name": "Kaoma District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 143,
+  "prov": "Western",
+  "name": "Luampa Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 144,
+  "prov": "Western",
+  "name": "Mangango Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 145,
+  "prov": "Western",
+  "name": "Lukulu District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 146,
+  "prov": "Western",
+  "name": "Lewanika Central Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 147,
+  "prov": "Western",
+  "name": "Mongu District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 148,
+  "prov": "Western",
+  "name": "Yeta District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 149,
+  "prov": "Western",
+  "name": "Mulobezi District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 150,
+  "prov": "Western",
+  "name": "Mwandi District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 151,
+  "prov": "Western",
+  "name": "Shangombo District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 152,
+  "prov": "Western",
+  "name": "Mwandi Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 153,
+  "prov": "Lusaka",
+  "name": "Mums Care Zesco",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 154,
+  "prov": "Lusaka",
+  "name": "Evelyn Hone College",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 155,
+  "prov": "Northern",
+  "name": "Kaleni Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 156,
+  "prov": "North Western",
+  "name": "Mufumbwe District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 157,
+  "prov": "North Western",
+  "name": "Chavuma District hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 158,
+  "prov": "North Western",
+  "name": "Chavuma Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 159,
+  "prov": "North Western",
+  "name": "Chitokoloki Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 160,
+  "prov": "North Western",
+  "name": "Kabompo District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 161,
+  "prov": "North Western",
+  "name": "Loloma Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 162,
+  "prov": "North Western",
+  "name": "Lumwana District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 163,
+  "prov": "North Western",
+  "name": "Mukinge Mission Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 164,
+  "prov": "North Western",
+  "name": "Mwinilunga District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 165,
+  "prov": "North Western",
+  "name": "Solwezi Genral Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 166,
+  "prov": "North Western",
+  "name": "St Dorothy Rural health",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 167,
+  "prov": "North Western",
+  "name": "Zambezi District Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 168,
+  "prov": "Southern",
+  "name": "CHIKANKATA MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "24/06/2026"
+ },
+ {
+  "n": 169,
+  "prov": "Southern",
+  "name": "VICTORIA HOSPITAL- MAZABUKA",
+  "type": "Routine Inspection",
+  "date": "24/06/2026"
+ },
+ {
+  "n": 170,
+  "prov": "Southern",
+  "name": "MAZABUKA GENERAL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "24/06/2026"
+ },
+ {
+  "n": 171,
+  "prov": "Southern",
+  "name": "MONZE MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "24/06/2026"
+ },
+ {
+  "n": 172,
+  "prov": "Southern",
+  "name": "GWEMBE DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "25/06/2026"
+ },
+ {
+  "n": 173,
+  "prov": "Southern",
+  "name": "CHIKUNI MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "25/06/2026"
+ },
+ {
+  "n": 174,
+  "prov": "Southern",
+  "name": "MUNYUMBWE FIRST LEVEL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "25/06/2026"
+ },
+ {
+  "n": 175,
+  "prov": "Southern",
+  "name": "MAAMBA GENERAL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "26/06/2026"
+ },
+ {
+  "n": 176,
+  "prov": "Southern",
+  "name": "NAMWIANGA MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "26/06/2026"
+ },
+ {
+  "n": 177,
+  "prov": "Southern",
+  "name": "KALOMO DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "26/06/2026"
+ },
+ {
+  "n": 178,
+  "prov": "Southern",
+  "name": "ZIMBA MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "26/06/2026"
+ },
+ {
+  "n": 179,
+  "prov": "Southern",
+  "name": "ZAMBIA REVENUE AUTHORITY KAZUNGULA",
+  "type": "Routine Inspection",
+  "date": "29/06/2026"
+ },
+ {
+  "n": 180,
+  "prov": "Southern",
+  "name": "KAZUNGULA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "29/06/2026"
+ },
+ {
+  "n": 181,
+  "prov": "Southern",
+  "name": "MAHATMA GHANDI CLINIC",
+  "type": "Routine Inspection",
+  "date": "29/06/2026"
+ },
+ {
+  "n": 182,
+  "prov": "Southern",
+  "name": "LIVINGSTONE UNIVERSITY TEACHIING HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "29/06/2026"
+ },
+ {
+  "n": 183,
+  "prov": "Southern",
+  "name": "MUKUNI MEDICAL CENTRE",
+  "type": "Routine Inspection",
+  "date": "29/06/2026"
+ },
+ {
+  "n": 184,
+  "prov": "Southern",
+  "name": "HARRY MWAAGA NKUMBULA INTERNATIONA AIRPORT",
+  "type": "Routine Inspection",
+  "date": "30/06/2026"
+ },
+ {
+  "n": 185,
+  "prov": "Southern",
+  "name": "CHOMA GENERAL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "30/06/2026"
+ },
+ {
+  "n": 186,
+  "prov": "Southern",
+  "name": "MACHA MISSION HOSITAL",
+  "type": "Routine Inspection",
+  "date": "01/07/2026"
+ },
+ {
+  "n": 187,
+  "prov": "Southern",
+  "name": "NAMWALA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "01/07/2026"
+ },
+ {
+  "n": 188,
+  "prov": "Southern",
+  "name": "CHIVUNA MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "01/07/2026"
+ },
+ {
+  "n": 189,
+  "prov": "Eastern",
+  "name": "NYIMBA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "05/08/2026"
+ },
+ {
+  "n": 190,
+  "prov": "Eastern",
+  "name": "MINGA MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "05/08/2026"
+ },
+ {
+  "n": 191,
+  "prov": "Eastern",
+  "name": "KALINDAWALO GENERAL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "05/08/2026"
+ },
+ {
+  "n": 192,
+  "prov": "Eastern",
+  "name": "NYANJE MISSION HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 193,
+  "prov": "Eastern",
+  "name": "ST. FRANCIS HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 194,
+  "prov": "Eastern",
+  "name": "CHADIZA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 195,
+  "prov": "Eastern",
+  "name": "MWAMI ADVENTIST HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 196,
+  "prov": "Eastern",
+  "name": "VUBWI DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 197,
+  "prov": "Eastern",
+  "name": "ZAMBIA REVENUE AUTHORITY MWAMI BORDER",
+  "type": "Routine Inspection",
+  "date": "06/08/2026"
+ },
+ {
+  "n": 198,
+  "prov": "Eastern",
+  "name": "MUZEYI RURAL HEALTH CENTRE",
+  "type": "Routine Inspection",
+  "date": "07/08/2026"
+ },
+ {
+  "n": 199,
+  "prov": "Eastern",
+  "name": "KOMOTO MISSION HOSPITAL MAMBWE",
+  "type": "Routine Inspection",
+  "date": "07/08/2026"
+ },
+ {
+  "n": 200,
+  "prov": "Eastern",
+  "name": "MAMBWE DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "07/08/2026"
+ },
+ {
+  "n": 201,
+  "prov": "Eastern",
+  "name": "LUNDAZI DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "10/08/2026"
+ },
+ {
+  "n": 202,
+  "prov": "Eastern",
+  "name": "CHAMA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "10/08/2026"
+ },
+ {
+  "n": 203,
+  "prov": "Eastern",
+  "name": "CHIPATA DISTRICT HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "11/08/2026"
+ },
+ {
+  "n": 204,
+  "prov": "Eastern",
+  "name": "CHIPATA CENTRAL HOSPITAL",
+  "type": "Routine Inspection",
+  "date": "11/08/2026"
+ },
+ {
+  "n": 205,
+  "prov": "Eastern",
+  "name": "UNILABS CHIPATA",
+  "type": "Routine Inspection",
+  "date": "11/08/2026"
+ },
+ {
+  "n": 206,
+  "prov": "Lusaka",
+  "name": "Cancer diseases hospital",
+  "type": "Preauthorisation",
+  "date": "",
+  "note": "Supplied by the section on WhatsApp, 7 Sep 2026."
+ },
+ {
+  "n": 207,
+  "prov": "Eastern",
+  "name": "Nisir national institute for scientic research and industry",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 208,
+  "prov": "Eastern",
+  "name": "Sajeevani medical centre",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 209,
+  "prov": "Eastern",
+  "name": "Multicare hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 210,
+  "prov": "Northern",
+  "name": "Mungwi district hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 211,
+  "prov": "Northern",
+  "name": "Mungwi rural health clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 212,
+  "prov": "Northern",
+  "name": "Hilltop hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 213,
+  "prov": "Northern",
+  "name": "Kasama general hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 214,
+  "prov": "Northern",
+  "name": "Mbala general hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 215,
+  "prov": "Northern",
+  "name": "Mpulungu district hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 216,
+  "prov": "Northern",
+  "name": "Senga hill district hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 217,
+  "prov": "Northern",
+  "name": "Mporokoso district hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 218,
+  "prov": "Northern",
+  "name": "St fedelis mission hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 219,
+  "prov": "Northern",
+  "name": "Luwingu district hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 220,
+  "prov": "Lusaka",
+  "name": "Kenneth Kaunda international airport",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 221,
+  "prov": "",
+  "name": "Bernaka hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 222,
+  "prov": "Lusaka",
+  "name": "Lusaka IVF",
+  "type": "Preauthorisation",
+  "date": ""
+ },
+ {
+  "n": 223,
+  "prov": "North Western",
+  "name": "Lumwana Mine",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 224,
+  "prov": "North Western",
+  "name": "Kansashi Mine",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 225,
+  "prov": "North Western",
+  "name": "Wireline",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 226,
+  "prov": "North Western",
+  "name": "Kalumbila Mine",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 227,
+  "prov": "North Western",
+  "name": "Solwezi Airport",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 228,
+  "prov": "Lusaka",
+  "name": "Cancer Diseases Hospital",
+  "type": "Preauthorisation",
+  "date": "29/07/2026",
+  "note": "Supplied by the section on WhatsApp, 7 Sep 2026."
+ },
+ {
+  "n": 229,
+  "prov": "Copperbelt",
+  "name": "Medcorp Hospital Ndola",
+  "type": "Routine Inspection",
+  "date": "",
+  "note": "Supplied by the section on WhatsApp, 7 Sep 2026."
+ },
+ {
+  "n": 230,
+  "prov": "",
+  "name": "Micheal Chilufya Sata Dental School",
+  "type": "Routine Inspection",
+  "date": "",
+  "note": "Supplied by the section on WhatsApp, 7 Sep 2026."
+ },
+ {
+  "n": 231,
+  "prov": "Copperbelt",
+  "name": "Springs of Life",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 232,
+  "prov": "",
+  "name": "Dr. Dilober",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 233,
+  "prov": "",
+  "name": "Ultra Spec Diagnostic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 234,
+  "prov": "Copperbelt",
+  "name": "Dangote",
+  "type": "Preauthorisation",
+  "date": ""
+ },
+ {
+  "n": 235,
+  "prov": "Southern",
+  "name": "Kazungula District Hospital",
+  "type": "Preauthorisation",
+  "date": ""
+ },
+ {
+  "n": 236,
+  "prov": "Lusaka",
+  "name": "Beit CURE International Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 237,
+  "prov": "Western",
+  "name": "Mwandi Mission Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 238,
+  "prov": "Western",
+  "name": "Lewanika General Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 239,
+  "prov": "Western",
+  "name": "Sikongo Mini Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 240,
+  "prov": "Western",
+  "name": "Nkeyema Mini Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 241,
+  "prov": "Western",
+  "name": "Arthur Wina Memorial Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 242,
+  "prov": "Western",
+  "name": "Sishekano Mini Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 243,
+  "prov": "Western",
+  "name": "Luena Barracks",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 244,
+  "prov": "Western",
+  "name": "Luampa Mini Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 245,
+  "prov": "Copperbelt",
+  "name": "Ndola Cancer Disease Hospital",
+  "type": "",
+  "date": ""
+ },
+ {
+  "n": 246,
+  "prov": "Lusaka",
+  "name": "Well Spring Specialist Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 247,
+  "prov": "Eastern",
+  "name": "Kalindawalo General Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 248,
+  "prov": "Eastern",
+  "name": "Kamoto Mission Hospital Mambwe",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 249,
+  "prov": "Eastern",
+  "name": "Nyimba District Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 250,
+  "prov": "Eastern",
+  "name": "St. Francis Mission Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 251,
+  "prov": "Eastern",
+  "name": "Unilabs Chipata",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 252,
+  "prov": "Eastern",
+  "name": "Chipata Central Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 253,
+  "prov": "Eastern",
+  "name": "Chipata District Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 254,
+  "prov": "Eastern",
+  "name": "Minga Mission Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 255,
+  "prov": "Eastern",
+  "name": "Mwami Adventist Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 256,
+  "prov": "Eastern",
+  "name": "Nyanje Mission Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 257,
+  "prov": "Eastern",
+  "name": "Petauke District Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 258,
+  "prov": "Eastern",
+  "name": "Katondwe Mission Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 259,
+  "prov": "Lusaka",
+  "name": "Coptic Kanyama",
+  "type": "Preauthorisation",
+  "date": ""
+ },
+ {
+  "n": 260,
+  "prov": "Lusaka",
+  "name": "Coptic Hospital Manchinchi Road",
+  "type": "Investigative Inspection",
+  "date": ""
+ },
+ {
+  "n": 261,
+  "prov": "Lusaka",
+  "name": "Coptic Hospital Manchinchi Road",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 262,
+  "prov": "Lusaka",
+  "name": "Coptic Hospital Manchinchi Road",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 263,
+  "prov": "Lusaka",
+  "name": "Coptic Hospital Manchinchi Road",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 264,
+  "prov": "Lusaka",
+  "name": "Friends Care Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 265,
+  "prov": "Lusaka",
+  "name": "Care Africa",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 266,
+  "prov": "Lusaka",
+  "name": "WRC Construction",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 267,
+  "prov": "Lusaka",
+  "name": "Medheal",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 268,
+  "prov": "Lusaka",
+  "name": "Medcross",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 269,
+  "prov": "Lusaka",
+  "name": "Rankin Engineering",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 270,
+  "prov": "Lusaka",
+  "name": "Asphalt Roads",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 271,
+  "prov": "",
+  "name": "Victoria Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 272,
+  "prov": "Lusaka",
+  "name": "Cardinal Adams",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 273,
+  "prov": "Lusaka",
+  "name": "Care For You Medical",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 274,
+  "prov": "Lusaka",
+  "name": "Care You Medical Centre",
+  "type": "Investigative Inspection",
+  "date": ""
+ },
+ {
+  "n": 275,
+  "prov": "Lusaka",
+  "name": "Ameer Medical Centre",
+  "type": "Investigative Inspection",
+  "date": ""
+ },
+ {
+  "n": 276,
+  "prov": "Lusaka",
+  "name": "China Jiangxi Cooperation",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 277,
+  "prov": "Lusaka",
+  "name": "China State Construction Engineering",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 278,
+  "prov": "Lusaka",
+  "name": "Evelyn Hone",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 279,
+  "prov": "Lusaka",
+  "name": "Lilayi Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 280,
+  "prov": "Lusaka",
+  "name": "Lusaka Adventist Dental",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 281,
+  "prov": "Lusaka",
+  "name": "Lusaka Adventist Clinic",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 282,
+  "prov": "Lusaka",
+  "name": "Maina Soko",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 283,
+  "prov": "Lusaka",
+  "name": "Mount Makulu",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 284,
+  "prov": "Lusaka",
+  "name": "Mums Care Woodlands",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 285,
+  "prov": "Lusaka",
+  "name": "Mums Care Woodlands",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 286,
+  "prov": "Lusaka",
+  "name": "University Teaching Adult Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 287,
+  "prov": "Lusaka",
+  "name": "University Teaching Adult Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 288,
+  "prov": "Lusaka",
+  "name": "University Teaching Children Hospital",
+  "type": "Preauthorisation Inspection",
+  "date": ""
+ },
+ {
+  "n": 289,
+  "prov": "Lusaka",
+  "name": "TMS Medical Services",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 290,
+  "prov": "Lusaka",
+  "name": "Chongwe District Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 291,
+  "prov": "Lusaka",
+  "name": "Luangwa District Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 292,
+  "prov": "Lusaka",
+  "name": "University of Lusaka Hospital",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 293,
+  "prov": "Lusaka",
+  "name": "Kafue General Hospital",
+  "type": "Follow-up Inspection",
+  "date": ""
+ },
+ {
+  "n": 294,
+  "prov": "Lusaka",
+  "name": "Sanket Diagnostics Lusaka",
+  "type": "Routine Inspection",
+  "date": ""
+ },
+ {
+  "n": 295,
+  "prov": "Lusaka",
+  "name": "Cancer disease hospital",
+  "type": "preauthorisation",
+  "date": ""
+ },
+ {
+  "n": 296,
+  "prov": "Central",
+  "name": "Nangoma mission hospital",
+  "type": "Routine inspection",
+  "date": "02/09/2026"
+ },
+ {
+  "n": 297,
+  "prov": "Central",
+  "name": "Mumbwa district hospital",
+  "type": "Routine inspection",
+  "date": "02/09/2026"
+ },
+ {
+  "n": 298,
+  "prov": "central",
+  "name": "Itezhi -tezhi district hospital",
+  "type": "Routine inspection",
+  "date": "03/09/2026"
+ }
+]

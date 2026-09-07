@@ -12,8 +12,10 @@ import {
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
+import { GAP_CATEGORIES } from "@/lib/rules/sourceCategories";
 import { mergeVerifiedInventory } from "@/lib/rules/inventoryEdits";
 import {
+  SEALED_SOURCES,
   SOURCE_CATEGORIES,
   categorizeEquipment,
   isSerialProvided,
@@ -95,6 +97,20 @@ export default function VerifiedSourceInventoryPage() {
     [inventory],
   );
   const maxCategory = Math.max(1, ...summary.byCategory.map((c) => c.count));
+  // A category with nothing in it is still one the inventory reports against,
+  // so it is named under the breakdown rather than dropped from it.
+  const categoriesInUse = summary.byCategory.filter((c) => c.count > 0);
+  const emptyCategories = summary.byCategory
+    .filter((c) => c.count === 0 && !GAP_CATEGORIES.includes(c.category))
+    .map((c) => c.category);
+  // The briefing asked for the catch-all to say what it holds.
+  const otherSpecialised = summary.otherSpecialised
+    .map((t) => `${t.type} (${t.count})`)
+    .join(" · ");
+  const maxSourceType = Math.max(
+    1,
+    ...summary.bySourceType.map((t) => t.count),
+  );
 
   const editByNo = useMemo(
     () => new Map(edits.map((e) => [e.key, e])),
@@ -222,7 +238,7 @@ export default function VerifiedSourceInventoryPage() {
         <div className="stat">
           <div className="stat-label">Radioactive sources</div>
           <div className="stat-value">{summary.radioactiveSources}</div>
-          <div className="stat-caption">sealed sources &amp; gauges</div>
+          <div className="stat-caption">sealed sources confirmed</div>
         </div>
       </section>
 
@@ -231,7 +247,7 @@ export default function VerifiedSourceInventoryPage() {
         note="Tap a category to filter the list below."
       >
         <ul className="mt-1 space-y-1.5">
-          {summary.byCategory.map(({ category: c, count }) => {
+          {categoriesInUse.map(({ category: c, count }) => {
             const active = category === c;
             return (
               <li key={c}>
@@ -252,6 +268,11 @@ export default function VerifiedSourceInventoryPage() {
                     </span>
                     <span className="tabular font-black shrink-0">{count}</span>
                   </div>
+                  {c === "Other Specialised Equipment" && otherSpecialised ? (
+                    <div className="text-[11px] leading-relaxed text-gunmetal/55">
+                      {otherSpecialised}
+                    </div>
+                  ) : null}
                   <div
                     className="mt-1 h-1.5 rounded-full overflow-hidden"
                     style={{ background: "rgba(26,27,29,0.06)" }}
@@ -271,7 +292,53 @@ export default function VerifiedSourceInventoryPage() {
             );
           })}
         </ul>
+        {emptyCategories.length > 0 ? (
+          <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
+            Nothing confirmed in this exercise under{" "}
+            {emptyCategories.join(" · ")}.
+          </p>
+        ) : null}
       </Panel>
+
+      {summary.bySourceType.length > 0 ? (
+        <Panel
+          title="Sealed sources by type of source"
+          note="The nuclide as the annex records it. Tap one to search the list below."
+        >
+          <ul className="mt-1 space-y-1.5">
+            {summary.bySourceType.map(({ nuclide, count }) => (
+              <li key={nuclide}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategory(SEALED_SOURCES);
+                    setSearch(nuclide);
+                    setPage(0);
+                  }}
+                  className="w-full text-left rounded-lg px-2 py-1.5 transition-colors"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-bold">{nuclide}</span>
+                    <span className="tabular font-black shrink-0">{count}</span>
+                  </div>
+                  <div
+                    className="mt-1 h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "rgba(26,27,29,0.06)" }}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(count / maxSourceType) * 100}%`,
+                        background: "var(--rpa-green, #00A050)",
+                      }}
+                    />
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
 
       {merged.removed.length > 0 ? (
         <Panel
