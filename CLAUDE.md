@@ -198,6 +198,34 @@ Watch out: Mongu and Ndola have thin workbook data (Mongu from July only, Ndola
 add thousands. `docs/screening-figure-audit.md` and `docs/audit-log.md` have the
 detail.
 
+## Routine: the source inventory's equipment categories
+
+Both inventory tabs — Source Inventory (RAIS) and Verified Source Inventory
+(the field annex) — report against **one list**, `SOURCE_CATEGORIES` in
+`lib/rules/sourceCategories.ts`, folded from each register's free-form text by
+`sourceCategory`. The split follows the Seniors' Monday Briefing of Sep 2026;
+`docs/source-inventory-categories-2026.md` holds the memo, the mapping and the
+counts.
+
+1. Edit the list and the classifier in `lib/rules/sourceCategories.ts`. **Order
+   is the logic** — nearly every entry contains a generic X-ray word, so each
+   specific machine must be tested before the generic test that would also
+   match it.
+2. Update `tests/sourceCategories.test.ts` (the pinned list, a case per split),
+   then the pinned per-category counts in `tests/raisInventory.test.ts` and
+   `tests/verifiedInventory.test.ts`.
+3. Update the tables in `docs/source-inventory-categories-2026.md` and the
+   Source Inventory section of the README.
+
+**Watch out:** nothing is stored per category — every figure is derived when the
+page is read — so a category change needs no re-seed and no migration, and the
+`inventoryEdits` overlay is untouched by it.
+
+**Watch out:** a category is never inferred from a manufacturer's model name.
+The 64 generators RAIS records as plain `XRF` sit in *XRF (Type Not Specified)*
+until the register itself says portable or fixed; that bucket and *Type Not
+Recorded* are worklists, and both are counted on the register-gaps panel.
+
 ## Routine: the Summary sheet's enforcement columns
 
 The Inspectorate tab's Summary (`components/inspectorate/InspectionSummaryTable.tsx`,

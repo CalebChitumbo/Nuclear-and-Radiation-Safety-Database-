@@ -115,19 +115,46 @@ describe("summary figures reconcile to the detail rows", () => {
       SUMMARY.byFamily.map((f) => [f.family, f.count]),
     );
     expect(counts).toEqual({
-      "Fixed & Digital Radiography": 280,
+      "Fixed X-Ray Machines": 172,
+      "Conventional Fixed Digital Radiography": 108,
       "Mobile & Portable X-Ray": 191,
-      "Dental & OPG Systems": 53,
-      "CT & PET-CT Scanners": 52,
-      "C-Arm Units": 52,
-      "Fluoroscopy, Angiography & Cathlab": 38,
+      "General Dental X-Ray": 53,
+      "Dental CBCT": 0,
       "Mammography Systems": 26,
-      "Radiotherapy & Accelerators": 11,
-      "Industrial & Analytical X-Ray": 93,
-      "Security Screening Scanners": 46,
-      "Other Specialised": 12,
+      "C-Arm Units": 52,
+      Fluoroscopy: 33,
+      "Angiography & Cath Lab": 5,
+      "General CT": 50,
+      "PET-CT": 2,
+      "SPECT-CT": 0,
+      Brachytherapy: 2,
+      Teletherapy: 2,
+      "Linear Accelerators": 6,
+      "Cargo Scanners": 10,
+      "Baggage Scanners": 36,
+      "Portal Monitors": 0,
+      "Portable XRF": 0,
+      "Fixed XRF": 0,
+      "XRF (Type Not Specified)": 64,
+      "Industrial X-Ray & Gauging": 29,
+      "Other Specialised Equipment": 13,
       "Type Not Recorded": 109,
     });
+  });
+
+  it("spells out the equipment under Other Specialised", () => {
+    expect(SUMMARY.otherSpecialised).toEqual([
+      { type: "Calibration Xray generator", count: 10 },
+      { type: "Bone densitometer", count: 1 },
+      { type: "Cyclotron", count: 1 },
+      { type: "Other type of particle radiation generators", count: 1 },
+    ]);
+    expect(
+      SUMMARY.otherSpecialised.reduce((a, t) => a + t.count, 0),
+    ).toBe(
+      SUMMARY.byFamily.find((f) => f.family === "Other Specialised Equipment")
+        ?.count,
+    );
   });
 
   it("puts every source in exactly one IAEA category, totalling 789", () => {
@@ -170,6 +197,7 @@ describe("summary figures reconcile to the detail rows", () => {
     expect(SUMMARY.dataQuality).toEqual({
       missingSerial: 110,
       missingType: 109,
+      xrfTypeUnspecified: 64,
       missingNuclide: 69,
       missingActivity: 345,
       uncategorisedSources: 591,
@@ -181,6 +209,9 @@ describe("summary figures reconcile to the detail rows", () => {
       SUMMARY.byFamily.map((f) => [f.family, f.count]),
     );
     expect(SUMMARY.dataQuality.missingType).toBe(family["Type Not Recorded"]);
+    expect(SUMMARY.dataQuality.xrfTypeUnspecified).toBe(
+      family["XRF (Type Not Specified)"],
+    );
     expect(SUMMARY.dataQuality.uncategorisedSources).toBe(
       SUMMARY.byCategory.find((c) => c.category === UNCATEGORISED)?.count,
     );
@@ -189,20 +220,14 @@ describe("summary figures reconcile to the detail rows", () => {
 
 describe("generatorFamily", () => {
   it("claims the treatment and screening machines before the X-ray words", () => {
-    expect(generatorFamily("Linear accelerator")).toBe(
-      "Radiotherapy & Accelerators",
-    );
-    expect(generatorFamily("Brachytherapy Afterloader")).toBe(
-      "Radiotherapy & Accelerators",
-    );
-    expect(generatorFamily("Deep Xray treatment")).toBe(
-      "Radiotherapy & Accelerators",
-    );
-    expect(generatorFamily("Cyclotron")).toBe("Radiotherapy & Accelerators");
-    expect(generatorFamily("Baggage Scanner")).toBe(
-      "Security Screening Scanners",
-    );
-    expect(generatorFamily("Cargo Scanner")).toBe("Security Screening Scanners");
+    expect(generatorFamily("Linear accelerator")).toBe("Linear Accelerators");
+    expect(generatorFamily("Brachytherapy Afterloader")).toBe("Brachytherapy");
+    expect(generatorFamily("Deep Xray treatment")).toBe("Teletherapy");
+    // A cyclotron is neither a linac nor a treatment machine; it is named
+    // under Other Specialised rather than counted as radiotherapy.
+    expect(generatorFamily("Cyclotron")).toBe("Other Specialised Equipment");
+    expect(generatorFamily("Baggage Scanner")).toBe("Baggage Scanners");
+    expect(generatorFamily("Cargo Scanner")).toBe("Cargo Scanners");
   });
 
   it("reads the specific machine before the generic word it contains", () => {
@@ -213,51 +238,49 @@ describe("generatorFamily", () => {
       "Mobile & Portable X-Ray",
     );
     // "Portable Dental X Ray" is dental, not portable radiography.
-    expect(generatorFamily("Portable Dental X Ray")).toBe(
-      "Dental & OPG Systems",
-    );
+    expect(generatorFamily("Portable Dental X Ray")).toBe("General Dental X-Ray");
     // "Digital C-arm X-ray" is a C-arm.
     expect(generatorFamily("Digital C-arm X-ray")).toBe("C-Arm Units");
-    // Industrial fluoroscopy is NDT kit, not a cathlab.
+    // Industrial fluoroscopy is NDT kit, not a fluoroscopy suite.
     expect(generatorFamily("Industrial Xray fluoroscopy")).toBe(
-      "Industrial & Analytical X-Ray",
+      "Industrial X-Ray & Gauging",
     );
-    expect(generatorFamily("Digital Fluoroscopy X-ray")).toBe(
-      "Fluoroscopy, Angiography & Cathlab",
-    );
+    expect(generatorFamily("Digital Fluoroscopy X-ray")).toBe("Fluoroscopy");
   });
 
   it("recognises the imaging families across the export's spellings", () => {
     expect(generatorFamily("Fixed Xray radiography")).toBe(
-      "Fixed & Digital Radiography",
-    );
-    expect(generatorFamily("Digital radiography DR x-ray")).toBe(
-      "Fixed & Digital Radiography",
+      "Fixed X-Ray Machines",
     );
     expect(generatorFamily("Conventional Xray generator")).toBe(
-      "Fixed & Digital Radiography",
+      "Fixed X-Ray Machines",
     );
-    expect(generatorFamily("CT scanner")).toBe("CT & PET-CT Scanners");
-    expect(generatorFamily("PET-CT")).toBe("CT & PET-CT Scanners");
+    expect(generatorFamily("Digital radiography DR x-ray")).toBe(
+      "Conventional Fixed Digital Radiography",
+    );
+    expect(generatorFamily("CT scanner")).toBe("General CT");
+    expect(generatorFamily("PET-CT")).toBe("PET-CT");
     expect(generatorFamily("Panoramic dental X-ray generator")).toBe(
-      "Dental & OPG Systems",
+      "General Dental X-Ray",
     );
     expect(generatorFamily("Cephalometric dental Xray generator")).toBe(
-      "Dental & OPG Systems",
+      "General Dental X-Ray",
     );
-    expect(generatorFamily("Cathlab")).toBe(
-      "Fluoroscopy, Angiography & Cathlab",
-    );
+    expect(generatorFamily("Cathlab")).toBe("Angiography & Cath Lab");
     expect(generatorFamily("Angiography generator")).toBe(
-      "Fluoroscopy, Angiography & Cathlab",
+      "Angiography & Cath Lab",
     );
-    expect(generatorFamily("XRF")).toBe("Industrial & Analytical X-Ray");
+    // The register's XRF rows do not say portable or fixed, so they wait in
+    // their own bucket rather than being guessed into one.
+    expect(generatorFamily("XRF")).toBe("XRF (Type Not Specified)");
     expect(generatorFamily("Xray thickness gauge")).toBe(
-      "Industrial & Analytical X-Ray",
+      "Industrial X-Ray & Gauging",
     );
-    expect(generatorFamily("Bone densitometer")).toBe("Other Specialised");
+    expect(generatorFamily("Bone densitometer")).toBe(
+      "Other Specialised Equipment",
+    );
     expect(generatorFamily("Calibration Xray generator")).toBe(
-      "Other Specialised",
+      "Other Specialised Equipment",
     );
   });
 
@@ -402,7 +425,7 @@ describe("raisInventoryToCsv", () => {
     const [, sourceLine, generatorLine] = csv.split("\r\n");
     expect(sourceLine).toContain("Cs-137");
     expect(sourceLine).toContain("Category 3");
-    expect(generatorLine).toContain("CT & PET-CT Scanners");
+    expect(generatorLine).toContain("General CT");
     // A generator has no nuclide or category to report.
     expect(generatorLine.split(",").filter((v) => v === "Cs-137")).toEqual([]);
   });

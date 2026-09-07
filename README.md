@@ -1015,15 +1015,17 @@ reconciles with a filter of the table:
 - four KPIs — registered items · generators · sealed sources · **security
   significant** (IAEA Category 1–3, the sources the Code of Conduct expects to
   be tracked individually: 150 of 789);
-- generators by **machine family** (`generatorFamily` folds the 33 free-form
-  `Type` spellings into twelve buckets, reading the specific machine before the
-  generic word it contains so a `Digital Mammography` is not swept into digital
-  radiography, an `Industrial Xray fluoroscopy` is NDT kit rather than a
-  cathlab, and a `Baggage Scanner` never lands in CT), each click-to-filter;
+- generators by **equipment category** (`generatorFamily` folds the 33 free-form
+  `Type` spellings into the shared categories below, reading the specific machine
+  before the generic word it contains so a `Digital Mammography` is not swept
+  into digital radiography, an `Industrial Xray fluoroscopy` is NDT kit rather
+  than a fluoroscopy suite, and a `Baggage Scanner` never lands in CT), each
+  click-to-filter;
 - sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
-  (110 with no serial, 109 generators with no type, 69 sources with no nuclide,
-  345 with no activity, 591 never categorised, 5 conflicting categories); and
+  (110 with no serial, 109 generators with no type, 64 XRF analysers the
+  register does not call portable or fixed, 69 sources with no nuclide, 345 with
+  no activity, 591 never categorised, 5 conflicting categories); and
 - search across RAN, manufacturer, model, serial and nuclide, with CSV export
   of the current view.
 
@@ -1043,10 +1045,12 @@ recorded: establishment, equipment type, serial number and the field status.
 These carry a facility and a field status that RAIS cannot supply.
 
 - four KPIs (sources & devices · facilities · in use · radioactive sources);
-- a breakdown by the nine **machine families** the exercise reports against
+- a breakdown by the same **equipment categories** the RAIS tab uses
   (`categorizeEquipment` folds the fifty-odd free-form spellings — `Fixed Xray`,
   `CT-Scan`, `C-arm (Mini)`, `Source: Cs-137`, `Industrial Nuclear Gauge` … —
-  into one of nine buckets), each a click-to-filter row;
+  into one of them), each a click-to-filter row;
+- the annex's **sealed sources by type of source** — the nuclide as recorded
+  (Co-57 5 · Cs-137 4 · Co-60 2 · Ba-133 · I-129 · I-131);
 - a **status** filter (`statusGroup` collapses the field statuses to In use /
   Not in use / Unspecified, reading the negatives before the positives they
   contain so `Expired (Inactive)` and `Not Yet In Use` are not counted as in
@@ -1055,6 +1059,43 @@ These carry a facility and a field status that RAIS cannot supply.
 
 The rules live in `lib/rules/verifiedInventory.ts` (pure and unit-tested); the
 page is `app/verified-source-inventory/page.tsx`.
+
+### The equipment categories
+
+Both tabs report against **one list of categories**, `SOURCE_CATEGORIES` in
+`lib/rules/sourceCategories.ts`, so the register and the field exercise name a
+machine the same way and can be read line against line. The split follows the
+Seniors' Monday Briefing of September 2026:
+
+| | |
+| --- | --- |
+| **Radiography** | Fixed X-Ray Machines · Conventional Fixed Digital Radiography · Mobile & Portable X-Ray |
+| **Dental** | General Dental X-Ray · Dental CBCT |
+| **Other imaging** | Mammography Systems · C-Arm Units · Fluoroscopy · Angiography & Cath Lab |
+| **CT** | General CT · PET-CT · SPECT-CT |
+| **Radiotherapy** | Brachytherapy · Teletherapy · Linear Accelerators |
+| **Screening** | Cargo Scanners · Baggage Scanners · Portal Monitors |
+| **Analytical & industrial** | Portable XRF · Fixed XRF · *XRF (Type Not Specified)* · Industrial X-Ray & Gauging |
+| **The rest** | Other Specialised Equipment · Sealed Sources · *Type Not Recorded* |
+
+One classifier reads both registers' vocabularies, and **order is the logic**:
+each specific machine claims its rows before the generic X-ray word they also
+contain. Two rules are worth repeating — a category is never inferred from a
+manufacturer's model name, so the 64 generators RAIS records as plain `XRF` wait
+in *XRF (Type Not Specified)* rather than being guessed into portable or fixed;
+and a category the briefing asked for exists whether or not anything is
+registered under it yet (Dental CBCT, SPECT-CT and Portal Monitors are empty
+today, and are named under the breakdown rather than hidden).
+
+*Other Specialised Equipment* lists what it holds under its own row — calibration
+sets, a bone densitometer, a cyclotron — so the catch-all says what is in it.
+Sealed sources are split by **type of source**, i.e. the nuclide as recorded, on
+both tabs.
+
+Nothing is stored per category: every figure is derived from the registers' own
+text when the page is read, so a category change needs no re-seed and leaves
+officers' corrections alone. The mapping, the counts and the judgement calls are
+in [`docs/source-inventory-categories-2026.md`](docs/source-inventory-categories-2026.md).
 
 ### Correcting a record
 
@@ -1172,14 +1213,19 @@ npm test
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
+- `sourceCategories` — the equipment categories both inventory tabs report
+  against: that every split the Seniors' Briefing asked for exists, and that the
+  classifier reads the specific machine before the generic X-ray word its
+  entries also carry (a portable dental set is dental, an industrial fluoroscopy
+  is NDT kit, a plain `XRF` is neither portable nor fixed)
 - `verifiedInventory` — verifies the seeded Annex I inventory (215 items numbered
   1…215, 75 facilities) and that every derived grouping reconciles to it: the
-  nine machine-family buckets, the status groups (reading the negatives first),
-  the serial-provided count, and the CSV columns
+  equipment categories, the sealed sources by type of source, the status groups
+  (reading the negatives first), the serial-provided count, and the CSV columns
 - `raisInventory` — verifies the seeded RAIS register (1,752 items, 963
   generators then 789 sources, each in accession order with a unique RAN) and
-  that every derived grouping reconciles to it: the twelve family buckets, the
-  IAEA categories and the 150 security-significant sources, the nuclide
+  that every derived grouping reconciles to it: the equipment categories and
+  what the catch-all among them holds, the IAEA categories and the 150 security-significant sources, the nuclide
   breakdown with its gap bucket sorted last, the register-gap counts against
   the right denominator, activity parsing in Bq/Ci, and the CSV columns
 - `inventoryEdits` — the correction overlay both inventories share: that a patch

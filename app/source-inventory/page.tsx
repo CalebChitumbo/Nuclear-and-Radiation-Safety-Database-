@@ -12,6 +12,7 @@ import {
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
+import { GAP_CATEGORIES } from "@/lib/rules/sourceCategories";
 import { mergeRaisInventory } from "@/lib/rules/inventoryEdits";
 import {
   GENERATOR_FAMILIES,
@@ -144,6 +145,16 @@ export default function SourceInventoryPage() {
     [inventory],
   );
   const maxFamily = Math.max(1, ...summary.byFamily.map((f) => f.count));
+  // A category with nothing in it is still a category the inventory reports
+  // against, so it is named under the breakdown rather than dropped from it.
+  const familiesInUse = summary.byFamily.filter((f) => f.count > 0);
+  const emptyFamilies = summary.byFamily
+    .filter((f) => f.count === 0 && !GAP_CATEGORIES.includes(f.family))
+    .map((f) => f.family);
+  // The briefing asked for the catch-all to say what it holds.
+  const otherSpecialised = summary.otherSpecialised
+    .map((t) => `${t.type} (${t.count})`)
+    .join(" · ");
   const maxNuclide = Math.max(1, ...summary.byNuclide.map((n) => n.count));
 
   const editByRan = useMemo(
@@ -343,18 +354,28 @@ export default function SourceInventoryPage() {
           note="Tap a family to filter the list below."
         >
           <ul className="mt-1 space-y-1.5">
-            {summary.byFamily.map(({ family, count }) => (
+            {familiesInUse.map(({ family, count }) => (
               <BreakdownRow
                 key={family}
                 label={family}
                 count={count}
                 max={maxFamily}
+                detail={
+                  family === "Other Specialised Equipment"
+                    ? otherSpecialised
+                    : undefined
+                }
                 active={grouping === `family:${family}`}
-                muted={family === "Type Not Recorded"}
+                muted={GAP_CATEGORIES.includes(family)}
                 onClick={() => pickFamily(family)}
               />
             ))}
           </ul>
+          {emptyFamilies.length > 0 ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
+              Nothing registered yet under {emptyFamilies.join(" · ")}.
+            </p>
+          ) : null}
         </Panel>
       ) : null}
 
@@ -422,6 +443,11 @@ export default function SourceInventoryPage() {
           <GapRow
             label="Generator type not recorded"
             count={gaps.missingType}
+            of={summary.generators}
+          />
+          <GapRow
+            label="XRF analyser not recorded as portable or fixed"
+            count={gaps.xrfTypeUnspecified}
             of={summary.generators}
           />
           <GapRow
@@ -702,6 +728,7 @@ function BreakdownRow({
   max,
   active,
   muted,
+  detail,
   onClick,
 }: {
   label: string;
@@ -709,6 +736,8 @@ function BreakdownRow({
   max: number;
   active: boolean;
   muted?: boolean;
+  /** What a catch-all row actually holds, spelled out under its label. */
+  detail?: string;
   onClick: () => void;
 }) {
   return (
@@ -730,6 +759,11 @@ function BreakdownRow({
           </span>
           <span className="tabular font-black shrink-0">{count}</span>
         </div>
+        {detail ? (
+          <div className="text-[11px] leading-relaxed text-gunmetal/55">
+            {detail}
+          </div>
+        ) : null}
         <div
           className="mt-1 h-1.5 rounded-full overflow-hidden"
           style={{ background: "rgba(26,27,29,0.06)" }}
