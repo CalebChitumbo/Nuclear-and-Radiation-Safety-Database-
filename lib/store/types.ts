@@ -222,6 +222,25 @@ export interface DataStore {
     };
   }>;
   addInspection(i: Omit<Inspection, "id">): Promise<Inspection>;
+  /**
+   * Correct an inspection already on the register — the wrong type, outcome,
+   * enforcement action or day. The reporting week is re-derived from the date,
+   * so moving an inspection moves it in the weekly report with it.
+   *
+   * The Inspectorate (and an administrator) may do this; the rules re-check the
+   * whole document, so the patch must leave it valid.
+   */
+  updateInspection(
+    id: string,
+    patch: Partial<Omit<Inspection, "id">>,
+    actor?: string,
+  ): Promise<Inspection>;
+  /**
+   * Remove an inspection from the register — an administrator's only, because
+   * it takes a counted inspection (and any enforcement action on it) back out
+   * of the work plan's cumulative figures.
+   */
+  deleteInspection(id: string): Promise<void>;
   /** Every cross-section inspection request, newest first. */
   listInspectionRequests(): Promise<InspectionRequest[]>;
   /** Inspection requests for one facility, newest first (indexed in Firebase). */

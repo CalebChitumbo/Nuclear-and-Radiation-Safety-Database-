@@ -115,6 +115,123 @@ export function existingScreeningEntry(
 }
 
 /**
+ * The id a daily entry MUST live under, or null when it may live under any.
+ *
+ * Only the border screening counts are pinned: one post, one day, one figure
+ * (see `screeningEntryId`). Everything else in the daily log is an ordinary
+ * document with an allocated id, and several of them may sit on the same day.
+ */
+export function postDayEntryId(
+  entry: Pick<DailyEntry, "kind" | "metricKey" | "border" | "date">,
+): string | null {
+  if (entry.kind !== "count") return null;
+  if (entry.metricKey !== vehicleScreeningKey()) return null;
+  if (!entry.border) return null;
+  return screeningEntryId(entry.date, entry.border);
+}
+
+/**
+ * Where an edited entry has to be written, and what has to be taken away.
+ *
+ * Correcting a figure is usually a write back to the same document. A screening
+ * count is not: its id names the post and the day it belongs to, so moving one
+ * to another day or another post has to move the DOCUMENT, or the post-day
+ * invariant breaks and the same day could be logged twice. Three shapes come
+ * out of that:
+ *
+ * - `id` set, `removeId` null — write over the document that is there.
+ * - both set — the post-day id changed; write the new one, drop the old.
+ * - `id` null — the entry stopped being a post-day figure (its metric changed,
+ *   or its post was cleared), so it needs a freshly allocated document and the
+ *   pinned one goes.
+ *
+ * Whatever already sits at the destination is REPLACED, which is the point:
+ * the caller shows the officer that figure before it disappears.
+ */
+export function planDailyEntryWrite(
+  entry: DailyEntry,
+  next: Pick<DailyEntry, "kind" | "metricKey" | "border" | "date">,
+): { id: string | null; removeId: string | null } {
+  // An entry that is not already stored under its post-day id is an ordinary
+  // document — the workbook import and the head-office figures both are.
+  if (entry.id !== postDayEntryId(entry)) {
+    return { id: entry.id, removeId: null };
+  }
+  const nextId = postDayEntryId(next);
+  if (nextId === entry.id) return { id: entry.id, removeId: null };
+  return { id: nextId, removeId: entry.id };
+}
+
+/**
+ * What an account may change on a daily entry that is already on file — the
+ * app's side of the `dailyEntries` update rule in `firestore.rules`:
+ *
+ * - `full` — every field on the entry. An administrator on any entry (that is
+ *   the point of the role: the figures are the department's, and a mistake
+ *   somebody else typed is still the department's to correct), and an officer
+ *   on the entries they wrote themselves.
+ * - `figure` — the number and its remark, and nothing that would move the
+ *   entry somewhere else. A post's screening figure is the one entry anybody
+ *   in the section may correct without having written it (a later shift, the
+ *   workbook import), and the rules refuse to let that same write re-point the
+ *   post-day at another post or another day.
+ * - `none` — read only.
+ *
+ * `postedOffice` confines a border coordinator to their own post, exactly as
+ * `filedAtOwnPost` does in the rules.
+ */
+export type DailyEntryEditScope = "none" | "figure" | "full";
+
+export interface DailyEntryEditor {
+  uid: string;
+  admin: boolean;
+  /** The sections whose records this account is shown (`sectionsFor`). */
+  sections: readonly Section[];
+  /** The inland office the account is posted to, if any. */
+  postedOffice?: string | null;
+}
+
+export function dailyEntryEditScope(
+  editor: DailyEntryEditor | null,
+  entry: DailyEntry,
+): DailyEntryEditScope {
+  if (!editor) return "none";
+  if (editor.admin) return "full";
+  if (!editor.sections.includes(entry.section)) return "none";
+  if (editor.postedOffice && entry.border !== editor.postedOffice) return "none";
+  if (editor.uid && entry.updatedBy === editor.uid) return "full";
+  return postDayEntryId(entry) === entry.id ? "figure" : "none";
+}
+
+/**
+ * The author an edited entry keeps naming. `updatedBy` is who wrote the figure
+ * that is there now — the rules force it to be the account doing the writing —
+ * so an administrator correcting somebody else's entry would otherwise erase
+ * the only record on the document of who logged it. `loggedBy` holds that,
+ * from the first edit onwards; the row then reads "logged by X, corrected by
+ * Y" instead of quietly becoming Y's.
+ */
+export function editedDailyEntry(
+  entry: DailyEntry,
+  next: Omit<DailyEntry, "id">,
+  editor: { uid: string; name: string },
+): Omit<DailyEntry, "id"> {
+  const author = entry.loggedBy || entry.updatedBy;
+  const authorName = entry.loggedByName || entry.updatedByName;
+  // Somebody else's entry keeps naming them; an officer correcting their own
+  // is simply its author again, so the field goes away rather than saying the
+  // same name twice.
+  const elsewhere = !!author && author !== editor.uid;
+  return {
+    ...next,
+    updatedBy: editor.uid,
+    updatedByName: editor.name,
+    loggedBy: elsewhere ? author : undefined,
+    loggedByName: elsewhere ? authorName : undefined,
+  };
+}
+
+/**
  * A post that logs truck by truck does not type a daily figure — it posts the
  * count of what it scanned. It goes to the post-day's own document
  * (`screeningEntryId`), so posting again REPLACES whatever figure the day held,

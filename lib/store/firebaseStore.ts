@@ -815,6 +815,32 @@ class FirebaseStore implements DataStore {
     return { ...i, week, id: ref.id };
   }
 
+  async updateInspection(
+    id: string,
+    patch: Partial<Omit<Inspection, "id">>,
+    actor?: string,
+  ): Promise<Inspection> {
+    const db = requireDb();
+    const ref = doc(db, "inspections", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("That inspection is no longer on file.");
+    const before = { id, ...(snap.data() as Omit<Inspection, "id">) };
+    const next: Inspection = { ...before, ...patch };
+    // The week is the date's, always — an inspection moved to another day is
+    // reported in the week that day falls in, not the one it was logged in.
+    next.week = weekLabelForDate(next.date, weeksSeed as WeekDef[], "");
+    next.updatedAt = new Date().toISOString();
+    if (actor) next.updatedBy = actor;
+    const { id: _id, ...data } = next;
+    await setDoc(ref, stripUndefined(data));
+    return next;
+  }
+
+  async deleteInspection(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "inspections", id));
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     const db = requireDb();
     const snap = await getDocs(collection(db, "inspectionRequests"));

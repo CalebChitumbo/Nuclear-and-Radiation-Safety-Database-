@@ -878,6 +878,32 @@ class MockStore implements DataStore {
     return ins;
   }
 
+  async updateInspection(
+    id: string,
+    patch: Partial<Omit<Inspection, "id">>,
+    actor?: string,
+  ): Promise<Inspection> {
+    const s = ensure();
+    const before = s.inspections.find((i) => i.id === id);
+    if (!before) throw new Error("That inspection is no longer on file.");
+    const next: Inspection = { ...before, ...patch, id };
+    // The week follows the date, so a corrected day reports in its own week.
+    next.week = weekLabelForDate(next.date, weeksSeed as WeekDef[], "");
+    next.updatedAt = new Date().toISOString();
+    if (actor) next.updatedBy = actor;
+    s.inspections = s.inspections.map((i) => (i.id === id ? next : i));
+    save(s);
+    dispatchChange();
+    return next;
+  }
+
+  async deleteInspection(id: string): Promise<void> {
+    const s = ensure();
+    s.inspections = s.inspections.filter((i) => i.id !== id);
+    save(s);
+    dispatchChange();
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     return [...ensure().inspectionRequests].sort((a, b) =>
       (b.requestedAt || "").localeCompare(a.requestedAt || ""),

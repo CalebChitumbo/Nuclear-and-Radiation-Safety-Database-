@@ -371,7 +371,7 @@ automatically (Production for the production branch, Preview for others).
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
 | `workPlanBaseline/{year}` | The plan year's **opening balance** — what each output had already achieved before the system started counting it. The report is cumulative, so every row counts up from here. Admin-writable only (it moves every section's figures at once) |
 | `workPlanConfig/{year}` | The sections' own changes to the approved plan — reworded outputs, revised targets, rows added or retired, and the register each row counts itself off. An **overlay**: only rows that were actually changed have an entry, so clearing one hands the row back to the workbook. Written a row at a time; wholesale reset is admin-only |
-| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
+| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. An entry corrected after the fact keeps its author on `loggedBy` while `updatedBy` names whoever corrected it. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
 | `borders/{id}` | NSSS border posts (vehicle screening); seeded with the eight inland offices, then managed by NSSS/admins — deactivation keeps history |
 | `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
@@ -778,6 +778,16 @@ Inspectorate stakeholder/TWG counts as `1.1.S1`/`1.2.S1`, the National Source
 Inventory team's field figures as `1.2.9.1`–`1.2.9.5` behind the exercise they
 belong to). They carry no target, % or status.
 
+They also **collapse**. The divider is a toggle — tap it and that
+subprogramme's supporting figures fold away, tap it again and they are back —
+and the switch beside *Showing* folds or unfolds every subprogramme's at once,
+so the report can be read as the plan proper and then opened up again when a
+supporting figure is what is wanted. It is a way of reading the report, not a
+change to it: nothing is retired or deleted, the export, the briefing and the
+work plan figures are unaffected, and the choice is remembered per browser. A
+collapsed band stays out of **Print / PDF** as well, which is the point when
+the printed update is going to a meeting that reports on outputs only.
+
 **Export sheet** writes the table as CSV in the workbook's own column order, so
 a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**
@@ -848,6 +858,47 @@ changing it would orphan every figure the border posts have recorded.
 "Open the sectional update" on the daily tab jumps to `/weekly` for the selected
 week; the "Week so far" panel beside the flow already shows the week's
 contribution per output and where that leaves it against the annual target.
+
+### Correcting what was logged
+
+A log typed on a phone at a facility gets the wrong number, the wrong metric,
+the wrong post or the wrong day sometimes, and the figure counts the moment it
+lands. So every entry on the day's list carries **Edit** beside it
+(`components/daily/EntryEditor.tsx`), and the inspections logged that day carry
+one too (`components/daily/InspectionEditor.tsx`) — the wizard's four taps are
+what make a wrong tap easy.
+
+Who may change what is `dailyEntryEditScope`, which mirrors the `dailyEntries`
+update rule in `firestore.rules` rather than restating it:
+
+| | may change |
+| --- | --- |
+| **an administrator** | every field of every entry, whatever section logged it — the figures are the department's, and a mistake somebody else typed is still the department's to put right |
+| **the officer who logged it** | every field of their own entry |
+| **anyone in the section** | the number and its remark on a **post's screening figure** — a later shift correcting the day's total. The post and the date stay put; the rules refuse a write that would re-point the post-day |
+
+Three things keep a correction honest:
+
+- **The document moves with the figure.** Re-dating a screening figure or
+  re-filing it against another post rewrites it to that post-day's own id and
+  drops the old document (`planDailyEntryWrite`), so *one post, one day, one
+  figure* survives the correction; the form says whose figure it is about to
+  replace before it does.
+- **The entry keeps naming who logged it.** `updatedBy` has to be the account
+  doing the writing, so a correction moves it to the corrector and the original
+  author is held on `loggedBy`; the row then reads "Mwansa · corrected by the
+  Director" instead of quietly becoming the Director's.
+- **The audit log records it like any other change** — the same trigger, the
+  same before/after, `X changed Vehicle Screening at Chirundu for 2026-09-02
+  from 143 to 134`. Nothing here is a back door around it.
+
+An inspection is editable in type, outcome, enforcement action and day (its
+reporting week is re-derived from the date, so a corrected day is reported in
+its own week). The **facility** is not: an inspection carries that facility's
+province, district and practice, so one filed against the wrong facility is
+removed and logged again — and removing an inspection is an administrator's,
+since it takes a counted inspection, and any enforcement action on it, back out
+of outputs 1.2.4 and 1.2.11.
 
 ---
 
