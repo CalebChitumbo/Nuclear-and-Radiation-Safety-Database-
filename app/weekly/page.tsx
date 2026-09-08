@@ -70,6 +70,14 @@ import {
 } from "@/lib/rules/types";
 
 const VIEW_STORAGE_KEY = "rpa-workplan-view";
+/**
+ * Which subprogrammes are reading without their supporting figures. Supporting
+ * figures are the detail a section keeps for itself — no target, no percentage,
+ * nothing the work plan is scored on — so an officer reading the plan proper
+ * wants them out of the way, and the same officer chasing a figure wants them
+ * back. Kept per browser: it is a way of reading the report, not a change to it.
+ */
+const SUPPORTING_STORAGE_KEY = "rpa-workplan-supporting-hidden";
 
 const ACTIVITY_STATUSES: Activity["status"][] = [
   "Not Started",
@@ -128,6 +136,37 @@ export default function WeeklyPage() {
       /* ignore */
     }
   };
+
+  // Subprogrammes whose supporting figures are collapsed, by id.
+  const [hiddenSupporting, setHiddenSupporting] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(SUPPORTING_STORAGE_KEY);
+      const ids = stored ? JSON.parse(stored) : null;
+      if (Array.isArray(ids)) {
+        setHiddenSupporting(ids.filter((x) => typeof x === "string"));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const rememberHidden = (ids: string[]) => {
+    setHiddenSupporting(ids);
+    try {
+      window.localStorage.setItem(SUPPORTING_STORAGE_KEY, JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleSupporting = (id: string) =>
+    rememberHidden(
+      hiddenSupporting.includes(id)
+        ? hiddenSupporting.filter((x) => x !== id)
+        : [...hiddenSupporting, id],
+    );
 
   // Licences and inspections are counted off the facilities register, which
   // only Licensing and the Inspectorate read; the other sections' rows never
@@ -243,6 +282,12 @@ export default function WeeklyPage() {
   // Outputs moved this week, not a sum of the figures — adding vehicles
   // screened to safety guides written would be a number about nothing.
   const movedThisWeek = planRows.filter((r) => r.week > 0).length;
+  // The supporting figures on show, and whether every subprogramme that has
+  // any has them collapsed — what the one switch above the tables acts on.
+  const supportingCount = reports.reduce((n, r) => n + r.supporting.length, 0);
+  const allSupportingHidden = reports
+    .filter((r) => r.supporting.length)
+    .every((r) => hiddenSupporting.includes(r.id));
 
   const onWeekValueChange = async (key: string, value: number) => {
     try {
@@ -450,6 +495,23 @@ export default function WeeklyPage() {
               { value: "both", label: "Week + year" },
             ]}
           />
+          {supportingCount ? (
+            <button
+              className="btn btn-ghost"
+              aria-pressed={!allSupportingHidden}
+              onClick={() =>
+                rememberHidden(
+                  allSupportingHidden
+                    ? []
+                    : reports.filter((r) => r.supporting.length).map((r) => r.id),
+                )
+              }
+            >
+              {allSupportingHidden
+                ? `Show the ${supportingCount} supporting figures`
+                : `Hide the ${supportingCount} supporting figures`}
+            </button>
+          ) : null}
         </div>
         <p className="section-note mt-3">
           The plan is <strong>cumulative for {WORK_PLAN_YEAR}</strong>: every
@@ -480,6 +542,8 @@ export default function WeeklyPage() {
           plan={plan}
           view={view}
           quarter={quarter}
+          supportingOpen={!hiddenSupporting.includes(sub.id)}
+          onToggleSupporting={() => toggleSupporting(sub.id)}
           openId={openId}
           onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
           canEdit={(section) => canEditSection(user, section)}
@@ -853,6 +917,8 @@ function SubprogrammeTable({
   plan,
   view,
   quarter,
+  supportingOpen,
+  onToggleSupporting,
   openId,
   onToggle,
   canEdit,
@@ -869,6 +935,9 @@ function SubprogrammeTable({
   view: WorkPlanView;
   /** The quarter the selected week reports into — its column is highlighted. */
   quarter: Quarter | null;
+  /** Whether this subprogramme's supporting figures are expanded. */
+  supportingOpen: boolean;
+  onToggleSupporting: () => void;
   openId: string | null;
   onToggle: (id: string) => void;
   canEdit: (section: WorkPlanRow["output"]["section"]) => boolean;
@@ -897,7 +966,10 @@ function SubprogrammeTable({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const startAdd = (supporting: boolean) =>
+  const startAdd = (supporting: boolean) => {
+    // Adding a figure into a band that is collapsed would file it out of
+    // sight, so opening the form opens the band.
+    if (supporting && !supportingOpen) onToggleSupporting();
     setAdding(
       emptyDraft(
         nextOutputId(plan, { subprogramme: sub.id, supporting }),
@@ -905,6 +977,7 @@ function SubprogrammeTable({
         supporting,
       ),
     );
+  };
 
   return (
     <Panel
@@ -1014,18 +1087,39 @@ function SubprogrammeTable({
             ))}
             {sub.supporting.length ? (
               <tr>
-                <td colSpan={columns.length} className="bg-[var(--sunken)]">
-                  <span
-                    className="caps text-[10px] text-gunmetal/55"
-                    style={{ position: "sticky", left: 0 }}
+                <td colSpan={columns.length} className="bg-[var(--sunken)] p-0">
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 sm:px-5 py-2"
+                    aria-expanded={supportingOpen}
+                    onClick={onToggleSupporting}
                   >
-                    Supporting figures — tracked by the section, not work plan
-                    outputs
-                  </span>
+                    {/* Sticky on the label, not the button: the table scrolls
+                        sideways and the band has to stay readable with it. */}
+                    <span
+                      className="inline-flex items-center gap-2"
+                      style={{ position: "sticky", left: 0 }}
+                    >
+                      <span
+                        className="text-[10px] text-gunmetal/55"
+                        aria-hidden="true"
+                      >
+                        {supportingOpen ? "▾" : "▸"}
+                      </span>
+                      <span className="caps text-[10px] text-gunmetal/55">
+                        {sub.supporting.length} supporting figure
+                        {sub.supporting.length === 1 ? "" : "s"} — tracked by the
+                        section, not work plan outputs
+                      </span>
+                      <span className="link-action text-[10px] no-print">
+                        {supportingOpen ? "Hide" : "Show"}
+                      </span>
+                    </span>
+                  </button>
                 </td>
               </tr>
             ) : null}
-            {sub.supporting.map((row) => (
+            {(supportingOpen ? sub.supporting : []).map((row) => (
               <PlanRow
                 key={row.output.id}
                 row={row}

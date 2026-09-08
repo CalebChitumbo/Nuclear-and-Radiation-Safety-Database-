@@ -725,6 +725,16 @@ export interface DailyEntry {
   createdAt?: string;
   updatedBy?: string;
   updatedByName?: string;
+  /**
+   * Who LOGGED the entry, when that is no longer who last wrote it — an
+   * administrator (or a later shift) corrected it. `updatedBy` has to name the
+   * account doing the writing (the security rules force it, and the audit log
+   * reads it as the actor), so without this the correction would erase the only
+   * record on the document of whose entry it was. Absent on an entry nobody has
+   * corrected, and cleared again if its own author comes back to it.
+   */
+  loggedBy?: string;
+  loggedByName?: string;
 }
 
 /**

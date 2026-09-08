@@ -371,7 +371,7 @@ automatically (Production for the production branch, Preview for others).
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
 | `workPlanBaseline/{year}` | The plan year's **opening balance** — what each output had already achieved before the system started counting it. The report is cumulative, so every row counts up from here. Admin-writable only (it moves every section's figures at once) |
 | `workPlanConfig/{year}` | The sections' own changes to the approved plan — reworded outputs, revised targets, rows added or retired, and the register each row counts itself off. An **overlay**: only rows that were actually changed have an entry, so clearing one hands the row back to the workbook. Written a row at a time; wholesale reset is admin-only |
-| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
+| `dailyEntries/{id}` | Daily Updates log — per-day, per-section counts (on the same metric keys the sectional update reads, optionally tagged with a `border`) and notes (incl. the NSSS `official` daily confirmation); a week's daily sums take precedence over typed weekly figures. An entry corrected after the fact keeps its author on `loggedBy` while `updatedBy` names whoever corrected it. Seeded with the inland offices' 2026 screening log, one document per post per day (`screen-YYYY-MM-DD-post`, so re-seeding updates a day in place) |
 | `borders/{id}` | NSSS border posts (vehicle screening); seeded with the eight inland offices, then managed by NSSS/admins — deactivation keeps history |
 | `truckScans/{id}` | Border Scan Log — one document per truck scanned at a post (unit, cargo, transporter, dose, result, action taken); every daily and weekly tally is derived from these |
 | `activities/{id}` | Free-form weekly activities, scoped per section |
@@ -778,6 +778,16 @@ Inspectorate stakeholder/TWG counts as `1.1.S1`/`1.2.S1`, the National Source
 Inventory team's field figures as `1.2.9.1`–`1.2.9.5` behind the exercise they
 belong to). They carry no target, % or status.
 
+They also **collapse**. The divider is a toggle — tap it and that
+subprogramme's supporting figures fold away, tap it again and they are back —
+and the switch beside *Showing* folds or unfolds every subprogramme's at once,
+so the report can be read as the plan proper and then opened up again when a
+supporting figure is what is wanted. It is a way of reading the report, not a
+change to it: nothing is retired or deleted, the export, the briefing and the
+work plan figures are unaffected, and the choice is remembered per browser. A
+collapsed band stays out of **Print / PDF** as well, which is the point when
+the printed update is going to a meeting that reports on outputs only.
+
 **Export sheet** writes the table as CSV in the workbook's own column order, so
 a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**
@@ -848,6 +858,47 @@ changing it would orphan every figure the border posts have recorded.
 "Open the sectional update" on the daily tab jumps to `/weekly` for the selected
 week; the "Week so far" panel beside the flow already shows the week's
 contribution per output and where that leaves it against the annual target.
+
+### Correcting what was logged
+
+A log typed on a phone at a facility gets the wrong number, the wrong metric,
+the wrong post or the wrong day sometimes, and the figure counts the moment it
+lands. So every entry on the day's list carries **Edit** beside it
+(`components/daily/EntryEditor.tsx`), and the inspections logged that day carry
+one too (`components/daily/InspectionEditor.tsx`) — the wizard's four taps are
+what make a wrong tap easy.
+
+Who may change what is `dailyEntryEditScope`, which mirrors the `dailyEntries`
+update rule in `firestore.rules` rather than restating it:
+
+| | may change |
+| --- | --- |
+| **an administrator** | every field of every entry, whatever section logged it — the figures are the department's, and a mistake somebody else typed is still the department's to put right |
+| **the officer who logged it** | every field of their own entry |
+| **anyone in the section** | the number and its remark on a **post's screening figure** — a later shift correcting the day's total. The post and the date stay put; the rules refuse a write that would re-point the post-day |
+
+Three things keep a correction honest:
+
+- **The document moves with the figure.** Re-dating a screening figure or
+  re-filing it against another post rewrites it to that post-day's own id and
+  drops the old document (`planDailyEntryWrite`), so *one post, one day, one
+  figure* survives the correction; the form says whose figure it is about to
+  replace before it does.
+- **The entry keeps naming who logged it.** `updatedBy` has to be the account
+  doing the writing, so a correction moves it to the corrector and the original
+  author is held on `loggedBy`; the row then reads "Mwansa · corrected by the
+  Director" instead of quietly becoming the Director's.
+- **The audit log records it like any other change** — the same trigger, the
+  same before/after, `X changed Vehicle Screening at Chirundu for 2026-09-02
+  from 143 to 134`. Nothing here is a back door around it.
+
+An inspection is editable in type, outcome, enforcement action and day (its
+reporting week is re-derived from the date, so a corrected day is reported in
+its own week). The **facility** is not: an inspection carries that facility's
+province, district and practice, so one filed against the wrong facility is
+removed and logged again — and removing an inspection is an administrator's,
+since it takes a counted inspection, and any enforcement action on it, back out
+of outputs 1.2.4 and 1.2.11.
 
 ---
 
@@ -1003,8 +1054,8 @@ empty-vs-placeholder), plus two rules:
 
 - `SealedCategoryManual` **overrides** `SealedCategory` — the plain column is
   what RAIS computes from the A/D ratio, the "Manual" one is an officer's own
-  determination. Where they disagree (5 sources) the record keeps both and the
-  page reports the conflict.
+  determination. Where they disagree (5 sources) the record keeps both, so the
+  conflict survives for whenever the category is reported on again (below).
 - RAIS' internal GUID is dropped. The RAN is unique and is what a re-import
   joins on; the random GUIDs alone would more than double the page's payload
   (74 KB gzipped with them, 31 KB without).
@@ -1012,22 +1063,24 @@ empty-vs-placeholder), plus two rules:
 Everything on the page derives from those detail rows, so every figure
 reconciles with a filter of the table:
 
-- four KPIs — registered items · generators · sealed sources · **security
-  significant** (IAEA Category 1–3, the sources the Code of Conduct expects to
-  be tracked individually: 150 of 789);
+- four KPIs — registered items · generators · sealed sources · **facilities
+  holding them** (303, with 219 items no facility is recorded against);
 - generators by **equipment category** (`generatorFamily` folds the 33 free-form
   `Type` spellings into the shared categories below, reading the specific machine
   before the generic word it contains so a `Digital Mammography` is not swept
   into digital radiography, an `Industrial Xray fluoroscopy` is NDT kit rather
   than a fluoroscopy suite, and a `Baggage Scanner` never lands in CT), each
   click-to-filter;
-- sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
+- sources by **nuclide** (Cs-137 dominates at 618);
+- **where they are held** — by province, by facility, and RAIS' standing for
+  each item (see below), all click-to-filter;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
   (110 with no serial, 109 generators with no type, 23 XRF analysers the
   register does not call portable or fixed, 69 sources with no nuclide, 345 with
-  no activity, 591 never categorised, 5 conflicting categories); and
-- search across RAN, manufacturer, model, serial and nuclide, with CSV export
-  of the current view.
+  no activity, 219 with no holder, 13 held by a facility the facilities register
+  does not hold); and
+- search across RAN, manufacturer, model, serial, nuclide, facility, district,
+  province and holding status, with CSV export of the current view.
 
 `parseActivity` reads RAIS' scientific notation (`9.99E+02 GBq`, `5E+00 mCi`)
 into becquerels so records in different units compare, returning `null` rather
@@ -1035,6 +1088,47 @@ than counting an unreadable value as zero.
 
 The rules live in `lib/rules/raisInventory.ts` (pure and unit-tested); the page
 is `app/source-inventory/page.tsx`.
+
+#### Who holds each item
+
+The register export says **what** an item is; it does not say **where** it is.
+RAIS keeps that on a second pair of exports — *History of a Radiation
+Generator* and *History of a Sealed Source* — one row per item: the facility it
+is registered under (with the facility's own `FAC/nnnn` code), the department
+inside it, RAIS' status for the item and the date that status was set.
+`npm run convert:holders -- <Generators.xlsx> <Sources.xlsx>` turns those into
+`seed/rais-source-holders.seed.json`, and `lib/rules/sourceHolders.ts` joins
+them onto the register by RAN.
+
+Two things the join is deliberately honest about:
+
+- **1,533 of the 1,752 items have a holder; 219 do not.** Those are registered
+  with nobody named against them and are counted as a gap, never given a
+  placeholder facility.
+- **296 of the 303 facilities are in the facilities register**, which is where
+  the **district and province** come from — they are not in the RAIS exports at
+  all. The other seven (a test record, a clinic or two RAIS knows and the
+  register does not) keep the name RAIS gave them, show no location, and are
+  counted apart as a worklist.
+
+The seed carries a small index of district and province for **only the
+facilities the exports name**, so the route need not bundle all 538 — an index
+of `seed/facilities.seed.json`, not new data, and `tests/sourceHolders.test.ts`
+checks it still agrees with the register so a facility that moves district is
+caught.
+
+#### The IAEA source category — withheld for now
+
+RAIS derives a sealed source's category from its **declared activity**, and the
+section's reading of the register in September 2026 was that too many of those
+activities were entered inaccurately for the category to be reported on. So the
+tab no longer shows the category split, the security-significant count or the
+category-conflict gap: a figure nobody trusts is worse than no figure.
+
+Nothing is deleted. The values are still stored, still correctable through the
+edit drawer, still in the CSV export, and still summarised and unit-tested in
+`lib/rules/raisInventory.ts` — bringing the reporting back, once the activities
+have been re-verified, is a change to the page and nothing else.
 
 ### Verified Source Inventory — the field exercise
 
@@ -1234,9 +1328,18 @@ npm test
 - `raisInventory` — verifies the seeded RAIS register (1,752 items, 963
   generators then 789 sources, each in accession order with a unique RAN) and
   that every derived grouping reconciles to it: the equipment categories and
-  what the catch-all among them holds, the IAEA categories and the 150 security-significant sources, the nuclide
-  breakdown with its gap bucket sorted last, the register-gap counts against
-  the right denominator, activity parsing in Bq/Ci, and the CSV columns
+  what the catch-all among them holds, the IAEA categories and the 150
+  security-significant sources (still pinned though the tab no longer reports
+  them), the nuclide breakdown with its gap bucket sorted last, the
+  register-gap counts against the right denominator, activity parsing in Bq/Ci,
+  and the CSV columns
+- `sourceHolders` — the facility each registered item is held by: that the
+  district and province join on from the facilities register, that two
+  spellings of one facility fold together on its code, that a facility the
+  register does not hold keeps its name and loses its location, and the seeded
+  figures (1,533 holdings of 1,752 items, 303 facilities, the provincial and
+  status splits) — plus that the seed's location index still agrees with
+  `seed/facilities.seed.json`, so a facility that moves district is caught
 - `inventoryEdits` — the correction overlay both inventories share: that a patch
   touches only the record it names and cannot introduce a field the record shape
   lacks, that only genuine differences are stored, that a removal leaves the
@@ -1290,10 +1393,12 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
 ├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
 ├── scripts/convert-rais-inventory.py   Flattens the two RAIS exports into one register seed
+├── scripts/convert-source-holders.py   Joins the RAIS "History of a …" exports on as holdings
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
 │                           daily-screening-2026.seed.json (8 posts, 1,484 days),
 │                           inspections-2026.seed.json (298 register rows),
 │                           rais-source-inventory.seed.json (1,752 RAIS items),
+│                           rais-source-holders.seed.json (1,533 holdings, 303 facilities),
 │                           verified-source-inventory-2026.seed.json (215, Annex I)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend

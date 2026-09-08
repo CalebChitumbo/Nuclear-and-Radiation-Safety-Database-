@@ -3,11 +3,16 @@ import {
   borderSums,
   buildOfficialScreeningText,
   dailyCountSums,
+  dailyEntryEditScope,
   dailyMetricOptions,
+  editedDailyEntry,
   effectiveValuesByWeek,
   entriesForDate,
   entriesForWeek,
   mergeWeekManualValues,
+  planDailyEntryWrite,
+  postDayEntryId,
+  screeningEntryId,
   sumMetricAcrossWeeks,
   vehicleScreeningKey,
 } from "../lib/rules/daily";
@@ -208,5 +213,185 @@ describe("border screening", () => {
     expect(text).toBe(
       "Official vehicles-screened total for 2026-05-27: 183 — Chirundu 100, Kasumbalesa 50, Head office / other 33",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Correcting what is already on file
+// ---------------------------------------------------------------------------
+
+const INSP = "Inspectorate" as const;
+
+/** A screening figure as the wizard stores one: pinned to its post-day id. */
+const postDay = (
+  border: string,
+  date: string,
+  over: Partial<DailyEntry> = {},
+): DailyEntry => ({
+  ...count(60, { border, date }),
+  id: screeningEntryId(date, border),
+  ...over,
+});
+
+describe("postDayEntryId", () => {
+  it("pins a border post's screening count to its post and day", () => {
+    expect(postDayEntryId(count(60, { border: "Chirundu" }))).toBe(
+      screeningEntryId("2026-05-27", "Chirundu"),
+    );
+  });
+
+  it("leaves everything else free — notes, head-office figures, other metrics", () => {
+    expect(postDayEntryId(note())).toBeNull();
+    expect(postDayEntryId(count(60))).toBeNull();
+    expect(
+      postDayEntryId(count(3, { border: "Chirundu", metricKey: "insp/x" })),
+    ).toBeNull();
+  });
+});
+
+describe("planDailyEntryWrite", () => {
+  it("writes an ordinary entry back over itself", () => {
+    const e = count(60, { id: "day-1" });
+    expect(planDailyEntryWrite(e, { ...e })).toEqual({
+      id: "day-1",
+      removeId: null,
+    });
+  });
+
+  it("keeps a post-day figure in place when the post and day do not move", () => {
+    const e = postDay("Chirundu", "2026-05-27");
+    expect(planDailyEntryWrite(e, { ...e, date: "2026-05-27" })).toEqual({
+      id: e.id,
+      removeId: null,
+    });
+  });
+
+  it("moves the DOCUMENT when a post-day figure is re-dated", () => {
+    const e = postDay("Chirundu", "2026-05-27");
+    expect(planDailyEntryWrite(e, { ...e, date: "2026-05-28" })).toEqual({
+      id: screeningEntryId("2026-05-28", "Chirundu"),
+      removeId: e.id,
+    });
+  });
+
+  it("moves it when the figure is re-filed against another post", () => {
+    const e = postDay("Chirundu", "2026-05-27");
+    expect(planDailyEntryWrite(e, { ...e, border: "Kasumbalesa" })).toEqual({
+      id: screeningEntryId("2026-05-27", "Kasumbalesa"),
+      removeId: e.id,
+    });
+  });
+
+  it("asks for a fresh document once it stops being a post-day figure", () => {
+    const e = postDay("Chirundu", "2026-05-27");
+    expect(
+      planDailyEntryWrite(e, { ...e, metricKey: metricKey(NSSS, "Other") }),
+    ).toEqual({ id: null, removeId: e.id });
+  });
+
+  it("never re-keys an entry that was not stored under its post-day id", () => {
+    // The head-office figures and anything logged before the post-day rule.
+    const e = count(60, { id: "day-9", border: "Chirundu" });
+    expect(planDailyEntryWrite(e, { ...e, date: "2026-05-28" })).toEqual({
+      id: "day-9",
+      removeId: null,
+    });
+  });
+});
+
+describe("dailyEntryEditScope", () => {
+  const officer = {
+    uid: "u1",
+    admin: false,
+    sections: [NSSS] as const,
+  };
+
+  it("gives an administrator every field of every entry", () => {
+    const admin = { uid: "boss", admin: true, sections: [INSP] as const };
+    expect(dailyEntryEditScope(admin, count(60, { updatedBy: "u1" }))).toBe(
+      "full",
+    );
+    expect(dailyEntryEditScope(admin, note({ section: INSP }))).toBe("full");
+  });
+
+  it("gives an officer every field of their own entry", () => {
+    expect(dailyEntryEditScope(officer, count(60, { updatedBy: "u1" }))).toBe(
+      "full",
+    );
+  });
+
+  it("lets anyone in the section correct a post's screening figure — the number only", () => {
+    expect(
+      dailyEntryEditScope(officer, postDay("Chirundu", "2026-05-27", {
+        updatedBy: "someone-else",
+      })),
+    ).toBe("figure");
+  });
+
+  it("refuses somebody else's ordinary entry", () => {
+    expect(
+      dailyEntryEditScope(officer, count(60, { updatedBy: "u2" })),
+    ).toBe("none");
+    expect(dailyEntryEditScope(officer, note({ updatedBy: "u2" }))).toBe("none");
+  });
+
+  it("refuses another section's entry, and a post other than the officer's own", () => {
+    expect(
+      dailyEntryEditScope(officer, count(60, { section: INSP, updatedBy: "u1" })),
+    ).toBe("none");
+    const posted = { ...officer, postedOffice: "Chirundu" };
+    expect(
+      dailyEntryEditScope(posted, postDay("Kasumbalesa", "2026-05-27")),
+    ).toBe("none");
+    expect(
+      dailyEntryEditScope(posted, postDay("Chirundu", "2026-05-27")),
+    ).toBe("figure");
+  });
+
+  it("refuses a signed-out reader", () => {
+    expect(dailyEntryEditScope(null, count(60))).toBe("none");
+  });
+});
+
+describe("editedDailyEntry", () => {
+  const boss = { uid: "boss", name: "The Director" };
+
+  it("stamps the corrector and keeps naming whoever logged it", () => {
+    const e = count(60, { updatedBy: "u1", updatedByName: "Mwansa" });
+    const next = editedDailyEntry(e, { ...e, value: 50 }, boss);
+    expect(next.updatedBy).toBe("boss");
+    expect(next.updatedByName).toBe("The Director");
+    expect(next.loggedBy).toBe("u1");
+    expect(next.loggedByName).toBe("Mwansa");
+  });
+
+  it("holds the original author through a second correction", () => {
+    const e = count(60, {
+      updatedBy: "boss",
+      updatedByName: "The Director",
+      loggedBy: "u1",
+      loggedByName: "Mwansa",
+    });
+    const next = editedDailyEntry(e, { ...e, value: 40 }, {
+      uid: "u2",
+      name: "Banda",
+    });
+    expect(next.loggedBy).toBe("u1");
+    expect(next.updatedBy).toBe("u2");
+  });
+
+  it("drops the field when the author comes back to their own entry", () => {
+    const e = count(60, {
+      updatedBy: "boss",
+      updatedByName: "The Director",
+      loggedBy: "u1",
+      loggedByName: "Mwansa",
+    });
+    const next = editedDailyEntry(e, { ...e, value: 40 }, {
+      uid: "u1",
+      name: "Mwansa",
+    });
+    expect(next.loggedBy).toBeUndefined();
+    expect(next.updatedBy).toBe("u1");
   });
 });

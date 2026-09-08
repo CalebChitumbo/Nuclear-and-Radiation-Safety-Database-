@@ -463,6 +463,32 @@ describe("the daily log", () => {
     );
   });
 
+  it("is an administrator's to correct, whoever wrote it and whatever it says", async () => {
+    // The Daily Updates correction form leans on this: a figure typed by
+    // mistake is the department's to put right, including moving it to the day
+    // or the post it belonged to. The audit log records the change either way.
+    await assertSucceeds(
+      setDoc(doc(admin(), "dailyEntries/d-nak"), {
+        ...entry(NSSS, "Nakonde", "u-admin"),
+        value: 6,
+        loggedBy: "u-nak",
+        loggedByName: "A. Phiri",
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(admin(), "dailyEntries/d-nak"), {
+        ...entry(NSSS, "Nakonde", "u-admin"),
+        date: "2026-09-02",
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(admin(), "dailyEntries/d-as"), entry(AS, undefined, "u-admin")),
+    );
+    // Moving a post-day figure means moving the DOCUMENT, so the correction
+    // ends with the old one being removed.
+    await assertSucceeds(deleteDoc(doc(admin(), "dailyEntries/d-chi")));
+  });
+
   it("still keeps an entry with no post the author's own to edit", async () => {
     // d-nsss carries no border, so it is not a post-day figure: only u-nsss,
     // who wrote it, may change it.

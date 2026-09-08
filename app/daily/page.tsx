@@ -14,9 +14,12 @@ import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useWeek } from "@/lib/weekContext";
 import { QuickLogWizard } from "@/components/daily/QuickLogWizard";
+import { DailyEntryEditor } from "@/components/daily/EntryEditor";
+import { InspectionEditor } from "@/components/daily/InspectionEditor";
 import {
   borderSums,
   buildOfficialScreeningText,
+  dailyEntryEditScope,
   effectiveValuesByWeek,
   entriesForDate,
   vehicleScreeningKey,
@@ -82,6 +85,9 @@ export default function DailyUpdatesPage() {
   const [section, setSection] = useState<Section>(
     () => sections[0] ?? "Authorisation & Standards",
   );
+  // The entry (and the inspection) whose correction form is open, if any.
+  const [editingEntry, setEditingEntry] = useState<string | null>(null);
+  const [editingInspection, setEditingInspection] = useState<string | null>(null);
 
   // Only the sections that work the facilities register read it; the others'
   // wizards never need it, and the rules would refuse them anyway.
@@ -204,6 +210,18 @@ export default function DailyUpdatesPage() {
   const editable = canEditSection(user, section);
   const isAdmin = user?.role === "admin";
   const today = todayISO();
+  // What this account may correct on an entry already on file — the app's side
+  // of the dailyEntries update rule. An administrator holds every entry, which
+  // is the point: figures somebody else typed by mistake are still the
+  // department's to put right.
+  const entryEditor = user
+    ? {
+        uid: user.uid,
+        admin: isAdmin,
+        sections,
+        postedOffice,
+      }
+    : null;
 
   const openWeeklyReport = () => {
     const w = weeks.find((x) => x.label === weekLabel);
@@ -352,15 +370,42 @@ export default function DailyUpdatesPage() {
               {dayInspections.length ? (
                 <ul className="divide-y divide-gunmetal/8 text-sm">
                   {dayInspections.map((i) => (
-                    <li
-                      key={i.id}
-                      className="flex items-center justify-between gap-2 flex-wrap py-2"
-                    >
-                      <span className="font-bold">{i.facilityName}</span>
-                      <span className="flex gap-1">
-                        <span className="chip slate">{i.type}</span>
-                        <span className="chip">{i.outcome}</span>
-                      </span>
+                    <li key={i.id} className="py-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-bold">{i.facilityName}</span>
+                        <span className="flex items-center gap-1">
+                          <span className="chip slate">{i.type}</span>
+                          <span className="chip">{i.outcome}</span>
+                          {i.enforcement ? (
+                            <span className="chip amber">{i.enforcement}</span>
+                          ) : null}
+                          {editable ? (
+                            <button
+                              className="link-action ml-1"
+                              onClick={() =>
+                                setEditingInspection((cur) =>
+                                  cur === i.id ? null : i.id,
+                                )
+                              }
+                            >
+                              {editingInspection === i.id ? "Close" : "Edit"}
+                            </button>
+                          ) : null}
+                        </span>
+                      </div>
+                      {editingInspection === i.id ? (
+                        <InspectionEditor
+                          inspection={i}
+                          weeks={weeks}
+                          canRemove={isAdmin}
+                          actorUid={user?.uid || ""}
+                          onSaved={() => {
+                            setEditingInspection(null);
+                            reload();
+                          }}
+                          onCancel={() => setEditingInspection(null)}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -389,52 +434,90 @@ export default function DailyUpdatesPage() {
             className="scroll-mt-20"
           >
             <ul className="divide-y divide-gunmetal/8">
-              {daySectionEntries.map((e) => (
-                <li
-                  key={e.id}
-                  className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    {e.kind === "count" ? (
-                      <div className="text-sm flex flex-wrap items-center gap-1.5">
-                        <span className="font-bold">{e.label}</span>
-                        <span className="chip green tabular">
-                          +{e.value ?? 0}
-                        </span>
-                        {e.border ? (
-                          <span className="chip slate">{e.border}</span>
+              {daySectionEntries.map((e) => {
+                const scope = dailyEntryEditScope(entryEditor, e);
+                return (
+                  <li key={e.id} className="px-4 sm:px-5 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {e.kind === "count" ? (
+                          <div className="text-sm flex flex-wrap items-center gap-1.5">
+                            <span className="font-bold">{e.label}</span>
+                            <span className="chip green tabular">
+                              +{e.value ?? 0}
+                            </span>
+                            {e.border ? (
+                              <span className="chip slate">{e.border}</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="text-sm whitespace-pre-line break-words">
+                            {e.official ? (
+                              <span className="chip green mr-1">official</span>
+                            ) : null}
+                            {e.text}
+                          </div>
+                        )}
+                        {e.kind === "count" && e.text ? (
+                          <div className="text-xs text-gunmetal/60 mt-0.5">
+                            {e.text}
+                          </div>
+                        ) : null}
+                        {/* Who logged it, and who last corrected it when that is
+                            somebody else — a correction never quietly becomes the
+                            corrector's entry. */}
+                        {e.loggedByName || e.updatedByName ? (
+                          <div className="text-[11px] text-gunmetal/50 mt-0.5">
+                            {e.loggedByName
+                              ? `${e.loggedByName} · corrected by ${
+                                  e.updatedByName || "an administrator"
+                                }`
+                              : e.updatedByName}
+                          </div>
                         ) : null}
                       </div>
-                    ) : (
-                      <div className="text-sm whitespace-pre-line break-words">
-                        {e.official ? (
-                          <span className="chip green mr-1">official</span>
+                      <div className="shrink-0 flex items-center gap-3">
+                        {scope !== "none" ? (
+                          <button
+                            className="link-action"
+                            onClick={() =>
+                              setEditingEntry((cur) => (cur === e.id ? null : e.id))
+                            }
+                          >
+                            {editingEntry === e.id ? "Close" : "Edit"}
+                          </button>
                         ) : null}
-                        {e.text}
+                        {isAdmin || (user && e.updatedBy === user.uid) ? (
+                          <button
+                            className="link-action"
+                            style={{ color: "var(--status-stalled)" }}
+                            onClick={() => removeEntry(e.id)}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </div>
-                    )}
-                    {e.kind === "count" && e.text ? (
-                      <div className="text-xs text-gunmetal/60 mt-0.5">
-                        {e.text}
-                      </div>
+                    </div>
+                    {editingEntry === e.id && scope !== "none" && user ? (
+                      <DailyEntryEditor
+                        entry={e}
+                        scope={scope}
+                        entries={entries}
+                        weeks={weeks}
+                        borders={borders}
+                        plan={plan}
+                        canPickBorder={!postedOffice}
+                        editor={{ uid: user.uid, name: user.displayName }}
+                        onSaved={() => {
+                          setEditingEntry(null);
+                          reload();
+                        }}
+                        onCancel={() => setEditingEntry(null)}
+                      />
                     ) : null}
-                    {e.updatedByName ? (
-                      <div className="text-[11px] text-gunmetal/50 mt-0.5">
-                        {e.updatedByName}
-                      </div>
-                    ) : null}
-                  </div>
-                  {isAdmin || (user && e.updatedBy === user.uid) ? (
-                    <button
-                      className="link-action shrink-0"
-                      style={{ color: "var(--status-stalled)" }}
-                      onClick={() => removeEntry(e.id)}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
               {daySectionEntries.length === 0 ? (
                 <li className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">
                   Nothing logged for {SHORT_SECTION[section]} on this day yet.
