@@ -385,6 +385,80 @@ export function entriesForWeek(
 }
 
 /**
+ * One week's contribution to a typed work plan output, and where it came from.
+ *
+ * A cumulative Total Actual is an opening balance plus everything recorded
+ * since, and until now the report could say what those two numbers were but
+ * not WHICH weeks the second one was made of. So a figure typed into the wrong
+ * week — the commonest way a manual output overshoots its target — could be
+ * seen but not found. This is the breakdown that finds it.
+ */
+export interface ManualWeekFigure {
+  week: string;
+  /** What was typed into the weekly report's box for this metric. */
+  typed: number;
+  /** What Daily Updates logged against it that week. */
+  daily: number;
+  /** What the report actually counts — the daily sum wins where there is one. */
+  effective: number;
+  /** True when the week is daily-derived, so its box is not the thing to fix. */
+  fromDaily: boolean;
+}
+
+/**
+ * Every week holding a figure for one output, in calendar order.
+ *
+ * `keys` is the output's whole key history (`metricKeysForOutput`), so a figure
+ * logged under wording the plan has since moved on from is still found — it is
+ * still in the total, so it has to be in the breakdown that explains the total.
+ *
+ * A week is listed when it holds anything at all, a typed 0 with daily entries
+ * included; weeks with nothing are left out. Precedence is the same rule the
+ * report itself uses (`mergeWeekManualValues`): the daily sum wins per metric,
+ * per week, so `effective` here and the reported figure can never disagree.
+ */
+export function manualWeekFigures(
+  keys: readonly string[],
+  weekMetrics: WeekMetrics[],
+  entries: DailyEntry[],
+  /** Week labels in calendar order; anything outside it sorts last, by label. */
+  order: readonly string[] = [],
+): ManualWeekFigure[] {
+  const wanted = new Set(keys.filter(Boolean));
+  if (!wanted.size) return [];
+
+  const typedByWeek = new Map<string, number>();
+  for (const wm of weekMetrics) {
+    let sum = 0;
+    for (const key of wanted) sum += wm.values?.[key] || 0;
+    if (sum !== 0) typedByWeek.set(wm.week, sum);
+  }
+
+  const dailyByWeek = new Map<string, number>();
+  for (const e of entries) {
+    if (e.kind !== "count" || !e.week || !e.metricKey) continue;
+    if (!wanted.has(e.metricKey)) continue;
+    const v =
+      typeof e.value === "number" && Number.isFinite(e.value) ? e.value : 0;
+    dailyByWeek.set(e.week, (dailyByWeek.get(e.week) || 0) + v);
+  }
+
+  const rank = new Map(order.map((label, i) => [label, i]));
+  return [...new Set([...typedByWeek.keys(), ...dailyByWeek.keys()])]
+    .map((week) => {
+      const typed = typedByWeek.get(week) || 0;
+      const fromDaily = dailyByWeek.has(week);
+      const daily = dailyByWeek.get(week) || 0;
+      return { week, typed, daily, effective: fromDaily ? daily : typed, fromDaily };
+    })
+    .sort((a, b) => {
+      const ra = rank.get(a.week) ?? Number.MAX_SAFE_INTEGER;
+      const rb = rank.get(b.week) ?? Number.MAX_SAFE_INTEGER;
+      return ra - rb || a.week.localeCompare(b.week);
+    });
+}
+
+/**
  * Total one metric across weeks whose label passes `weekFilter` — computed on
  * effective (daily-first) values so a week is never double counted.
  */

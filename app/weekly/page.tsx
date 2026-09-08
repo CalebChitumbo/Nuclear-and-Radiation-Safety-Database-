@@ -28,6 +28,7 @@ import { todayISO } from "@/lib/rules/week";
 import {
   effectiveValuesByWeek,
   entriesForWeek,
+  manualWeekFigures,
   mergeWeekManualValues,
 } from "@/lib/rules/daily";
 import { toCsv } from "@/lib/rules/exportCsv";
@@ -37,6 +38,7 @@ import {
   deriveWorkPlan,
   describeBinding,
   formatPercent,
+  metricKeysForOutput,
   nextOutputId,
   planForSections,
   retiredOutputs,
@@ -60,10 +62,13 @@ import {
 import {
   SECTIONS,
   type Activity,
+  type DailyEntry,
   type Inspection,
   type Section,
   type WorkPlanBaseline,
   type WorkPlanConfig,
+  type WeekDef,
+  type WeekMetrics,
   type WorkPlanNote,
   type WorkPlanOutputConfig,
   type WorkPlanStatus,
@@ -290,9 +295,16 @@ export default function WeeklyPage() {
     .every((r) => hiddenSupporting.includes(r.id));
 
   const onWeekValueChange = async (key: string, value: number) => {
+    await onWeekMetricSave(selected.label, key, value);
+  };
+
+  // The same write, for a week other than the one being reported on — how a
+  // figure typed into the wrong week is taken back out. The row's breakdown
+  // names the week, so nobody has to go hunting for it a week at a time.
+  const onWeekMetricSave = async (week: string, key: string, value: number) => {
     try {
       const s = await store();
-      await s.setWeekMetricValue(selected.label, key, value);
+      await s.setWeekMetricValue(week, key, value);
       reload();
     } catch (err) {
       toast.push(
@@ -544,6 +556,10 @@ export default function WeeklyPage() {
           quarter={quarter}
           supportingOpen={!hiddenSupporting.includes(sub.id)}
           onToggleSupporting={() => toggleSupporting(sub.id)}
+          weeks={weeks}
+          weekMetricsAll={data.weekMetricsAll}
+          dailyEntries={data.dailyEntries}
+          onWeekMetricSave={onWeekMetricSave}
           openId={openId}
           onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
           canEdit={(section) => canEditSection(user, section)}
@@ -919,6 +935,10 @@ function SubprogrammeTable({
   quarter,
   supportingOpen,
   onToggleSupporting,
+  weeks,
+  weekMetricsAll,
+  dailyEntries,
+  onWeekMetricSave,
   openId,
   onToggle,
   canEdit,
@@ -938,6 +958,12 @@ function SubprogrammeTable({
   /** Whether this subprogramme's supporting figures are expanded. */
   supportingOpen: boolean;
   onToggleSupporting: () => void;
+  /** The reporting calendar, and every stored figure — a row's detail panel
+      shows which weeks its cumulative total is made of, and corrects them. */
+  weeks: WeekDef[];
+  weekMetricsAll: WeekMetrics[];
+  dailyEntries: DailyEntry[];
+  onWeekMetricSave: (week: string, key: string, value: number) => Promise<void>;
   openId: string | null;
   onToggle: (id: string) => void;
   canEdit: (section: WorkPlanRow["output"]["section"]) => boolean;
@@ -1076,6 +1102,10 @@ function SubprogrammeTable({
                 subId={sub.id}
                 columns={columns}
                 quarter={quarter}
+                weeks={weeks}
+                weekMetricsAll={weekMetricsAll}
+                dailyEntries={dailyEntries}
+                onWeekMetricSave={onWeekMetricSave}
                 open={openId === row.output.id}
                 onToggle={() => onToggle(row.output.id)}
                 canEdit={canEdit(row.output.section)}
@@ -1127,6 +1157,10 @@ function SubprogrammeTable({
                 subId={sub.id}
                 columns={columns}
                 quarter={quarter}
+                weeks={weeks}
+                weekMetricsAll={weekMetricsAll}
+                dailyEntries={dailyEntries}
+                onWeekMetricSave={onWeekMetricSave}
                 open={openId === row.output.id}
                 onToggle={() => onToggle(row.output.id)}
                 canEdit={canEdit(row.output.section)}
@@ -1193,6 +1227,10 @@ function PlanRow({
   subId,
   columns,
   quarter,
+  weeks,
+  weekMetricsAll,
+  dailyEntries,
+  onWeekMetricSave,
   open,
   onToggle,
   canEdit,
@@ -1207,6 +1245,10 @@ function PlanRow({
   subId: string;
   columns: ColKey[];
   quarter: Quarter | null;
+  weeks: WeekDef[];
+  weekMetricsAll: WeekMetrics[];
+  dailyEntries: DailyEntry[];
+  onWeekMetricSave: (week: string, key: string, value: number) => Promise<void>;
   open: boolean;
   onToggle: () => void;
   canEdit: boolean;
@@ -1358,6 +1400,10 @@ function PlanRow({
                 row={row}
                 plan={plan}
                 subId={subId}
+                weeks={weeks}
+                weekMetricsAll={weekMetricsAll}
+                dailyEntries={dailyEntries}
+                onWeekMetricSave={onWeekMetricSave}
                 canEdit={canEdit}
                 onSave={(patch) => onNoteSave(output.id, patch)}
                 onOutputSave={onOutputSave}
@@ -1404,6 +1450,10 @@ function RowDetail({
   row,
   plan,
   subId,
+  weeks,
+  weekMetricsAll,
+  dailyEntries,
+  onWeekMetricSave,
   canEdit,
   onSave,
   onOutputSave,
@@ -1412,6 +1462,10 @@ function RowDetail({
   row: WorkPlanRow;
   plan: Subprogramme[];
   subId: string;
+  weeks: WeekDef[];
+  weekMetricsAll: WeekMetrics[];
+  dailyEntries: DailyEntry[];
+  onWeekMetricSave: (week: string, key: string, value: number) => Promise<void>;
   canEdit: boolean;
   onSave: (
     patch: Pick<WorkPlanNote, "status" | "comments" | "actionPoints">,
@@ -1522,6 +1576,20 @@ function RowDetail({
             </span>
           </span>
         </div>
+      ) : null}
+
+      {/* What the "recorded since" figure is actually made of, week by week —
+          and the only place a figure typed into the wrong week can be taken
+          back out without knowing which week it was. */}
+      {!row.auto ? (
+        <RecordedWeeks
+          row={row}
+          weeks={weeks}
+          weekMetricsAll={weekMetricsAll}
+          dailyEntries={dailyEntries}
+          canEdit={canEdit}
+          onSave={onWeekMetricSave}
+        />
       ) : null}
 
       {row.breakdown.length ? (
@@ -1725,6 +1793,156 @@ function RowDetail({
  * untypable: every keystroke triggered an async write + full reload and the
  * controlled input reverted to the stale value before the next keypress.
  */
+/**
+ * The weeks a typed output's cumulative figure is made of, each correctable in
+ * place.
+ *
+ * Total Actual is opening balance + everything recorded since, and a manual
+ * output overshoots its target almost exclusively one way: a figure typed into
+ * a week it did not belong to. The report could always say the total was 3; it
+ * could not say the 3 was a carried 1 plus two weeks that should have been
+ * empty. This says it, and lets whoever may edit the row put each week right —
+ * including a week that is not the one being reported on, which is otherwise
+ * only reachable by changing the reporting week and hunting.
+ *
+ * A week Daily Updates supplied is shown but not typed into: its figure is the
+ * sum of that week's entries, so the correction belongs on the entry (the
+ * report would only overwrite it back on the next read). The link says so.
+ */
+function RecordedWeeks({
+  row,
+  weeks,
+  weekMetricsAll,
+  dailyEntries,
+  canEdit,
+  onSave,
+}: {
+  row: WorkPlanRow;
+  weeks: WeekDef[];
+  weekMetricsAll: WeekMetrics[];
+  dailyEntries: DailyEntry[];
+  canEdit: boolean;
+  onSave: (week: string, key: string, value: number) => Promise<void>;
+}) {
+  const keys = useMemo(
+    () => metricKeysForOutput(row.output),
+    [row.output],
+  );
+  const figures = useMemo(
+    () =>
+      manualWeekFigures(
+        keys,
+        weekMetricsAll,
+        dailyEntries,
+        weeks.map((w) => w.label),
+      ),
+    [keys, weekMetricsAll, dailyEntries, weeks],
+  );
+
+  if (!figures.length) {
+    return (
+      <div className="text-sm text-gunmetal/55">
+        <span className="caps text-[10px] text-gunmetal/55 mr-2">
+          Recorded since
+        </span>
+        Nothing has been recorded for this output yet
+        {row.openingTotal > 0
+          ? " — its figure is the opening balance alone."
+          : "."}
+      </div>
+    );
+  }
+
+  const recorded = figures.reduce((n, f) => n + f.effective, 0);
+
+  return (
+    <div>
+      <div className="caps text-[10px] text-gunmetal/55 mb-1">
+        Weeks this figure is made of — {recorded.toLocaleString()} recorded
+        across {figures.length} week{figures.length === 1 ? "" : "s"}
+      </div>
+      <ul className="divide-y divide-gunmetal/8" style={{ maxWidth: 460 }}>
+        {figures.map((f) => (
+          <li
+            key={f.week}
+            className="flex items-center justify-between gap-3 py-1.5"
+          >
+            <span className="min-w-0 text-sm">
+              {f.week}
+              {f.fromDaily ? (
+                <Link className="link-action ml-2 text-[11px]" href="/daily">
+                  from Daily Updates
+                </Link>
+              ) : null}
+            </span>
+            {f.fromDaily || !canEdit || !row.metricKey ? (
+              <span className="tabular font-black shrink-0">
+                {f.effective.toLocaleString()}
+              </span>
+            ) : (
+              <WeekFigureInput
+                value={f.typed}
+                onSave={(v) => onSave(f.week, row.metricKey as string, v)}
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+      {canEdit && figures.some((f) => !f.fromDaily) ? (
+        <p className="mt-2 text-[11px] leading-relaxed text-gunmetal/55 no-print">
+          Correct a week here and the cumulative figure, the quarter columns and
+          % Achieved move with it. Set it to 0 to take a figure out entirely.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** One week's typed figure, saved on blur — the same feel as the week box. */
+function WeekFigureInput({
+  value,
+  onSave,
+}: {
+  value: number;
+  onSave: (value: number) => Promise<void>;
+}) {
+  const [text, setText] = useState(String(value));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => setText(String(value)), [value]);
+
+  const commit = async () => {
+    const n = Number(text);
+    if (!Number.isFinite(n) || n < 0) {
+      setText(String(value));
+      return;
+    }
+    if (n === value) return;
+    setBusy(true);
+    try {
+      await onSave(n);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <input
+      className="input tabular text-right shrink-0"
+      style={{ maxWidth: 88 }}
+      inputMode="numeric"
+      disabled={busy}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      aria-label="Figure recorded this week"
+    />
+  );
+}
+
 function MetricInput({
   label,
   value,

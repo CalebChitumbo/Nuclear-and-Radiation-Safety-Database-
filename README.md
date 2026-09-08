@@ -788,6 +788,17 @@ work plan figures are unaffected, and the choice is remembered per browser. A
 collapsed band stays out of **Print / PDF** as well, which is the point when
 the printed update is going to a meeting that reports on outputs only.
 
+**Which weeks a figure is made of.** Open a typed row (▸) and, under the
+opening-balance split, it lists every week that holds a figure for that output
+and lets whoever may edit the row correct each one in place. This is how a
+figure typed into the wrong week is taken back out: an output showing 3 against
+a target of 1 is a carried 1 plus two weeks that should have been empty, and
+without this the only way to find them was to change the reporting week and
+hunt one week at a time. Setting a week to 0 removes its figure; the cumulative
+total, the quarter columns and % Achieved move with it. A week Daily Updates
+supplied is listed but not typed into — its figure is the sum of that week's
+entries, so the correction belongs on the entry, and the row links there.
+
 **Export sheet** writes the table as CSV in the workbook's own column order, so
 a section can paste its update straight into the plan spreadsheet; **Generate
 brief** writes the same thing as a plain-text briefing, and **Print / PDF**

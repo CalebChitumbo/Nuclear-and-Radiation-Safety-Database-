@@ -9,6 +9,7 @@ import {
   effectiveValuesByWeek,
   entriesForDate,
   entriesForWeek,
+  manualWeekFigures,
   mergeWeekManualValues,
   planDailyEntryWrite,
   postDayEntryId,
@@ -393,5 +394,102 @@ describe("editedDailyEntry", () => {
     });
     expect(next.loggedBy).toBeUndefined();
     expect(next.updatedBy).toBe("u1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Which weeks a cumulative figure is made of
+// ---------------------------------------------------------------------------
+
+const OTHER = metricKey(NSSS, "RPO conference (Medical)");
+const W24 = "W24 — wk of 08 Jun 2026";
+const ORDER = [W22, W23, W24];
+
+const wm = (week: string, values: Record<string, number>): WeekMetrics => ({
+  week,
+  values,
+});
+
+describe("manualWeekFigures", () => {
+  it("names the weeks a typed figure was entered in, in calendar order", () => {
+    const rows = manualWeekFigures(
+      [OTHER],
+      [wm(W23, { [OTHER]: 1 }), wm(W22, { [OTHER]: 1 })],
+      [],
+      ORDER,
+    );
+    expect(rows.map((r) => r.week)).toEqual([W22, W23]);
+    expect(rows.map((r) => r.effective)).toEqual([1, 1]);
+    expect(rows.every((r) => !r.fromDaily)).toBe(true);
+  });
+
+  it("adds up to the figure the report counts — the stray weeks and all", () => {
+    // The 1.3.1 case: a carried 1 plus two weeks that should have been empty
+    // reads as 3 against a target of 1.
+    const rows = manualWeekFigures(
+      [OTHER],
+      [wm(W22, { [OTHER]: 1 }), wm(W24, { [OTHER]: 1 })],
+      [],
+      ORDER,
+    );
+    expect(rows.reduce((n, r) => n + r.effective, 0)).toBe(2);
+  });
+
+  it("leaves out weeks that hold nothing for this output", () => {
+    const rows = manualWeekFigures(
+      [OTHER],
+      [wm(W22, { [OTHER]: 0, [SCREEN]: 500 }), wm(W23, { [SCREEN]: 400 })],
+      [],
+      ORDER,
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("counts a week's daily entries, and marks it as not the box to type in", () => {
+    const rows = manualWeekFigures(
+      [SCREEN],
+      [wm(W22, { [SCREEN]: 999 })],
+      [count(60, { week: W22 }), count(40, { week: W22 })],
+      ORDER,
+    );
+    expect(rows).toEqual([
+      { week: W22, typed: 999, daily: 100, effective: 100, fromDaily: true },
+    ]);
+  });
+
+  it("agrees with what the report itself counts for that week", () => {
+    const entries = [count(60, { week: W22 }), count(40, { week: W22 })];
+    const merged = mergeWeekManualValues({ [SCREEN]: 999 }, entries);
+    const [row] = manualWeekFigures([SCREEN], [wm(W22, { [SCREEN]: 999 })], entries, ORDER);
+    expect(row.effective).toBe(merged.values[SCREEN]);
+  });
+
+  it("finds figures logged under the output's earlier metric names too", () => {
+    const legacy = metricKey(NSSS, "Conference for RPOs");
+    const rows = manualWeekFigures(
+      [OTHER, legacy],
+      [wm(W22, { [legacy]: 1 }), wm(W23, { [OTHER]: 1 })],
+      [],
+      ORDER,
+    );
+    expect(rows.map((r) => [r.week, r.effective])).toEqual([
+      [W22, 1],
+      [W23, 1],
+    ]);
+  });
+
+  it("sorts a week outside the calendar last rather than dropping it", () => {
+    const rows = manualWeekFigures(
+      [OTHER],
+      [wm("W99 — retired label", { [OTHER]: 5 }), wm(W22, { [OTHER]: 1 })],
+      [],
+      ORDER,
+    );
+    expect(rows.map((r) => r.week)).toEqual([W22, "W99 — retired label"]);
+  });
+
+  it("reads no keys, and an empty register, without inventing a week", () => {
+    expect(manualWeekFigures([], [wm(W22, { [OTHER]: 1 })], [], ORDER)).toEqual([]);
+    expect(manualWeekFigures([OTHER], [], [], ORDER)).toEqual([]);
   });
 });
