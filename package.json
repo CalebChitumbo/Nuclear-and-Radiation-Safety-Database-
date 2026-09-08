@@ -21,6 +21,7 @@
     "reconcile:inland": "npm run py && .venv/bin/python scripts/reconcile-inland-detail.py 'INLAND DAILY ASSESSMENTS' --report docs/inland-detail-reconciliation.md",
     "extract:inland": "npm run py && .venv/bin/python scripts/import-inland-detail.py 'INLAND DAILY ASSESSMENTS'",
     "convert:summary": "npm run py && .venv/bin/python scripts/convert-daily-summary-xlsx.py",
+    "convert:holders": "npm run py && .venv/bin/python scripts/convert-source-holders.py",
     "seed:fresh": "tsx scripts/seed.ts --fresh",
     "seed:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts",
     "seed:fresh:emulator": "FIRESTORE_EMULATOR_HOST=localhost:8080 tsx scripts/seed.ts --fresh",

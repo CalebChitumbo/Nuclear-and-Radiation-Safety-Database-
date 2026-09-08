@@ -18,21 +18,29 @@ import {
   GENERATOR_FAMILIES,
   IAEA_CATEGORIES,
   RAIS_KINDS,
-  SEALED_CATEGORY_LABELS,
-  UNCATEGORISED,
   generatorFamilyOf,
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
   raisInventoryToCsv,
-  sealedCategoryLabel,
   summarizeRaisInventory,
   type GeneratorFamily,
   type RaisInventorySeed,
   type RaisKind,
   type RaisRecord,
 } from "@/lib/rules/raisInventory";
+import {
+  HOLDER_NOT_RECORDED,
+  holderFor,
+  holderSearchText,
+  loadSourceHolders,
+  locationLabel,
+  summariseHolders,
+  type ResolvedHolder,
+  type SourceHoldersSeed,
+} from "@/lib/rules/sourceHolders";
 import seed from "@/seed/rais-source-inventory.seed.json";
+import holderSeed from "@/seed/rais-source-holders.seed.json";
 
 /**
  * Source Inventory — the national register of radiation generators and sealed
@@ -52,6 +60,17 @@ import seed from "@/seed/rais-source-inventory.seed.json";
 const BASELINE = loadRaisInventory(seed as RaisInventorySeed);
 const BASELINE_BY_RAN = new Map(BASELINE.map((r) => [r.ran, r]));
 const META = (seed as RaisInventorySeed).meta;
+
+// Who holds each item, joined on by RAN. A second RAIS export (see
+// `lib/rules/sourceHolders.ts`) and, like the register itself, fixed reference
+// data that lives in this route's chunk rather than behind a store read — the
+// facilities collection is Licensing's and the Inspectorate's to read, and this
+// tab is the National Source Inventory's.
+const HOLDERS = loadSourceHolders(holderSeed as SourceHoldersSeed);
+const HOLDER_META = (holderSeed as SourceHoldersSeed).meta;
+
+/** How many facilities the "held by" panel lists before "show all". */
+const FACILITY_PREVIEW = 12;
 
 const KIND_FILTERS: { value: "all" | RaisKind; label: string }[] = [
   { value: "all", label: "All" },
@@ -123,13 +142,20 @@ const RAIS_FIELDS: readonly EditField[] = [
  */
 type Grouping = "" | `family:${string}` | `nuclide:${string}`;
 
+/**
+ * Where an item is held, as one piece of filter state: a province, or one
+ * named facility. The prefix says which, the same way `Grouping` does.
+ */
+type Holding = "" | `province:${string}` | `facility:${string}`;
+
 const PAGE_SIZE = 50;
 
 export default function SourceInventoryPage() {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<"all" | RaisKind>("all");
   const [grouping, setGrouping] = useState<Grouping>("");
-  const [category, setCategory] = useState("");
+  const [holding, setHolding] = useState<Holding>("");
+  const [showAllFacilities, setShowAllFacilities] = useState(false);
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
   /** null = closed; { ran: null } = adding a record. */
@@ -144,6 +170,14 @@ export default function SourceInventoryPage() {
     () => summarizeRaisInventory(inventory),
     [inventory],
   );
+  const holders = useMemo(
+    () => summariseHolders(inventory, HOLDERS),
+    [inventory],
+  );
+  const maxProvince = Math.max(1, ...holders.byProvince.map((p) => p.count));
+  const facilitiesShown = showAllFacilities
+    ? holders.byFacility
+    : holders.byFacility.slice(0, FACILITY_PREVIEW);
   const maxFamily = Math.max(1, ...summary.byFamily.map((f) => f.count));
   // A category with nothing in it is still a category the inventory reports
   // against, so it is named under the breakdown rather than dropped from it.
@@ -181,24 +215,28 @@ export default function SourceInventoryPage() {
   // Normalise each row's search haystack once, not per keystroke.
   const indexed = useMemo(
     () =>
-      inventory.map((r) => ({
-        r,
-        family:
-          r.kind === "Radiation Generator" ? generatorFamilyOf(r) : null,
-        nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
-        category: r.kind === "Sealed Source" ? sealedCategoryLabel(r) : null,
-        hay: [
-          r.ran,
-          r.type,
-          r.manufacturer,
-          r.model,
-          r.serialNumber,
-          r.nuclide || "",
-          r.activity || "",
-        ]
-          .map(norm)
-          .join(" "),
-      })),
+      inventory.map((r) => {
+        const holder = holderFor(HOLDERS, r.ran);
+        return {
+          r,
+          family:
+            r.kind === "Radiation Generator" ? generatorFamilyOf(r) : null,
+          nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
+          holder,
+          hay: [
+            r.ran,
+            r.type,
+            r.manufacturer,
+            r.model,
+            r.serialNumber,
+            r.nuclide || "",
+            r.activity || "",
+            holderSearchText(holder),
+          ]
+            .map(norm)
+            .join(" "),
+        };
+      }),
     [inventory],
   );
 
@@ -212,28 +250,37 @@ export default function SourceInventoryPage() {
         } else if (grouping.startsWith("nuclide:")) {
           if (row.nuclide !== grouping.slice("nuclide:".length)) return false;
         }
-        if (category && row.category !== category) return false;
+        if (holding.startsWith("province:")) {
+          const want = holding.slice("province:".length);
+          if ((row.holder?.province || "") !== want) return false;
+        } else if (holding.startsWith("facility:")) {
+          const want = holding.slice("facility:".length);
+          const key = row.holder
+            ? row.holder.facCode || row.holder.facility
+            : "";
+          if (key !== want) return false;
+        }
         return !q || row.hay.includes(q);
       })
       .map(({ r }) => r);
-  }, [indexed, search, kind, grouping, category]);
+  }, [indexed, search, kind, grouping, holding]);
 
   const exportCsv = useCallback(() => {
     downloadTextFile(
       `rpa-rais-source-inventory-${new Date().toISOString().slice(0, 10)}.csv`,
-      raisInventoryToCsv(filtered),
+      raisInventoryToCsv(filtered, HOLDERS),
     );
   }, [filtered]);
 
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
 
   const activeFilters =
-    (kind !== "all" ? 1 : 0) + (grouping ? 1 : 0) + (category ? 1 : 0);
+    (kind !== "all" ? 1 : 0) + (grouping ? 1 : 0) + (holding ? 1 : 0);
 
   const resetFilters = () => {
     setKind("all");
     setGrouping("");
-    setCategory("");
+    setHolding("");
     setPage(0);
   };
 
@@ -245,7 +292,6 @@ export default function SourceInventoryPage() {
     const off = grouping === next;
     setGrouping(off ? "" : next);
     setKind(off ? "all" : "Radiation Generator");
-    setCategory("");
     setPage(0);
   };
 
@@ -257,10 +303,10 @@ export default function SourceInventoryPage() {
     setPage(0);
   };
 
-  const pickCategory = (value: string) => {
-    const off = category === value;
-    setCategory(off ? "" : value);
-    setKind(off ? "all" : "Sealed Source");
+  // Where an item is held cuts across both registers, so picking a province or
+  // a facility never touches the kind — a mine holds generators and sources.
+  const pickHolding = (next: Holding) => {
+    setHolding(holding === next ? "" : next);
     setPage(0);
   };
 
@@ -331,11 +377,13 @@ export default function SourceInventoryPage() {
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Security significant</div>
+          <div className="stat-label">Facilities holding them</div>
           <div className="stat-value text-[var(--rpa-green-dark)]">
-            {summary.securitySignificant}
+            {holders.facilities}
           </div>
-          <div className="stat-caption">IAEA Category 1–3 sources</div>
+          <div className="stat-caption">
+            {holders.withoutHolder} items with no holder recorded
+          </div>
         </div>
       </section>
 
@@ -347,9 +395,8 @@ export default function SourceInventoryPage() {
           onChange={(v) => {
             setKind(v);
             // The other axis' grouping no longer applies once the kind flips.
-            if (v === "Radiation Generator") {
-              if (grouping.startsWith("nuclide:")) setGrouping("");
-              setCategory("");
+            if (v === "Radiation Generator" && grouping.startsWith("nuclide:")) {
+              setGrouping("");
             }
             if (v === "Sealed Source" && grouping.startsWith("family:")) {
               setGrouping("");
@@ -408,35 +455,99 @@ export default function SourceInventoryPage() {
             </ul>
           </Panel>
 
-          <Panel
-            title="By IAEA source category"
-            note="Categories 1–3 are the security-significant sources the Code of Conduct expects to be tracked individually."
-          >
-            <div className="flex flex-wrap gap-2 mt-1">
-              {summary.byCategory.map(({ category: c, count }) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => pickCategory(c)}
-                  aria-pressed={category === c}
-                  className="text-left rounded-lg px-3 py-2 border transition-colors"
-                  style={{
-                    borderColor:
-                      category === c ? "var(--rpa-green-dark)" : "var(--line)",
-                    background:
-                      category === c ? "rgba(0,160,80,0.10)" : "transparent",
-                  }}
-                >
-                  <div className="caps text-[10px] text-gunmetal/55">{c}</div>
-                  <div className="tabular font-black text-lg leading-tight">
-                    {count}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Panel>
         </>
       ) : null}
+
+      <Panel
+        title="Where they are held"
+        note={`The facility each item is registered under, from the RAIS holdings export of ${HOLDER_META.exportedOn}. Tap a province or a facility to filter the list below.`}
+      >
+        <ul className="mt-1 space-y-1.5">
+          {holders.byProvince.map(({ label, count }) => (
+            <BreakdownRow
+              key={label}
+              label={label}
+              count={count}
+              max={maxProvince}
+              active={holding === `province:${label}`}
+              onClick={() => pickHolding(`province:${label}`)}
+            />
+          ))}
+        </ul>
+        {holders.byProvince.length === 0 ? (
+          <p className="text-sm text-gunmetal/55">
+            No holding has a province — the facilities register does not hold
+            any of the facilities RAIS names.
+          </p>
+        ) : null}
+
+        {/* What the holdings say about the items themselves. RAIS' own
+            wording, so "Not Imported" is a standing, not a mistake. */}
+        {holders.byStatus.length ? (
+          <div className="mt-4 pt-3 border-t border-gunmetal/8 flex flex-wrap gap-x-4 gap-y-1">
+            {holders.byStatus.map(({ label, count }) => (
+              <span key={label} className="text-xs text-gunmetal/60">
+                {label}{" "}
+                <span className="tabular font-black text-gunmetal">{count}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </Panel>
+
+      <Panel
+        title={`Facilities on the register — ${holders.facilities}`}
+        note="Every facility RAIS names as holding an item, most first."
+      >
+        <ul className="mt-1 divide-y divide-gunmetal/8">
+          {facilitiesShown.map((f) => {
+            const key = f.facCode || f.label;
+            const active = holding === `facility:${key}`;
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => pickHolding(`facility:${key}`)}
+                  className="w-full text-left flex items-baseline justify-between gap-3 py-2 px-2 rounded-lg transition-colors"
+                  style={{
+                    background: active ? "rgba(0,160,80,0.10)" : "transparent",
+                  }}
+                >
+                  <span className="min-w-0">
+                    <span
+                      className={`text-sm ${active ? "font-black" : "font-bold"}`}
+                    >
+                      {f.label}
+                    </span>
+                    <span className="block text-[11px] text-gunmetal/55">
+                      {f.facCode ? `${f.facCode} · ` : ""}
+                      {f.onRegister ? (
+                        locationLabel(f) || "Location not recorded"
+                      ) : (
+                        <span className="italic">
+                          not on the facilities register
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <span className="tabular font-black shrink-0">{f.count}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {holders.byFacility.length > FACILITY_PREVIEW ? (
+          <button
+            className="btn btn-ghost mt-3"
+            onClick={() => setShowAllFacilities((v) => !v)}
+          >
+            {showAllFacilities
+              ? `Show the top ${FACILITY_PREVIEW}`
+              : `Show all ${holders.byFacility.length} facilities`}
+          </button>
+        ) : null}
+      </Panel>
 
       <Panel
         title="Register gaps"
@@ -469,16 +580,23 @@ export default function SourceInventoryPage() {
             of={summary.sealedSources}
           />
           <GapRow
-            label="Source not categorised"
-            count={gaps.uncategorisedSources}
-            of={summary.sealedSources}
+            label="No facility recorded as holding the item"
+            count={holders.withoutHolder}
+            of={summary.total}
           />
           <GapRow
-            label="Entered category contradicts the one RAIS calculated"
-            count={gaps.categoryConflicts}
-            of={summary.sealedSources}
+            label="Held by a facility the facilities register does not hold"
+            count={holders.itemsOffRegister}
+            of={summary.total}
           />
         </ul>
+        <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
+          The IAEA source category is not reported here for now: RAIS derives it
+          from the declared activity, and too many activities are entered
+          inaccurately for the split to be relied on. The values are still
+          stored, still correctable, and still in the CSV export — the
+          breakdown returns once the activities have been re-verified.
+        </p>
       </Panel>
 
       {merged.removed.length > 0 ? (
@@ -533,7 +651,7 @@ export default function SourceInventoryPage() {
             <input
               id="rais-search"
               className="input"
-              placeholder="RAN, manufacturer, model, serial, nuclide…"
+              placeholder="RAN, manufacturer, model, serial, nuclide, facility…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -563,10 +681,7 @@ export default function SourceInventoryPage() {
                 onChange={(e) => {
                   const next = e.target.value as Grouping;
                   setGrouping(next);
-                  if (next.startsWith("family:")) {
-                    setKind("Radiation Generator");
-                    setCategory("");
-                  }
+                  if (next.startsWith("family:")) setKind("Radiation Generator");
                   if (next.startsWith("nuclide:")) setKind("Sealed Source");
                   setPage(0);
                 }}
@@ -593,27 +708,36 @@ export default function SourceInventoryPage() {
               </select>
             </div>
             <div>
-              <label className="field-label" htmlFor="rais-category">
-                IAEA category{" "}
-                <span className="text-gunmetal/45">(sealed sources)</span>
+              <label className="field-label" htmlFor="rais-holding">
+                Held by
               </label>
               <select
-                id="rais-category"
+                id="rais-holding"
                 className="input"
-                value={category}
-                disabled={kind === "Radiation Generator"}
+                value={holding}
                 onChange={(e) => {
-                  setCategory(e.target.value);
-                  if (e.target.value) setKind("Sealed Source");
+                  setHolding(e.target.value as Holding);
                   setPage(0);
                 }}
               >
-                <option value="">All categories</option>
-                {SEALED_CATEGORY_LABELS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                <option value="">Anywhere</option>
+                <optgroup label="Province">
+                  {holders.byProvince.map(({ label, count }) => (
+                    <option key={label} value={`province:${label}`}>
+                      {label} ({count})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Facility">
+                  {holders.byFacility.map((f) => (
+                    <option
+                      key={f.facCode || f.label}
+                      value={`facility:${f.facCode || f.label}`}
+                    >
+                      {f.label} ({f.count})
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           </div>
@@ -636,9 +760,10 @@ export default function SourceInventoryPage() {
               <tr>
                 <th>RAN</th>
                 <th>Item</th>
+                <th>Held by</th>
                 <th>Manufacturer / Model</th>
                 <th>Serial Number</th>
-                <th>Activity / Category</th>
+                <th>Activity</th>
                 {canEdit ? <th aria-label="Edit" /> : null}
               </tr>
             </thead>
@@ -655,7 +780,7 @@ export default function SourceInventoryPage() {
               {visible.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canEdit ? 6 : 5}
+                    colSpan={canEdit ? 7 : 6}
                     className="py-10 text-center text-gunmetal/55"
                   >
                     No registered items match these filters.
@@ -699,10 +824,13 @@ export default function SourceInventoryPage() {
       <p className="text-[11px] text-gunmetal/50 px-1">
         Source: {META.sourceDocument}, {META.system}
         {META.exportedOn ? `, exported ${META.exportedOn}` : ""}.{" "}
-        {META.coverage}. Held by the {META.department}. Imported values are
-        reproduced as registered; anything corrected here is marked and keeps
-        what the register said. See Verified Source Inventory for the items
-        confirmed in the field.
+        {META.coverage}. Held by the {META.department}. Who holds each item is
+        from {HOLDER_META.sourceDocument}
+        {HOLDER_META.exportedOn ? `, exported ${HOLDER_META.exportedOn}` : ""};
+        the district and province of each facility are the facilities
+        register&apos;s. Imported values are reproduced as registered; anything
+        corrected here is marked and keeps what the register said. See Verified
+        Source Inventory for the items confirmed in the field.
       </p>
 
       {editing ? (
@@ -827,17 +955,58 @@ function ProvenanceChip({ edited, added }: { edited: boolean; added: boolean }) 
   return null;
 }
 
-/** Category 1–3 read as the significant ones; 4–5 and uncategorised are quiet. */
-function CategoryChip({ r }: { r: RaisRecord }) {
-  const c = sealedCategoryLabel(r);
-  if (c === UNCATEGORISED) {
-    return <span className="chip slate">Not categorised</span>;
+/**
+ * RAIS' standing for the item, in RAIS' own words. An item in use reads green,
+ * one that never arrived or has left the country reads as the exception it is,
+ * and an item nobody has filed a holding for is the quiet grey.
+ */
+const HOLDING_TONE: Record<string, string> = {
+  "In Use": "chip green",
+  "In Storage": "chip slate",
+  Imported: "chip slate",
+  "In Transport": "chip amber",
+  "In-Process": "chip amber",
+  Draft: "chip amber",
+  "Not Imported": "chip amber",
+  Unknown: "chip slate",
+  Exported: "chip red",
+};
+
+function HoldingChip({ holder }: { holder: ResolvedHolder | null }) {
+  if (!holder || !holder.status) {
+    return <span className="chip slate">{HOLDER_NOT_RECORDED}</span>;
   }
-  const significant = c === "Category 1" || c === "Category 2";
   return (
-    <span className={significant ? "chip red" : c === "Category 3" ? "chip amber" : "chip green"}>
-      {c}
+    <span className={HOLDING_TONE[holder.status] || "chip slate"}>
+      {holder.status}
     </span>
+  );
+}
+
+/** Who holds the item and where — the column an inspector plans a visit from. */
+function HolderCell({ holder }: { holder: ResolvedHolder | null }) {
+  if (!holder) {
+    return (
+      <span className="text-gunmetal/45 italic">{HOLDER_NOT_RECORDED}</span>
+    );
+  }
+  const where = locationLabel(holder);
+  return (
+    <>
+      <div className="break-words">{holder.facility || "—"}</div>
+      <div className="text-[11px] text-gunmetal/55 mt-0.5">
+        {where ? <span>{where}</span> : null}
+        {holder.department ? (
+          <span>
+            {where ? " · " : ""}
+            {holder.department}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1">
+        <HoldingChip holder={holder} />
+      </div>
+    </>
   );
 }
 
@@ -881,6 +1050,7 @@ const RaisRow = memo(function RaisRow({
   onEdit: (() => void) | null;
 }) {
   const recorded = isSerialRecorded(r.serialNumber);
+  const holder = holderFor(HOLDERS, r.ran);
   return (
     <tr>
       <td className="tabular font-bold whitespace-nowrap">
@@ -895,6 +1065,9 @@ const RaisRow = memo(function RaisRow({
         <ItemCell r={r} />
       </td>
       <td>
+        <HolderCell holder={holder} />
+      </td>
+      <td>
         <div>{r.manufacturer || <span className="text-gunmetal/40">—</span>}</div>
         {r.model ? (
           <div className="text-[11px] text-gunmetal/55 mt-0.5">{r.model}</div>
@@ -905,18 +1078,15 @@ const RaisRow = memo(function RaisRow({
       </td>
       <td>
         {r.kind === "Sealed Source" ? (
-          <div className="space-y-1">
-            <div className="tabular text-[11px]">
-              {r.activity || (
-                <span className="text-gunmetal/45 italic">
-                  Activity not recorded
-                </span>
-              )}
-              {r.activityDate ? (
-                <span className="text-gunmetal/45"> · {r.activityDate}</span>
-              ) : null}
-            </div>
-            <CategoryChip r={r} />
+          <div className="tabular text-[11px]">
+            {r.activity || (
+              <span className="text-gunmetal/45 italic">
+                Activity not recorded
+              </span>
+            )}
+            {r.activityDate ? (
+              <span className="text-gunmetal/45"> · {r.activityDate}</span>
+            ) : null}
           </div>
         ) : (
           <span className="text-gunmetal/35">—</span>
@@ -950,6 +1120,8 @@ const RaisCard = memo(function RaisCard({
 }) {
   const recorded = isSerialRecorded(r.serialNumber);
   const source = r.kind === "Sealed Source";
+  const holder = holderFor(HOLDERS, r.ran);
+  const where = locationLabel(holder);
   return (
     <li className="px-4 py-3">
       <div className="flex items-start justify-between gap-2">
@@ -966,8 +1138,22 @@ const RaisCard = memo(function RaisCard({
           <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
             {source ? "Sealed source" : generatorFamilyOf(r)}
           </div>
+          <div className="text-xs mt-1 break-words">
+            {holder ? (
+              <>
+                <span className="font-bold">{holder.facility || "—"}</span>
+                {where ? (
+                  <span className="text-gunmetal/55"> · {where}</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="text-gunmetal/45 italic">
+                {HOLDER_NOT_RECORDED}
+              </span>
+            )}
+          </div>
         </div>
-        {source ? <CategoryChip r={r} /> : null}
+        <HoldingChip holder={holder} />
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <div className="text-xs text-gunmetal/55 tabular min-w-0">

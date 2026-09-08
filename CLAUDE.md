@@ -198,6 +198,43 @@ Watch out: Mongu and Ndola have thin workbook data (Mongu from July only, Ndola
 add thousands. `docs/screening-figure-audit.md` and `docs/audit-log.md` have the
 detail.
 
+## Routine: RAIS hands over a fresh "History of a …" pair
+
+The two exports — `History of a Radiation Generator.xlsx` and `History of a
+Sealed Source.xlsx` — say which facility each registered item is held by, its
+department, RAIS' status for it and the date that status was set. They
+**replace** the previous import rather than adding to it.
+
+```bash
+npm run convert:holders -- <History_of_a_Radiation_Generator.xlsx> \
+  <History_of_a_Sealed_Source.xlsx> --exported-on YYYY-MM-DD
+```
+
+1. Read what it prints before committing: the row counts, the status split, the
+   provinces, the facilities NOT in `seed/facilities.seed.json` (a worklist, not
+   an error) and the register coverage line. It refuses outright if a holding
+   names an item `seed/rais-source-inventory.seed.json` does not hold — run
+   `scripts/convert-rais-inventory.py` first in that case: the two pairs of
+   exports are of the same register, and the register one is the newer.
+2. Update the pinned figures in `tests/sourceHolders.test.ts` under **the 2026
+   holdings export** (holdings, generators/sources, items with no holder,
+   facilities and how many are off-register, the top provinces and statuses,
+   and the size of the location index).
+3. Update the counts in `README.md` (the *Who holds each item* section and the
+   Source Inventory KPI/gaps bullets).
+
+**Watch out:** district and province are NOT in these exports. The seed carries
+an index of them for the facilities the exports name, taken from
+`seed/facilities.seed.json` at conversion time — so **re-run the converter after
+the facilities register changes**, or the tab shows a facility in the district
+it used to be in. The test that compares the index against the register is what
+catches it.
+
+**Watch out:** nothing here corrects the register. The exports carry a type and
+a nuclide of their own and they disagree with the register export in places;
+the converter reads neither. An item's type is `rais-source-inventory.seed.json`'s
+to say.
+
 ## Routine: the source inventory's equipment categories
 
 Both inventory tabs — Source Inventory (RAIS) and Verified Source Inventory
@@ -220,6 +257,13 @@ counts.
 **Watch out:** nothing is stored per category — every figure is derived when the
 page is read — so a category change needs no re-seed and no migration, and the
 `inventoryEdits` overlay is untouched by it.
+
+**Watch out:** this is the *equipment* category (`SOURCE_CATEGORIES`), not the
+IAEA source category 1–5. That second one is **deliberately not reported** on
+the Source Inventory tab as of Sep 2026 — RAIS derives it from the declared
+activity and too many activities are inaccurate — but it is still stored,
+summarised and tested. Do not "fix" the missing panel; see *The IAEA source
+category — withheld for now* in the README before putting it back.
 
 **Watch out:** RAIS types all 64 XRF analysers as the bare word `XRF`, so the
 portable/fixed split comes from a RAN-keyed determination table,

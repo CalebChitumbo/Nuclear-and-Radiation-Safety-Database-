@@ -1054,8 +1054,8 @@ empty-vs-placeholder), plus two rules:
 
 - `SealedCategoryManual` **overrides** `SealedCategory` — the plain column is
   what RAIS computes from the A/D ratio, the "Manual" one is an officer's own
-  determination. Where they disagree (5 sources) the record keeps both and the
-  page reports the conflict.
+  determination. Where they disagree (5 sources) the record keeps both, so the
+  conflict survives for whenever the category is reported on again (below).
 - RAIS' internal GUID is dropped. The RAN is unique and is what a re-import
   joins on; the random GUIDs alone would more than double the page's payload
   (74 KB gzipped with them, 31 KB without).
@@ -1063,22 +1063,24 @@ empty-vs-placeholder), plus two rules:
 Everything on the page derives from those detail rows, so every figure
 reconciles with a filter of the table:
 
-- four KPIs — registered items · generators · sealed sources · **security
-  significant** (IAEA Category 1–3, the sources the Code of Conduct expects to
-  be tracked individually: 150 of 789);
+- four KPIs — registered items · generators · sealed sources · **facilities
+  holding them** (303, with 219 items no facility is recorded against);
 - generators by **equipment category** (`generatorFamily` folds the 33 free-form
   `Type` spellings into the shared categories below, reading the specific machine
   before the generic word it contains so a `Digital Mammography` is not swept
   into digital radiography, an `Industrial Xray fluoroscopy` is NDT kit rather
   than a fluoroscopy suite, and a `Baggage Scanner` never lands in CT), each
   click-to-filter;
-- sources by **nuclide** (Cs-137 dominates at 618) and by **IAEA category**;
+- sources by **nuclide** (Cs-137 dominates at 618);
+- **where they are held** — by province, by facility, and RAIS' standing for
+  each item (see below), all click-to-filter;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
   (110 with no serial, 109 generators with no type, 23 XRF analysers the
   register does not call portable or fixed, 69 sources with no nuclide, 345 with
-  no activity, 591 never categorised, 5 conflicting categories); and
-- search across RAN, manufacturer, model, serial and nuclide, with CSV export
-  of the current view.
+  no activity, 219 with no holder, 13 held by a facility the facilities register
+  does not hold); and
+- search across RAN, manufacturer, model, serial, nuclide, facility, district,
+  province and holding status, with CSV export of the current view.
 
 `parseActivity` reads RAIS' scientific notation (`9.99E+02 GBq`, `5E+00 mCi`)
 into becquerels so records in different units compare, returning `null` rather
@@ -1086,6 +1088,47 @@ than counting an unreadable value as zero.
 
 The rules live in `lib/rules/raisInventory.ts` (pure and unit-tested); the page
 is `app/source-inventory/page.tsx`.
+
+#### Who holds each item
+
+The register export says **what** an item is; it does not say **where** it is.
+RAIS keeps that on a second pair of exports — *History of a Radiation
+Generator* and *History of a Sealed Source* — one row per item: the facility it
+is registered under (with the facility's own `FAC/nnnn` code), the department
+inside it, RAIS' status for the item and the date that status was set.
+`npm run convert:holders -- <Generators.xlsx> <Sources.xlsx>` turns those into
+`seed/rais-source-holders.seed.json`, and `lib/rules/sourceHolders.ts` joins
+them onto the register by RAN.
+
+Two things the join is deliberately honest about:
+
+- **1,533 of the 1,752 items have a holder; 219 do not.** Those are registered
+  with nobody named against them and are counted as a gap, never given a
+  placeholder facility.
+- **296 of the 303 facilities are in the facilities register**, which is where
+  the **district and province** come from — they are not in the RAIS exports at
+  all. The other seven (a test record, a clinic or two RAIS knows and the
+  register does not) keep the name RAIS gave them, show no location, and are
+  counted apart as a worklist.
+
+The seed carries a small index of district and province for **only the
+facilities the exports name**, so the route need not bundle all 538 — an index
+of `seed/facilities.seed.json`, not new data, and `tests/sourceHolders.test.ts`
+checks it still agrees with the register so a facility that moves district is
+caught.
+
+#### The IAEA source category — withheld for now
+
+RAIS derives a sealed source's category from its **declared activity**, and the
+section's reading of the register in September 2026 was that too many of those
+activities were entered inaccurately for the category to be reported on. So the
+tab no longer shows the category split, the security-significant count or the
+category-conflict gap: a figure nobody trusts is worse than no figure.
+
+Nothing is deleted. The values are still stored, still correctable through the
+edit drawer, still in the CSV export, and still summarised and unit-tested in
+`lib/rules/raisInventory.ts` — bringing the reporting back, once the activities
+have been re-verified, is a change to the page and nothing else.
 
 ### Verified Source Inventory — the field exercise
 
@@ -1285,9 +1328,18 @@ npm test
 - `raisInventory` — verifies the seeded RAIS register (1,752 items, 963
   generators then 789 sources, each in accession order with a unique RAN) and
   that every derived grouping reconciles to it: the equipment categories and
-  what the catch-all among them holds, the IAEA categories and the 150 security-significant sources, the nuclide
-  breakdown with its gap bucket sorted last, the register-gap counts against
-  the right denominator, activity parsing in Bq/Ci, and the CSV columns
+  what the catch-all among them holds, the IAEA categories and the 150
+  security-significant sources (still pinned though the tab no longer reports
+  them), the nuclide breakdown with its gap bucket sorted last, the
+  register-gap counts against the right denominator, activity parsing in Bq/Ci,
+  and the CSV columns
+- `sourceHolders` — the facility each registered item is held by: that the
+  district and province join on from the facilities register, that two
+  spellings of one facility fold together on its code, that a facility the
+  register does not hold keeps its name and loses its location, and the seeded
+  figures (1,533 holdings of 1,752 items, 303 facilities, the provincial and
+  status splits) — plus that the seed's location index still agrees with
+  `seed/facilities.seed.json`, so a facility that moves district is caught
 - `inventoryEdits` — the correction overlay both inventories share: that a patch
   touches only the record it names and cannot introduce a field the record shape
   lacks, that only genuine differences are stored, that a removal leaves the
@@ -1341,10 +1393,12 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
 ├── scripts/check-border-vocabulary.py  Replays a border workbook through the cargo vocabulary
 ├── scripts/convert-rais-inventory.py   Flattens the two RAIS exports into one register seed
+├── scripts/convert-source-holders.py   Joins the RAIS "History of a …" exports on as holdings
 ├── seed/                   facilities.seed.json (538), weeks-2026.seed.json (52),
 │                           daily-screening-2026.seed.json (8 posts, 1,484 days),
 │                           inspections-2026.seed.json (298 register rows),
 │                           rais-source-inventory.seed.json (1,752 RAIS items),
+│                           rais-source-holders.seed.json (1,533 holdings, 303 facilities),
 │                           verified-source-inventory-2026.seed.json (215, Annex I)
 ├── public/                 favicon, manifest
 ├── firestore.rules         Security rules — the real backend

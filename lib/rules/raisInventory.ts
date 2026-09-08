@@ -9,6 +9,7 @@ import {
   type SourceCategory,
 } from "./sourceCategories";
 import { XRF_FORM_BY_RAN } from "./xrfDeterminations";
+import { holderFor, type SourceHolderIndex } from "./sourceHolders";
 
 /**
  * The Source Inventory tab — the national register of radiation generators and
@@ -126,6 +127,23 @@ export function generatorFamilyOf(record: RaisRecord): GeneratorFamily {
   if (family !== XRF_UNSPECIFIED) return family;
   return XRF_FORM_BY_RAN[record.ran.trim()] || family;
 }
+
+// ---------------------------------------------------------------------------
+// The IAEA source category — computed, but not reported on the tab
+// ---------------------------------------------------------------------------
+//
+// RAIS derives a sealed source's category from its declared activity, and the
+// section's reading of the register in September 2026 was that too many of
+// those activities were entered inaccurately for the category to be reported
+// on: a figure nobody trusts is worse than no figure. So the Source Inventory
+// tab no longer shows the category split, the security-significant count or
+// the category-conflict gap.
+//
+// Nothing is deleted. The values are still stored, still corrected through the
+// edit drawer, still exported in the CSV, and still summarised below and
+// pinned by `tests/raisInventory.test.ts` — so bringing the reporting back,
+// once the activities have been re-verified, is a change to the page and
+// nothing else. See the README's Source Inventory section.
 
 /** The five IAEA source categories, most significant first. */
 export const IAEA_CATEGORIES = [
@@ -377,8 +395,21 @@ export function loadRaisInventory(seed: RaisInventorySeed): RaisRecord[] {
     .sort((a, b) => a.no - b.no);
 }
 
-/** Flatten records for CSV export, one line per item, with the derived groups. */
-export function raisInventoryToCsv(records: RaisRecord[]): string {
+/**
+ * Flatten records for CSV export, one line per item, with the derived groups.
+ *
+ * Pass the holder index and each line also carries who holds the item and
+ * where — the columns an inspector plans a visit from. Omit it and the export
+ * is the register alone, as it was before the holdings were imported.
+ *
+ * The IAEA category columns stay in the export even though the tab no longer
+ * reports on them: the value is RAIS' and losing it from the download would be
+ * a deletion, not a change of emphasis.
+ */
+export function raisInventoryToCsv(
+  records: RaisRecord[],
+  holders?: SourceHolderIndex,
+): string {
   const header = [
     "No",
     "RAN",
@@ -397,9 +428,17 @@ export function raisInventoryToCsv(records: RaisRecord[]): string {
     "Security Level",
     "ISO 2919",
     "Working Life",
+    "Held By",
+    "Facility Code",
+    "Department",
+    "District",
+    "Province",
+    "Holding Status",
+    "Status Date",
   ];
   const rows = records.map((r) => {
     const source = r.kind === "Sealed Source";
+    const h = holders ? holderFor(holders, r.ran) : null;
     return [
       String(r.no),
       r.ran,
@@ -418,6 +457,13 @@ export function raisInventoryToCsv(records: RaisRecord[]): string {
       r.securityLevel || "",
       r.isoCompliance || "",
       r.workingLife || "",
+      h?.facility || "",
+      h?.facCode || "",
+      h?.department || "",
+      h?.district || "",
+      h?.province || "",
+      h?.status || "",
+      h?.statusDate || "",
     ];
   });
   return toCsv(header, rows);
