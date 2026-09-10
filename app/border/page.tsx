@@ -33,6 +33,7 @@ import { ShiftLog } from "@/components/border/ShiftLog";
 import { Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { downloadTextFile } from "@/components/downloadFile";
+import { ScreeningExportPanel } from "@/components/nsss/ScreeningExportPanel";
 import { useToast } from "@/components/Toast";
 import { canEditSection, useAuth } from "@/lib/auth";
 import { dailyEntryScope } from "@/lib/rules/access";
@@ -497,6 +498,16 @@ export default function BorderScanPage() {
           />
         </div>
       )}
+
+      {/* The SharePoint hand-over — a posted officer's own office, or any
+          office from head office. Reads the same entries the day totals above
+          are posted into. */}
+      <ScreeningExportPanel
+        entries={data.entries}
+        borders={data.borders}
+        fixedOffice={postedOffice}
+        generatedBy={user?.displayName || ""}
+      />
     </div>
   );
 }
