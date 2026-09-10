@@ -3,8 +3,11 @@ import {
   buildInspectionDatabase,
   cardExpiry,
   cardStatus,
+  cardDaysLeft,
   cardsDue,
   databaseCsvRows,
+  describeCard,
+  suggestedFollowUp,
   roundLabel,
   summariseInspectionDatabase,
   summaryCsvRows,
@@ -73,6 +76,69 @@ describe("inspection cards", () => {
     // A UTC-anchored shift: the same answer from either side of the date line.
     expect(cardExpiry("2026-12-31")).toBe("2027-01-30");
     expect(cardExpiry("2026-02-28")).toBe("2026-03-30");
+  });
+
+  it("issuing a card at the inspection starts the 30-day timer from that day", () => {
+    // The log form, the wizard and the request drawer all set cardIssued to
+    // the inspection date, so the timer is the visit's, never the typing's.
+    const issuedAtVisit = insp({ date: "2026-08-01", cardIssued: "2026-08-01" });
+    const [row] = buildInspectionDatabase([issuedAtVisit], [fac()], { today: "2026-08-02" });
+    expect(row.cardExpiry).toBe("2026-08-31");
+    expect(row.cardStatus).toBe("Active");
+    expect(cardDaysLeft(row.cardExpiry, "2026-08-02")).toBe(29);
+    expect(cardStatus("2026-08-01", "2026-09-01")).toBe("Expired");
+  });
+
+  it("counts the days left, or overdue, and says so", () => {
+    expect(cardDaysLeft("2026-08-14", "2026-08-14")).toBe(0);
+    expect(cardDaysLeft("2026-08-20", "2026-08-14")).toBe(6);
+    expect(cardDaysLeft("2026-07-24", "2026-08-14")).toBe(-21);
+    expect(cardDaysLeft("", "2026-08-14")).toBeNull();
+    expect(describeCard("2026-07-24", "2026-08-14")).toBe("Expired 21 days ago");
+    expect(describeCard("2026-08-13", "2026-08-14")).toBe("Expired 1 day ago");
+    expect(describeCard("2026-08-14", "2026-08-14")).toBe("Expires today");
+    expect(describeCard("2026-08-15", "2026-08-14")).toBe("Expires in 1 day");
+    expect(describeCard("2026-08-20", "2026-08-14")).toBe("Expires in 6 days");
+    expect(describeCard("", "2026-08-14")).toBe("");
+  });
+
+  it("lists expired cards before expiring ones, most overdue first", () => {
+    const rows = buildInspectionDatabase(
+      [
+        insp({ id: "soon", facilityId: "f1", facilityName: "Soon", cardIssued: "2026-07-20" }),
+        insp({ id: "long-gone", facilityId: "f2", facilityName: "Long Gone", cardIssued: "2026-05-01" }),
+        insp({ id: "just-gone", facilityId: "f3", facilityName: "Just Gone", cardIssued: "2026-07-10" }),
+        insp({ id: "fine", facilityId: "f4", facilityName: "Fine", cardIssued: "2026-08-10" }),
+        insp({ id: "none", facilityId: "f5", facilityName: "No Card" }),
+      ],
+      [],
+      { today: TODAY },
+    );
+    const due = cardsDue(rows);
+    expect(due.map((r) => [r.facility, r.cardStatus])).toEqual([
+      ["Long Gone", "Expired"],
+      ["Just Gone", "Expired"],
+      ["Soon", "Expiring Soon"],
+    ]);
+    expect(due.map((r) => cardDaysLeft(r.cardExpiry, TODAY))).toEqual([-75, -5, 5]);
+  });
+
+  it("suggests the next step from the card and what was already done", () => {
+    expect(suggestedFollowUp({ cardStatus: "Expiring Soon", enforcement: "" })).toMatchObject({
+      type: "Follow-up",
+    });
+    expect(suggestedFollowUp({ cardStatus: "Expired", enforcement: "" })).toMatchObject({
+      type: "Follow-up",
+    });
+    expect(
+      suggestedFollowUp({ cardStatus: "Expired", enforcement: "Engagement at Facility Level" }),
+    ).toMatchObject({ type: "Follow-up" });
+    expect(
+      suggestedFollowUp({ cardStatus: "Expired", enforcement: "Written Warning" }),
+    ).toMatchObject({ type: "Enforcement Action" });
+    expect(
+      suggestedFollowUp({ cardStatus: "Expired", enforcement: "Suspension of Practice" }).hint,
+    ).toContain("Suspension of Practice");
   });
 });
 

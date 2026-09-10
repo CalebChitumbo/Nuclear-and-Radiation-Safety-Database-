@@ -622,10 +622,71 @@ export function summaryCsvRows(summary: InspectionSummary): string[][] {
 /**
  * Cards that need attention, soonest expiry first: the ones already expired and
  * the ones inside their last fortnight. This is the follow-up list the card
- * columns exist for.
+ * columns exist for. Expired cards come before expiring ones by construction,
+ * because an expiry already past sorts before one still to come.
  */
 export function cardsDue(rows: DatabaseRow[]): DatabaseRow[] {
   return rows
     .filter((r) => r.cardStatus === "Expired" || r.cardStatus === "Expiring Soon")
     .sort((a, b) => a.cardExpiry.localeCompare(b.cardExpiry));
+}
+
+/**
+ * Whole days from today to the card's expiry: positive while it runs,
+ * negative once it has run out (the number of days overdue). Null when
+ * there is no card.
+ */
+export function cardDaysLeft(expiry: string, today: string): number | null {
+  if (!expiry || !today) return null;
+  const ms = parseISO(expiry).getTime() - parseISO(today).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+/**
+ * The one line the follow-up list shows under a card: how long it has been
+ * expired, or how long it has left. Empty when there is no card.
+ */
+export function describeCard(expiry: string, today: string): string {
+  const days = cardDaysLeft(expiry, today);
+  if (days === null) return "";
+  if (days < 0) {
+    const n = -days;
+    return `Expired ${n} day${n === 1 ? "" : "s"} ago`;
+  }
+  if (days === 0) return "Expires today";
+  return `Expires in ${days} day${days === 1 ? "" : "s"}`;
+}
+
+/**
+ * The follow-up an expired card calls for. The Inspectorate's own sequence:
+ * a card is re-issued at a follow-up visit; if the facility was already on
+ * notice the next step is the firmer one. This only SUGGESTS — the officer
+ * picks the action on the form.
+ */
+export function suggestedFollowUp(row: Pick<DatabaseRow, "cardStatus" | "enforcement">): {
+  type: InspectionType;
+  hint: string;
+} {
+  if (row.cardStatus !== "Expired") {
+    return {
+      type: "Follow-up",
+      hint: "Card still running — schedule the follow-up before it expires.",
+    };
+  }
+  if (!row.enforcement) {
+    return {
+      type: "Follow-up",
+      hint: "Card expired with no action on record — a follow-up inspection, and a written notice if the findings stand.",
+    };
+  }
+  if (isSummarisedEnforcement(row.enforcement)) {
+    return {
+      type: "Enforcement Action",
+      hint: `Card expired after ${row.enforcement} — record the next enforcement step.`,
+    };
+  }
+  return {
+    type: "Follow-up",
+    hint: `Card expired after an ${row.enforcement.toLowerCase()} — a follow-up, and a formal notice if nothing has changed.`,
+  };
 }

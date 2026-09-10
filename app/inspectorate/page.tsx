@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 
@@ -28,8 +28,11 @@ import {
   cardExpiry,
   cardsDue,
   databaseCsvRows,
+  describeCard,
+  suggestedFollowUp,
   summariseInspectionDatabase,
   summaryCsvRows,
+  CARD_VALID_DAYS,
   DATABASE_CSV_HEADER,
   ENFORCEMENT_ACTIONS,
   type EnforcementAction,
@@ -99,6 +102,10 @@ export default function InspectoratePage() {
   });
 
   const [period, setPeriod] = useState<InspectionPeriod>("year");
+  // "Record follow-up" on a due card fills the logging form with the facility
+  // and the suggested type, and scrolls to it. The nonce re-applies the same
+  // card if it is tapped twice.
+  const [prefill, setPrefill] = useState<LogPrefill | null>(null);
   const [round, setRound] = useState<string>(ALL_ROUNDS);
   const [coverage, setCoverage] = useState<Coverage>("inspected");
   const [limit, setLimit] = useState(SHEET_PAGE);
@@ -336,35 +343,80 @@ export default function InspectoratePage() {
         ) : null}
       </Panel>
 
-      {/* Inspection cards — the column the workbook keeps to chase re-issues */}
-      <Panel title={`Inspection cards due — ${due.length}`} flush>
+      {/* Inspection cards — the column the workbook keeps to chase re-issues.
+          A card starts its 30-day timer the day it is issued (the log form,
+          the wizard and the request drawer all stamp the inspection date);
+          the expired ones lead this list, most overdue first, each with the
+          last action taken and a way to record the next one. */}
+      <Panel
+        title={`Inspection cards due — ${due.length}`}
+        flush
+        note={`${due.filter((r) => r.cardStatus === "Expired").length} expired · ${
+          due.filter((r) => r.cardStatus === "Expiring Soon").length
+        } inside the last fortnight. A card runs ${CARD_VALID_DAYS} days from the day it is issued.`}
+      >
         {due.length === 0 ? (
           <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
-            No card is expired or inside its last fortnight. A card runs 30 days
-            from the day it is issued.
+            No card is expired or inside its last fortnight.
           </p>
         ) : (
           <ul className="divide-y divide-gunmetal/8">
-            {due.map((r) => (
-              <li
-                key={`${r.round}::${r.facilityId || r.facility}`}
-                className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <div className="font-bold break-words">{r.facility}</div>
-                  <div className="text-[11px] text-gunmetal/55">
-                    {r.round}
-                    {r.district ? ` · ${r.district}` : ""}
+            {due.map((r) => {
+              const next = suggestedFollowUp(r);
+              return (
+                <li
+                  key={`${r.round}::${r.facilityId || r.facility}`}
+                  className="px-4 sm:px-5 py-3 flex flex-wrap items-start justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold break-words">{r.facility}</div>
+                    <div className="text-[11px] text-gunmetal/55">
+                      {r.round}
+                      {r.district ? ` · ${r.district}` : ""}
+                      {r.lastInspected ? ` · last inspected ${r.lastInspected}` : ""}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                      {r.enforcement ? (
+                        <EnforcementChip action={r.enforcement} />
+                      ) : (
+                        <span className="chip slate">No action on record</span>
+                      )}
+                      <span className="text-gunmetal/60">{next.hint}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <CardStatusChip status={r.cardStatus} />
-                  <div className="text-[11px] text-gunmetal/55 tabular mt-1">
-                    {r.cardIssued} → {r.cardExpiry}
+                  <div className="text-right shrink-0">
+                    <CardStatusChip status={r.cardStatus} />
+                    <div className="text-[11px] text-gunmetal/55 tabular mt-1">
+                      {r.cardIssued} → {r.cardExpiry}
+                    </div>
+                    <div
+                      className={`text-[11px] font-bold tabular ${
+                        r.cardStatus === "Expired"
+                          ? "text-[var(--status-stalled)]"
+                          : "text-[#7a5b07]"
+                      }`}
+                    >
+                      {describeCard(r.cardExpiry, today)}
+                    </div>
+                    {canEditInsp ? (
+                      <button
+                        className="link-action mt-1"
+                        onClick={() =>
+                          setPrefill({
+                            facilityId: r.facilityId,
+                            facilityName: r.facility,
+                            type: next.type,
+                            nonce: Date.now(),
+                          })
+                        }
+                      >
+                        Record {next.type === "Enforcement Action" ? "next action" : "follow-up"} →
+                      </button>
+                    ) : null}
                   </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>
@@ -535,6 +587,7 @@ export default function InspectoratePage() {
         <LogInspectionPanel
           facilities={facilities}
           knownPhases={knownPhases}
+          prefill={prefill}
           onLogged={reload}
           toastPush={toast.push}
         />
@@ -578,20 +631,34 @@ function InspectionRow({
   );
 }
 
+/** What a due card hands the logging form. */
+interface LogPrefill {
+  facilityId: string | null;
+  facilityName: string;
+  type: InspectionType;
+  nonce: number;
+}
+
 /**
  * The Inspectorate's logging form. It asks for exactly what the database
  * columns need and nothing else: the facility (which carries district, practice
  * and province in from the register), the type, the outcome, the enforcement
  * action if one was taken, and whether an inspection card was issued.
+ *
+ * `prefill` arrives from the cards-due list: the facility and the suggested
+ * type are filled in and the form scrolls into view, so recording the follow-up
+ * to an expired card is one tap plus the outcome.
  */
 function LogInspectionPanel({
   facilities,
   knownPhases,
+  prefill,
   onLogged,
   toastPush,
 }: {
   facilities: Facility[];
   knownPhases: string[];
+  prefill?: LogPrefill | null;
   onLogged: () => void;
   toastPush: (msg: string, kind?: "success" | "error") => void;
 }) {
@@ -626,6 +693,18 @@ function LogInspectionPanel({
   const selected: Facility | null = facilityId
     ? facilities.find((f) => f.id === facilityId) || null
     : null;
+
+  useEffect(() => {
+    if (!prefill) return;
+    setFacilityId(prefill.facilityId);
+    setFacilityQuery(prefill.facilityName);
+    setFacilityNameFreeText(prefill.facilityId ? "" : prefill.facilityName);
+    setType(prefill.type);
+    setDate(todayISO());
+    document
+      .getElementById("log-inspection")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [prefill]);
 
   const submit = async () => {
     const fname = selected ? selected.name : facilityNameFreeText.trim();
@@ -681,6 +760,10 @@ function LogInspectionPanel({
   };
 
   return (
+    <>
+      {/* The scroll target for "Record follow-up" — sits above the panel so
+          the whole form, title included, comes into view. */}
+      <span id="log-inspection" className="block scroll-mt-4" aria-hidden />
     <Panel
       title="Log inspection"
       note="One entry moves the facility row, the province summary, the card list and this week's report."
@@ -883,6 +966,7 @@ function LogInspectionPanel({
         {busy ? "Saving…" : "Log inspection"}
       </button>
     </Panel>
+    </>
   );
 }
 
