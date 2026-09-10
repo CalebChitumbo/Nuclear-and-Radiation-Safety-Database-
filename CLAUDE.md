@@ -298,3 +298,26 @@ Notice · Suspension of License · Cancellation of License
 - To change the format again: edit `ENFORCEMENT_COLUMNS`, then update
   `tests/inspectionDatabase.test.ts` (columns + band), `tests/workPlan.test.ts`
   (1.2.11 split labels) and the README's Summary-sheet table.
+
+## Routine: Management asks for the SharePoint workbook, or a new stage split
+
+- The **Excel export for SharePoint** is the panel on `/nsss` and `/border`.
+  It reads `dailyEntries` (and `truckScans` when ticked) and writes nothing;
+  the sheets are built in `lib/rules/screeningExport.ts`, the file by
+  `lib/rules/xlsx.ts`. Add a column by editing the sheet builder and its pin in
+  `tests/screeningExport.test.ts`. To check a file by hand, open it with
+  `.venv/bin/python -c "import openpyxl; …"` (`npm run py` makes the venv).
+- The **Functional Facilities** tab folds RAIS's stages into Management's
+  eight in `LICENSING_BUCKETS` (`lib/rules/functionalFacilities.ts`). A new
+  RAIS stage added to `STAGES` must be placed in a bucket or
+  `tests/functionalFacilities.test.ts` fails on the cover check — that is the
+  point of the test.
+- The **enforcement standing** on the register, the facility record and the
+  functional tab is read off `inspections.enforcement` by
+  `lib/rules/enforcementStatus.ts`. A new action in `ENFORCEMENT_ACTIONS` needs
+  grading there (`RESTRICTIVE_ACTIONS` / `NOTICE_ACTIONS`, else it reads as an
+  engagement) and the coverage pin in the same test file updated.
+- The **inspection card** timer is `cardIssued` + 30 days, derived; the due
+  list and its *Record follow-up* prefill live on `/inspectorate`
+  (`cardsDue`, `describeCard`, `suggestedFollowUp`). See
+  `docs/management-updates-2026-09.md` for what was asked and verified.
