@@ -140,6 +140,14 @@ export const ROUTES: readonly RouteAccess[] = [
     sections: [AS, INSP],
   },
   {
+    href: "/functional-facilities",
+    label: "Functional Facilities",
+    short: "Functional",
+    icon: "◈",
+    group: "Register",
+    sections: [AS, INSP],
+  },
+  {
     href: "/source-inventory",
     label: "Source Inventory",
     icon: "⚛",

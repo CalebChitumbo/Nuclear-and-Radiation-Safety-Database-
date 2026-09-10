@@ -121,5 +121,25 @@ describe("facilitiesToCsv", () => {
     expect(row).toContain(
       "Renewal of Use/Possession Licence (Q1 2026); Importation Licence (Q2 2026)",
     );
+    // The enforcement columns are blank without a standing map, and filled
+    // from it — so the register export says what the Authority last did.
+    expect(header.endsWith("Latest Enforcement Action,Enforcement Date")).toBe(true);
+    expect(row.endsWith(",,")).toBe(true);
+    const withStanding = facilitiesToCsv(
+      [f],
+      new Map([
+        [
+          f.id,
+          {
+            action: "Suspension of Practice",
+            severity: "restricted",
+            date: "2026-06-15",
+            inspectionId: "i1",
+            history: [],
+          },
+        ],
+      ]),
+    );
+    expect(withStanding.split("\r\n")[1].endsWith(",Suspension of Practice,2026-06-15")).toBe(true);
   });
 });

@@ -108,6 +108,7 @@ describe("canOpen — who opens what", () => {
     expect(opens(licensing)).toEqual([
       "/",
       "/facilities",
+      "/functional-facilities",
       "/reports",
       "/licences",
       "/licence-status",
@@ -122,6 +123,7 @@ describe("canOpen — who opens what", () => {
   it("gives the Inspectorate its database, the register and the handoff", () => {
     expect(opens(inspector)).toEqual([
       "/facilities",
+      "/functional-facilities",
       "/inspectorate",
       "/inspection-requests",
       "/daily",
