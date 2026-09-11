@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { Bars } from "@/components/Bars";
 import { FigureChangesPanel } from "@/components/nsss/FigureChangesPanel";
+import { ScreeningExportPanel } from "@/components/nsss/ScreeningExportPanel";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
@@ -290,6 +291,14 @@ export default function NsssPage() {
           onChanged={reload}
         />
       </section>
+
+      {/* The SharePoint hand-over: the same entries the figures above are
+          summed from, as a workbook the section uploads. */}
+      <ScreeningExportPanel
+        entries={data?.entries || []}
+        borders={data?.borders || []}
+        generatedBy={user?.displayName || ""}
+      />
 
       <FigureChangesPanel entries={data?.auditLog || []} />
 

@@ -140,7 +140,11 @@ export default function DashboardPage() {
           label="Functional"
           value={(agg.functional ?? agg.total).toLocaleString()}
           accent="green"
-          caption={`${(agg.total - (agg.functional ?? agg.total)).toLocaleString()} non-functional`}
+          caption={
+            <Link className="link-action" href="/functional-facilities">
+              {`${(agg.total - (agg.functional ?? agg.total)).toLocaleString()} non-functional · licensing breakdown →`}
+            </Link>
+          }
         />
         <Kpi
           label="Authorisations on record"
@@ -229,7 +233,14 @@ export default function DashboardPage() {
           title="Facilities by province (licensed / total)"
           rows={provinceRows}
         />
-        <Panel title="Unlicensed pipeline">
+        <Panel
+          title="Unlicensed pipeline — whole register"
+          action={
+            <Link className="link-action" href="/functional-facilities">
+              Functional only →
+            </Link>
+          }
+        >
           {stageRows.length === 0 ? (
             <p className="text-sm text-gunmetal/60">
               Every facility is licensed. (You won&apos;t see this often.)

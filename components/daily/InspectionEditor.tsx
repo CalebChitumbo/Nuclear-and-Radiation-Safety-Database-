@@ -10,16 +10,19 @@
  * in place moves the section's reported figures.
  *
  * Everything except the facility is editable here: type, outcome, enforcement
- * action and the day. The facility is not, because an inspection filed against
- * the wrong facility carries that facility's province, district and practice
- * with it — that one is removed and logged again. Removing is an
- * administrator's, since it takes a counted inspection back out of the year.
+ * action, the day, and whether (and when) an inspection card was issued — the
+ * card's 30-day timer is derived from that date, so correcting it here moves
+ * the card on the Inspectorate tab's due list. The facility is not, because an
+ * inspection filed against the wrong facility carries that facility's
+ * province, district and practice with it — that one is removed and logged
+ * again. Removing is an administrator's, since it takes a counted inspection
+ * back out of the year.
  */
 import { useState } from "react";
 
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import { ENFORCEMENT_ACTIONS } from "@/lib/rules/inspectionDatabase";
+import { ENFORCEMENT_ACTIONS, cardExpiry } from "@/lib/rules/inspectionDatabase";
 import { weekLabelForDate } from "@/lib/rules/week";
 import {
   INSPECTION_OUTCOMES,
@@ -52,6 +55,8 @@ export function InspectionEditor({
   const [outcome, setOutcome] = useState<InspectionOutcome>(inspection.outcome);
   const [enforcement, setEnforcement] = useState(inspection.enforcement || "");
   const [notes, setNotes] = useState(inspection.notes || "");
+  const [cardIssued, setCardIssued] = useState(!!inspection.cardIssued);
+  const [cardDate, setCardDate] = useState(inspection.cardIssued || inspection.date);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -77,6 +82,7 @@ export function InspectionEditor({
           outcome,
           enforcement: enforcement || undefined,
           notes,
+          cardIssued: cardIssued ? cardDate || date : undefined,
         },
         actorUid,
       );
@@ -191,6 +197,38 @@ export function InspectionEditor({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={cardIssued}
+            onChange={(e) => {
+              setCardIssued(e.target.checked);
+              if (e.target.checked && !cardDate) setCardDate(date);
+            }}
+          />
+          <span>Inspection card issued</span>
+        </label>
+        {cardIssued ? (
+          <div>
+            <label className="field-label" htmlFor={`insp-card-${inspection.id}`}>
+              Card issued on
+            </label>
+            <input
+              id={`insp-card-${inspection.id}`}
+              type="date"
+              className="input"
+              style={{ maxWidth: 170 }}
+              value={cardDate}
+              onChange={(e) => setCardDate(e.target.value)}
+            />
+            <div className="text-[11px] text-gunmetal/50 mt-0.5 tabular">
+              valid to {cardExpiry(cardDate || date) || "—"} (30 days)
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div>

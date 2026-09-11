@@ -29,12 +29,18 @@ exercise) · **Reports**
 breakdowns, every count deep-linking into the filtered register, CSV export)
 · **Authorisations**
 (`/licences` — authorisation statistics built from the register) ·
+**Functional Facilities** (`/functional-facilities` — the licensing breakdown
+for operating facilities only, public beside private in Management's stages,
+the private functional facilities without a licence listed by name, and what
+the Authority has done about each) ·
 **Inspectorate** (`/inspectorate` — the section's inspection database, in the
 format of its own workbook: the province summary with its INSPECTIONS /
 ENFORCEMENT ACTIONS columns, a facility-per-row sheet per province
-round, inspection cards falling due, the forward schedule, and the log) · **Nuclear Safety, Security &
+round, inspection cards falling due with the next step to record, the forward
+schedule, and the log) · **Nuclear Safety, Security &
 Safeguards** (`/nsss` — the NSSS section's metrics dashboard: vehicle
-screening, IAEA meetings, engagements, TWG) · **Smart Status Update**
+screening, IAEA meetings, engagements, TWG — and the Excel workbook the
+section hands SharePoint) · **Smart Status Update**
 (`/licence-status` — the self-updating RAIS workflow tracker) · Bulk Approval ·
 Inspection Requests (the Licensing ↔ Inspectorate interface) · **Daily
 Updates** (`/daily` — each section logs its day; the week totals itself).
@@ -611,6 +617,49 @@ the Monday pack reads exactly as it always has. Output **1.2.11** counts every
 inspection that led to an enforcement action — expand it for the split by
 action, the same six columns the summary bands, with engagements as one line.
 
+**Following a card up.** Issuing a card at the visit starts its 30-day timer
+from the inspection's date. *Inspection cards due* lists the expired cards
+first, most overdue first (*Expired 41 days ago*), each with the last
+enforcement action taken and a **Record follow-up →** that fills the log form
+with the facility and the suggested type — *Enforcement Action* once a notice
+has already been served — and scrolls to it. A card logged without its date,
+or on the wrong day, is corrected on the inspection editor (Daily Updates),
+and the timer follows.
+
+---
+
+## Functional facilities — the licensing breakdown Management reads
+
+The Overview's pipeline counts the whole register, non-functional facilities
+included. **Functional Facilities** (`/functional-facilities`,
+`lib/rules/functionalFacilities.ts`) is the same breakdown for the facilities
+that are operating, which is the one Management asked for in September 2026
+(404 of 541 that day). Everything on it is derived when the page is read;
+marking a facility non-functional on its record takes it off the tab at once.
+
+- **Stage × Public / Private / Functional** in Management's eight stages —
+  Licensed · No application submitted · Application submitted · Awaiting
+  payment · Under review and assessment · Approval and issue in progress ·
+  Licence expiring (renewal due) · Import licence only. Each stage folds the
+  RAIS statuses it contains (`LICENSING_BUCKETS`, one table, tested to cover
+  every RAIS stage exactly once) and names them underneath, each a link into
+  the register filtered to those facilities.
+- **The list** — the private (or public, or both) functional facilities
+  without a licence, province then name, filterable by stage and by enforcement
+  standing; CSV of the list, or the whole view as an Excel workbook.
+- **No application submitted — why.** A suspended practice is not simply "no
+  application". `lib/rules/enforcementStatus.ts` reads the latest enforcement
+  action recorded against each facility off the inspection register (the
+  latest dated action wins; an undated register row speaks only when nothing
+  dated does) and grades it — *restricted* (practice or licence suspended,
+  device seized, licence cancelled), *notice served* (written warning,
+  enforcement notice) or *engagement only* — so the table says how many of the
+  "no application" facilities the Authority has already acted against, and the
+  list says which. The same standing shows as a chip on the register's rows,
+  as a field on the facility record, and as two columns on the register's CSV.
+
+Full detail in [docs/management-updates-2026-09.md](docs/management-updates-2026-09.md).
+
 ---
 
 ## The sectional update — the 2026 RPA work plan format
@@ -1027,6 +1076,20 @@ posts can log** (`firebase deploy --only firestore:rules,firestore:indexes`) —
 Firestore denies writes to a collection no deployed rule mentions, admin
 account or not. Until then the tab reads fine and saving reports the command.
 
+**Export to Excel for SharePoint.** The reporting system stays where the
+figures are entered; SharePoint keeps a file of them. The panel on the NSSS
+dashboard (any office, or all) and on the Border Scan Log (a posted officer's
+own office) downloads one `.xlsx` workbook for the selected reporting week, a
+month, a quarter, the year or all time — a **Summary** sheet (office, period,
+totals, who generated it, a line per office), **Daily totals** (a row per day,
+a column per office), **Entries** (every figure behind the totals, how it got
+there and who logged or corrected it) and, for a week to a quarter, the
+**Truck scans** behind them (`lib/rules/screeningExport.ts`). The figures are
+the same `dailyEntries` output 1.3.12 sums, filtered the same way. The
+workbook is written by `lib/rules/xlsx.ts`, a small dependency-free writer of
+the Office Open XML parts a sheet of text and numbers needs — deterministic,
+so the same records give byte-identical files.
+
 `scripts/check-border-vocabulary.py` replays a monthly workbook through the
 vocabulary and reports coverage — 99.7% of the June 2026 Nakonde book's 9,198
 scans resolve to the standard list, folding 43 commodities' worth of spelling
@@ -1276,8 +1339,10 @@ npm test
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
 - `inspectionDatabase` — the Inspectorate workbook reproduced from the register:
-  the 30-day inspection card (expiry, Active / Expiring Soon / Expired, and that
-  the arithmetic does not move with the browser's timezone), the four
+  the 30-day inspection card (expiry, Active / Expiring Soon / Expired, that
+  the arithmetic does not move with the browser's timezone, that issuing a
+  card at the visit starts the timer from that day, days left or overdue, the
+  due list expired-first, and the suggested next step), the four
   inspection-type columns and their row total, the enforcement action carried on
   a row, phased province rounds getting their own sheet and summary row, sheet
   numbering and province order, the coverage list of facilities still at zero,
@@ -1318,6 +1383,23 @@ npm test
   renumbered row still finding the notes and opening figures saved under its
   old number, and the mock store saving one row at a time so two sections never
   overwrite each other
+- `functionalFacilities` — the functional-only licensing breakdown: that
+  Management's eight stages cover every RAIS stage exactly once, the public /
+  private split summing to the sector, non-functional facilities left out
+  licensed or not, the private unlicensed list in province-then-name order —
+  and the enforcement standing behind it: all nine actions graded, the latest
+  dated action winning over an undated register row, a free-text log matched
+  by name, and the "no application submitted" split into restricted / notice /
+  engagement / unexplained
+- `xlsx` — the Excel writer: column lettering, sheet-name rules, numeric vs
+  inline-string cells with escaping, the bold frozen header, and that the
+  package is a ZIP Excel can walk (every part present, CRCs right, stored,
+  UTF-8 names) and deterministic
+- `screeningExport` — the SharePoint workbook: the period a kind names (week by
+  label, month / quarter / year by day), the weeks a period touches, the
+  entries kept for an office, how each figure got there, the Summary and Daily
+  totals pivot, both hands named on a corrected entry, the scans sheet only
+  when supplied, and the file name
 - `aggregate` — sector / province / stage breakdowns
 - `week` — date → week-label mapping
 - `screeningSeed` — verifies the seeded daily screening log (1,615 entries,
@@ -1372,6 +1454,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── pending/            Where a request waits for an administrator
 │   ├── page.tsx            Overview / Dashboard
 │   ├── facilities/         Register + deep-linkable detail
+│   ├── functional-facilities/  Licensing breakdown for operating facilities, public / private
 │   ├── source-inventory/   Source Inventory — the RAIS register (read-only)
 │   ├── verified-source-inventory/  Annex I items confirmed in the field (read-only)
 │   ├── licences/           Authorisations tab — statistics from the register
@@ -1390,12 +1473,18 @@ Add Firestore rules tests with the emulator in a follow-up.
 ├── components/inspectorate/ InspectionSummaryTable + InspectionDatabaseTable — the
 │                           workbook's Summary and province sheets, shared by the
 │                           Inspectorate dashboard and the weekly report
+├── components/nsss/        FigureChangesPanel (the audit log) + ScreeningExportPanel
+│                           (the Excel workbook for SharePoint)
 ├── components/             UI primitives — Section (Panel/PageHeader/Field), Segmented,
 │                           Sidebar, Topbar, MobileNav, Drawer, Kpi, Bars, Gauge, Toast …
 ├── components/facility/    FacilityDetail — shared by the drawer and /facilities/[id]
 ├── lib/
 │   ├── rules/              PURE business logic — fully unit-tested
-│   │   └── access.ts       Who sees what — the route table and workspaces
+│   │   ├── access.ts       Who sees what — the route table and workspaces
+│   │   ├── functionalFacilities.ts  Management's stages, the functional split
+│   │   ├── enforcementStatus.ts     The latest action against each facility
+│   │   ├── screeningExport.ts       The SharePoint workbook's sheets
+│   │   └── xlsx.ts         A dependency-free .xlsx writer
 │   ├── store/              DataStore interface + mockStore + firebaseStore
 │   ├── auth.tsx            Auth context: signed-in officer vs pending account
 │   ├── firebase.ts         Client init

@@ -1,3 +1,4 @@
+import type { FacilityEnforcement } from "./enforcementStatus";
 import { authWhen } from "./licenceStats";
 import type { Facility } from "./types";
 
@@ -15,9 +16,14 @@ export function toCsv(header: string[], rows: string[][]): string {
 
 /**
  * Flatten register rows for export — one line per facility, mirroring the
- * columns the register table and reports filter on.
+ * columns the register table and reports filter on. Pass the enforcement
+ * standing (`enforcementByFacility`) and each line also says what the
+ * Authority last did about the facility, and when.
  */
-export function facilitiesToCsv(facilities: Facility[]): string {
+export function facilitiesToCsv(
+  facilities: Facility[],
+  enforcement?: Map<string, FacilityEnforcement>,
+): string {
   const header = [
     "No",
     "Facility",
@@ -36,6 +42,8 @@ export function facilitiesToCsv(facilities: Facility[]): string {
     "Licence Numbers",
     "Licences Held",
     "Import Detail",
+    "Latest Enforcement Action",
+    "Enforcement Date",
   ];
   const rows = facilities.map((f, i) => [
     String(i + 1),
@@ -65,6 +73,8 @@ export function facilitiesToCsv(facilities: Facility[]): string {
       })
       .join("; "),
     f.statusDetail || "",
+    enforcement?.get(f.id)?.action || "",
+    enforcement?.get(f.id)?.date || "",
   ]);
   return toCsv(header, rows);
 }

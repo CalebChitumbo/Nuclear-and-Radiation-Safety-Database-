@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { CardStatusChip } from "@/components/inspectorate/InspectionDatabaseTable";
 import { detectType } from "@/lib/rules/detectType";
+import { enforcementByFacility } from "@/lib/rules/enforcementStatus";
 import { cardStatus } from "@/lib/rules/inspectionDatabase";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
 import { authWhen } from "@/lib/rules/licenceStats";
@@ -133,6 +134,14 @@ export function FacilityDetail({
   const otherAuths = useMemo(
     () => (facility?.auths || []).filter((a) => !isUseP(a.type)),
     [facility],
+  );
+  // What the Authority last did about this facility, off its inspections.
+  const enforcement = useMemo(
+    () =>
+      facility
+        ? enforcementByFacility(inspections, [facility]).get(facility.id)
+        : undefined,
+    [facility, inspections],
   );
 
   if (notFound) {
@@ -311,6 +320,16 @@ export function FacilityDetail({
           Stalled application
         </span>
       ) : null}
+      {enforcement ? (
+        <span
+          className={`chip ${enforcement.severity === "engagement" ? "amber" : "red"}`}
+          title={`Latest enforcement action on the inspection register${
+            enforcement.date ? ` — ${enforcement.date}` : ""
+          }`}
+        >
+          {enforcement.action}
+        </span>
+      ) : null}
     </div>
   );
 
@@ -346,6 +365,19 @@ export function FacilityDetail({
         <Field label="Sector" value={facility.sector} />
         <Field label="Sequence #" value={String(facility.no || "—")} />
         <Field label="Stage" value={facility.stage} wide />
+        <Field
+          label="Enforcement standing"
+          value={
+            enforcement
+              ? `${enforcement.action}${enforcement.date ? ` · ${enforcement.date}` : ""}${
+                  enforcement.history.length > 1
+                    ? ` · ${enforcement.history.length} actions on record`
+                    : ""
+                }`
+              : "No enforcement action recorded"
+          }
+          wide
+        />
         {facility.currentStatus ? (
           <Field label="RAIS status" value={facility.currentStatus} wide />
         ) : null}

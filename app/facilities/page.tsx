@@ -11,8 +11,13 @@ import { Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { StatusPill } from "@/components/StatusPill";
 import { downloadTextFile } from "@/components/downloadFile";
+import { EnforcementChip } from "@/components/inspectorate/InspectionDatabaseTable";
 import { useAuth } from "@/lib/auth";
 import { useStoreData } from "@/lib/storeHooks";
+import {
+  enforcementByFacility,
+  type FacilityEnforcement,
+} from "@/lib/rules/enforcementStatus";
 import { facilitiesToCsv } from "@/lib/rules/exportCsv";
 import { norm } from "@/lib/rules/matching";
 import {
@@ -43,7 +48,15 @@ export default function FacilitiesPage() {
 function FacilitiesInner() {
   const { canEditAS } = useAuth();
   const { data, loading, error, reload } = useStoreData(
-    async (s) => s.listFacilities(),
+    async (s) => {
+      const [facilities, inspections] = await Promise.all([
+        s.listFacilities(),
+        // The enforcement standing shown on each row comes from the
+        // inspection register; the register itself must open without it.
+        s.listInspections().catch(() => []),
+      ]);
+      return { facilities, inspections };
+    },
     [],
   );
   // Deep-linkable filters (the Reports page links into pre-filtered views):
@@ -89,7 +102,13 @@ function FacilitiesInner() {
   // they fold away behind a toggle and open on demand.
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const facilities: Facility[] = useMemo(() => data || [], [data]);
+  const facilities: Facility[] = useMemo(() => data?.facilities || [], [data]);
+  // What the Authority last did about each facility — a chip on the row, a
+  // column on the export. See lib/rules/enforcementStatus.ts.
+  const enforcement = useMemo(
+    () => enforcementByFacility(data?.inspections || [], facilities),
+    [data?.inspections, facilities],
+  );
   const initialLoading = loading && !data;
 
   // Normalise each facility's search haystack once per data load, not five
@@ -144,9 +163,9 @@ function FacilitiesInner() {
   const exportCsv = useCallback(() => {
     downloadTextFile(
       `rpa-register-${new Date().toISOString().slice(0, 10)}.csv`,
-      facilitiesToCsv(filtered),
+      facilitiesToCsv(filtered, enforcement),
     );
-  }, [filtered]);
+  }, [filtered, enforcement]);
 
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
   const openFacility = useCallback((id: string) => setOpenId(id), []);
@@ -407,7 +426,12 @@ function FacilitiesInner() {
             </thead>
             <tbody>
               {visible.map((f) => (
-                <FacilityRow key={f.id} f={f} onOpen={openFacility} />
+                <FacilityRow
+                  key={f.id}
+                  f={f}
+                  enforcement={enforcement.get(f.id)}
+                  onOpen={openFacility}
+                />
               ))}
               {visible.length === 0 ? (
                 <tr>
@@ -425,7 +449,12 @@ function FacilitiesInner() {
         {/* Phone: a seven-column table is unusable, so each facility is a row */}
         <ul className="md:hidden divide-y divide-gunmetal/8">
           {visible.map((f) => (
-            <FacilityCard key={f.id} f={f} onOpen={openFacility} />
+            <FacilityCard
+              key={f.id}
+              f={f}
+              enforcement={enforcement.get(f.id)}
+              onOpen={openFacility}
+            />
           ))}
           {visible.length === 0 ? (
             <li className="py-10 px-4 text-center text-sm text-gunmetal/55">
@@ -455,13 +484,33 @@ function FacilitiesInner() {
 }
 
 /** The flags a facility carries beyond its licensing status. */
-function Flags({ f, small }: { f: Facility; small?: boolean }) {
-  if (f.functional !== false && !f.stalled && !f.needsReview) return null;
+function Flags({
+  f,
+  enforcement,
+  small,
+}: {
+  f: Facility;
+  enforcement?: FacilityEnforcement;
+  small?: boolean;
+}) {
+  if (f.functional !== false && !f.stalled && !f.needsReview && !enforcement) {
+    return null;
+  }
   const size = small ? "text-[10px]" : "";
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {f.functional === false ? (
         <span className={`chip red ${size}`}>Non-Functional</span>
+      ) : null}
+      {/* The latest enforcement action on the inspection register — so a
+          suspended or closed practice never reads as plain "no application". */}
+      {enforcement ? (
+        <span
+          className={size}
+          title={`${enforcement.action}${enforcement.date ? ` on ${enforcement.date}` : ""} — recorded on the Inspectorate tab`}
+        >
+          <EnforcementChip action={enforcement.action} />
+        </span>
       ) : null}
       {f.stalled ? (
         <span
@@ -485,9 +534,11 @@ function Flags({ f, small }: { f: Facility; small?: boolean }) {
 
 const FacilityCard = memo(function FacilityCard({
   f,
+  enforcement,
   onOpen,
 }: {
   f: Facility;
+  enforcement?: FacilityEnforcement;
   onOpen: (id: string) => void;
 }) {
   const usePAuths = (f.auths || []).filter((a) => isUseP(a.type));
@@ -524,7 +575,7 @@ const FacilityCard = memo(function FacilityCard({
             <span className="text-gunmetal/50"> · {f.practice}</span>
           ) : null}
         </div>
-        <Flags f={f} small />
+        <Flags f={f} enforcement={enforcement} small />
       </button>
     </li>
   );
@@ -532,9 +583,11 @@ const FacilityCard = memo(function FacilityCard({
 
 const FacilityRow = memo(function FacilityRow({
   f,
+  enforcement,
   onOpen,
 }: {
   f: Facility;
+  enforcement?: FacilityEnforcement;
   onOpen: (id: string) => void;
 }) {
   const otherAuths = (f.auths || []).filter((a) => !isUseP(a.type));
@@ -556,7 +609,7 @@ const FacilityRow = memo(function FacilityRow({
         <div className="text-xs text-gunmetal/55 tabular">
           {f.facCode || "—"} · {f.district || "—"}
         </div>
-        <Flags f={f} small />
+        <Flags f={f} enforcement={enforcement} small />
       </td>
       <td className="tabular">{f.province}</td>
       <td>{f.practice || "—"}</td>
