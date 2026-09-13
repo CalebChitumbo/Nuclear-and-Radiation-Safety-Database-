@@ -1154,10 +1154,19 @@ export function validateOutputEdit(
  * Every figure below is the workbook's Q1–Q4 row, except where the system
  * already holds the records behind it:
  *
- * - 1.1.4  the workbook's 357 licences by quarter. The licence register holds
- *          no dated `licenceEvents` yet (the Licensing Status import seeds
- *          facilities and their authorisations, not issue events), so the whole
- *          figure is carried in and every licence logged from here adds on top.
+ * - 1.1.4  part carried, part counted, the way 1.2.4 is. The Licensing Status
+ *          workbook of 13 Sep 2026 counts 380 licences issued (up from the 357
+ *          the sections' sheet reported in August, same 152/125 for Q1/Q2, the
+ *          rest Q3). The import seeds facilities and their authorisations, not
+ *          issue events — but by then officers had logged 14 dated licences in
+ *          the app, and 13 of them are inside the workbook's 380 (the eight 7
+ *          Sep renewals, the variations for ZRA Chirundu, ZRA Kasumbalesa,
+ *          Katondwe, Unilus, Kansanshi and Coptic Church). Those are counted
+ *          off `licenceEvents`, so the balance sheds them: 380 - 13 = 367,
+ *          taken out of Q3 because that is the quarter the report attributes
+ *          every one of those events to (their weeks start in Q3). The 14th —
+ *          Company Clinic's transfer, AUTH/TRF/0054 — is on no sheet of the
+ *          workbook and counts on top. See docs/licensing-status-2026-import.md.
  * - 1.2.4  part carried, part counted. The section's 2026 facility inspection
  *          register was imported on 7 Sep 2026 (297 inspections), and 42 of its
  *          rows carry a date, so those are counted off the register and the
@@ -1194,7 +1203,7 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.1.1": [3, 3, 0, 0],
   "1.1.2": [1, 2, 0, 0],
   "1.1.3": [0, 1, 0, 0],
-  "1.1.4": [152, 125, 80, 0],
+  "1.1.4": [152, 125, 90, 0],
   "1.1.5": [0, 1, 0, 0],
   "1.1.6": [1, 3, 0, 0],
   "1.1.7": [0, 1, 0, 0],

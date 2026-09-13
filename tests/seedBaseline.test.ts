@@ -7,8 +7,8 @@ import facilities from "../seed/facilities.seed.json";
 
 /**
  * §16 — seeded baseline: the 2026 Licensing Status workbook register
- * (538 facilities = the workbook's 511 rows + 27 previous-register rows the
- * workbook does not carry, kept and flagged for review). See
+ * (538 facilities = the Sep 2026 workbook's 501 rows + 37 previous-register
+ * rows the workbook does not carry, kept and flagged for review). See
  * docs/licensing-status-2026-import.md.
  */
 describe("§16 — seeded baseline (2026 Licensing Status workbook)", () => {
@@ -20,21 +20,21 @@ describe("§16 — seeded baseline (2026 Licensing Status workbook)", () => {
     expect(agg.total).toBe(538);
   });
 
-  it("220 licensed / 318 unlicensed", () => {
-    expect(agg.licensed).toBe(220);
-    expect(agg.unlicensed).toBe(318);
+  it("228 licensed / 310 unlicensed", () => {
+    expect(agg.licensed).toBe(228);
+    expect(agg.unlicensed).toBe(310);
   });
 
-  it("401 functional / 137 non-functional", () => {
-    expect(agg.functional).toBe(401);
-    expect(mapped.filter((f) => f.functional === false).length).toBe(137);
+  it("392 functional / 146 non-functional", () => {
+    expect(agg.functional).toBe(392);
+    expect(mapped.filter((f) => f.functional === false).length).toBe(146);
   });
 
-  it("Public 65/250, Private 155/288 (licensed/total)", () => {
+  it("Public 69/250, Private 159/288 (licensed/total)", () => {
     expect(agg.bySector.Public.total).toBe(250);
-    expect(agg.bySector.Public.licensed).toBe(65);
+    expect(agg.bySector.Public.licensed).toBe(69);
     expect(agg.bySector.Private.total).toBe(288);
-    expect(agg.bySector.Private.licensed).toBe(155);
+    expect(agg.bySector.Private.licensed).toBe(159);
   });
 
   it("Medical 350 / Non-Medical 188", () => {
@@ -48,25 +48,25 @@ describe("§16 — seeded baseline (2026 Licensing Status workbook)", () => {
     for (const f of stalled) expect(f.licensed).toBe(false);
   });
 
-  it("160 records flagged for review, each with a note", () => {
+  it("161 records flagged for review, each with a note", () => {
     const flagged = mapped.filter((f) => f.needsReview);
-    expect(flagged.length).toBe(160);
+    expect(flagged.length).toBe(161);
     for (const f of flagged) expect(f.reviewNote).toBeTruthy();
   });
 
-  it("361 authorisations on record", () => {
-    expect(agg.auths).toBe(361);
+  it("383 authorisations on record", () => {
+    expect(agg.auths).toBe(383);
   });
 
   it("every stage maps to a known Stage value (nothing fell back silently)", () => {
     // "No Application Submitted" is both a real status and safeStage's
     // fallback; a mapping regression would inflate it well past the register's
     // own count.
-    expect(agg.byStage["No Application Submitted"]).toBe(213);
-    expect(agg.byStage["Waiting for Payment"]).toBe(52);
+    expect(agg.byStage["No Application Submitted"]).toBe(212);
+    expect(agg.byStage["Waiting for Payment"]).toBe(46);
     expect(agg.byStage["Import Licence Only (Not yet Use/Possession)"]).toBe(12);
-    // Facilities the previous register showed licensed and the workbook
-    // leaves blank — one this time, plus seven still waiting from before.
+    // Facilities a register showed licensed and a workbook then left blank —
+    // none new this time; the eight still waiting from the earlier imports.
     expect(agg.byStage["Licence Expiring (Renewal Due)"]).toBe(8);
   });
 
@@ -95,8 +95,10 @@ describe("§16 — seeded baseline (2026 Licensing Status workbook)", () => {
 
 /**
  * The licence counts the workbook's own "Totals" sheet reports for 2026 —
- * 357 licences across eight types. The four further authorisations are the
- * ones the carried-over facilities already held (no quarter on those).
+ * 380 licences across eight types, of which 379 land on a facility (the one
+ * importation licence the sheet books to the Radiation Protection Authority
+ * itself has no register row to land on). The four further authorisations
+ * are the ones the carried-over facilities already held (no quarter on those).
  */
 describe("§16 — licences issued (2026 Licensing Status workbook)", () => {
   const mapped = mapAllSeed(facilities as SeedFacility[]);
@@ -105,17 +107,18 @@ describe("§16 — licences issued (2026 Licensing Status workbook)", () => {
     .flatMap((f) => f.auths || [])
     .filter((a) => (a.quarter || "").startsWith("2026-"));
 
-  it("357 licences issued in 2026, 4 carried over from the previous register", () => {
-    expect(workbook.length).toBe(357);
-    expect(stats.totalIssued).toBe(361);
+  it("379 licences issued in 2026, 4 carried over from the previous register", () => {
+    expect(workbook.length).toBe(379);
+    expect(stats.totalIssued).toBe(383);
   });
 
   it("matches the workbook's Totals sheet, type by type", () => {
     const count = (type: string) =>
       workbook.filter((a) => a.type === type).length;
-    expect(workbook.filter((a) => isUseP(a.type)).length).toBe(238);
-    expect(count("Importation Licence")).toBe(82);
-    expect(count("Variation of Terms and Conditions")).toBe(18);
+    expect(workbook.filter((a) => isUseP(a.type)).length).toBe(248);
+    // The Totals sheet says 91; the 91st is the Authority's own import.
+    expect(count("Importation Licence")).toBe(90);
+    expect(count("Variation of Terms and Conditions")).toBe(22);
     expect(count("Transfer Licence")).toBe(7);
     expect(count("Decommissioning Licence")).toBe(5);
     expect(count("Export Licence")).toBe(3);
@@ -123,19 +126,19 @@ describe("§16 — licences issued (2026 Licensing Status workbook)", () => {
     expect(count("Transport Licence")).toBe(1);
   });
 
-  it("splits by quarter of issue: Q1 196, Q2 142, Q3 19", () => {
+  it("splits by quarter of issue: Q1 198, Q2 142, Q3 39", () => {
     const byQuarter = (q: string) =>
       workbook.filter((a) => a.quarter === q).length;
-    expect(byQuarter("2026-Q1")).toBe(196);
+    expect(byQuarter("2026-Q1")).toBe(198);
     expect(byQuarter("2026-Q2")).toBe(142);
-    expect(byQuarter("2026-Q3")).toBe(19);
+    expect(byQuarter("2026-Q3")).toBe(39);
   });
 
   it("counts quarter-dated use licences as current for 2026", () => {
     // The workbook dates licences by quarter, not by day; licensedThisYear
     // reads the quarter's year (authYear) so these are not "unconfirmed".
-    expect(stats.licensedThisYear).toBe(216);
+    expect(stats.licensedThisYear).toBe(224);
     expect(stats.licensedYearUnconfirmed).toBe(4);
-    expect(stats.licensedTotal).toBe(220);
+    expect(stats.licensedTotal).toBe(228);
   });
 });

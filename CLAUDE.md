@@ -12,6 +12,67 @@ npm run typecheck && npm test
 `npm run test:rules` needs the Firestore emulator and JDK 21+ (the default
 Java 17 makes it silently no-op).
 
+## Routine: the section hands over a new Licensing Status workbook
+
+The Authorisation & Standards section periodically hands over a fresh
+`Licensing Status.xlsx` — the register sheet (*Renewal or Use Possession*, one
+row per facility with its RAN, licence status, use/possession licences and
+quarter) plus a sheet per standalone licence type and a *Totals* sheet. It is
+the authoritative source for **who is licensed and with what**, and it
+replaces the previous import rather than adding to it.
+
+1. Convert it. This rewrites the seed AND the import doc, matches every row
+   back to the previous seed (FAC code, alias, name, fuzzy) and reconciles the
+   licences against the Totals sheet type by type — a mismatch is printed,
+   never absorbed:
+
+   ```bash
+   npm run py && .venv/bin/python scripts/convert-licensing-status-xlsx.py <workbook>.xlsx
+   ```
+
+   Read the report before committing: *Newly licensed*, *Was licensed, no
+   current licence*, *Carried over*, *Licences with no facility* and the
+   **not applied** worklists. Columns are read by header, so a re-laid sheet
+   still converts; a column the sheet gains needs a line in
+   `MAIN_SHEET_HEADERS`.
+2. Update the pinned figures in `tests/seedBaseline.test.ts` (facilities,
+   licensed/unlicensed, functional, sectors, review count, authorisations, the
+   stage counts, the per-type and per-quarter licence counts).
+3. **Re-baseline 1.1.4.** `WORK_PLAN_OPENING_BALANCE["1.1.4"]` carries the
+   workbook's Totals figure LESS every dated `licenceEvents` record the app
+   already counts that the workbook also holds (pull the events and match them
+   to the workbook's sheets by facility and type); a licence the app holds that
+   is on no sheet counts on top. Put the movement in the latest quarter with
+   work in it, update the pin in `tests/workPlan.test.ts` and note it in
+   `docs/subprogrammes-2026-cumulative-update.md` under 1.1.4.
+4. Update the counts in `README.md` (the intro, the seed verification line,
+   the `seedBaseline` test entry and the acceptance criteria).
+5. Run the checks, commit on a `claude/...` branch, open a PR. Then re-seed the
+   live project — **the register only**, so the screening log and inspection
+   register are not rewritten:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --only facilities
+   ```
+
+   Read what it prints: every facility an officer has edited in the app is
+   **merged, not replaced** (`mergeSeededFacility`) — the workbook sets whether
+   it is licensed and with which licences; the officer's stage on an
+   application the workbook has unlicensed, their dated licences and their
+   corrections to the record stand. The run lists each one.
+
+**Watch out:** the workbook's *Facility Type*, *District* and *Province*
+columns are NOT taken over what the register holds — the Sep 2026 book had
+`#VALUE!` in 452 district cells and put Mbala in Muchinga. They fill a blank and
+are otherwise reported as worklists in `docs/licensing-status-2026-import.md`
+for an officer to apply in the app. Its *Application Status* column is recorded
+on the facility's detail line and never moves a stage.
+
+**Watch out:** the Totals sheet can book a licence to a holder with no register
+row (Sep 2026: an import licence for the Radiation Protection Authority itself).
+It stays unmatched and the reconciliation reads one short — say so rather than
+inventing a facility for it.
+
 ## Routine: the Inspectorate hands over a new inspection total
 
 The Inspectorate periodically gives a new **total routine and follow-up

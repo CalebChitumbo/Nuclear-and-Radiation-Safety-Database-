@@ -37,6 +37,21 @@ quarter of issue. The workbook's split is what ships, because this is the sheet
 the Monday report is read against. The total, the percentage and the status are
 unaffected either way.
 
+*13 Sep 2026:* 1.1.4 re-baselined to **367 carried** (152 / 125 / 90). The
+section's Licensing Status workbook of that date counts **380** licences issued
+(248 use/possession, 91 import, 22 variation, 7 transfer, 5 decommissioning,
+3 export, 3 transit, 1 transport — see
+[the register import](./licensing-status-2026-import.md)); the 23 gained since
+August all fall in Q3. By then officers had recorded 14 dated licences in the
+app, and 13 of them are inside the workbook's 380 — the eight renewals of
+7 Sep and the variations for ZRA Chirundu, ZRA Kasumbalesa, Katondwe, Unilus,
+Kansanshi and Coptic Church — so those are counted off `licenceEvents` and the
+balance sheds them (380 − 13 = 367, out of Q3 because the report attributes
+every one of those events to Q3). The 14th, Company Clinic's transfer
+AUTH/TRF/0054, is on no sheet of the workbook and counts on top: the report
+reads 152 / 125 / 104 = **381**. Same rule as 1.2.4: never carry what the
+system already counts.
+
 ## Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
 
 Every 1.2.x row already matched the workbook — the August update
