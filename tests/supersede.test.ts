@@ -122,6 +122,28 @@ function wf(p: Partial<LicenceWorkflow> & { currentStatus?: NewApplicationStatus
   };
 }
 
+describe("a backlog replayed newest-first (stalled Apps Script trigger)", () => {
+  // The script forwards the newest THREAD first, so the Approved email reaches
+  // the function before the Submitted one. Because the ingest stamps
+  // receivedAt with the email's SENT date (not arrival), the older email is
+  // still recognised as stale and cannot overwrite the pending Approved row.
+  const submitted: SupersedeInput = {
+    receivedAt: "2026-07-14T09:00:00.000Z",
+    phase: "Payment",
+    currentStatus: "Invoice Request Generation Pending",
+  };
+  const approved: SupersedeInput = {
+    receivedAt: "2026-08-20T11:30:00.000Z",
+    phase: "Licence Issued",
+    currentStatus: "Licence Approved",
+  };
+
+  it("keeps the later-sent email even though it arrived first", () => {
+    expect(shouldSupersede(approved, submitted)).toBe(false);
+    expect(shouldSupersede(submitted, approved)).toBe(true);
+  });
+});
+
 describe("resolveFacilityStatus", () => {
   it("picks the most recent applicable workflow by receivedAt", () => {
     const workflows = [

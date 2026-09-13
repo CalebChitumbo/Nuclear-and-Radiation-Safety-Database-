@@ -56,7 +56,11 @@ interface IngestSummary {
 /** Firestore write batches cap at 500 ops; stay safely under it. */
 const BATCH_LIMIT = 450;
 
-async function ingest(text: string, subject: string): Promise<IngestSummary> {
+async function ingest(
+  text: string,
+  subject: string,
+  sentAt = "",
+): Promise<IngestSummary> {
   const db = getFirestore();
 
   const facSnap = await db.collection("facilities").get();
@@ -99,6 +103,11 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
   let batchOps = 0;
   const batches = [batch];
   const now = new Date().toISOString();
+  // Order by when the email was SENT, not when it reached us. A provider that
+  // replays a backlog (the Apps Script after a stalled trigger) delivers newest
+  // threads first, so arrival time would let an older status overwrite a newer
+  // pending row. Providers that pass no date fall back to arrival.
+  const receivedAt = sentAt || now;
   const summary: IngestSummary = { ...empty, parsed: records.length };
 
   records.forEach((r) => {
@@ -132,7 +141,7 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
         : null,
       {
         date: rec.lastSeen,
-        receivedAt: now,
+        receivedAt,
         phase: rec.phase,
         currentStatus: rec.currentStatus,
         special: rec.special,
@@ -158,7 +167,7 @@ async function ingest(text: string, subject: string): Promise<IngestSummary> {
         ...rec,
         source: "email",
         reviewStatus: "needs-review",
-        receivedAt: now,
+        receivedAt,
         emailSubject: subject || "",
         updatedAt: now,
         updatedBy: BOT,
@@ -218,7 +227,7 @@ export const ingestRaisEmail = onRequest(
       return;
     }
 
-    const { subject, text, from } = pickEmailText(inbound.body);
+    const { subject, text, from, sentAt } = pickEmailText(inbound.body);
 
     // Optional second gate: the provider forwards EVERY email delivered to the
     // ingest address, so restrict which senders may feed the register queue.
@@ -243,7 +252,7 @@ export const ingestRaisEmail = onRequest(
     }
 
     try {
-      const summary = await ingest(text, subject);
+      const summary = await ingest(text, subject, sentAt);
       logger.info("ingestRaisEmail processed an email", { subject, ...summary });
       res.status(200).json({ ok: true, ...summary });
     } catch (err) {

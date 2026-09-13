@@ -60,6 +60,9 @@ function forwardRaisEmails() {
         payload: JSON.stringify({
           subject: msg.getSubject(),
           plain: msg.getPlainBody(),
+          // The email's own date: the function orders notifications by it, so a
+          // backlog forwarded newest-thread-first still resolves correctly.
+          date: msg.getDate().toISOString(),
         }),
         muteHttpExceptions: true,
       });

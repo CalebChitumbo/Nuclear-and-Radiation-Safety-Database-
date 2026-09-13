@@ -73,6 +73,15 @@ Accepting an update writes the facility, which triggers the existing
   arriving twice updates the same row instead of duplicating it. A re-sent or
   stale email will **not** knock an already-applied (or officer-resolved) item
   back into the queue, nor regress its status.
+- **Ordered by the email's own date, not arrival.** The Apps Script sends
+  `date` (the message's Date header) and the function stores it as
+  `receivedAt`, which is what `shouldSupersede` compares. That matters when a
+  backlog is replayed after the trigger has stalled: the script forwards the
+  newest *thread* first, so an older "Submitted" can reach the function after
+  the newer "Approved" for the same RAN — and without the sent date it would
+  overwrite the pending row. Providers that pass no date fall back to arrival
+  time, as before. (Emails dated more than a day in the future are treated as
+  undated.)
 
 ## 1. Deploy the function
 
