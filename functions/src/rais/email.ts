@@ -25,6 +25,13 @@ export interface ParsedEmail {
   subject: string;
   text: string;
   from: string;
+  /**
+   * When the email was SENT (its Date header), as an ISO timestamp — "" when
+   * the provider did not pass one or it could not be parsed. The ingest uses it
+   * to order notifications, so a backlog replayed out of order (the Apps Script
+   * forwards newest threads first) still resolves to the genuinely latest one.
+   */
+  sentAt: string;
 }
 
 function str(v: unknown): string {
@@ -61,8 +68,24 @@ export function htmlToText(html: string): string {
 }
 
 /**
- * Pull the subject, plain-text body and sender out of whatever shape the
- * provider posted. Prefers a provider's pre-stripped plaintext, then any
+ * Normalise an email Date header (RFC 2822, ISO, or epoch ms) to ISO. Rejects
+ * anything unparseable or more than a day in the future — a clock-skewed or
+ * garbage header must not make a notification outrank everything after it.
+ */
+export function parseEmailDate(
+  v: unknown,
+  nowMs: number = Date.now(),
+): string {
+  const raw = str(v).trim();
+  if (!raw) return "";
+  const ms = /^\d{11,}$/.test(raw) ? Number(raw) : Date.parse(raw);
+  if (Number.isNaN(ms) || ms > nowMs + 24 * 60 * 60 * 1000) return "";
+  return new Date(ms).toISOString();
+}
+
+/**
+ * Pull the subject, plain-text body, sender and sent date out of whatever shape
+ * the provider posted. Prefers a provider's pre-stripped plaintext, then any
  * plaintext field, then an HTML body converted to text.
  */
 export function pickEmailText(body: Record<string, unknown>): ParsedEmail {
@@ -75,6 +98,11 @@ export function pickEmailText(body: Record<string, unknown>): ParsedEmail {
     firstField(body, ["subject", "Subject"]) || str(headers.subject).trim();
   const from =
     firstField(body, ["from", "sender", "From"]) || str(headers.from).trim();
+  // `date` is what gmail-apps-script.gs sends (msg.getDate()); `Date` is
+  // Mailgun's header field; CloudMailin nests it under headers.
+  const sentAt = parseEmailDate(
+    firstField(body, ["date", "Date", "sent_at"]) || str(headers.date),
+  );
 
   let text = firstField(body, [
     "stripped-text", // Mailgun, signature/quote removed
@@ -89,7 +117,7 @@ export function pickEmailText(body: Record<string, unknown>): ParsedEmail {
     if (html) text = htmlToText(html);
   }
 
-  return { subject, text: text.trim(), from };
+  return { subject, text: text.trim(), from, sentAt };
 }
 
 // ---------------------------------------------------------------------------

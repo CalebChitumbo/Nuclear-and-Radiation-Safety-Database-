@@ -469,7 +469,11 @@ export interface LicenceWorkflow {
    * officer to confirm the facility match on the Licensing Status tab.
    */
   reviewStatus?: "applied" | "needs-review";
-  /** ISO timestamp the connector received the source email. */
+  /**
+   * ISO timestamp of the source email — its Date header when the provider
+   * passed one (the Apps Script does), else when the connector received it.
+   * This is what orders notifications for the same RAN (see supersede.ts).
+   */
   receivedAt?: string;
   /** Subject line of the source email (for the review queue). */
   emailSubject?: string;

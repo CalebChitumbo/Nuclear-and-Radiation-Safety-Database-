@@ -2,6 +2,8 @@ import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  parseEmailDate,
+  pickEmailText,
   senderAllowed,
   verifyMailgunSignature,
 } from "../functions/src/rais/email";
@@ -78,5 +80,44 @@ describe("todayISO", () => {
 
   it("pads single-digit months and days", () => {
     expect(todayISO(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+});
+
+describe("email sent date (orders a replayed backlog)", () => {
+  const NOW = Date.parse("2026-09-13T10:00:00.000Z");
+
+  it("normalises RFC 2822, ISO and epoch-ms dates to ISO", () => {
+    expect(parseEmailDate("Tue, 01 Sep 2026 08:15:00 +0200", NOW)).toBe(
+      "2026-09-01T06:15:00.000Z",
+    );
+    expect(parseEmailDate("2026-09-01T06:15:00.000Z", NOW)).toBe(
+      "2026-09-01T06:15:00.000Z",
+    );
+    expect(parseEmailDate(String(Date.UTC(2026, 8, 1, 6, 15)), NOW)).toBe(
+      "2026-09-01T06:15:00.000Z",
+    );
+  });
+
+  it("rejects garbage, blanks and dates more than a day in the future", () => {
+    expect(parseEmailDate("", NOW)).toBe("");
+    expect(parseEmailDate("yesterday-ish", NOW)).toBe("");
+    expect(parseEmailDate("2026-09-20T00:00:00.000Z", NOW)).toBe("");
+    // Small skew is tolerated.
+    expect(parseEmailDate("2026-09-13T20:00:00.000Z", NOW)).not.toBe("");
+  });
+
+  it("pickEmailText reads the Apps Script's `date`, Mailgun's `Date`, CloudMailin's headers.date", () => {
+    const iso = "2026-09-01T06:15:00.000Z";
+    expect(
+      pickEmailText({ subject: "s", plain: "b", date: iso }).sentAt,
+    ).toBe(iso);
+    expect(
+      pickEmailText({ subject: "s", "body-plain": "b", Date: iso }).sentAt,
+    ).toBe(iso);
+    expect(
+      pickEmailText({ plain: "b", headers: { subject: "s", date: iso } }).sentAt,
+    ).toBe(iso);
+    // No date at all → "" so the ingest falls back to arrival time.
+    expect(pickEmailText({ subject: "s", plain: "b" }).sentAt).toBe("");
   });
 });
