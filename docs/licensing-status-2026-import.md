@@ -1,6 +1,6 @@
 # Register import — 2026 Licensing Status workbook
 
-Imported 2026-09-13 from `Licensing Status-4.xlsx` (the Authorisation & Standards licensing status workbook), replacing the register the previous import left behind. Regenerate with:
+Imported 2026-09-14 from `Licensing Status-4.xlsx` (the Authorisation & Standards licensing status workbook), replacing the register the previous import left behind. Regenerate with:
 
 ```
 python3 scripts/convert-licensing-status-xlsx.py <Licensing_Status.xlsx>
@@ -12,13 +12,13 @@ python3 scripts/convert-licensing-status-xlsx.py <Licensing_Status.xlsx>
 |---|---|
 | Facilities | **538** |
 | — from the workbook / carried over | 501 / 37 |
-| Licensed / Unlicensed | 228 / 310 |
+| Licensed / Unlicensed | 235 / 303 |
 | Functional / Non-functional | 392 / 146 |
 | Medical / Non-Medical | 350 / 188 |
-| Licences recorded | **383** |
-| — from the workbook / carried over | 379 / 4 |
-| First-time licensees | 4 |
-| Stalled applications | 23 |
+| Licences recorded | **393** |
+| — from the workbook / carried over | 389 / 4 |
+| First-time licensees | 6 |
+| Stalled applications | 22 |
 | Flagged for review | 161 |
 
 ## Applying it to the live project
@@ -35,12 +35,12 @@ A facility an officer has edited in the app is **merged, not replaced**: the wor
 |---|---|---|
 | Decommissioning Licence | 5 | 5 |
 | Export Licence | 3 | 3 |
-| Importation Licence | 91 | 90 ⚠ (-1) |
+| Importation Licence | 94 | 91 ⚠ (-3) |
 | Transfer Licence | 7 | 7 |
 | Transit Licence | 3 | 3 |
 | Transport Licence | 1 | 1 |
-| Use/Possession | 248 | 248 |
-| Variation of Terms and Conditions | 22 | 22 |
+| Use/Possession | 255 | 255 |
+| Variation of Terms and Conditions | 24 | 24 |
 
 A further **4** licence(s) sit on the carried-over facilities below — they come from the previous register, not from this workbook, so they are outside its totals.
 
@@ -48,10 +48,10 @@ Per licence type as stored on the register:
 
 | Licence type | Count |
 |---|---|
-| Renewal of Use/Possession Licence | 240 |
-| Importation Licence | 90 |
-| Variation of Terms and Conditions | 22 |
-| New Use/Possession Licence | 12 |
+| Renewal of Use/Possession Licence | 245 |
+| Importation Licence | 91 |
+| Variation of Terms and Conditions | 24 |
+| New Use/Possession Licence | 14 |
 | Transfer Licence | 7 |
 | Decommissioning Licence | 5 |
 | Export Licence | 3 |
@@ -64,24 +64,43 @@ By quarter of issue:
 |---|---|
 | 2026-Q1 | 198 |
 | 2026-Q2 | 142 |
-| 2026-Q3 | 39 |
-| carried over | 4 |
+| 2026-Q3 | 48 |
+| no quarter (carried over or not stated) | 5 |
 
 ## Stage breakdown
 
 | Stage | Facilities |
 |---|---|
-| Licensed | 228 |
-| No Application Submitted | 212 |
-| Waiting for Payment | 46 |
+| Licensed | 235 |
+| No Application Submitted | 210 |
+| Waiting for Payment | 43 |
 | Import Licence Only (Not yet Use/Possession) | 12 |
-| Authorization Terms Issued | 9 |
 | Licence Expiring (Renewal Due) | 8 |
-| In Final Processing | 7 |
+| Authorization Terms Issued | 8 |
 | Accounts Clearance Pending | 6 |
+| In Final Processing | 6 |
 | Application Submitted | 5 |
 | Draft Application | 3 |
 | Under Review and Assessment | 2 |
+
+## Was licensed, no current licence in the workbook (1)
+
+Imported as unlicensed at stage *Licence Expiring (Renewal Due)* and flagged for review.
+
+- Lusaka Adventist Dental Clinic (FAC/0145)
+
+## Newly licensed (8)
+
+Unlicensed in the previous register, licensed in the workbook.
+
+- Arthur Davison Children's Hospital (FAC/0002) — was *No Application Submitted*
+- Chongwe District Hospital (FAC/0019) — was *Waiting for Payment*
+- Hightech Diagnostic Centre (FAC/0644) — was *No Application Submitted*
+- Lusaka IVF And Fertility Clinic Limited (FAC/0581) — was *Licence Expiring (Renewal Due)*
+- Maina Soko Military Hospital (FAC/0147) — was *Authorization Terms Issued*
+- Mkushi District Hospital (FAC/0076) — was *Waiting for Payment*
+- Namwala District Hospital (FAC/0151) — was *Waiting for Payment*
+- Sunshine Dental Clinic (FAC/0391) — was *In Final Processing*
 
 ## Curated matches (10)
 
@@ -299,8 +318,10 @@ The workbook's *Province* column gives a different province from the one the reg
 - ZAF Samora AFB (FAC/0672) — Northern → Muchinga
 - ZRA Chirundu (FAC/0183) — Lusaka → Southern
 
-## Licences with no facility in the workbook (1)
+## Licences with no facility in the workbook (3)
 
 These rows appear on a licence-type sheet but no row of the register sheet matches them, so they are **not** counted on any facility.
 
 - RADIATION PROTECTION AUTHORITY — Importation Licence, Q3 ×1 (closest: ZAMBIA REVENUE AUTHORITY KATIMA MULILO 0.29)
+- SISHEKANU MINI HOSPITAL — Importation Licence, quarter not stated ×1 (closest: Wumi Mini Hospital 0.67)
+- SOUTH POINT CLINIC — Importation Licence, quarter not stated ×1 (closest: SOUTH POINT CLINIC- AVONDALE 0.78)

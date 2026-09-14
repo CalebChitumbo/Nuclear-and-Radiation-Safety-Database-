@@ -982,8 +982,11 @@ def convert(xlsx_path, old_seed_path, year):
         "checks": checks,
         "carried": len(carried),
         "by_stage": Counter(s["stage"] for s in ordered),
+        # A blank quarter is a carried-over licence, or a workbook row whose
+        # "Quarter of Issuance" cell was left empty (Sep 2026: one import).
         "by_quarter": Counter(
-            l["q"] or "carried over" for s in ordered for l in s["lics"]
+            l["q"] or "no quarter (carried over or not stated)"
+            for s in ordered for l in s["lics"]
         ),
         "first_time": len(first_time),
     }
