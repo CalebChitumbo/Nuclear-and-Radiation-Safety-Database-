@@ -475,11 +475,12 @@ describe("opening balance — the plan is cumulative for the year", () => {
     // The figures the sections' work plan sheets show. Changing them silently
     // re-states every report, so they are pinned here.
     // 1.1.x — Authorisation & Standards. 1.1.4 was the sections' sheet's 357
-    // licences (152/125/80); the 13 Sep 2026 Licensing Status workbook counts
-    // 380, and 13 of those are dated licenceEvents the app already counts, so
-    // 367 is carried (the 23 gained and the 13 shed both fall in Q3).
+    // licences (152/125/80); the 14 Sep 2026 Licensing Status workbook counts
+    // 392, and the 15 dated licenceEvents the app already held are all shed
+    // so the report reads exactly 392 at the hand-over: 377 is carried (the
+    // 35 gained and the 15 shed both fall in Q3).
     expect(WORK_PLAN_OPENING_BALANCE["1.1.1"]).toEqual([3, 3, 0, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([152, 125, 90, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.1.4"]).toEqual([152, 125, 100, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.1.6"]).toEqual([1, 3, 0, 0]);
     // 1.2.x — the Inspectorate's Subprogram 1.2 sheet.
     // 1.2.4 was re-baselined to 295 on 4 Sep 2026 (was 284). The 7 Sep 2026
@@ -524,12 +525,12 @@ describe("opening balance — the plan is cumulative for the year", () => {
       baseline: null,
     });
     const r = row(reports, "1.1.4");
-    expect(r.opening).toEqual([152, 125, 90, 0]);
+    expect(r.opening).toEqual([152, 125, 100, 0]);
     expect(r.recorded).toEqual([0, 2, 1, 0]);
-    expect(r.quarters).toEqual([152, 127, 91, 0]);
-    expect(r.openingTotal).toBe(367);
+    expect(r.quarters).toEqual([152, 127, 101, 0]);
+    expect(r.openingTotal).toBe(377);
     expect(r.recordedTotal).toBe(3);
-    expect(r.total).toBe(370);
+    expect(r.total).toBe(380);
     // The week column stays the week's own work — it is not cumulative.
     expect(r.week).toBe(2);
   });
@@ -603,11 +604,11 @@ describe("opening balance — the plan is cumulative for the year", () => {
       baseline: null,
     });
     const line = workPlanRows(reports).find((r) => r[1] === "1.1.4")!;
-    expect(line[10]).toBe("368"); // Total Actual
-    expect(line[15]).toBe("367"); // Opening Balance
+    expect(line[10]).toBe("378"); // Total Actual
+    expect(line[15]).toBe("377"); // Opening Balance
     expect(line[16]).toBe("1"); // Recorded in System
     expect(workPlanBrief(reports, Q2)).toContain(
-      "[opening balance 367, recorded since 1]",
+      "[opening balance 377, recorded since 1]",
     );
   });
 });
