@@ -1159,16 +1159,17 @@ export function validateOutputEdit(
  *          the sections' sheet reported in August and the 380 of the 13 Sep
  *          book, same 152/125 for Q1/Q2, the rest Q3). The import seeds
  *          facilities and their authorisations, not issue events — but by then
- *          officers had logged 15 dated licences in the app, and 13 of them are
- *          inside the workbook's 392 (the eight 7 Sep renewals, the variations
- *          for ZRA Chirundu, ZRA Kasumbalesa, Katondwe, Unilus, Kansanshi and
- *          Coptic Church). Those are counted off `licenceEvents`, so the
- *          balance sheds them: 392 - 13 = 379, taken out of Q3 because that is
- *          the quarter the report attributes every one of those events to
- *          (their weeks start in Q3). The other two — Company Clinic's
- *          transfer, AUTH/TRF/0054, and Chainama Hills College Hospital's
- *          import of 14 Sep — are on no sheet of the workbook and count on
- *          top. See docs/licensing-status-2026-import.md.
+ *          officers had logged 15 dated licences in the app. All 15 are
+ *          counted off `licenceEvents`, so the balance sheds every one of
+ *          them: 392 - 15 = 377, taken out of Q3 because that is the quarter
+ *          the report attributes every one of those events to (their weeks
+ *          start in Q3). The section's instruction (14 Sep 2026) is that the
+ *          report reads the workbook's own 392 as at the hand-over — so the two
+ *          events on none of its sheets (Company Clinic's transfer,
+ *          AUTH/TRF/0054, and Chainama Hills College Hospital's import of
+ *          14 Sep) are treated as inside its total rather than on top of it.
+ *          Licences logged after the hand-over add on top of 392, as they
+ *          should. See docs/licensing-status-2026-import.md.
  * - 1.2.4  part carried, part counted. The section's 2026 facility inspection
  *          register was imported on 7 Sep 2026 (297 inspections), and 42 of its
  *          rows carry a date, so those are counted off the register and the
@@ -1205,7 +1206,7 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.1.1": [3, 3, 0, 0],
   "1.1.2": [1, 2, 0, 0],
   "1.1.3": [0, 1, 0, 0],
-  "1.1.4": [152, 125, 102, 0],
+  "1.1.4": [152, 125, 100, 0],
   "1.1.5": [0, 1, 0, 0],
   "1.1.6": [1, 3, 0, 0],
   "1.1.7": [0, 1, 0, 0],

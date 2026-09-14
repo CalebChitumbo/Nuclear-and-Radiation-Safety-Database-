@@ -714,7 +714,7 @@ reports 358 once the next one is logged, not 1.
 The figures ship with each section's own actuals as at the August 2026 update
 (`WORK_PLAN_OPENING_BALANCE` in `lib/rules/workPlan.ts`), so the report is right
 from the first day — 1.1.x from the *Licensing Status* workbook (1.1.4 carries
-that workbook's 392 licences *less* the 13 the app already holds as dated
+that workbook's 392 licences *less* the 15 the app already holds as dated
 `licenceEvents`, see
 [`docs/subprogrammes-2026-cumulative-update.md`](docs/subprogrammes-2026-cumulative-update.md)),
 1.2.x from the Inspectorate's *Subprogram 1.2* sheet (see

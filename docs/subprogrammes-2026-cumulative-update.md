@@ -52,20 +52,21 @@ AUTH/TRF/0054, is on no sheet of the workbook and counts on top: the report
 reads 152 / 125 / 104 = **381**. Same rule as 1.2.4: never carry what the
 system already counts.
 
-*14 Sep 2026:* 1.1.4 re-baselined to **379 carried** (152 / 125 / 102). The
+*14 Sep 2026:* 1.1.4 re-baselined to **377 carried** (152 / 125 / 100). The
 section handed over a fresh Licensing Status workbook the next morning, and it
 counts **392** licences issued (255 use/possession, 94 import, 24 variation,
 7 transfer, 5 decommissioning, 3 export, 3 transit, 1 transport — see
 [the register import](./licensing-status-2026-import.md)); the 12 gained since
-the 13 Sep book all fall in Q3. The same 13 dated `licenceEvents` are inside
-the workbook's 392, so the balance sheds them (392 − 13 = 379, again out of
-Q3). Two events are on no sheet of the workbook and count on top — Company
-Clinic's transfer AUTH/TRF/0054 and the importation licence Chainama Hills
-College Hospital was given on 14 Sep 2026 — so the report reads
-152 / 125 / 117 = **394**. Three of the workbook's 94 import licences land on
-no register row (the Authority's own, SISHEKANU MINI HOSPITAL, and a
-"SOUTH POINT CLINIC" that names none of that clinic's three branches); they are
-inside the 392 the balance carries, so the total is right, but they are on no
+the 13 Sep book all fall in Q3. The section's instruction is that the report
+reads the workbook's own **392** as at the hand-over, so all 15 dated
+`licenceEvents` the app held by then are shed from the balance (392 − 15 = 377,
+out of Q3) — including the two on none of its sheets, Company Clinic's transfer
+AUTH/TRF/0054 and Chainama Hills College Hospital's import of 14 Sep, which the
+13 Sep note had counted on top. The report reads 152 / 125 / 115 = **392**, and
+every licence logged after the hand-over adds on top. Three of the workbook's
+94 import licences land on no register row (the Authority's own, SISHEKANU MINI
+HOSPITAL, and a "SOUTH POINT CLINIC" that names none of that clinic's three
+branches); they are inside the 392, so the total is right, but they are on no
 facility's record until the section says which.
 
 ## Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
