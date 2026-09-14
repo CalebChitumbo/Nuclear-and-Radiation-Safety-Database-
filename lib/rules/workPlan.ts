@@ -1154,10 +1154,22 @@ export function validateOutputEdit(
  * Every figure below is the workbook's Q1–Q4 row, except where the system
  * already holds the records behind it:
  *
- * - 1.1.4  the workbook's 357 licences by quarter. The licence register holds
- *          no dated `licenceEvents` yet (the Licensing Status import seeds
- *          facilities and their authorisations, not issue events), so the whole
- *          figure is carried in and every licence logged from here adds on top.
+ * - 1.1.4  part carried, part counted, the way 1.2.4 is. The Licensing Status
+ *          workbook of 14 Sep 2026 counts 392 licences issued (up from the 357
+ *          the sections' sheet reported in August and the 380 of the 13 Sep
+ *          book, same 152/125 for Q1/Q2, the rest Q3). The import seeds
+ *          facilities and their authorisations, not issue events — but by then
+ *          officers had logged 15 dated licences in the app. All 15 are
+ *          counted off `licenceEvents`, so the balance sheds every one of
+ *          them: 392 - 15 = 377, taken out of Q3 because that is the quarter
+ *          the report attributes every one of those events to (their weeks
+ *          start in Q3). The section's instruction (14 Sep 2026) is that the
+ *          report reads the workbook's own 392 as at the hand-over — so the two
+ *          events on none of its sheets (Company Clinic's transfer,
+ *          AUTH/TRF/0054, and Chainama Hills College Hospital's import of
+ *          14 Sep) are treated as inside its total rather than on top of it.
+ *          Licences logged after the hand-over add on top of 392, as they
+ *          should. See docs/licensing-status-2026-import.md.
  * - 1.2.4  part carried, part counted. The section's 2026 facility inspection
  *          register was imported on 7 Sep 2026 (297 inspections), and 42 of its
  *          rows carry a date, so those are counted off the register and the
@@ -1194,7 +1206,7 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.1.1": [3, 3, 0, 0],
   "1.1.2": [1, 2, 0, 0],
   "1.1.3": [0, 1, 0, 0],
-  "1.1.4": [152, 125, 80, 0],
+  "1.1.4": [152, 125, 100, 0],
   "1.1.5": [0, 1, 0, 0],
   "1.1.6": [1, 3, 0, 0],
   "1.1.7": [0, 1, 0, 0],

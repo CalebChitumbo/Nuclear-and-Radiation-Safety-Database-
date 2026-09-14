@@ -5,12 +5,13 @@ Authority of Zambia (RPA) — Nuclear & Radiation Safety Department**. It
 unifies the licensing register, authorisations, inspections, and daily/weekly
 sectional reporting into one system, backed by Firebase and pre-seeded with
 the real register of **538 facilities** from the *2026 Licensing Status*
-workbook: 401 functional / 137 non-functional, 220 licensed, each classified
-Medical or Non-Medical, and **361 licences on record** — the 357 the workbook
-accounts for (238 use/possession, 82 import, 18 variation, 7 transfer,
-5 decommissioning, 3 export, 3 transit, 1 transport), dated by quarter of issue
-(see `docs/licensing-status-2026-import.md` for the full import log, and
-`docs/register-2026-import.md` for the July 2026 register it replaced).
+workbook (14 Sep 2026 hand-over): 392 functional / 146 non-functional, 235
+licensed, each classified Medical or Non-Medical, and **393 licences on
+record** — the 389 the workbook accounts for (255 use/possession, 91 import,
+24 variation, 7 transfer, 5 decommissioning, 3 export, 3 transit, 1 transport),
+dated by quarter of issue (see `docs/licensing-status-2026-import.md` for the
+full import log, and `docs/register-2026-import.md` for the July 2026 register
+it replaced).
 
 It also ships the inland offices' **2026 daily screening log** — 1,615 daily
 counts across the eight posts, 356,372 vehicles assessed to 6 Sep 2026 — seeded
@@ -134,13 +135,22 @@ to the seed.
 5. Seed the project:
    ```bash
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed
-   # verify the dashboard reads 538 / 220 / 318 / 401 functional
+   # verify the dashboard reads 538 / 235 / 303 / 392 functional
    ```
    A re-import can supersede a facility document rather than update it (the
    workbook dropped it, or RAIS has since issued it a RAN and its id changed).
    `seed` lists those on every run; `npm run seed -- --prune` deletes them,
    and only ever the ones carrying no `updatedBy` — a facility added or
    edited in the app is reported and kept.
+
+   A facility document an officer has **edited in the app** (it carries
+   `updatedBy`) is merged rather than replaced: the workbook decides whether
+   it is licensed and with which licences, and the officer's stage on an
+   application the workbook has unlicensed, their dated licences and their
+   corrections to the record stand (`mergeSeededFacility` in
+   `lib/store/seeding.ts`; the seed prints each merge). For a register
+   re-import use `npm run seed -- --only facilities`, which leaves the
+   screening log and the inspection register alone.
 
    **Replacing an existing register** (e.g. applying the 2026 Licensing
    Status workbook over a previously seeded project):
@@ -703,8 +713,11 @@ reports 358 once the next one is logged, not 1.
 
 The figures ship with each section's own actuals as at the August 2026 update
 (`WORK_PLAN_OPENING_BALANCE` in `lib/rules/workPlan.ts`), so the report is right
-from the first day — 1.1.x from the *Licensing Status* workbook, 1.2.x from the
-Inspectorate's *Subprogram 1.2* sheet (see
+from the first day — 1.1.x from the *Licensing Status* workbook (1.1.4 carries
+that workbook's 392 licences *less* the 15 the app already holds as dated
+`licenceEvents`, see
+[`docs/subprogrammes-2026-cumulative-update.md`](docs/subprogrammes-2026-cumulative-update.md)),
+1.2.x from the Inspectorate's *Subprogram 1.2* sheet (see
 [`docs/inspectorate-work-plan-2026-update.md`](docs/inspectorate-work-plan-2026-update.md)),
 1.3.12 from nothing at all because its daily log is seeded instead.
 **Opening balance — 2026** on `/weekly` shows what is in
@@ -1405,9 +1418,12 @@ npm test
 - `screeningSeed` — verifies the seeded daily screening log (1,615 entries,
   356,372 vehicles, reconciled post by post against the workbook's Summary
   sheet) and that it fills in work plan output 1.3.12 with nothing carried in
-- `seedBaseline` — verifies the register baseline (538 / 220 / 318 / 401 functional /
+- `seedBaseline` — verifies the register baseline (538 / 235 / 303 / 392 functional /
   Medical 350) and that the licences on record reconcile with the Licensing
   Status workbook's own totals, type by type and quarter by quarter
+- `seedMerge` — a register re-import over a facility an officer has edited in
+  the app: the workbook's licence status wins, the officer's stage, dated
+  licences and corrections stand
 - `category` — Medical vs Non-Medical classification, seed-field mapping, CSV export
 - `sourceCategories` — the equipment categories both inventory tabs report
   against: that every split the Seniors' Briefing asked for exists, and that the
@@ -1564,9 +1580,10 @@ will be served alongside the inline SVG fallback in `components/Logo.tsx`.
 
 ## Acceptance criteria (from §16 of the spec)
 
-- [x] Seeded dashboard shows **538 total, 220 licensed, 318 unlicensed,
-      401 functional, Public 65/250, Private 155/288, 361 authorisations** —
-      verified by `tests/seedBaseline.test.ts` (2026 Licensing Status workbook).
+- [x] Seeded dashboard shows **538 total, 235 licensed, 303 unlicensed,
+      392 functional, Public 74/250, Private 161/288, 393 authorisations** —
+      verified by `tests/seedBaseline.test.ts` (2026 Licensing Status workbook,
+      14 Sep 2026 hand-over).
 - [x] The §6 worked expectation passes — `tests/recordLicence.test.ts`.
 - [x] Authorisations-on-Record increments on every recorded licence with or
       without an AUTH number.

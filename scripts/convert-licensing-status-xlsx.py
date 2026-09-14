@@ -8,7 +8,12 @@ RAN / FAC code), and records every licence the workbook accounts for:
 
   * sheet "Renewal or Use Possession" — the register itself, one row per
     facility, plus the Use/Possession licences issued (renewal or new use),
-    their quantity and quarter of issue.
+    their quantity and quarter of issue. Columns are read by their header, so
+    the section can reorder or add them; the Sep 2026 layout added "Facility
+    Type" (sector + category — see the decisions below) and
+    "Application Status" (RAIS's wording for where an unlicensed application
+    sits — recorded on the facility's detail line, never used to move its
+    stage: the stage an officer has set in the app is theirs to keep).
   * sheets "Import", "Export", "Tranfer of Licence", "Transport", "Transit",
     "Variation of Terms or Condition", "Decommission", "Design and
     Construction" — the standalone authorisations, by facility and quarter.
@@ -26,7 +31,13 @@ one-to-one.
 
 Decisions encoded here:
   * The workbook is authoritative for the register's membership, licence
-    status, district, region and operating status.
+    status and operating status. Its "Facility Type" (sector + category),
+    district and province are taken for a facility the register has never
+    seen, or to fill a blank; where the register already holds a different
+    reading, the workbook's is reported as a worklist, not applied — the Sep
+    2026 workbook's District column is a broken formula ("#VALUE!") on nearly
+    every row, and its Province and Facility Type columns are wrong on rows
+    the register has right.
   * Rows the workbook does not carry stay on the register with their previous
     status, flagged for review — the workbook's own licence sheets record
     licences for some of them, so its register sheet is not exhaustive.
@@ -256,28 +267,103 @@ def read_workbook(path: str):
     if main is None:
         sys.exit("Could not find the 'Renewal or Use Possession' sheet")
 
+    columns = main_sheet_columns(next(cells(main), []))
     facilities = []
     for v in cells(main, min_row=2):
-        v += [""] * (9 - len(v))
-        if not v[0]:
+        v += [""] * (max(columns.values()) + 1 - len(v))
+        def col(field):
+            i = columns.get(field)
+            return v[i] if i is not None else ""
+        raw_name = col("raw_name")
+        if not raw_name:
             continue  # the sheet's trailing total row carries no name
+        fac = col("fac")
         facilities.append({
-            "raw_name": v[0],
-            "lic_status": v[1],
-            "lic_type": v[2],
-            "qty": v[3],
-            "quarters": v[4],
-            "district": v[5],
-            "fac_status": v[6],
-            "region": v[7],
-            "fac": v[8],
+            "raw_name": raw_name,
+            "fac_type": col("fac_type"),
+            "lic_status": col("lic_status"),
+            "app_status": col("app_status"),
+            "lic_type": col("lic_type"),
+            "qty": col("qty"),
+            "quarters": col("quarters"),
+            # A district cell the workbook's own formula could not resolve
+            # ("#VALUE!", "#REF!") is no district at all.
+            "district": "" if col("district").startswith("#") else col("district"),
+            "fac_status": col("fac_status"),
+            "region": normalise_province(col("region")),
+            "fac": fac,
             # Identity within this import. A row RAIS has not yet given a FAC
             # code keeps its licences and its match to the previous register,
             # so its key falls back to the name — dropping it would silently
             # lose the licences the workbook counts against it.
-            "key": v[8] or f"noran:{norm(v[0])}",
+            "key": fac or f"noran:{norm(raw_name)}",
         })
     return facilities, type_rows, new_licensees, totals
+
+
+# Header -> field of the register sheet. The section has re-laid the sheet
+# out once already (Sep 2026 added Facility Type and Application Status and
+# moved District), so the columns are found by name, not position.
+MAIN_SHEET_HEADERS = {
+    "name": "raw_name",
+    "facility type": "fac_type",
+    "licence status": "lic_status",
+    "license status": "lic_status",
+    "application status": "app_status",
+    "licence type": "lic_type",
+    "license type": "lic_type",
+    "number of licences": "qty",
+    "number of licenses": "qty",
+    "quantity": "qty",
+    "quarter of issue": "quarters",
+    "quarter": "quarters",
+    "district": "district",
+    "province": "region",
+    "region": "region",
+    "facilitystatus": "fac_status",
+    "facility status": "fac_status",
+    "ran": "fac",
+    "fac": "fac",
+}
+# The Aug 2026 layout had no header the matcher needs to know about beyond
+# these; a sheet whose first row names none of them is read positionally.
+MAIN_SHEET_POSITIONAL = [
+    "raw_name", "lic_status", "lic_type", "qty", "quarters", "district",
+    "fac_status", "region", "fac",
+]
+
+
+def main_sheet_columns(header_row):
+    columns = {}
+    for i, h in enumerate(header_row):
+        field = MAIN_SHEET_HEADERS.get(" ".join(h.lower().split()))
+        if field and field not in columns:
+            columns[field] = i
+    if "raw_name" not in columns or "fac" not in columns:
+        columns = {f: i for i, f in enumerate(MAIN_SHEET_POSITIONAL)}
+    return columns
+
+
+def normalise_province(text: str) -> str:
+    """'North Western' / 'western' -> the register's own spelling."""
+    key = re.sub(r"[^a-z]", "", (text or "").lower())
+    for p in PROVINCES:
+        if re.sub(r"[^a-z]", "", p.lower()) == key:
+            return p
+    return (text or "").strip()
+
+
+# "Public, Medical" (the register sheet's Facility Type) -> (sector, category).
+def parse_facility_type(text: str):
+    t = (text or "").lower()
+    sector = "Public" if "public" in t else ("Private" if "private" in t else "")
+    if "non" in t and "medic" in t:
+        category = "Non-Medical"
+    elif "medic" in t:
+        category = "Medical"
+    else:
+        category = ""
+    return sector, category
 
 
 def parse_quarters(text: str, qty: int):
@@ -406,6 +492,7 @@ def classify_leftovers(old_rows, matches, new_by_fac):
 LICENCE_ALIASES = {
     "northway dental": "FAC/0643",                 # North Way Dental Clinic
     "zambia revenue authority kapiri mposhi": "FAC/0225",   # ZRA Kapiri Mposhi
+    "zambia revenue authority kasu": "FAC/0226",   # ZRA Kasumbalesa, cut short
     "university teaching hospital nuclear medicine": "FAC/0116",
     # The cement plants are listed per site on the register sheet; the
     # unqualified spellings are the Lusaka (Chilanga) plant.
@@ -544,6 +631,10 @@ def convert(xlsx_path, old_seed_path, year):
         "fuzzy": [],
         "aliases": [],
         "licence_aliases_used": [],
+        "sector_changed": [],
+        "category_changed": [],
+        "district_changed": [],
+        "province_changed": [],
     }
 
     new_by_key = {r["key"]: r for r in new_rows}
@@ -629,12 +720,28 @@ def convert(xlsx_path, old_seed_path, year):
                 + (f"showing the register's own {fac}" if fac else "confirm the RAIS code")
             )
 
-        district = r["district"] or (old.get("dist") if old else "")
-        province = r["region"] if r["region"] in PROVINCES else ""
+        # District and province: the register's own reading stands where it
+        # has one; the workbook fills a blank and is otherwise REPORTED, not
+        # applied. The Sep 2026 workbook's District column is a broken
+        # formula on nearly every row and its Province column contradicts
+        # geography on rows the register has right (Mbala in Muchinga,
+        # Solwezi in Copperbelt), so an officer takes each disagreement from
+        # the report's worklist.
+        old_district = (old.get("dist") or "") if old else ""
+        district = old_district or r["district"]
+        if old_district and r["district"] and norm(old_district) != norm(r["district"]):
+            report["district_changed"].append(
+                (name, fac or "no RAN", old_district, r["district"])
+            )
+        wb_province = r["region"] if r["region"] in PROVINCES else ""
+        old_province = old["prov"] if old and old.get("prov") in PROVINCES else ""
+        province = old_province or wb_province
+        if old_province and wb_province and old_province != wb_province:
+            report["province_changed"].append(
+                (name, fac or "no RAN", old_province, wb_province)
+            )
         if not province:
             province = dist_prov.get((district or "").strip().lower(), "")
-        if not province and old and old.get("prov") in PROVINCES:
-            province = old["prov"]
         if not province:
             province = "Lusaka"
             review.append("No province in the licensing status list — confirm")
@@ -642,6 +749,20 @@ def convert(xlsx_path, old_seed_path, year):
         practice = old.get("prac", "") if old else ""
         sector = old.get("sec") if old else guess_sector(name)
         category = old.get("cat") if old else guess_category(practice, name)
+        # The workbook's Facility Type is read for a row the register has
+        # never seen, and only REPORTED for one it has: the column disagrees
+        # with the register on dozens of rows, some plainly wrong (a public
+        # children's hospital as "Private, Non-Medical"), so an officer
+        # decides those one by one from the report's worklist.
+        wb_sector, wb_category = parse_facility_type(r["fac_type"])
+        if old:
+            if wb_sector and wb_sector != sector:
+                report["sector_changed"].append((name, fac or "no RAN", sector, wb_sector))
+            if wb_category and wb_category != category:
+                report["category_changed"].append((name, fac or "no RAN", category, wb_category))
+        else:
+            sector = wb_sector or sector
+            category = wb_category or category
 
         status_key = " ".join(r["fac_status"].lower().split())
         functional = FUNCTIONAL_STATUS.get(status_key)
@@ -726,6 +847,8 @@ def convert(xlsx_path, old_seed_path, year):
             detail_bits.append(f"{short} · {n} licence{'s' if n > 1 else ''} · {qs}")
         else:
             detail_bits.append("no current use/possession licence")
+        if r["app_status"]:
+            detail_bits.append(f"application: {r['app_status']}")
         if r["key"] in first_time:
             detail_bits.append("first-time licensee")
         if r["fac_status"]:
@@ -859,8 +982,11 @@ def convert(xlsx_path, old_seed_path, year):
         "checks": checks,
         "carried": len(carried),
         "by_stage": Counter(s["stage"] for s in ordered),
+        # A blank quarter is a carried-over licence, or a workbook row whose
+        # "Quarter of Issuance" cell was left empty (Sep 2026: one import).
         "by_quarter": Counter(
-            l["q"] or "carried over" for s in ordered for l in s["lics"]
+            l["q"] or "no quarter (carried over or not stated)"
+            for s in ordered for l in s["lics"]
         ),
         "first_time": len(first_time),
     }
@@ -902,6 +1028,25 @@ def write_report(path, report, xlsx_path, year, imported_on):
     L.append(f"| Stalled applications | {c['stalled']} |")
     L.append(f"| Flagged for review | {c['review']} |")
     L.append("")
+
+    L.append("## Applying it to the live project\n")
+    L.append(
+        "```\nGOOGLE_APPLICATION_CREDENTIALS=./service-account.json "
+        "npm run seed -- --only facilities\n```\n"
+    )
+    L.append(
+        "A facility an officer has edited in the app is **merged, not "
+        "replaced**: the workbook decides whether it is licensed and with which "
+        "licences; the officer's stage on an application the workbook has "
+        "unlicensed, their dated licences (a dated record stands in for the "
+        "workbook's quarter-dated entry of the same type) and their corrections "
+        "to the record itself all stand. `mergeSeededFacility` "
+        "(`lib/store/seeding.ts`) is the rule; the seed prints what it kept, "
+        "facility by facility. Work plan output **1.1.4** carries the "
+        "workbook's total *less* the dated licences the app already counts as "
+        "`licenceEvents` — re-baseline it when this changes (see "
+        "`docs/subprogrammes-2026-cumulative-update.md`).\n"
+    )
 
     L.append("## Licences issued — reconciled against the workbook's Totals sheet\n")
     L.append("| Licence type | Workbook total | Imported |")
@@ -1042,6 +1187,27 @@ def write_report(path, report, xlsx_path, year, imported_on):
         )
         for name, target, lic_type in sorted(report["licence_aliases_used"]):
             L.append(f"- {name} → {target} ({lic_type})")
+        L.append("")
+
+    worklists = (
+        ("sector_changed", "Sector", "*Facility Type*"),
+        ("category_changed", "Category", "*Facility Type*"),
+        ("district_changed", "District", "*District*"),
+        ("province_changed", "Province", "*Province*"),
+    )
+    for key, what, column in worklists:
+        if not report[key]:
+            continue
+        L.append(f"## {what} — the workbook disagrees ({len(report[key])}, not applied)\n")
+        L.append(
+            f"The workbook's {column} column gives a different {what.lower()} "
+            "from the one the register holds. The column is not taken over the "
+            "register — some of its readings are plainly wrong — so these are a "
+            "worklist for an officer, who corrects the facility in the app where "
+            "the workbook is right. Register → workbook:\n"
+        )
+        for name, fac, was, now in sorted(report[key]):
+            L.append(f"- {name} ({fac}) — {was} → {now}")
         L.append("")
 
     if report["licence_rows_unmatched"]:

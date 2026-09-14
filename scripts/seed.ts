@@ -19,6 +19,18 @@
  * IDs (facility + type + which repeat), so re-running updates in place. A screening figure an officer has since corrected is overwritten by
  * the workbook's; nothing is ever added twice.
  *
+ * A facility an officer has EDITED in the app (it carries `updatedBy`) is not
+ * simply replaced: the workbook decides whether it is licensed and with what,
+ * and the officer's stage on an unlicensed application, their dated licences
+ * and their corrections to the record itself stand — see mergeSeededFacility.
+ * Each such merge is printed.
+ *
+ * ONLY THE REGISTER (`--only facilities`): writes the facility register, the
+ * reference lists and the dashboard aggregate, and leaves the screening log and
+ * the inspection register alone. Use it for a Licensing Status re-import —
+ * there is no reason for one to overwrite a screening figure a coordinator has
+ * since corrected.
+ *
  * PRUNING (`--prune`): a register re-import can supersede a facility document
  * rather than update it (the workbook dropped it, or RAIS has since issued it a
  * RAN and its id changed). Those are reported on every run and deleted only
@@ -40,11 +52,17 @@ import { join } from "node:path";
 
 import { initAdminApp } from "./adminApp";
 import { vehicleScreeningKey } from "../lib/rules/daily";
-import type { DailyEntry, Inspection, WeekDef } from "../lib/rules/types";
+import type {
+  DailyEntry,
+  Facility,
+  Inspection,
+  WeekDef,
+} from "../lib/rules/types";
 import {
   INSPECTION_REGISTER_HANDOVER,
   supersededByRegister,
   mapAllSeed,
+  mergeSeededFacility,
   mapAllSeedInspections,
   mapSeedBorders,
   mapSeedScreening,
@@ -65,6 +83,19 @@ import {
 const SEED_DIR = join(process.cwd(), "seed");
 const FRESH = process.argv.includes("--fresh");
 const PRUNE = process.argv.includes("--prune");
+/** `--only facilities` / `--only=facilities`: the register and nothing else. */
+const ONLY = (() => {
+  const args = process.argv.slice(2);
+  const eq = args.find((a) => a.startsWith("--only="));
+  if (eq) return eq.slice("--only=".length);
+  const i = args.indexOf("--only");
+  return i >= 0 ? args[i + 1] || "" : "";
+})();
+if (ONLY && ONLY !== "facilities") {
+  console.error(`--only takes "facilities"; got "${ONLY}"`);
+  process.exit(1);
+}
+const REGISTER_ONLY = ONLY === "facilities";
 
 /** Collections wiped by --fresh: the register + everything keyed to it. */
 const FRESH_WIPE_COLLECTIONS = [
@@ -103,6 +134,46 @@ async function chunkedBatchWrite<T>(
       `  wrote batch ${i + 1}-${Math.min(i + size, items.length)}/${items.length}\n`,
     );
   }
+}
+
+/**
+ * Fold the officers' work on the register into what the seed is about to
+ * write. A document nobody has touched in the app is replaced outright; one
+ * an officer has edited keeps their stage, dated licences and corrections
+ * (mergeSeededFacility says exactly what). Printed so the run shows what the
+ * workbook overrode and what it did not.
+ */
+async function mergeWithApp(seeded: Facility[]): Promise<Facility[]> {
+  const db = getFirestore();
+  const snap = await db.collection("facilities").get();
+  const live = new Map(snap.docs.map((d) => [d.id, d.data() as Facility]));
+
+  const merged: Facility[] = [];
+  const notes = [];
+  for (const f of seeded) {
+    const out = mergeSeededFacility(f, live.get(f.id));
+    merged.push(out.facility);
+    if (out.note) notes.push(out.note);
+  }
+  if (!notes.length) {
+    console.log("  no facility edited in the app since the last seed");
+    return merged;
+  }
+
+  console.log(
+    `  ${notes.length} facility document(s) edited in the app — the ` +
+      "workbook sets their licence status, the officer's work stands:",
+  );
+  for (const n of notes) {
+    const bits = [];
+    if (n.stageKept) bits.push(`stage kept: ${n.stageKept}`);
+    else if (n.licenceLost) bits.push("licensed in the app, not in the workbook");
+    else bits.push("licensed per the workbook");
+    if (n.datedKept) bits.push(`${n.datedKept} dated licence(s) stand for the workbook's`);
+    if (n.datedExtra) bits.push(`${n.datedExtra} dated licence(s) kept on top`);
+    console.log(`    ${n.id.padEnd(12)} ${n.name} — ${bits.join("; ")}`);
+  }
+  return merged;
 }
 
 /**
@@ -343,7 +414,7 @@ async function main() {
     for (const c of FRESH_WIPE_COLLECTIONS) await wipeCollection(c);
   }
 
-  const facilities = mapAllSeed(facilitiesRaw);
+  const facilities = await mergeWithApp(mapAllSeed(facilitiesRaw));
   console.log(`Seeding ${facilities.length} facilities…`);
 
   await chunkedBatchWrite(facilities, 400, (f, batch) => {
@@ -352,6 +423,41 @@ async function main() {
 
   await reportSupersededFacilities(new Set(facilities.map((f) => f.id)));
 
+  if (REGISTER_ONLY) {
+    console.log("--only facilities: leaving the screening log and inspection register as they are");
+  } else {
+    await seedScreeningAndInspections(db, facilities, screening, registerRows, weeks);
+  }
+
+  console.log("Writing reference lists + week calendar…");
+  // Single source of truth: lib/rules/types.ts — hardcoding these here once
+  // silently dropped newly added stages from the reference doc.
+  await db.doc("config/referenceLists").set({
+    provinces: [...PROVINCES],
+    sectors: [...SECTORS],
+    categories: [...CATEGORIES],
+    stages: [...STAGES],
+    licenceTypes: [...LICENCE_TYPES],
+    inspectionTypes: [...INSPECTION_TYPES],
+    weeks,
+  });
+
+  console.log("Computing dashboard aggregate…");
+  const agg = computeAggregate(facilities);
+  await db.doc("aggregates/dashboard").set(agg);
+  console.log(
+    `Done. total=${agg.total} licensed=${agg.licensed} unlicensed=${agg.unlicensed} ` +
+      `functional=${agg.functional} auths=${agg.auths}`,
+  );
+}
+
+async function seedScreeningAndInspections(
+  db: FirebaseFirestore.Firestore,
+  facilities: Facility[],
+  screening: SeedScreening,
+  registerRows: SeedInspection[],
+  weeks: WeekDef[],
+) {
   // The inland offices and their daily screening figures. Seeded as ordinary
   // daily entries so the NSSS tab, the weekly report and work plan output
   // 1.3.12 all count them — see docs/daily-screening-2026-import.md.
@@ -401,27 +507,6 @@ async function main() {
   });
   await reportSupersededInspections(register.inspections);
   await reportSupersededTypedInspections();
-
-  console.log("Writing reference lists + week calendar…");
-  // Single source of truth: lib/rules/types.ts — hardcoding these here once
-  // silently dropped newly added stages from the reference doc.
-  await db.doc("config/referenceLists").set({
-    provinces: [...PROVINCES],
-    sectors: [...SECTORS],
-    categories: [...CATEGORIES],
-    stages: [...STAGES],
-    licenceTypes: [...LICENCE_TYPES],
-    inspectionTypes: [...INSPECTION_TYPES],
-    weeks,
-  });
-
-  console.log("Computing dashboard aggregate…");
-  const agg = computeAggregate(facilities);
-  await db.doc("aggregates/dashboard").set(agg);
-  console.log(
-    `Done. total=${agg.total} licensed=${agg.licensed} unlicensed=${agg.unlicensed} ` +
-      `functional=${agg.functional} auths=${agg.auths}`,
-  );
 }
 
 main().catch((err) => {

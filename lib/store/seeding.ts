@@ -195,6 +195,116 @@ export function mapAllSeed(rows: SeedFacility[]): Facility[] {
   return rows.map(mapSeedFacility);
 }
 
+/** What the register re-import kept of an officer's work on one facility. */
+export interface SeedMergeNote {
+  id: string;
+  name: string;
+  /** The app's stage stood over the workbook's (both have it unlicensed). */
+  stageKept?: Stage;
+  /** Dated licences the officer recorded that the workbook's now stand as. */
+  datedKept: number;
+  /** Dated licences the workbook does not account for, kept on top. */
+  datedExtra: number;
+  /** The app had it licensed; the workbook records no current licence. */
+  licenceLost?: boolean;
+}
+
+/**
+ * A register re-import over a facility an officer has edited in the app.
+ *
+ * The workbook is the section's account of who is licensed and with what, so
+ * it decides `licensed` and the licences. It says nothing about where an
+ * unlicensed application sits in the app's pipeline (its own "Application
+ * Status" wording is recorded on the detail line, not mapped to a stage), and
+ * it dates nothing — so what the officer has done in the app stands:
+ *
+ *   - an unlicensed facility keeps the stage (and RAIS status) the officer
+ *     moved it to; one the workbook now shows licensed becomes Licensed;
+ *   - a licence the officer recorded WITH A DATE stands in for the workbook's
+ *     quarter-dated entry of the same type (same number, or the workbook's
+ *     carries none) — the dated record is the same licence, dated — and one
+ *     the workbook has no entry for at all is kept on top;
+ *   - name, district, province, practice, sector, category, operating status
+ *     and the review flag are the officer's — the import's notes for a record
+ *     they have already worked on would only undo their corrections.
+ *
+ * Only a document carrying `updatedBy` is an officer's; one a previous seed
+ * wrote and nobody touched is simply replaced, as before.
+ */
+export function mergeSeededFacility(
+  seeded: Facility,
+  live: Facility | undefined,
+): { facility: Facility; note?: SeedMergeNote } {
+  if (!live || !live.updatedBy) return { facility: seeded };
+
+  const note: SeedMergeNote = {
+    id: seeded.id,
+    name: live.name || seeded.name,
+    datedKept: 0,
+    datedExtra: 0,
+  };
+
+  // Licences: the workbook's, with the officer's dated records standing in
+  // for the entries they date, and the rest kept on top.
+  const auths: Authorisation[] = seeded.auths.map((a) => ({ ...a }));
+  const dated = (live.auths || []).filter((a) => a.date || a.eventId);
+  for (const d of dated) {
+    const byNumber = auths.findIndex(
+      (a) => !a.date && a.type === d.type && !!d.number && a.number === d.number,
+    );
+    const unnumbered =
+      byNumber >= 0
+        ? -1
+        : auths.findIndex((a) => !a.date && a.type === d.type && !a.number);
+    const at = byNumber >= 0 ? byNumber : unnumbered;
+    if (at >= 0) {
+      auths[at] = { ...d };
+      note.datedKept++;
+    } else {
+      auths.push({ ...d });
+      note.datedExtra++;
+    }
+  }
+
+  const merged: Facility = {
+    ...live,
+    no: seeded.no,
+    facCode: seeded.facCode || live.facCode,
+    licensed: seeded.licensed,
+    stage: seeded.stage,
+    auths,
+  };
+  if (seeded.statusDetail) merged.statusDetail = seeded.statusDetail;
+  else delete merged.statusDetail;
+
+  if (seeded.licensed) {
+    merged.stage = "Licensed";
+    // The RAIS application status is about the application that was in
+    // flight; it has been overtaken.
+    delete merged.currentStatus;
+  } else if (live.licensed) {
+    // Licensed in the app, no current licence in the workbook: the workbook
+    // wins, and the record is flagged the way the converter flags one that
+    // came off the licensed list.
+    note.licenceLost = true;
+    merged.stage = "Licence Expiring (Renewal Due)";
+    merged.needsReview = true;
+    merged.reviewNote = [
+      "Licensed in the app; the licensing status list records no current " +
+        "licence — confirm the renewal",
+      live.reviewNote || "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    delete merged.currentStatus;
+  } else {
+    merged.stage = live.stage;
+    note.stageKept = live.stage;
+  }
+
+  return { facility: merged, note };
+}
+
 // ---------------------------------------------------------------------------
 // Border screening — the 2026 daily summary workbook
 // ---------------------------------------------------------------------------
