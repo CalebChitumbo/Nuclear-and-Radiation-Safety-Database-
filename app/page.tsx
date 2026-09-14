@@ -12,10 +12,22 @@ import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
 import {
+  WORK_PLAN_YEAR,
+  licencesIssuedNote,
+  licencesIssuedRow,
+} from "@/lib/rules/workPlan";
+import {
   deriveInspectionInbox,
   inspectionRequestStats,
 } from "@/lib/rules/inspectionRequests";
-import { LICENCE_TYPES, PROVINCES, STAGES, isUseP } from "@/lib/rules/types";
+import {
+  LICENCE_TYPES,
+  PROVINCES,
+  STAGES,
+  isUseP,
+  type WorkPlanBaseline,
+  type WorkPlanConfig,
+} from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -28,24 +40,34 @@ interface FeedItem {
 }
 
 export default function DashboardPage() {
-  const { selected } = useWeek();
+  const { selected, weeks } = useWeek();
   const { canEditAS, canEditInsp } = useAuth();
 
   // The week filter below is applied client-side, so the loader doesn't depend
   // on the selected week — refetching the collections on every week change
   // was wasted Firestore reads.
   const { data, error, reload } = useStoreData(async (s) => {
-    const [agg, facilities, events, inspections, requests] = await Promise.all([
-      s.getAggregate(),
-      s.listFacilities(),
-      s.listLicenceEvents(),
-      s.listInspections(),
-      // The inspection-request summary is secondary: if this collection can't be
-      // read yet (e.g. its security rules haven't been deployed), the core
-      // dashboard must still load. Degrade to an empty list rather than failing.
-      s.listInspectionRequests().catch(() => []),
-    ]);
-    return { agg, facilities, events, inspections, requests };
+    const [agg, facilities, events, inspections, requests, baseline, config] =
+      await Promise.all([
+        s.getAggregate(),
+        s.listFacilities(),
+        s.listLicenceEvents(),
+        s.listInspections(),
+        // The inspection-request summary is secondary: if this collection can't be
+        // read yet (e.g. its security rules haven't been deployed), the core
+        // dashboard must still load. Degrade to an empty list rather than failing.
+        s.listInspectionRequests().catch(() => []),
+        // The licences-issued headline is the work plan's own figure (output
+        // 1.1.4), read through the same saved baseline and plan as the weekly
+        // report. Without either, the approved plan applies.
+        s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+          () => null as WorkPlanBaseline | null,
+        ),
+        s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
+          () => null as WorkPlanConfig | null,
+        ),
+      ]);
+    return { agg, facilities, events, inspections, requests, baseline, config };
   }, []);
 
   if (!data) {
@@ -64,6 +86,16 @@ export default function DashboardPage() {
   });
   const requestStats = inspectionRequestStats(requests, CURRENT_YEAR);
   const licence = computeLicenceStats(facilities, CURRENT_YEAR);
+  const issued = licencesIssuedRow({
+    events,
+    weeks,
+    week: selected.label,
+    baseline: data.baseline?.values ?? null,
+    config: data.config,
+  });
+  const issuedNote = issued
+    ? licencesIssuedNote(issued.total, licence.totalIssued)
+    : "";
   const issuedTypeRows = LICENCE_TYPES.map((t) => ({
     type: t,
     count: licence.issuedByType[t] || 0,
@@ -150,7 +182,7 @@ export default function DashboardPage() {
           label="Authorisations on record"
           value={agg.auths.toLocaleString()}
           accent="slate"
-          caption="One entry per recorded licence"
+          caption="Every licence on the register, incl. before 2026 — not the issued figure"
         />
       </section>
 
@@ -258,7 +290,11 @@ export default function DashboardPage() {
       {/* Licences issued (all types) + who holds a current use licence */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel
-          title="Licences issued (all types)"
+          title={
+            issued
+              ? `Licences issued (${WORK_PLAN_YEAR})`
+              : "Licences issued (all types)"
+          }
           action={
             <Link className="link-action" href="/licences">
               Authorisations →
@@ -266,8 +302,14 @@ export default function DashboardPage() {
           }
         >
           <div className="text-3xl sm:text-4xl font-black tabular">
-            {licence.totalIssued.toLocaleString()}
+            {(issued ? issued.total : licence.totalIssued).toLocaleString()}
           </div>
+          {issued && (
+            <p className="mt-1 text-xs text-gunmetal/60">
+              {issuedNote ||
+                `Output ${issued.output.id} — the figure the weekly report shows`}
+            </p>
+          )}
           <p className="mt-1 text-sm text-gunmetal/70">
             <span className="text-[var(--rpa-green-dark)] font-bold">
               {licence.useTotal}

@@ -1724,6 +1724,74 @@ export function deriveWorkPlan(input: WorkPlanInput): SubprogrammeReport[] {
   });
 }
 
+/**
+ * The licences-issued figure the work plan reports (output 1.1.4): the
+ * section's opening balance at hand-over plus every dated licence event since.
+ *
+ * The Overview and Licences pages show THIS figure as their headline, so the
+ * dashboard and the weekly report can never disagree. They used to count the
+ * register's authorisations instead, which is a different number by design —
+ * the register also carries licences from before the plan year, and some of
+ * the section's licences land on no facility at all (see `licencesIssuedNote`).
+ *
+ * Read off the plan the sections have saved (`config`) so a reworded or
+ * renumbered 1.1.4 is still found: it is the one output counted off the
+ * whole licence register. Null if the sections have retired it.
+ */
+export function licencesIssuedRow(input: {
+  events: LicenceEvent[];
+  weeks: WeekDef[];
+  /** The selected reporting week, for the row's "this week" figure. */
+  week?: string;
+  baseline?: Record<string, number[]> | null;
+  config?: WorkPlanConfig | null;
+  year?: number;
+}): WorkPlanRow | null {
+  const plan = applyWorkPlanConfig(input.config);
+  const reports = deriveWorkPlan({
+    plan,
+    weeks: input.weeks,
+    week: input.week ?? input.weeks[input.weeks.length - 1]?.label ?? "",
+    events: input.events,
+    inspections: [],
+    valuesByWeek: new Map(),
+    baseline: input.baseline,
+    year: input.year,
+  });
+  for (const r of reports) {
+    for (const row of [...r.rows, ...r.supporting]) {
+      const { source } = row.output;
+      if (source.kind === "licences" && !source.match) return row;
+    }
+  }
+  return null;
+}
+
+/**
+ * One line reconciling the reported figure with the register's own count, for
+ * the caption under the headline. Empty when the two agree.
+ *
+ * The register can read high (licences a facility held before the plan year;
+ * a licence an officer dated that the section's hand-over total already
+ * counted) or low (a licence in the section's total that names a holder with
+ * no register row — Sep 2026: the Authority's own import licence).
+ */
+export function licencesIssuedNote(
+  reported: number,
+  onRegister: number,
+  year = WORK_PLAN_YEAR,
+): string {
+  const diff = onRegister - reported;
+  if (diff === 0) return "";
+  const n = Math.abs(diff);
+  const head = `${onRegister.toLocaleString()} authorisation${
+    onRegister === 1 ? "" : "s"
+  } on the register`;
+  return diff > 0
+    ? `${head} — the ${n} extra were held before ${year} or are already inside the section's total`
+    : `${head} — ${n} of the reported licences land${n === 1 ? "s" : ""} on no facility`;
+}
+
 // ---------------------------------------------------------------------------
 // Exports for the Monday meeting
 // ---------------------------------------------------------------------------

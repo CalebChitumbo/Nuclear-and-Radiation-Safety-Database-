@@ -471,6 +471,16 @@ facilities hold a current use licence **for a chosen year** versus those whose
 renewal is still in the pipeline (and at which stage). `lib/rules/licenceStats.ts`
 computes it; the Overview surfaces a summary.
 
+The **Licences issued headline** on both pages is not the register's count — it
+is work plan output **1.1.4**'s figure, derived by `licencesIssuedRow`
+(`lib/rules/workPlan.ts`) through the same saved baseline and plan as the
+weekly report, so the dashboard and the report always read the same number
+(392 at the 14 Sep 2026 hand-over). The register's own authorisation count sits
+in the caption with why it differs: it carries licences from before the plan
+year, and the section's total holds licences that land on no facility. A
+facility the register holds twice inflates it — `npm run fix:duplicate-facilities`
+finds and collapses those.
+
 ---
 
 ## Application notes & history — the officer handover
