@@ -47,6 +47,7 @@ import {
 } from "../rules/inventoryEdits";
 import { recordLicence } from "../rules/recordLicence";
 import {
+  accessPatch,
   approvalPatch,
   normaliseOfficeName,
   requiresInlandOffice,
@@ -337,6 +338,21 @@ class FirebaseStore implements DataStore {
     // An officer approved at a post the register has never heard of registers
     // the post: their figures need an office to be filed against, and the
     // screening report reads its columns off this list.
+    if (patch.border) await this.addBorder(patch.border, actorUid);
+    await updateDoc(doc(db, "users", uid), { ...patch });
+  }
+
+  async updateUserAccess(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void> {
+    const db = requireDb();
+    const patch = accessPatch(decision);
     if (patch.border) await this.addBorder(patch.border, actorUid);
     await updateDoc(doc(db, "users", uid), { ...patch });
   }

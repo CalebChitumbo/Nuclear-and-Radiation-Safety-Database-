@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   MIN_PASSWORD_LENGTH,
+  accessChangeBlocker,
+  accessPatch,
   approvalPatch,
   canLogForOffice,
   newAccountRequest,
@@ -43,8 +45,9 @@ describe("validateSignup", () => {
   });
 
   it("holds the password to the minimum length, and to itself", () => {
-    expect(validateSignup(input({ password: "short", confirmPassword: "short" })))
-      .toHaveLength(1);
+    expect(
+      validateSignup(input({ password: "short", confirmPassword: "short" })),
+    ).toHaveLength(1);
     expect(
       validateSignup(input({ confirmPassword: "something-else" })),
     ).toEqual(["The two passwords do not match."]);
@@ -166,6 +169,65 @@ describe("approvalPatch", () => {
     expect(patch.role).toBe("admin");
     expect(patch.section).toBe("All");
     expect(patch.border).toBe("");
+  });
+});
+
+describe("accessPatch", () => {
+  it("changes only the role, section and office", () => {
+    expect(
+      accessPatch({ role: "officer", section: NSSS, border: "nakonde" }),
+    ).toEqual({ role: "officer", section: NSSS, border: "Nakonde" });
+  });
+
+  it("drops the office when the account leaves NSSS", () => {
+    expect(
+      accessPatch({
+        role: "officer",
+        section: "Inspectorate",
+        border: "Nakonde",
+      }).border,
+    ).toBe("");
+  });
+
+  it("can post a head-office officer or bring one back", () => {
+    expect(accessPatch({ role: "officer", section: NSSS }).border).toBe("");
+    expect(
+      accessPatch({ role: "officer", section: NSSS, border: " chirundu " })
+        .border,
+    ).toBe("Chirundu");
+  });
+
+  it("never touches the approval record or the disabled flag", () => {
+    const patch = accessPatch({ role: "admin", section: "All" });
+    expect(Object.keys(patch).sort()).toEqual(["border", "role", "section"]);
+  });
+});
+
+describe("accessChangeBlocker", () => {
+  const me = { uid: "admin-1", role: "admin" as const };
+
+  it("stops an administrator removing their own role", () => {
+    expect(accessChangeBlocker("admin-1", me, { role: "officer" })).toMatch(
+      /your own administrator role/,
+    );
+  });
+
+  it("lets them change anything else about themselves", () => {
+    expect(accessChangeBlocker("admin-1", me, { role: "admin" })).toBe("");
+  });
+
+  it("lets another administrator demote them", () => {
+    expect(accessChangeBlocker("admin-2", me, { role: "officer" })).toBe("");
+  });
+
+  it("lets an administrator promote an officer", () => {
+    expect(
+      accessChangeBlocker(
+        "admin-1",
+        { uid: "u", role: "officer" },
+        { role: "admin" },
+      ),
+    ).toBe("");
   });
 });
 

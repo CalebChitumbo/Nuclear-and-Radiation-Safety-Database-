@@ -17,9 +17,13 @@
  *
  * Provisioning an account outright is still here — it is the path for someone
  * who cannot sign up themselves, and the one way to create an administrator.
+ *
+ * None of it is final. An officer moves section, a coordinator is posted to a
+ * different office, someone is made an administrator: every settled account
+ * can be edited from the table below, and the claims follow the document.
  */
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
@@ -29,6 +33,7 @@ import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { isMockMode } from "@/lib/firebase";
 import {
+  accessChangeBlocker,
   officeOptions,
   pendingRequests,
   requiresInlandOffice,
@@ -69,6 +74,7 @@ export default function AdminUsersPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [togglingUid, setTogglingUid] = useState<string | null>(null);
+  const [editingUid, setEditingUid] = useState<string | null>(null);
 
   if (!isAdmin) {
     return (
@@ -307,40 +313,68 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {accounts.map((u) => (
-                <tr key={u.uid}>
-                  <td className="font-bold">{u.displayName}</td>
-                  <td className="tabular">{u.email}</td>
-                  <td>
-                    <span className={`chip ${u.role === "admin" ? "yellow" : ""}`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="text-xs">{u.section}</td>
-                  <td className="text-xs">
-                    {u.border ? (
-                      <>
-                        {u.border}{" "}
-                        <span className="chip slate">scan log only</span>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    {u.disabled ? (
-                      <span className="chip red">Disabled</span>
-                    ) : (
-                      <span className="chip green">Active</span>
-                    )}
-                  </td>
-                  <td className="text-right">
-                    <ToggleButton
-                      disabled={togglingUid === u.uid}
-                      isDisabledAccount={!!u.disabled}
-                      onClick={() => toggleUser(u.uid, !u.disabled)}
-                    />
-                  </td>
-                </tr>
+                <Fragment key={u.uid}>
+                  <tr>
+                    <td className="font-bold">{u.displayName}</td>
+                    <td className="tabular">{u.email}</td>
+                    <td>
+                      <span
+                        className={`chip ${u.role === "admin" ? "yellow" : ""}`}
+                      >
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="text-xs">{u.section}</td>
+                    <td className="text-xs">
+                      {u.border ? (
+                        <>
+                          {u.border}{" "}
+                          <span className="chip slate">scan log only</span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      {u.disabled ? (
+                        <span className="chip red">Disabled</span>
+                      ) : (
+                        <span className="chip green">Active</span>
+                      )}
+                    </td>
+                    <td className="text-right whitespace-nowrap">
+                      <button
+                        className="link-action mr-3"
+                        onClick={() =>
+                          setEditingUid(editingUid === u.uid ? null : u.uid)
+                        }
+                      >
+                        {editingUid === u.uid ? "Close" : "Edit"}
+                      </button>
+                      <ToggleButton
+                        disabled={togglingUid === u.uid}
+                        isDisabledAccount={!!u.disabled}
+                        onClick={() => toggleUser(u.uid, !u.disabled)}
+                      />
+                    </td>
+                  </tr>
+                  {editingUid === u.uid ? (
+                    <tr>
+                      <td colSpan={7} className="!p-0">
+                        <AccessEditor
+                          account={u}
+                          offices={offices}
+                          actorUid={user?.uid || ""}
+                          onDone={() => {
+                            setEditingUid(null);
+                            reload();
+                          }}
+                          onCancel={() => setEditingUid(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -356,11 +390,21 @@ export default function AdminUsersPage() {
                     {u.email}
                   </div>
                 </div>
-                <ToggleButton
-                  disabled={togglingUid === u.uid}
-                  isDisabledAccount={!!u.disabled}
-                  onClick={() => toggleUser(u.uid, !u.disabled)}
-                />
+                <div className="flex shrink-0 gap-3">
+                  <button
+                    className="link-action"
+                    onClick={() =>
+                      setEditingUid(editingUid === u.uid ? null : u.uid)
+                    }
+                  >
+                    {editingUid === u.uid ? "Close" : "Edit"}
+                  </button>
+                  <ToggleButton
+                    disabled={togglingUid === u.uid}
+                    isDisabledAccount={!!u.disabled}
+                    onClick={() => toggleUser(u.uid, !u.disabled)}
+                  />
+                </div>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 <span className={`chip ${u.role === "admin" ? "yellow" : ""}`}>
@@ -376,6 +420,20 @@ export default function AdminUsersPage() {
                   <span className="chip green">Active</span>
                 )}
               </div>
+              {editingUid === u.uid ? (
+                <div className="mt-3 -mx-4">
+                  <AccessEditor
+                    account={u}
+                    offices={offices}
+                    actorUid={user?.uid || ""}
+                    onDone={() => {
+                      setEditingUid(null);
+                      reload();
+                    }}
+                    onCancel={() => setEditingUid(null)}
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -535,6 +593,162 @@ function RequestCard({
         </button>
       </div>
     </li>
+  );
+}
+
+/**
+ * Change what a settled account may do. The same three settings approval
+ * fixes — role, section, inland office — with the same meaning: the office is
+ * what turns an NSSS officer into a scan-log-only posting. Saving rewrites the
+ * account document; the Cloud Function re-mints the claims from it, so the
+ * officer sees the change on their next sign-in or token refresh.
+ */
+function AccessEditor({
+  account,
+  offices,
+  actorUid,
+  onDone,
+  onCancel,
+}: {
+  account: UserDoc;
+  offices: string[];
+  actorUid: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const toast = useToast();
+  const [role, setRole] = useState<Role>(account.role);
+  const [section, setSection] = useState<Section | "All">(account.section);
+  const [border, setBorder] = useState(account.border || "");
+  const [busy, setBusy] = useState(false);
+
+  const needsOffice = requiresInlandOffice(section);
+  const blocker = accessChangeBlocker(actorUid, account, { role });
+  const office = needsOffice ? border.trim() : "";
+  const unchanged =
+    role === account.role &&
+    section === account.section &&
+    office.toLowerCase() === (account.border || "").toLowerCase();
+
+  const save = async () => {
+    if (blocker) {
+      toast.push(blocker, "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const s = await store();
+      await s.updateUserAccess(
+        account.uid,
+        { role, section, border: office },
+        actorUid,
+      );
+      toast.push(
+        `${account.displayName}'s access updated. It applies on their next sign-in or within the hour.`,
+        "success",
+      );
+      onDone();
+    } catch (err) {
+      toast.push(
+        err instanceof Error ? err.message : "Could not update the account.",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="inset px-4 py-3 border-t border-gunmetal/8">
+      <div className="caps text-[10px] text-gunmetal/55 mb-2">
+        Edit access · {account.displayName}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="field-label" htmlFor={`edit-role-${account.uid}`}>
+            Role
+          </label>
+          <select
+            id={`edit-role-${account.uid}`}
+            className="input"
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role)}
+          >
+            {ROLES.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label
+            className="field-label"
+            htmlFor={`edit-section-${account.uid}`}
+          >
+            Section
+          </label>
+          <select
+            id={`edit-section-${account.uid}`}
+            className="input"
+            value={section}
+            onChange={(e) => setSection(e.target.value as Section | "All")}
+          >
+            <option value="All">All</option>
+            {SECTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        {needsOffice ? (
+          <div>
+            <label
+              className="field-label"
+              htmlFor={`edit-office-${account.uid}`}
+            >
+              Inland office
+            </label>
+            <input
+              id={`edit-office-${account.uid}`}
+              className="input"
+              list="rpa-offices"
+              value={border}
+              onChange={(e) => setBorder(e.target.value)}
+              placeholder="e.g. Nakonde"
+            />
+            <p className="text-[11px] text-gunmetal/60 mt-1.5">
+              {!border.trim()
+                ? "Blank: a head-office officer who sees the whole section. Name an office to post them there — they then see the Border Scan Log only."
+                : !offices.some(
+                      (o) => o.toLowerCase() === border.trim().toLowerCase(),
+                    )
+                  ? "New office — saving registers it. Posted there, this officer sees the Border Scan Log only."
+                  : "Posted here, this officer sees the Border Scan Log only."}
+            </p>
+          </div>
+        ) : null}
+      </div>
+      {blocker ? (
+        <p
+          className="text-[11px] mt-2"
+          style={{ color: "var(--status-stalled)" }}
+        >
+          {blocker}
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-col sm:flex-row gap-2">
+        <button
+          className="btn btn-primary"
+          disabled={busy || unchanged || !!blocker}
+          onClick={save}
+        >
+          {busy ? "Saving…" : "Save changes"}
+        </button>
+        <button className="btn btn-ghost" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

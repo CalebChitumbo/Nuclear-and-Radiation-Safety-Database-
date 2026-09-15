@@ -25,6 +25,7 @@ import {
 } from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
 import {
+  accessPatch,
   approvalPatch,
   normaliseOfficeName,
   requiresInlandOffice,
@@ -1197,6 +1198,23 @@ class MockStore implements DataStore {
     actorUid: string,
   ): Promise<void> {
     const patch = approvalPatch(decision, actorUid);
+    if (patch.border) await this.addBorder(patch.border, actorUid);
+    const s = ensure();
+    s.users = s.users.map((u) => (u.uid === uid ? { ...u, ...patch } : u));
+    save(s);
+    dispatchChange();
+  }
+
+  async updateUserAccess(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void> {
+    const patch = accessPatch(decision);
     if (patch.border) await this.addBorder(patch.border, actorUid);
     const s = ensure();
     s.users = s.users.map((u) => (u.uid === uid ? { ...u, ...patch } : u));
