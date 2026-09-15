@@ -319,6 +319,21 @@ export interface DataStore {
   ): Promise<void>;
   /** Turn a request down. The account stays, disabled, so it cannot re-apply. */
   declineUser(uid: string): Promise<void>;
+  /**
+   * Change what a settled account may do — role, section, inland office. The
+   * Cloud Function re-mints the claims from the new document (onUserDocWrite),
+   * so the change reaches the officer on their next token refresh. As with
+   * approval, an office the register has never heard of is added.
+   */
+  updateUserAccess(
+    uid: string,
+    decision: {
+      role: UserDoc["role"];
+      section: UserDoc["section"];
+      border?: string;
+    },
+    actorUid: string,
+  ): Promise<void>;
   setUserDisabled(uid: string, disabled: boolean): Promise<void>;
   exportAll(): Promise<{
     facilities: Facility[];

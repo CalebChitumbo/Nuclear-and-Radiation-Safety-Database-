@@ -185,6 +185,49 @@ export function approvalPatch(
 }
 
 /**
+ * The patch that changes what a settled account may do — its role, its section
+ * and, for NSSS, the inland office it is posted to. The same three things
+ * approval settles, so the same normalisation applies (an office is kept only
+ * where the section has one). It touches nothing else: the approval record,
+ * the disabled flag and the sign-in all stand. onUserDocWrite re-mints the
+ * account's claims from the new values on the way through.
+ */
+export function accessPatch(decision: {
+  role: UserDoc["role"];
+  section: UserDoc["section"];
+  border?: string;
+}): Pick<UserDoc, "role" | "section" | "border"> {
+  return {
+    role: decision.role,
+    section: decision.section,
+    border: requiresInlandOffice(decision.section)
+      ? normaliseOfficeName(decision.border || "")
+      : "",
+  };
+}
+
+/**
+ * Why an administrator may not change a given account's access — or "" when
+ * they may. The one refusal is their own administrator role: the claims are
+ * re-minted on the server the moment the document changes, so demoting
+ * yourself locks you out of the very desk the change is made from.
+ */
+export function accessChangeBlocker(
+  actorUid: string,
+  account: Pick<UserDoc, "uid" | "role">,
+  next: { role: UserDoc["role"] },
+): string {
+  if (
+    account.uid === actorUid &&
+    account.role === "admin" &&
+    next.role !== "admin"
+  ) {
+    return "You cannot remove your own administrator role. Ask another administrator to make the change.";
+  }
+  return "";
+}
+
+/**
  * Whether an account may log for a given inland office. An officer posted to
  * one office may only file against that office; an account with no posting
  * (head office, an administrator, a cross-section "All") may file for any.
@@ -203,7 +246,9 @@ export function canLogForOffice(
  * The office an account logs for, or null when it may choose. Screens use this
  * to answer the shift header once and then stay out of the way.
  */
-export function postedOffice(user: Pick<UserDoc, "border"> | null): string | null {
+export function postedOffice(
+  user: Pick<UserDoc, "border"> | null,
+): string | null {
   return user?.border ? user.border : null;
 }
 

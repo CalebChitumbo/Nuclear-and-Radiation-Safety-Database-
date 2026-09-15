@@ -310,6 +310,19 @@ up again.
 Accounts created before any of this have no `pending` field and are therefore
 read as settled — nothing about an existing officer changes.
 
+### Changing an account after approval
+
+Nothing settled at approval is final. **Edit** on any row of the staff accounts
+table opens the same three settings — role, section and inland office — and
+saving rewrites the account document (`updateUserAccess`, the patch is
+`accessPatch` in `lib/rules/signup.ts`). `onUserDocWrite` re-mints the claims
+from it, so the change reaches the officer on their next sign-in or when their
+token refreshes (within the hour). Moving an NSSS officer out of the section
+drops their posting; naming an office the register does not hold registers it,
+as approval does. The one thing an administrator may not do is remove their own
+administrator role — that would lock them out of the very desk they are
+working from — so another administrator has to make that change.
+
 The rules live in `lib/rules/signup.ts` and are exercised by
 `tests/signup.test.ts`.
 
