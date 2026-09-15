@@ -478,8 +478,8 @@ describe("raisInventoryToCsv", () => {
       "No,RAN,Kind,Type,Family,Manufacturer,Model,Serial Number,Nuclide," +
         "Activity,Activity Date,IAEA Category,Category Source," +
         "RAIS Calculated Category,Security Level,ISO 2919,Working Life," +
-        "Held By,Facility Code,Department,District,Province," +
-        "Holding Status,Status Date",
+        "Located At,Facility Code,Department,District,Province," +
+        "Location Status,Status Date",
     );
     expect(lines.length).toBe(1753); // header + 1,752 rows
   });

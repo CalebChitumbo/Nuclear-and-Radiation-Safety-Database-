@@ -181,7 +181,7 @@ describe("summariseHolders", () => {
   it("reads an empty register without inventing a holder", () => {
     const s = summariseHolders([], FIXTURE);
     expect(s).toMatchObject({ withHolder: 0, withoutHolder: 0, facilities: 0 });
-    expect(HOLDER_NOT_RECORDED).toBe("Holder not recorded");
+    expect(HOLDER_NOT_RECORDED).toBe("Location not recorded");
   });
 });
 

@@ -69,7 +69,7 @@ const META = (seed as RaisInventorySeed).meta;
 const HOLDERS = loadSourceHolders(holderSeed as SourceHoldersSeed);
 const HOLDER_META = (holderSeed as SourceHoldersSeed).meta;
 
-/** How many facilities the "held by" panel lists before "show all". */
+/** How many facilities the "located at" panel lists before "show all". */
 const FACILITY_PREVIEW = 12;
 
 const KIND_FILTERS: { value: "all" | RaisKind; label: string }[] = [
@@ -377,12 +377,12 @@ export default function SourceInventoryPage() {
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Facilities holding them</div>
+          <div className="stat-label">Facilities they are located at</div>
           <div className="stat-value text-[var(--rpa-green-dark)]">
             {holders.facilities}
           </div>
           <div className="stat-caption">
-            {holders.withoutHolder} items with no holder recorded
+            {holders.withoutHolder} items with no location recorded
           </div>
         </div>
       </section>
@@ -459,8 +459,8 @@ export default function SourceInventoryPage() {
       ) : null}
 
       <Panel
-        title="Where they are held"
-        note={`The facility each item is registered under, from the RAIS holdings export of ${HOLDER_META.exportedOn}. Tap a province or a facility to filter the list below.`}
+        title="Where they are located"
+        note={`The facility each item is registered under, from the RAIS location export of ${HOLDER_META.exportedOn}. Tap a province or a facility to filter the list below.`}
       >
         <ul className="mt-1 space-y-1.5">
           {holders.byProvince.map(({ label, count }) => (
@@ -476,7 +476,7 @@ export default function SourceInventoryPage() {
         </ul>
         {holders.byProvince.length === 0 ? (
           <p className="text-sm text-gunmetal/55">
-            No holding has a province — the facilities register does not hold
+            No location has a province — the facilities register does not hold
             any of the facilities RAIS names.
           </p>
         ) : null}
@@ -497,7 +497,7 @@ export default function SourceInventoryPage() {
 
       <Panel
         title={`Facilities on the register — ${holders.facilities}`}
-        note="Every facility RAIS names as holding an item, most first."
+        note="Every facility RAIS locates an item at, most first."
       >
         <ul className="mt-1 divide-y divide-gunmetal/8">
           {facilitiesShown.map((f) => {
@@ -580,12 +580,12 @@ export default function SourceInventoryPage() {
             of={summary.sealedSources}
           />
           <GapRow
-            label="No facility recorded as holding the item"
+            label="No facility recorded as the item's location"
             count={holders.withoutHolder}
             of={summary.total}
           />
           <GapRow
-            label="Held by a facility the facilities register does not hold"
+            label="Located at a facility the facilities register does not hold"
             count={holders.itemsOffRegister}
             of={summary.total}
           />
@@ -709,7 +709,7 @@ export default function SourceInventoryPage() {
             </div>
             <div>
               <label className="field-label" htmlFor="rais-holding">
-                Held by
+                Located at
               </label>
               <select
                 id="rais-holding"
@@ -760,7 +760,7 @@ export default function SourceInventoryPage() {
               <tr>
                 <th>RAN</th>
                 <th>Item</th>
-                <th>Held by</th>
+                <th>Located at</th>
                 <th>Manufacturer / Model</th>
                 <th>Serial Number</th>
                 <th>Activity</th>
@@ -824,7 +824,7 @@ export default function SourceInventoryPage() {
       <p className="text-[11px] text-gunmetal/50 px-1">
         Source: {META.sourceDocument}, {META.system}
         {META.exportedOn ? `, exported ${META.exportedOn}` : ""}.{" "}
-        {META.coverage}. Held by the {META.department}. Who holds each item is
+        {META.coverage}. Maintained by the {META.department}. Where each item is located is
         from {HOLDER_META.sourceDocument}
         {HOLDER_META.exportedOn ? `, exported ${HOLDER_META.exportedOn}` : ""};
         the district and province of each facility are the facilities
@@ -983,7 +983,7 @@ function HoldingChip({ holder }: { holder: ResolvedHolder | null }) {
   );
 }
 
-/** Who holds the item and where — the column an inspector plans a visit from. */
+/** Where the item is located — the column an inspector plans a visit from. */
 function HolderCell({ holder }: { holder: ResolvedHolder | null }) {
   if (!holder) {
     return (

@@ -70,8 +70,8 @@ export interface SourceHoldersSeed {
   facilities: SourceHolderFacility[];
 }
 
-/** Shown wherever an item's holder, or a holder's location, is not on file. */
-export const HOLDER_NOT_RECORDED = "Holder not recorded";
+/** Shown wherever an item's location, or that facility's district, is not on file. */
+export const HOLDER_NOT_RECORDED = "Location not recorded";
 export const LOCATION_NOT_RECORDED = "Location not on the facilities register";
 
 /**

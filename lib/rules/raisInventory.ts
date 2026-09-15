@@ -428,12 +428,12 @@ export function raisInventoryToCsv(
     "Security Level",
     "ISO 2919",
     "Working Life",
-    "Held By",
+    "Located At",
     "Facility Code",
     "Department",
     "District",
     "Province",
-    "Holding Status",
+    "Location Status",
     "Status Date",
   ];
   const rows = records.map((r) => {

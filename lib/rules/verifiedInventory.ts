@@ -33,7 +33,7 @@ import {
 export interface VerifiedRecord {
   /** Running number in the annex (1…215). */
   no: number;
-  /** Establishment / facility holding the item. */
+  /** Establishment / facility the item is located at. */
   facility: string;
   /** Equipment type as written in the annex (free-form). */
   equipmentType: string;

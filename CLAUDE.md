@@ -292,7 +292,7 @@ npm run convert:holders -- <History_of_a_Radiation_Generator.xlsx> \
    holdings export** (holdings, generators/sources, items with no holder,
    facilities and how many are off-register, the top provinces and statuses,
    and the size of the location index).
-3. Update the counts in `README.md` (the *Who holds each item* section and the
+3. Update the counts in `README.md` (the *Where each item is located* section and the
    Source Inventory KPI/gaps bullets).
 
 **Watch out:** district and province are NOT in these exports. The seed carries
