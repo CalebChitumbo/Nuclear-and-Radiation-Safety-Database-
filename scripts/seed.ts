@@ -187,8 +187,19 @@ async function mergeWithApp(seeded: Facility[]): Promise<Facility[]> {
  * `updatedBy`, i.e. ones a previous seed wrote and nobody has touched in the
  * app. A facility an officer added or edited is always reported and kept — the
  * workbook is not authoritative over their work.
+ *
+ * One case is called out by name: a kept document whose facility this seed
+ * ALSO writes under another id. That is the same facility on the register
+ * twice, and its licences count twice on every dashboard (Sep 2026: three of
+ * them read 400 licences where the section reported 392). The seed will not
+ * delete it — the officer's edit may be worth carrying to the new document
+ * first — so it says exactly which pairs to reconcile.
  */
-async function reportSupersededFacilities(seededIds: Set<string>) {
+async function reportSupersededFacilities(seeded: Facility[]) {
+  const seededIds = new Set(seeded.map((f) => f.id));
+  const seededByName = new Map(
+    seeded.map((f) => [f.name.trim().toLowerCase(), f.id]),
+  );
   const db = getFirestore();
   const snap = await db.collection("facilities").select("updatedBy", "name").get();
   const extras = snap.docs.filter((d) => !seededIds.has(d.id));
@@ -199,13 +210,24 @@ async function reportSupersededFacilities(seededIds: Set<string>) {
 
   const stale = extras.filter((d) => !d.get("updatedBy"));
   const touched = extras.filter((d) => d.get("updatedBy"));
+  const twin = (d: (typeof extras)[number]) =>
+    seededByName.get(String(d.get("name") || "").trim().toLowerCase());
 
   if (touched.length) {
     console.log(
       `  ${touched.length} facility document(s) not in this register were ` +
         "added or edited in the app — keeping them:",
     );
-    for (const d of touched) console.log(`    ${d.id}  ${d.get("name") || ""}`);
+    for (const d of touched) {
+      const dup = twin(d);
+      console.log(
+        `    ${d.id}  ${d.get("name") || ""}` +
+          (dup
+            ? `  ← ON THE REGISTER TWICE: this seed writes it as ${dup}. ` +
+              "Its licences count twice until one is removed."
+            : ""),
+      );
+    }
   }
   if (stale.length === 0) return;
 
@@ -421,7 +443,7 @@ async function main() {
     batch.set(db.doc(`facilities/${f.id}`), f);
   });
 
-  await reportSupersededFacilities(new Set(facilities.map((f) => f.id)));
+  await reportSupersededFacilities(facilities);
 
   if (REGISTER_ONLY) {
     console.log("--only facilities: leaving the screening log and inspection register as they are");

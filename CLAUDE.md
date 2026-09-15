@@ -73,6 +73,17 @@ row (Sep 2026: an import licence for the Radiation Protection Authority itself).
 It stays unmatched and the reconciliation reads one short — say so rather than
 inventing a facility for it.
 
+**Watch out:** the seed's "not in this register … keeping them" list can hide
+the same facility twice — an old `fac-NN` document an officer once touched
+beside the `seed-…` one this import writes. The run flags such a pair *ON THE
+REGISTER TWICE*; collapse it with `npm run fix:duplicate-facilities` (dry run;
+`--apply` to write), which carries the officer's review over and deletes the old
+document. Left alone, its licences count twice on the Overview and Licences
+headlines. Those headlines read output **1.1.4**'s figure — the same one the
+weekly report shows — so the dashboard and the report can never disagree; the
+register's own authorisation count sits in the caption with the reason it
+differs (licences from before the plan year; licences that land on no facility).
+
 ## Routine: the Inspectorate hands over a new inspection total
 
 The Inspectorate periodically gives a new **total routine and follow-up

@@ -13,6 +13,8 @@ import {
   planForSections,
   findOutput,
   formatPercent,
+  licencesIssuedNote,
+  licencesIssuedRow,
   metricKeysForOutput,
   outputMetricKey,
   percentAchieved,
@@ -185,6 +187,59 @@ describe("quarters", () => {
     expect(index.get(week("W15"))).toBe(2);
     expect(index.get(week("W40"))).toBe(3); // 28 Sep → 2 Oct
     expect(index.get(week("W53"))).toBe(4); // 28 Dec → 1 Jan 2027
+  });
+});
+
+describe("licences issued — the dashboards' headline", () => {
+  const events = [
+    ev("Renewal of Use/Possession Licence", Q2, "2026-05-26", 1),
+    ev("Importation Licence", Q3, "2026-07-21", 2),
+  ];
+
+  it("is the 1.1.4 row itself, so the dashboard and the report agree", () => {
+    const r = licencesIssuedRow({ events, weeks: WEEKS, week: Q3 });
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q3,
+      events,
+      inspections: [],
+      valuesByWeek: new Map(),
+      baseline: null,
+    });
+    expect(r?.output.id).toBe("1.1.4");
+    expect(r?.total).toBe(row(reports, "1.1.4").total);
+    expect(r?.total).toBe(377 + 2);
+    expect(r?.week).toBe(1);
+  });
+
+  it("reads the saved baseline and the sections' plan, like the report", () => {
+    const r = licencesIssuedRow({
+      events,
+      weeks: WEEKS,
+      baseline: { "1.1.4": [100, 0, 0, 0] },
+      config: { year: 2026, outputs: { "1.1.4": { target: 200 } } },
+    });
+    expect(r?.total).toBe(102);
+    expect(r?.output.target).toBe(200);
+    // Retired by the section: nothing to show, and the pages fall back to the
+    // register's own count.
+    expect(
+      licencesIssuedRow({
+        events,
+        weeks: WEEKS,
+        config: { year: 2026, outputs: { "1.1.4": { hidden: true } } },
+      }),
+    ).toBeNull();
+  });
+
+  it("explains the gap to the register's count either way, or says nothing", () => {
+    expect(licencesIssuedNote(392, 392)).toBe("");
+    expect(licencesIssuedNote(392, 395)).toBe(
+      "395 authorisations on the register — the 3 extra were held before 2026 or are already inside the section's total",
+    );
+    expect(licencesIssuedNote(392, 391)).toBe(
+      "391 authorisations on the register — 1 of the reported licences lands on no facility",
+    );
   });
 });
 

@@ -8,16 +8,24 @@ import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { useStoreData } from "@/lib/storeHooks";
+import { useWeek } from "@/lib/weekContext";
 import {
   authSortKey,
   authWhen,
   computeLicenceStats,
 } from "@/lib/rules/licenceStats";
 import {
+  WORK_PLAN_YEAR,
+  licencesIssuedNote,
+  licencesIssuedRow,
+} from "@/lib/rules/workPlan";
+import {
   LICENCE_TYPES,
   isUseP,
   type Facility,
   type LicenceType,
+  type WorkPlanBaseline,
+  type WorkPlanConfig,
 } from "@/lib/rules/types";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -76,10 +84,23 @@ function flattenAuths(facilities: Facility[]): AuthRow[] {
 }
 
 export default function LicencesPage() {
-  const { data, error, reload } = useStoreData(
-    async (s) => s.listFacilities(),
-    [],
-  );
+  const { selected, weeks } = useWeek();
+  const { data, error, reload } = useStoreData(async (s) => {
+    const [facilities, events, baseline, config] = await Promise.all([
+      s.listFacilities(),
+      s.listLicenceEvents(),
+      // The headline is the work plan's own figure (output 1.1.4), so it reads
+      // the same saved baseline and plan the weekly report does. Neither is
+      // required — without them the approved plan applies.
+      s.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanBaseline | null,
+      ),
+      s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
+        () => null as WorkPlanConfig | null,
+      ),
+    ]);
+    return { facilities, events, baseline, config };
+  }, []);
   const [year, setYear] = useState(CURRENT_YEAR);
   // The itemized table's filters: a licence type, or the "standalone" / "use" /
   // "all" groupings; plus a free-text search.
@@ -88,10 +109,28 @@ export default function LicencesPage() {
   const [page, setPage] = useState(0);
 
   const stats = useMemo(
-    () => (data ? computeLicenceStats(data, year) : null),
+    () => (data ? computeLicenceStats(data.facilities, year) : null),
     [data, year],
   );
-  const authRows = useMemo(() => (data ? flattenAuths(data) : []), [data]);
+  // Licences issued this plan year, exactly as the weekly report counts them:
+  // the section's opening balance plus every dated licence since.
+  const issued = useMemo(
+    () =>
+      data
+        ? licencesIssuedRow({
+            events: data.events,
+            weeks,
+            week: selected.label,
+            baseline: data.baseline?.values ?? null,
+            config: data.config,
+          })
+        : null,
+    [data, weeks, selected.label],
+  );
+  const authRows = useMemo(
+    () => (data ? flattenAuths(data.facilities) : []),
+    [data],
+  );
   const filteredAuthRows = useMemo(() => {
     const q = authSearch.trim().toLowerCase();
     return authRows.filter((r) => {
@@ -196,11 +235,22 @@ export default function LicencesPage() {
 
       {/* Totals — renewal + import + transit + every other type */}
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
-        <Kpi
-          label="Licences issued (all types)"
-          value={stats.totalIssued.toLocaleString()}
-          caption="One entry per recorded authorisation"
-        />
+        {issued ? (
+          <Kpi
+            label={`Licences issued (${WORK_PLAN_YEAR})`}
+            value={issued.total.toLocaleString()}
+            caption={
+              licencesIssuedNote(issued.total, stats.totalIssued) ||
+              `Output ${issued.output.id} — the figure the weekly report shows`
+            }
+          />
+        ) : (
+          <Kpi
+            label="Licences issued (all types)"
+            value={stats.totalIssued.toLocaleString()}
+            caption="One entry per recorded authorisation"
+          />
+        )}
         <Kpi
           label="Use / Possession"
           value={stats.useTotal.toLocaleString()}

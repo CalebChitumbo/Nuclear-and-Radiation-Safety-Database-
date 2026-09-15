@@ -69,6 +69,29 @@ HOSPITAL, and a "SOUTH POINT CLINIC" that names none of that clinic's three
 branches); they are inside the 392, so the total is right, but they are on no
 facility's record until the section says which.
 
+*14 Sep 2026 (evening):* the Overview and Licences pages now show **this same
+1.1.4 figure** as their "Licences issued" headline (`licencesIssuedRow` in
+`lib/rules/workPlan.ts`, read through the same saved baseline and plan as the
+weekly report). They used to count the register's authorisations, which is a
+different number by design and read **400** against the report's 392. Eight
+apart, in two parts:
+
+- **5 were a data fault.** CIDRZ - Ibex Campus, K.G.P Dental Surgery and
+  Kenneth Kaunda International Airport each existed twice in Firestore — an
+  old `fac-41` / `fac-73` / `fac-85` document from an earlier seed beside the
+  current `seed-…` one. An officer had cleared the review flag on the old
+  three on 11 Aug, so the seed's prune kept them ("edited in the app") and
+  their licences counted twice (2 + 2 + 1). The seed report now names such a
+  pair as *ON THE REGISTER TWICE*; the old three were removed by hand, the
+  officer's review carried to the surviving document.
+- **3 are by design.** The register carries 4 use licences from before 2026
+  (the carried-over facilities), holds the 2 no-sheet events the section said
+  to treat as inside its 392, and cannot hold the 3 import licences that land
+  on no facility — so 392 + 4 + 2 − 3 = **395** authorisations on the
+  register once the duplicates are gone. The headline's caption states that
+  count and why it differs; the register's own split by type still sits under
+  it.
+
 ## Subprogramme 1.2 — Nuclear & Radiation Safety Inspections
 
 Every 1.2.x row already matched the workbook — the August update
