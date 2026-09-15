@@ -226,7 +226,7 @@ export default function VerifiedSourceInventoryPage() {
         <div className="stat">
           <div className="stat-label">Facilities</div>
           <div className="stat-value">{summary.facilities}</div>
-          <div className="stat-caption">establishments holding sources</div>
+          <div className="stat-caption">establishments where sources are located</div>
         </div>
         <div className="stat">
           <div className="stat-label">In use</div>

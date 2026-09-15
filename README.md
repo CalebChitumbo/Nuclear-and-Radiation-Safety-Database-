@@ -1161,7 +1161,7 @@ Everything on the page derives from those detail rows, so every figure
 reconciles with a filter of the table:
 
 - four KPIs — registered items · generators · sealed sources · **facilities
-  holding them** (303, with 219 items no facility is recorded against);
+  they are located at** (303, with 219 items no facility is recorded against);
 - generators by **equipment category** (`generatorFamily` folds the 33 free-form
   `Type` spellings into the shared categories below, reading the specific machine
   before the generic word it contains so a `Digital Mammography` is not swept
@@ -1169,15 +1169,15 @@ reconciles with a filter of the table:
   than a fluoroscopy suite, and a `Baggage Scanner` never lands in CT), each
   click-to-filter;
 - sources by **nuclide** (Cs-137 dominates at 618);
-- **where they are held** — by province, by facility, and RAIS' standing for
+- **where they are located** — by province, by facility, and RAIS' standing for
   each item (see below), all click-to-filter;
 - a **register gaps** panel — the counts of items RAIS cannot fully describe
   (110 with no serial, 109 generators with no type, 23 XRF analysers the
   register does not call portable or fixed, 69 sources with no nuclide, 345 with
-  no activity, 219 with no holder, 13 held by a facility the facilities register
-  does not hold); and
+  no activity, 219 with no location, 13 located at a facility the facilities
+  register does not hold); and
 - search across RAN, manufacturer, model, serial, nuclide, facility, district,
-  province and holding status, with CSV export of the current view.
+  province and location status, with CSV export of the current view.
 
 `parseActivity` reads RAIS' scientific notation (`9.99E+02 GBq`, `5E+00 mCi`)
 into becquerels so records in different units compare, returning `null` rather
@@ -1186,7 +1186,7 @@ than counting an unreadable value as zero.
 The rules live in `lib/rules/raisInventory.ts` (pure and unit-tested); the page
 is `app/source-inventory/page.tsx`.
 
-#### Who holds each item
+#### Where each item is located
 
 The register export says **what** an item is; it does not say **where** it is.
 RAIS keeps that on a second pair of exports — *History of a Radiation
@@ -1199,7 +1199,7 @@ them onto the register by RAN.
 
 Two things the join is deliberately honest about:
 
-- **1,533 of the 1,752 items have a holder; 219 do not.** Those are registered
+- **1,533 of the 1,752 items have a location; 219 do not.** Those are registered
   with nobody named against them and are counted as a gap, never given a
   placeholder facility.
 - **296 of the 303 facilities are in the facilities register**, which is where
