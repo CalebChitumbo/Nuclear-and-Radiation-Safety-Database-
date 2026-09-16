@@ -115,6 +115,7 @@ describe("canOpen — who opens what", () => {
       "/bulk-approval",
       "/inspection-requests",
       "/daily",
+      "/tasks",
       "/weekly",
       "/settings",
     ]);
@@ -127,6 +128,7 @@ describe("canOpen — who opens what", () => {
       "/inspectorate",
       "/inspection-requests",
       "/daily",
+      "/tasks",
       "/weekly",
       "/inspections",
       "/settings",
@@ -138,13 +140,14 @@ describe("canOpen — who opens what", () => {
       "/nsss",
       "/border",
       "/daily",
+      "/tasks",
       "/weekly",
       "/settings",
     ]);
   });
 
-  it("gives a posted officer the scan log and nothing else", () => {
-    expect(opens(nakonde)).toEqual(["/border"]);
+  it("gives a posted officer the scan log, their desk and nothing else", () => {
+    expect(opens(nakonde)).toEqual(["/border", "/tasks"]);
   });
 
   it("gives the National Source Inventory its two registers", () => {
@@ -152,6 +155,7 @@ describe("canOpen — who opens what", () => {
       "/source-inventory",
       "/verified-source-inventory",
       "/daily",
+      "/tasks",
       "/weekly",
       "/settings",
     ]);
@@ -192,13 +196,14 @@ describe("navFor", () => {
     ]);
     expect(navFor(nsi).map((g) => [g.heading, g.items.map((i) => i.href)])).toEqual([
       ["Register", ["/source-inventory", "/verified-source-inventory"]],
-      ["Workflow", ["/daily"]],
+      ["Workflow", ["/daily", "/tasks"]],
     ]);
   });
 
-  it("is one link for a posted officer", () => {
+  it("is the scan log and the desk for a posted officer", () => {
     expect(navFor(nakonde)).toEqual([
       { heading: "Sections", items: [ROUTES.find((r) => r.href === "/border")] },
+      { heading: "Workflow", items: [ROUTES.find((r) => r.href === "/tasks")] },
     ]);
   });
 
@@ -228,15 +233,18 @@ describe("mobileTabsFor", () => {
       "/inspection-requests",
       "/inspectorate",
     ]);
+    // Tasks fills the fourth slot where a section has one free.
     expect(mobileTabsFor(nsssDesk).map((t) => t.href)).toEqual([
       "/daily",
       "/nsss",
       "/border",
+      "/tasks",
     ]);
     expect(mobileTabsFor(nsi).map((t) => t.href)).toEqual([
       "/daily",
       "/source-inventory",
       "/verified-source-inventory",
+      "/tasks",
     ]);
   });
 

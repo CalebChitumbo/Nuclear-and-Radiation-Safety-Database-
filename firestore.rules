@@ -487,7 +487,83 @@ service cloud.firestore {
         ]
         && (!('border' in d) || (d.border is string && d.border.size() <= 80))
         && (!('pending' in d) || d.pending is bool)
-        && (!('disabled' in d) || d.disabled is bool);
+        && (!('disabled' in d) || d.disabled is bool)
+        // Placement on the reporting line (the Tasks desk). '' clears either.
+        && (!('grade' in d) || d.grade in
+             ['', 'Director', 'Manager', 'Senior Officer', 'Officer', 'Technologist'])
+        && (!('reportsTo' in d) || (d.reportsTo is string && d.reportsTo.size() <= 128));
+    }
+
+    // ---------------------------------------------------------------------
+    // The staff directory and the Tasks desk.
+    //
+    // The directory is the slice of `users` every approved officer may read:
+    // name, section, grade and who each account reports to. It is what says
+    // whom a task may be given to, and the rules below read it the same way
+    // lib/rules/tasks.ts does — work goes to a DIRECT REPORT, a PEER (someone
+    // with the same supervisor, both placed) or one's OWN SUPERVISOR, and to
+    // nobody else. An officer in another line is reached through their
+    // supervisor, who passes it on. Written by onUserDocWrite and by the
+    // Users desk; never by an officer.
+    // ---------------------------------------------------------------------
+    function reportsToOf(uid) {
+      return get(/databases/$(database)/documents/directory/$(uid)).data.get('reportsTo', '');
+    }
+    function mayAssignTo(target) {
+      return target == request.auth.uid
+        || isAdmin()
+        || reportsToOf(target) == request.auth.uid
+        || (reportsToOf(target) != '' && reportsToOf(target) == reportsToOf(request.auth.uid))
+        || reportsToOf(request.auth.uid) == target;
+    }
+    function onTask(d) {
+      return d.assignedToUid == request.auth.uid
+        || d.assignedByUid == request.auth.uid
+        || request.auth.uid in d.watcherUids;
+    }
+    function validTask(d) {
+      return d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.status in ['Assigned','In Progress','Submitted','Closed','Cancelled']
+        && d.priority in ['Urgent','High','Normal','Low']
+        && d.assignedByUid is string && d.assignedToUid is string
+        && d.assignedAt is string
+        && d.watcherUids is list && d.events is list
+        && d.section is string
+        && d.dueDate is string
+        && (d.dueDate == '' || d.dueDate.matches('\\d{4}-\\d{2}-\\d{2}'));
+    }
+
+    match /directory/{uid} {
+      allow read:  if approved();
+      allow write: if isAdmin();
+    }
+
+    match /tasks/{id} {
+      // On the task, in the officer's section, or the department.
+      allow read: if approved()
+        && (isAdmin() || section() == 'All'
+            || onTask(resource.data)
+            || resource.data.section == section());
+      // Given by the account writing it, opened Assigned, to someone on the
+      // account's line.
+      allow create: if approved()
+        && validTask(request.resource.data)
+        && request.resource.data.assignedByUid == request.auth.uid
+        && request.resource.data.status == 'Assigned'
+        && mayAssignTo(request.resource.data.assignedToUid);
+      // Anyone on the task may move it (which moves are theirs is the app's
+      // state machine); who gave it and when never changes; and it may only
+      // be handed to someone else by the account that gave it, along the
+      // same line.
+      allow update: if approved()
+        && validTask(request.resource.data)
+        && (isAdmin() || onTask(resource.data))
+        && request.resource.data.assignedByUid == resource.data.assignedByUid
+        && request.resource.data.assignedAt == resource.data.assignedAt
+        && (request.resource.data.assignedToUid == resource.data.assignedToUid
+            || ((isAdmin() || resource.data.assignedByUid == request.auth.uid)
+                && mayAssignTo(request.resource.data.assignedToUid)));
+      allow delete: if isAdmin();
     }
 
     function ownAccountRequest(d, uid) {

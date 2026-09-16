@@ -249,20 +249,38 @@ export const onUserDocWrite = onDocumentWritten(
     const uid = event.params.uid as string;
     const after = event.data?.after?.data() as
       | {
+          displayName?: string;
           role?: string;
           section?: string;
           border?: string;
           pending?: boolean;
           disabled?: boolean;
+          grade?: string;
+          reportsTo?: string;
         }
       | undefined;
+    // The staff directory is the slice of this document every approved
+    // officer may read — name, section, grade, supervisor — so the Tasks desk
+    // can say who may give work to whom. Mirrored on every write; written
+    // whole so a cleared field is cleared there too.
+    const directory = getFirestore().doc(`directory/${uid}`);
     try {
       if (!after) {
         // The user doc was deleted: revoke the mirrored claims so the Auth
         // account loses all role/section access instead of keeping it forever.
         await getAuth().setCustomUserClaims(uid, {});
+        await directory.delete();
         return;
       }
+      await directory.set({
+        uid,
+        displayName: after.displayName || "",
+        section: after.section || "",
+        ...(after.border ? { border: after.border } : {}),
+        ...(after.grade ? { grade: after.grade } : {}),
+        ...(after.reportsTo ? { reportsTo: after.reportsTo } : {}),
+        active: !after.pending && !after.disabled,
+      });
       if (after.pending || after.disabled) {
         // Waiting on approval, declined, or switched off: hold nothing.
         await getAuth().setCustomUserClaims(uid, {});

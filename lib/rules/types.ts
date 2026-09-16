@@ -108,6 +108,39 @@ export type Section = (typeof SECTIONS)[number];
 export const ROLES = ["admin", "officer"] as const;
 export type Role = (typeof ROLES)[number];
 
+/**
+ * The department's reporting line, top down. It is what the Tasks desk reads
+ * to decide who may assign work to whom: an account's `reportsTo` names its
+ * immediate supervisor, and a task may only go to a direct report, a peer
+ * (someone with the same supervisor) or that supervisor. The grade is the
+ * post's name — it labels the org chart and the directory, and nothing is
+ * gated on it directly: a Senior Officer with nobody reporting to them cannot
+ * pass a task down, and a Technologist someone reports to can.
+ */
+export const GRADES = [
+  "Director",
+  "Manager",
+  "Senior Officer",
+  "Officer",
+  "Technologist",
+] as const;
+export type Grade = (typeof GRADES)[number];
+
+/** The post each grade holds in the department, with the abbreviation staff use. */
+export const GRADE_META: Record<Grade, { post: string; short: string }> = {
+  Director: { post: "Director, Nuclear & Radiation Safety", short: "DNRS" },
+  Manager: { post: "Manager, Nuclear & Radiation Safety", short: "MNRS" },
+  "Senior Officer": {
+    post: "Senior Nuclear & Radiation Safety Officer",
+    short: "SNRSO",
+  },
+  Officer: { post: "Nuclear & Radiation Safety Officer", short: "NRSO" },
+  Technologist: {
+    post: "Nuclear & Radiation Safety Technologist",
+    short: "NRST",
+  },
+};
+
 export interface Authorisation {
   type: LicenceType;
   number: string;
@@ -925,6 +958,171 @@ export interface UserDoc {
   /** When, and by whom, the request was approved (ISO / uid). */
   approvedAt?: string;
   approvedBy?: string;
+  /**
+   * Where the account sits on the reporting line — see GRADES. Both are an
+   * administrator's to set, after approval, on the Users desk; an account with
+   * neither is not yet placed and can be assigned work by nobody but itself
+   * and an administrator. `reportsTo` is the uid of the immediate supervisor;
+   * the Director reports to nobody.
+   */
+  grade?: Grade | "";
+  reportsTo?: string;
+}
+
+/**
+ * One line of the staff directory — the slice of an account every approved
+ * officer may read, so a supervisor can pick who a task goes to and the
+ * security rules can check the reporting line. Mirrored from `users` (which
+ * only administrators read) by onUserDocWrite and by the Users desk itself.
+ */
+export interface DirectoryEntry {
+  uid: string;
+  displayName: string;
+  section: Section | "All";
+  border?: string;
+  grade?: Grade;
+  reportsTo?: string;
+  /** Approved and not disabled — the only accounts work can go to. */
+  active: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — the desk
+// ---------------------------------------------------------------------------
+
+/**
+ * Lifecycle of an assigned task. The officer's "done" is not the end of it:
+ * the assigner reads what came back and either closes it or returns it with
+ * comments, so a task waiting on the assigner shows as theirs, not the
+ * officer's.
+ *
+ *   Assigned → In Progress → Submitted → Closed
+ *                   ↑            │
+ *                   └── returned ┘
+ *
+ * - Assigned     Given, not yet started. `seenAt` says whether it was opened.
+ * - In Progress  The officer has started it — or it came back to them.
+ * - Submitted    Handed back with an outcome; waiting on the assigner.
+ * - Closed       The assigner accepted it.
+ * - Cancelled    Withdrawn by the assigner. Out-of-band, from any open state.
+ */
+export const TASK_STATUSES = [
+  "Assigned",
+  "In Progress",
+  "Submitted",
+  "Closed",
+  "Cancelled",
+] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_PRIORITIES = ["Urgent", "High", "Normal", "Low"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+/**
+ * What kind of work it is. Free to add to; the supervisor's view groups by it
+ * so the department can see what takes the time.
+ */
+export const TASK_CATEGORIES = [
+  "Letter response",
+  "Memo",
+  "Application review",
+  "Inspection report",
+  "Data entry",
+  "Meeting action",
+  "Other",
+] as const;
+export type TaskCategory = (typeof TASK_CATEGORIES)[number];
+
+/** How the officer handed a task back. */
+export const TASK_OUTCOMES = ["Done", "Not done"] as const;
+export type TaskOutcome = (typeof TASK_OUTCOMES)[number];
+
+/** Someone on a task — the assigner, the officer, a watcher. */
+export interface TaskParty {
+  uid: string;
+  name: string;
+  section: Section | "All" | "";
+  grade?: Grade;
+}
+
+/**
+ * One entry in a task's trail. Every move — given, seen, started, handed back,
+ * returned, closed, a deadline moved, an extension asked for, a comment —
+ * appends one, so the whole conversation is on the task and nobody has to
+ * reconstruct who moved what from memory.
+ */
+export interface TaskEvent {
+  at: string;
+  by: string;
+  byName: string;
+  kind:
+    | "created"
+    | "seen"
+    | "started"
+    | "submitted"
+    | "returned"
+    | "closed"
+    | "cancelled"
+    | "reassigned"
+    | "deadline"
+    | "extension-requested"
+    | "extension-approved"
+    | "extension-declined"
+    | "passed-on"
+    | "comment";
+  status?: TaskStatus;
+  /** The due date this entry set or asked for. */
+  dueDate?: string;
+  text: string;
+}
+
+/**
+ * An assigned piece of work. The uids and the section are duplicated flat
+ * beside the parties because the security rules and the queries read them —
+ * a task is fetched by "assigned to me", "assigned by me", "I am watching"
+ * and "my section", and the rules allow exactly those reads.
+ */
+export interface Task {
+  id: string;
+  title: string;
+  details: string;
+  category: TaskCategory;
+  priority: TaskPriority;
+  /** An outside reference the work is about — a letter's Ref No., a RAN. */
+  reference?: string;
+  /** Where the material is — a SharePoint or Drive link. */
+  link?: string;
+  assignedBy: TaskParty;
+  assignedTo: TaskParty;
+  assignedByUid: string;
+  assignedToUid: string;
+  /** Supervisors kept in the loop — the shared supervisor when peers task each other. */
+  watchers: TaskParty[];
+  watcherUids: string[];
+  /** The officer's section: what "my section's tasks" reads. */
+  section: Section | "All" | "";
+  /** The officer gave it to themself — on their desk, in nobody's statistics. */
+  self: boolean;
+  status: TaskStatus;
+  outcome?: TaskOutcome;
+  /** YYYY-MM-DD, or "" for no deadline. */
+  dueDate: string;
+  /** The deadline as first set — moving it never loses the original. */
+  originalDueDate: string;
+  assignedAt: string;
+  seenAt?: string;
+  startedAt?: string;
+  submittedAt?: string;
+  closedAt?: string;
+  cancelledAt?: string;
+  /** A deadline extension the officer has asked for and the assigner has not yet answered. */
+  extensionRequest?: { dueDate: string; reason: string; at: string };
+  /** The task this one was passed on from, when a supervisor handed it down. */
+  parentId?: string;
+  parentTitle?: string;
+  /** How many times it came back with comments. */
+  returns: number;
+  events: TaskEvent[];
 }
 
 export interface WeekDef {

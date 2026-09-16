@@ -8,8 +8,10 @@ import { useAuth } from "@/lib/auth";
 import { isMockMode } from "@/lib/firebase";
 
 const DEMO_ACCOUNTS = [
-  { email: "admin@rpa.gov.zm", role: "Administrator" },
-  { email: "as.officer@rpa.gov.zm", role: "Authorisation & Standards officer" },
+  { email: "admin@rpa.gov.zm", role: "Administrator (Director on the demo org chart)" },
+  { email: "manager@rpa.gov.zm", role: "Manager NRS — supervises the three Senior Officers" },
+  { email: "as.officer@rpa.gov.zm", role: "Authorisation & Standards Senior Officer" },
+  { email: "as.nrso@rpa.gov.zm", role: "Authorisation & Standards Officer — reports to the Senior Officer" },
   { email: "inspector@rpa.gov.zm", role: "Inspectorate officer" },
   { email: "nsss@rpa.gov.zm", role: "Nuclear Safety, Security & Safeguards officer" },
   {

@@ -10,16 +10,25 @@ import type {
   InventoryKind,
 } from "../rules/inventoryEdits";
 import type {
+  NewTaskInput,
+  TaskAction,
+  TaskReadScope,
+  TaskViewer,
+} from "../rules/tasks";
+import type {
   Activity,
   AuditEntry,
   Border,
   DailyEntry,
   DashboardAggregate,
+  DirectoryEntry,
   Facility,
   Inspection,
   InspectionRequest,
   LicenceEvent,
   LicenceWorkflow,
+  Task,
+  TaskParty,
   TruckScan,
   UserDoc,
   WeekDef,
@@ -331,10 +340,54 @@ export interface DataStore {
       role: UserDoc["role"];
       section: UserDoc["section"];
       border?: string;
+      /** Placement on the reporting line — see GRADES. "" clears. */
+      grade?: UserDoc["grade"];
+      reportsTo?: string;
     },
     actorUid: string,
   ): Promise<void>;
   setUserDisabled(uid: string, disabled: boolean): Promise<void>;
+  /**
+   * The staff directory — every account's name, section, grade and
+   * supervisor, readable by every approved officer. It is the slice of
+   * `users` the Tasks desk needs to say who may give work to whom, mirrored
+   * from the account documents (see directoryEntry in lib/rules/tasks.ts).
+   */
+  listDirectory(): Promise<DirectoryEntry[]>;
+  /**
+   * The tasks this account may read — see taskScopeFor. The department reads
+   * all of them; anyone else the ones they are on and their section's. Newest
+   * first; the page groups and sorts them itself.
+   */
+  listTasks(scope: TaskReadScope): Promise<Task[]>;
+  /**
+   * Give a task. Checked against the reporting line (buildTask); refused with
+   * the name of the supervisor to go through when the officer is not on the
+   * actor's line.
+   */
+  addTask(input: NewTaskInput, actor: TaskParty, viewer: TaskViewer): Promise<Task>;
+  /**
+   * Move a task on — start, hand back, accept, return, cancel, re-plan,
+   * comment. The rules module decides what each party may do; this only
+   * persists the result.
+   */
+  updateTask(
+    id: string,
+    action: TaskAction,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<Task>;
+  /**
+   * Hand a task down the line: a new task to one of the actor's own reports,
+   * linked to this one, which records the hand-down and stays open on the
+   * actor's desk until they hand it back up themselves.
+   */
+  passTaskOn(
+    id: string,
+    input: NewTaskInput,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<{ parent: Task; child: Task }>;
   exportAll(): Promise<{
     facilities: Facility[];
     licenceEvents: LicenceEvent[];

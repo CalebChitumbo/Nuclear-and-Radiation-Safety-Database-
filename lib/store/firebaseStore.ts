@@ -54,6 +54,15 @@ import {
 } from "../rules/signup";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
+  applyTaskAction,
+  buildTask,
+  directoryEntry,
+  type NewTaskInput,
+  type TaskAction,
+  type TaskReadScope,
+  type TaskViewer,
+} from "../rules/tasks";
+import {
   buildWorkflowComment,
   workflowHistoryOnSave,
 } from "../rules/workflowNotes";
@@ -63,12 +72,15 @@ import {
   type AuditEntry,
   type DailyEntry,
   type DashboardAggregate,
+  type DirectoryEntry,
   type Facility,
   type Inspection,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type Task,
+  type TaskParty,
   type TruckScan,
   type UserDoc,
   type WeekDef,
@@ -340,6 +352,19 @@ class FirebaseStore implements DataStore {
     // screening report reads its columns off this list.
     if (patch.border) await this.addBorder(patch.border, actorUid);
     await updateDoc(doc(db, "users", uid), { ...patch });
+    await this.mirrorDirectory(uid);
+  }
+
+  /**
+   * Keep the staff directory in step with an account document. The Cloud
+   * Function does the same on every write; this makes the change visible to
+   * the administrator at once rather than after the function has run.
+   */
+  private async mirrorDirectory(uid: string): Promise<void> {
+    const db = requireDb();
+    const user = await this.getUser(uid);
+    if (!user) return;
+    await setDoc(doc(db, "directory", uid), directoryEntry(user));
   }
 
   async updateUserAccess(
@@ -348,6 +373,8 @@ class FirebaseStore implements DataStore {
       role: UserDoc["role"];
       section: UserDoc["section"];
       border?: string;
+      grade?: UserDoc["grade"];
+      reportsTo?: string;
     },
     actorUid: string,
   ): Promise<void> {
@@ -355,6 +382,7 @@ class FirebaseStore implements DataStore {
     const patch = accessPatch(decision);
     if (patch.border) await this.addBorder(patch.border, actorUid);
     await updateDoc(doc(db, "users", uid), { ...patch });
+    await this.mirrorDirectory(uid);
   }
 
   async declineUser(uid: string): Promise<void> {
@@ -365,6 +393,7 @@ class FirebaseStore implements DataStore {
       pending: false,
       disabled: true,
     });
+    await this.mirrorDirectory(uid);
   }
 
   async getAggregate(): Promise<DashboardAggregate> {
@@ -1162,6 +1191,122 @@ class FirebaseStore implements DataStore {
   async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
     const db = requireDb();
     await updateDoc(doc(db, "users", uid), { disabled });
+    await this.mirrorDirectory(uid);
+  }
+
+  // --- the staff directory and the Tasks desk -----------------------------
+
+  async listDirectory(): Promise<DirectoryEntry[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "directory"));
+    return snap.docs.map((d) => ({
+      ...(d.data() as DirectoryEntry),
+      uid: d.id,
+    }));
+  }
+
+  async listTasks(scope: TaskReadScope): Promise<Task[]> {
+    const db = requireDb();
+    const col = collection(db, "tasks");
+    // One query per case the rules allow; the union is the account's view.
+    // A department account reads the collection outright.
+    const queries = scope.department
+      ? [query(col)]
+      : [
+          query(col, where("assignedToUid", "==", scope.uid)),
+          query(col, where("assignedByUid", "==", scope.uid)),
+          query(col, where("watcherUids", "array-contains", scope.uid)),
+          ...(scope.section
+            ? [query(col, where("section", "==", scope.section))]
+            : []),
+        ];
+    const snaps = await Promise.all(queries.map((q) => getDocs(q)));
+    const byId = new Map<string, Task>();
+    for (const snap of snaps) {
+      for (const d of snap.docs) {
+        byId.set(d.id, { ...(d.data() as Omit<Task, "id">), id: d.id });
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      b.assignedAt.localeCompare(a.assignedAt),
+    );
+  }
+
+  async addTask(
+    input: NewTaskInput,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<Task> {
+    const db = requireDb();
+    const directory = await this.listDirectory();
+    const draft = buildTask(input, actor, directory, new Date().toISOString(), {
+      isAdmin: viewer.isAdmin,
+    });
+    const ref = doc(collection(db, "tasks"));
+    await setDoc(ref, draft);
+    return { ...draft, id: ref.id };
+  }
+
+  private async readTask(id: string): Promise<Task> {
+    const db = requireDb();
+    const snap = await getDoc(doc(db, "tasks", id));
+    if (!snap.exists()) throw new Error("Task not found.");
+    return { ...(snap.data() as Omit<Task, "id">), id };
+  }
+
+  async updateTask(
+    id: string,
+    action: TaskAction,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<Task> {
+    const db = requireDb();
+    const current = await this.readTask(id);
+    const updated = applyTaskAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+      viewer,
+    );
+    if (updated === current) return current;
+    // Written whole: a return drops the outcome, an answer drops the
+    // extension request, and a merge would leave those behind.
+    const { id: _id, ...data } = updated;
+    void _id;
+    await setDoc(doc(db, "tasks", id), data);
+    return updated;
+  }
+
+  async passTaskOn(
+    id: string,
+    input: NewTaskInput,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<{ parent: Task; child: Task }> {
+    const db = requireDb();
+    const current = await this.readTask(id);
+    const directory = await this.listDirectory();
+    const now = new Date().toISOString();
+    const childDraft = buildTask(input, actor, directory, now, {
+      isAdmin: viewer.isAdmin,
+      parent: { id, title: current.title },
+    });
+    const childRef = doc(collection(db, "tasks"));
+    const parent = applyTaskAction(
+      current,
+      { kind: "passed-on", to: childDraft.assignedTo, childId: childRef.id },
+      actor,
+      now,
+      viewer,
+    );
+    const { id: _pid, ...parentData } = parent;
+    void _pid;
+    const batch = writeBatch(db);
+    batch.set(childRef, childDraft);
+    batch.set(doc(db, "tasks", id), parentData);
+    await batch.commit();
+    return { parent, child: { ...childDraft, id: childRef.id } };
   }
 
   async exportAll() {

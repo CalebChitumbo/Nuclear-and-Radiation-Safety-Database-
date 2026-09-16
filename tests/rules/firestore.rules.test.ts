@@ -77,6 +77,25 @@ const pending = () => env.authenticatedContext("u-pending", {}).firestore();
 
 // --- the records -----------------------------------------------------------
 
+const task = (
+  by: string,
+  to: string,
+  section: string,
+  watcherUids: string[] = [],
+  status = "Assigned",
+) => ({
+  title: "Respond to MoH letter",
+  status,
+  priority: "Normal",
+  assignedByUid: by,
+  assignedToUid: to,
+  watcherUids,
+  section,
+  dueDate: "2026-09-30",
+  assignedAt: "2026-09-14T08:00:00.000Z",
+  events: [],
+});
+
 const scan = (border: string, officerUid = "u-nak") => ({
   date: "2026-09-01",
   week: "W36 2026",
@@ -144,6 +163,30 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, "licenceWorkflows/w1"), { ran: "AUTH/USE.NEW/0203", notes: [] });
     await setDoc(doc(db, "aggregates/dashboard"), { total: 1 });
+    // The reporting line: the administrator at the top, a senior in each
+    // section under them (peers), the second NSSS officer and the Nakonde
+    // coordinator under the NSSS senior. The NSI officer is placed too.
+    for (const [uid, section, reportsTo] of [
+      ["u-admin", "All", ""],
+      ["u-as", AS, "u-admin"],
+      ["u-insp", INSP, "u-admin"],
+      ["u-nsss", NSSS, "u-admin"],
+      ["u-nsi", NSI, "u-admin"],
+      ["u-other", NSSS, "u-nsss"],
+      ["u-nak", NSSS, "u-nsss"],
+    ] as const) {
+      await setDoc(doc(db, `directory/${uid}`), {
+        uid,
+        displayName: uid,
+        section,
+        ...(reportsTo ? { reportsTo } : {}),
+        active: true,
+      });
+    }
+    // A task the A&S senior gave their Inspectorate peer, watched by the
+    // administrator; one the NSSS senior gave the second NSSS officer.
+    await setDoc(doc(db, "tasks/t-peer"), task("u-as", "u-insp", INSP, ["u-admin"]));
+    await setDoc(doc(db, "tasks/t-nsss"), task("u-nsss", "u-other", NSSS));
     await setDoc(doc(db, "inventoryEdits/rais:RAN1"), {
       id: "rais:RAN1",
       inventory: "rais",
@@ -595,5 +638,101 @@ describe("the border register", () => {
     await assertFails(setDoc(doc(nakonde(), "borders/mwami"), { name: "Mwami", active: true }));
     await assertFails(setDoc(doc(as(), "borders/mwami"), { name: "Mwami", active: true }));
     await assertFails(getDocs(collection(pending(), "borders")));
+  });
+});
+
+// --- the staff directory and the Tasks desk ---------------------------------
+
+describe("the staff directory", () => {
+  it("is readable by every approved officer, posted ones included, and written by administrators only", async () => {
+    await assertSucceeds(getDocs(collection(as(), "directory")));
+    await assertSucceeds(getDocs(collection(nakonde(), "directory")));
+    await assertSucceeds(getDoc(doc(nsi(), "directory/u-as")));
+    await assertFails(getDocs(collection(pending(), "directory")));
+    await assertSucceeds(
+      setDoc(doc(admin(), "directory/u-new"), { uid: "u-new", displayName: "New", section: AS, active: true }),
+    );
+    await assertFails(
+      setDoc(doc(as(), "directory/u-new"), { uid: "u-new", displayName: "New", section: AS, active: true }),
+    );
+    await assertFails(updateDoc(doc(nsssDesk(), "directory/u-nak"), { reportsTo: "u-nsss" }));
+  });
+});
+
+describe("the Tasks desk", () => {
+  it("lets work be given to a direct report, a peer, one's own supervisor and oneself", async () => {
+    await assertSucceeds(setDoc(doc(nsssDesk(), "tasks/new-1"), task("u-nsss", "u-other", NSSS)));
+    await assertSucceeds(setDoc(doc(as(), "tasks/new-2"), task("u-as", "u-insp", INSP)));
+    await assertSucceeds(setDoc(doc(nsssOther(), "tasks/new-3"), task("u-other", "u-nsss", NSSS)));
+    await assertSucceeds(setDoc(doc(as(), "tasks/new-4"), task("u-as", "u-as", AS)));
+    // A posted coordinator gives their peer work, and their supervisor.
+    await assertSucceeds(setDoc(doc(nakonde(), "tasks/new-5"), task("u-nak", "u-other", NSSS)));
+    await assertSucceeds(setDoc(doc(nakonde(), "tasks/new-6"), task("u-nak", "u-nsss", NSSS)));
+  });
+
+  it("refuses an officer off the line, and the department's top reaching two levels down", async () => {
+    await assertFails(setDoc(doc(as(), "tasks/bad-1"), task("u-as", "u-other", NSSS)));
+    await assertFails(setDoc(doc(as(), "tasks/bad-2"), task("u-as", "u-nak", NSSS)));
+    // Two levels down one's own line goes through the senior in between —
+    // unless the account is an administrator, who may reach anyone.
+    await assertSucceeds(setDoc(doc(admin(), "tasks/ok-admin"), task("u-admin", "u-nak", NSSS)));
+  });
+
+  it("insists the task is given by the account writing it, opened Assigned, and well-formed", async () => {
+    await assertFails(setDoc(doc(as(), "tasks/bad-3"), task("u-insp", "u-as", AS)));
+    await assertFails(setDoc(doc(as(), "tasks/bad-4"), task("u-as", "u-insp", INSP, [], "Closed")));
+    await assertFails(setDoc(doc(as(), "tasks/bad-5"), { ...task("u-as", "u-insp", INSP), title: "" }));
+    await assertFails(setDoc(doc(as(), "tasks/bad-6"), { ...task("u-as", "u-insp", INSP), dueDate: "30/09/2026" }));
+    await assertFails(setDoc(doc(pending(), "tasks/bad-7"), task("u-pending", "u-pending", AS)));
+    // An account with no directory line can give work to nobody but itself.
+    await assertFails(setDoc(doc(nsi(), "tasks/bad-8"), task("u-nsi", "u-as", AS)));
+  });
+
+  it("is read by the parties, the watchers, the section and the department", async () => {
+    await assertSucceeds(getDoc(doc(as(), "tasks/t-peer")));
+    await assertSucceeds(getDoc(doc(insp(), "tasks/t-peer")));
+    await assertSucceeds(getDoc(doc(admin(), "tasks/t-peer")));
+    // Filed under the officer's section, so the rest of the Inspectorate
+    // reads it and the rest of A&S does not.
+    await assertFails(getDoc(doc(nsssDesk(), "tasks/t-peer")));
+    await assertFails(getDoc(doc(nsi(), "tasks/t-peer")));
+    await assertFails(getDoc(doc(pending(), "tasks/t-peer")));
+    // The NSSS task: the section's, the posted coordinator's too.
+    await assertSucceeds(getDoc(doc(nakonde(), "tasks/t-nsss")));
+    await assertFails(getDoc(doc(as(), "tasks/t-nsss")));
+  });
+
+  it("answers the four scoped list queries and refuses an unscoped one from a section officer", async () => {
+    const col = collection(as(), "tasks");
+    await assertSucceeds(getDocs(query(col, where("assignedToUid", "==", "u-as"))));
+    await assertSucceeds(getDocs(query(col, where("assignedByUid", "==", "u-as"))));
+    await assertSucceeds(getDocs(query(col, where("watcherUids", "array-contains", "u-as"))));
+    await assertSucceeds(getDocs(query(col, where("section", "==", AS))));
+    await assertFails(getDocs(query(col, where("section", "==", INSP))));
+    await assertFails(getDocs(col));
+    await assertSucceeds(getDocs(collection(admin(), "tasks")));
+  });
+
+  it("lets anyone on the task move it, never re-writing who gave it or when", async () => {
+    await assertSucceeds(
+      updateDoc(doc(insp(), "tasks/t-peer"), { status: "In Progress", startedAt: "2026-09-15T08:00:00.000Z" }),
+    );
+    await assertSucceeds(updateDoc(doc(admin(), "tasks/t-peer"), { events: [{ kind: "comment" }] }));
+    await assertFails(updateDoc(doc(insp(), "tasks/t-peer"), { assignedByUid: "u-insp" }));
+    await assertFails(updateDoc(doc(insp(), "tasks/t-peer"), { assignedAt: "2026-01-01T00:00:00.000Z" }));
+    await assertFails(updateDoc(doc(nsssDesk(), "tasks/t-peer"), { status: "Closed" }));
+  });
+
+  it("hands a task to someone else only from the account that gave it, along the line", async () => {
+    // The officer may not pass it sideways themselves.
+    await assertFails(updateDoc(doc(insp(), "tasks/t-peer"), { assignedToUid: "u-nsss" }));
+    // The assigner may, to another peer; not to someone off their line.
+    await assertSucceeds(updateDoc(doc(as(), "tasks/t-peer"), { assignedToUid: "u-nsss", section: NSSS }));
+    await assertFails(updateDoc(doc(nsssDesk(), "tasks/t-nsss"), { assignedToUid: "u-as", section: AS }));
+  });
+
+  it("is deleted by administrators only", async () => {
+    await assertFails(deleteDoc(doc(as(), "tasks/t-peer")));
+    await assertSucceeds(deleteDoc(doc(admin(), "tasks/t-peer")));
   });
 });

@@ -579,6 +579,45 @@ trackable — and the facility drawer lists every request a facility has had.
 
 ---
 
+## The Tasks desk — who has what, and when it is due back
+
+Every account has a desk at `/tasks`. A supervisor gives an officer a piece of
+work — respond to a letter, draft a memo, review an application — with a
+category, a priority and a deadline; the officer sees it on their desk, works
+it and **hands it back** as *Done* or *Not done* with a reason; the supervisor
+**accepts and closes** it or **returns** it with comments. A task waiting on
+the supervisor reads as theirs, not the officer's, which is what keeps the
+follow-up honest. `docs/task-desk.md` is the full design note.
+
+**Who may give work to whom** is the department's reporting line, set by an
+administrator on the Users desk with two fields on each account — the
+**grade** (Director · Manager · Senior Officer · Officer · Technologist) and
+**reports to** (the immediate supervisor). A task goes to a **direct report**,
+a **peer** (same supervisor) or one's **own supervisor**, and to nobody else;
+anyone in another line is reached **through their supervisor**, who is given
+the task and **passes it on** — a linked task on their own report's desk while
+the original stays open on theirs. When peers task each other the shared
+supervisor is put in the loop. `firestore.rules` checks the same three cases
+against the **staff directory** (`directory/{uid}`, the readable slice of
+`users` that `onUserDocWrite` mirrors; `npm run sync:directory` backfills it
+once). An account with no grade or supervisor is *not placed* and can be
+given work by nobody but itself and an administrator.
+
+**What is derived, never stored:** the standing (*Overdue Nd · Due today ·
+Due in Nd · On track · Awaiting review · Closed on time · Closed Nd late*),
+the days on the desk and the turnaround in *working* days (weekends and
+Zambia's public holidays skipped), the officer's desk grouped by when things
+are due, the supervisor's per-officer table (open, overdue, handed back,
+closed and how many late, on-time rate, average turnaround, oldest open) and
+the badge on the Tasks link. Every move — opened, started, handed back,
+returned, deadline moved with its reason, extension asked for and answered,
+reassigned, passed on, comment — is an event on the task, and the original
+deadline stays on the record. All of it is pure in `lib/rules/tasks.ts` and
+pinned in `tests/tasks.test.ts`; the mock store's lifecycle is
+`tests/taskStore.test.ts`.
+
+---
+
 ## The inspection database — the Inspectorate's own workbook
 
 The Inspectorate keeps its year in one workbook: a sheet per province round, a
@@ -1369,6 +1408,13 @@ npm test
 - `recordLicence` — full R1–R6 worked expectation
 - `inspectionRequests` — request state machine, capability gating, inbox
   notifications and stats for the Inspectorate ↔ Licensing handoff
+- `tasks` — the Tasks desk: the reporting line (direct report, peer, own
+  supervisor; the refusal that names whom to go through; the shared supervisor
+  put in the loop), the state machine and who may take which move, the derived
+  standing, working days over Zambia's public holidays, the officer's desk,
+  the review queue, the badge and the supervisor's per-officer summary
+- `taskStore` — the mock store gives, works, passes on and closes a task, and
+  places an account on the line from the Users desk
 - `workflowNotes` — the application notes & history trail: comment building,
   the automatic history entries a save produces, and that officer comments
   survive re-imports
@@ -1498,6 +1544,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── verified-source-inventory/  Annex I items confirmed in the field (read-only)
 │   ├── licences/           Authorisations tab — statistics from the register
 │   ├── inspectorate/       Inspection database — summary, province sheets, cards, log
+│   ├── tasks/              The Tasks desk — what is on each desk, what is out, what is late
 │   ├── inspections/        (moved) redirects to /inspectorate
 │   ├── nsss/               Nuclear Safety, Security & Safeguards dashboard
 │   ├── border/             Border Scan Log — one record per scanned truck

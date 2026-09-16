@@ -393,3 +393,38 @@ Notice · Suspension of License · Cancellation of License
   list and its *Record follow-up* prefill live on `/inspectorate`
   (`cardsDue`, `describeCard`, `suggestedFollowUp`). See
   `docs/management-updates-2026-09.md` for what was asked and verified.
+
+## Routine: a new officer joins, or the reporting line changes
+
+The Tasks desk (`/tasks`) reads **who may give work to whom** off the
+reporting line — `grade` and `reportsTo` on each account, set by an
+administrator on `/admin/users`. A task goes to a direct report, a peer (same
+supervisor) or one's own supervisor; anyone else is reached through their
+supervisor, who passes it on. `docs/task-desk.md` is the design note.
+
+1. Approve the account as usual, then **Edit** it on the Users desk and set the
+   grade and who it reports to. The *Reporting line* panel at the foot of that
+   page draws the result; an account showing **Not placed** can be given work
+   by nobody but itself and an administrator.
+2. Nothing else to run: `onUserDocWrite` mirrors the account onto
+   `directory/{uid}` (the readable slice the picker and the rules use), and
+   the Users desk writes it directly too.
+
+**Watch out:** accounts that existed before the directory did have no line
+until they are next written. After deploying, run once:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run sync:directory
+```
+
+**Watch out:** the grades are labels; nothing is gated on them. "Can pass a
+task on" means *someone reports to you*, whatever your grade — a Technologist
+with a report can, a Senior Officer with none cannot. Changing the cases the
+rules allow means changing `assignmentBlocker` in `lib/rules/tasks.ts`,
+`mayAssignTo` in `firestore.rules`, `tests/tasks.test.ts` and the rules suite
+together.
+
+**Watch out:** the standing, the turnaround and the supervisor's table are
+derived when the page is read; no figure is stored per task beyond its dates
+and events. A task is written whole on every move (`setDoc`, not a merge) so
+that a return drops the outcome and an answer drops the extension request.

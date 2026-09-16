@@ -39,10 +39,14 @@ import {
   requiresInlandOffice,
   settledAccounts,
 } from "@/lib/rules/signup";
+import { directoryEntry, orgChart, type OrgNode } from "@/lib/rules/tasks";
 import {
+  GRADES,
+  GRADE_META,
   ROLES,
   SECTIONS,
   type Border,
+  type Grade,
   type Role,
   type Section,
   type UserDoc,
@@ -306,6 +310,8 @@ export default function AdminUsersPage() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Section</th>
+                <th>Grade</th>
+                <th>Reports to</th>
                 <th>Inland office</th>
                 <th>Status</th>
                 <th></th>
@@ -325,6 +331,16 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
                     <td className="text-xs">{u.section}</td>
+                    <td className="text-xs">
+                      {u.grade ? (
+                        <span title={GRADE_META[u.grade].post}>
+                          {GRADE_META[u.grade].short}
+                        </span>
+                      ) : (
+                        <span className="chip amber">Not placed</span>
+                      )}
+                    </td>
+                    <td className="text-xs">{nameOf(u.reportsTo, users) || "—"}</td>
                     <td className="text-xs">
                       {u.border ? (
                         <>
@@ -360,9 +376,10 @@ export default function AdminUsersPage() {
                   </tr>
                   {editingUid === u.uid ? (
                     <tr>
-                      <td colSpan={7} className="!p-0">
+                      <td colSpan={9} className="!p-0">
                         <AccessEditor
                           account={u}
+                          accounts={accounts}
                           offices={offices}
                           actorUid={user?.uid || ""}
                           onDone={() => {
@@ -411,6 +428,14 @@ export default function AdminUsersPage() {
                   {u.role}
                 </span>
                 <span className="chip">{u.section}</span>
+                {u.grade ? (
+                  <span className="chip slate">{GRADE_META[u.grade].short}</span>
+                ) : (
+                  <span className="chip amber">Not placed</span>
+                )}
+                {u.reportsTo ? (
+                  <span className="chip">→ {nameOf(u.reportsTo, users)}</span>
+                ) : null}
                 {u.border ? (
                   <span className="chip slate">{u.border} · scan log only</span>
                 ) : null}
@@ -424,6 +449,7 @@ export default function AdminUsersPage() {
                 <div className="mt-3 -mx-4">
                   <AccessEditor
                     account={u}
+                    accounts={accounts}
                     offices={offices}
                     actorUid={user?.uid || ""}
                     onDone={() => {
@@ -437,6 +463,15 @@ export default function AdminUsersPage() {
             </li>
           ))}
         </ul>
+      </Panel>
+
+      <Panel
+        title="Reporting line"
+        note="Who gives work to whom on the Tasks desk. A task goes to a direct report, a peer or one's own supervisor; anyone else is reached through their supervisor. Place each account with Edit above — an account with no grade or supervisor can be given work by nobody but itself and an administrator."
+      >
+        {accounts.length === 0 ? null : (
+          <OrgTree nodes={orgChart(accounts.map(directoryEntry))} />
+        )}
       </Panel>
 
       {/* Shared by the request cards and the provisioning form. */}
@@ -605,12 +640,15 @@ function RequestCard({
  */
 function AccessEditor({
   account,
+  accounts,
   offices,
   actorUid,
   onDone,
   onCancel,
 }: {
   account: UserDoc;
+  /** Every settled account — the supervisor picker. */
+  accounts: UserDoc[];
   offices: string[];
   actorUid: string;
   onDone: () => void;
@@ -620,15 +658,24 @@ function AccessEditor({
   const [role, setRole] = useState<Role>(account.role);
   const [section, setSection] = useState<Section | "All">(account.section);
   const [border, setBorder] = useState(account.border || "");
+  const [grade, setGrade] = useState<Grade | "">(account.grade || "");
+  const [reportsTo, setReportsTo] = useState(account.reportsTo || "");
   const [busy, setBusy] = useState(false);
 
   const needsOffice = requiresInlandOffice(section);
-  const blocker = accessChangeBlocker(actorUid, account, { role });
+  const blocker =
+    accessChangeBlocker(actorUid, account, { role }) ||
+    (reportsTo === account.uid ? "An account cannot report to itself." : "");
   const office = needsOffice ? border.trim() : "";
   const unchanged =
     role === account.role &&
     section === account.section &&
-    office.toLowerCase() === (account.border || "").toLowerCase();
+    office.toLowerCase() === (account.border || "").toLowerCase() &&
+    grade === (account.grade || "") &&
+    reportsTo === (account.reportsTo || "");
+  const supervisors = accounts
+    .filter((u) => u.uid !== account.uid && !u.disabled)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const save = async () => {
     if (blocker) {
@@ -640,7 +687,7 @@ function AccessEditor({
       const s = await store();
       await s.updateUserAccess(
         account.uid,
-        { role, section, border: office },
+        { role, section, border: office, grade, reportsTo },
         actorUid,
       );
       toast.push(
@@ -727,6 +774,51 @@ function AccessEditor({
             </p>
           </div>
         ) : null}
+        <div>
+          <label className="field-label" htmlFor={`edit-grade-${account.uid}`}>
+            Grade
+          </label>
+          <select
+            id={`edit-grade-${account.uid}`}
+            className="input"
+            value={grade}
+            onChange={(e) => setGrade(e.target.value as Grade | "")}
+          >
+            <option value="">Not placed</option>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {g} · {GRADE_META[g].short}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label
+            className="field-label"
+            htmlFor={`edit-reports-${account.uid}`}
+          >
+            Reports to
+          </label>
+          <select
+            id={`edit-reports-${account.uid}`}
+            className="input"
+            value={reportsTo}
+            onChange={(e) => setReportsTo(e.target.value)}
+          >
+            <option value="">Nobody (top of the line)</option>
+            {supervisors.map((u) => (
+              <option key={u.uid} value={u.uid}>
+                {u.displayName}
+                {u.grade ? ` · ${GRADE_META[u.grade].short}` : ""}
+                {u.section !== "All" ? ` · ${u.section}` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gunmetal/60 mt-1.5">
+            The immediate supervisor — who gives this account work on the Tasks
+            desk, and whom its own tasks go up to.
+          </p>
+        </div>
       </div>
       {blocker ? (
         <p
@@ -774,5 +866,36 @@ function ToggleButton({
     >
       {isDisabledAccount ? "Enable" : "Disable"}
     </button>
+  );
+}
+
+function nameOf(uid: string | undefined, users: UserDoc[]): string {
+  if (!uid) return "";
+  return users.find((u) => u.uid === uid)?.displayName || "(unknown account)";
+}
+
+/** The reporting line as an indented tree. */
+function OrgTree({ nodes, depth = 0 }: { nodes: OrgNode[]; depth?: number }) {
+  return (
+    <ul className={depth ? "ml-4 border-l border-gunmetal/10 pl-3" : ""}>
+      {nodes.map((n) => (
+        <li key={n.entry.uid} className="py-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className={`font-bold ${n.entry.active ? "" : "text-gunmetal/50 line-through"}`}>
+              {n.entry.displayName}
+            </span>
+            {n.entry.grade ? (
+              <span className="chip slate">{GRADE_META[n.entry.grade].short}</span>
+            ) : (
+              <span className="chip amber">Not placed</span>
+            )}
+            <span className="text-xs text-gunmetal/55">
+              {n.entry.border || (n.entry.section === "All" ? "Department" : n.entry.section)}
+            </span>
+          </div>
+          {n.reports.length ? <OrgTree nodes={n.reports} depth={depth + 1} /> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
