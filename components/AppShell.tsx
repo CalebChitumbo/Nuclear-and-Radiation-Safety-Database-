@@ -12,6 +12,8 @@ import { useStoreData } from "@/lib/storeHooks";
 import { canOpen, seesRegister } from "@/lib/rules/access";
 import { deriveInspectionInbox } from "@/lib/rules/inspectionRequests";
 import { pendingRequests } from "@/lib/rules/signup";
+import { taskBadge, taskScopeFor } from "@/lib/rules/tasks";
+import { todayISO } from "@/lib/rules/week";
 
 const STANDALONE_ROUTES = ["/login", "/signup", "/pending"];
 
@@ -37,15 +39,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       const accountRequests = isAdmin
         ? await s.listUsers().catch(() => [])
         : [];
+      // Every account has a desk; what needs attention on it today.
+      const scope = taskScopeFor(user);
+      const tasks = scope ? await s.listTasks(scope).catch(() => []) : [];
       return {
         inbox: deriveInspectionInbox(requests, { canEditAS, canEditInsp }),
         accounts: pendingRequests(accountRequests).length,
+        tasks: user ? taskBadge(tasks, user.uid, todayISO()) : 0,
       };
     },
-    [canEditAS, canEditInsp, isAdmin, handoff],
+    [canEditAS, canEditInsp, isAdmin, handoff, user?.uid],
   );
   const inspectionBadge = user ? badges?.inbox.count || 0 : 0;
   const requestBadge = user && isAdmin ? badges?.accounts || 0 : 0;
+  const tasksBadge = user ? badges?.tasks || 0 : 0;
 
   // Close the mobile navigation drawer whenever the route changes.
   useEffect(() => {
@@ -97,6 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onMobileClose={() => setMobileNavOpen(false)}
         inspectionBadge={inspectionBadge}
         requestBadge={requestBadge}
+        taskBadge={tasksBadge}
       />
       {/* Content is full-width on mobile; the fixed sidebar only reserves
           space from the `lg` breakpoint up, where it is always visible. */}
@@ -109,6 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <MobileNav
         onMore={() => setMobileNavOpen(true)}
         badge={inspectionBadge}
+        taskBadge={tasksBadge}
       />
     </div>
   );

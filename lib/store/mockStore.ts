@@ -32,6 +32,16 @@ import {
 } from "../rules/signup";
 import { resolveFacilityStatus } from "../rules/supersede";
 import {
+  applyTaskAction,
+  buildTask,
+  directoryEntry,
+  inTaskScope,
+  type NewTaskInput,
+  type TaskAction,
+  type TaskReadScope,
+  type TaskViewer,
+} from "../rules/tasks";
+import {
   buildWorkflowComment,
   workflowHistoryOnSave,
 } from "../rules/workflowNotes";
@@ -41,12 +51,15 @@ import {
   type Border,
   type DailyEntry,
   type DashboardAggregate,
+  type DirectoryEntry,
   type Facility,
   type Inspection,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
   type LicenceWorkflow,
+  type Task,
+  type TaskParty,
   type TruckScan,
   type UserDoc,
   type WeekDef,
@@ -109,7 +122,82 @@ interface State {
   truckScans: TruckScan[];
   inventoryEdits: InventoryEdit[];
   users: UserDoc[];
+  tasks: Task[];
 }
+
+/**
+ * The demo department, placed on its reporting line so the Tasks desk can be
+ * tried: the Director over the Manager, the Manager over a Senior Officer in
+ * each section, and an Officer or coordinator under those.
+ */
+const DEMO_USERS: UserDoc[] = [
+  {
+    uid: "demo-admin",
+    email: "admin@rpa.gov.zm",
+    displayName: "Demo Administrator",
+    role: "admin",
+    section: "All",
+    grade: "Director",
+  },
+  {
+    uid: "demo-manager",
+    email: "manager@rpa.gov.zm",
+    displayName: "Manager NRS",
+    role: "officer",
+    section: "All",
+    grade: "Manager",
+    reportsTo: "demo-admin",
+  },
+  {
+    uid: "demo-as",
+    email: "as.officer@rpa.gov.zm",
+    displayName: "A&S Officer",
+    role: "officer",
+    section: "Authorisation & Standards",
+    grade: "Senior Officer",
+    reportsTo: "demo-manager",
+  },
+  {
+    uid: "demo-as-nrso",
+    email: "as.nrso@rpa.gov.zm",
+    displayName: "A&S Licensing Officer",
+    role: "officer",
+    section: "Authorisation & Standards",
+    grade: "Officer",
+    reportsTo: "demo-as",
+  },
+  {
+    uid: "demo-insp",
+    email: "inspector@rpa.gov.zm",
+    displayName: "Inspectorate Officer",
+    role: "officer",
+    section: "Inspectorate",
+    grade: "Senior Officer",
+    reportsTo: "demo-manager",
+  },
+  {
+    uid: "demo-nsss",
+    email: "nsss@rpa.gov.zm",
+    displayName: "NSSS Officer",
+    role: "officer",
+    section: "Nuclear Safety, Security & Safeguards",
+    grade: "Senior Officer",
+    reportsTo: "demo-manager",
+  },
+  // A border coordinator posted to one inland office: their screening
+  // figures can only be filed against Nakonde, which is what the sign-up
+  // form asks an NSSS officer for.
+  {
+    uid: "demo-nakonde",
+    email: "nakonde@rpa.gov.zm",
+    displayName: "Nakonde Coordinator",
+    role: "officer",
+    section: "Nuclear Safety, Security & Safeguards",
+    border: "Nakonde",
+    grade: "Officer",
+    reportsTo: "demo-nsss",
+  },
+];
 
 function freshState(): State {
   const facilities = mapAllSeed(facilitiesSeed as SeedFacility[]);
@@ -141,47 +229,8 @@ function freshState(): State {
     borders: mapSeedBorders(screeningSeed as SeedScreening),
     truckScans: [],
     inventoryEdits: [],
-    users: [
-      {
-        uid: "demo-admin",
-        email: "admin@rpa.gov.zm",
-        displayName: "Demo Administrator",
-        role: "admin",
-        section: "All",
-      },
-      {
-        uid: "demo-as",
-        email: "as.officer@rpa.gov.zm",
-        displayName: "A&S Officer",
-        role: "officer",
-        section: "Authorisation & Standards",
-      },
-      {
-        uid: "demo-insp",
-        email: "inspector@rpa.gov.zm",
-        displayName: "Inspectorate Officer",
-        role: "officer",
-        section: "Inspectorate",
-      },
-      {
-        uid: "demo-nsss",
-        email: "nsss@rpa.gov.zm",
-        displayName: "NSSS Officer",
-        role: "officer",
-        section: "Nuclear Safety, Security & Safeguards",
-      },
-      // A border coordinator posted to one inland office: their screening
-      // figures can only be filed against Nakonde, which is what the sign-up
-      // form asks an NSSS officer for.
-      {
-        uid: "demo-nakonde",
-        email: "nakonde@rpa.gov.zm",
-        displayName: "Nakonde Coordinator",
-        role: "officer",
-        section: "Nuclear Safety, Security & Safeguards",
-        border: "Nakonde",
-      },
-    ],
+    users: DEMO_USERS.map((u) => ({ ...u })),
+    tasks: [],
   };
 }
 
@@ -215,26 +264,18 @@ function load(): State {
     if (!parsed.truckScans) parsed.truckScans = [];
     // Back-compat: stores saved before the inventories became editable.
     if (!parsed.inventoryEdits) parsed.inventoryEdits = [];
-    // Back-compat: add the NSSS demo account to older saved stores.
-    if (!parsed.users.some((u) => u.uid === "demo-nsss")) {
-      parsed.users.push({
-        uid: "demo-nsss",
-        email: "nsss@rpa.gov.zm",
-        displayName: "NSSS Officer",
-        role: "officer",
-        section: "Nuclear Safety, Security & Safeguards",
-      });
-    }
-    // Back-compat: the border coordinator posted to one inland office.
-    if (!parsed.users.some((u) => u.uid === "demo-nakonde")) {
-      parsed.users.push({
-        uid: "demo-nakonde",
-        email: "nakonde@rpa.gov.zm",
-        displayName: "Nakonde Coordinator",
-        role: "officer",
-        section: "Nuclear Safety, Security & Safeguards",
-        border: "Nakonde",
-      });
+    // Back-compat: stores saved before the Tasks desk existed.
+    if (!parsed.tasks) parsed.tasks = [];
+    // Back-compat: the demo department, placed on its reporting line. Accounts
+    // an older store already holds keep what was typed and gain a placement
+    // only where they have none.
+    for (const demo of DEMO_USERS) {
+      const existing = parsed.users.find((u) => u.uid === demo.uid);
+      if (!existing) parsed.users.push({ ...demo });
+      else if (!existing.grade && !existing.reportsTo) {
+        existing.grade = demo.grade;
+        if (demo.reportsTo) existing.reportsTo = demo.reportsTo;
+      }
     }
     return parsed;
   } catch {
@@ -440,6 +481,90 @@ class MockStore implements DataStore {
 
   async listUsers(): Promise<UserDoc[]> {
     return [...ensure().users];
+  }
+
+  // --- the staff directory and the Tasks desk -----------------------------
+
+  async listDirectory(): Promise<DirectoryEntry[]> {
+    return ensure().users.map(directoryEntry);
+  }
+
+  async listTasks(scope: TaskReadScope): Promise<Task[]> {
+    return ensure()
+      .tasks.filter((t) => inTaskScope(t, scope))
+      .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));
+  }
+
+  async addTask(
+    input: NewTaskInput,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<Task> {
+    const s = ensure();
+    const draft = buildTask(
+      input,
+      actor,
+      s.users.map(directoryEntry),
+      new Date().toISOString(),
+      { isAdmin: viewer.isAdmin },
+    );
+    const task: Task = { ...draft, id: newId("task") };
+    s.tasks.push(task);
+    save(s);
+    dispatchChange();
+    return task;
+  }
+
+  async updateTask(
+    id: string,
+    action: TaskAction,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<Task> {
+    const s = ensure();
+    const current = s.tasks.find((t) => t.id === id);
+    if (!current) throw new Error("Task not found.");
+    const updated = applyTaskAction(
+      current,
+      action,
+      actor,
+      new Date().toISOString(),
+      viewer,
+    );
+    if (updated === current) return current;
+    s.tasks = s.tasks.map((t) => (t.id === id ? updated : t));
+    save(s);
+    dispatchChange();
+    return updated;
+  }
+
+  async passTaskOn(
+    id: string,
+    input: NewTaskInput,
+    actor: TaskParty,
+    viewer: TaskViewer,
+  ): Promise<{ parent: Task; child: Task }> {
+    const s = ensure();
+    const current = s.tasks.find((t) => t.id === id);
+    if (!current) throw new Error("Task not found.");
+    const now = new Date().toISOString();
+    const childDraft = buildTask(input, actor, s.users.map(directoryEntry), now, {
+      isAdmin: viewer.isAdmin,
+      parent: { id, title: current.title },
+    });
+    const child: Task = { ...childDraft, id: newId("task") };
+    const parent = applyTaskAction(
+      current,
+      { kind: "passed-on", to: child.assignedTo, childId: child.id },
+      actor,
+      now,
+      viewer,
+    );
+    s.tasks = s.tasks.map((t) => (t.id === id ? parent : t));
+    s.tasks.push(child);
+    save(s);
+    dispatchChange();
+    return { parent, child };
   }
 
   async getAggregate(): Promise<DashboardAggregate> {
@@ -1211,6 +1336,8 @@ class MockStore implements DataStore {
       role: UserDoc["role"];
       section: UserDoc["section"];
       border?: string;
+      grade?: UserDoc["grade"];
+      reportsTo?: string;
     },
     actorUid: string,
   ): Promise<void> {

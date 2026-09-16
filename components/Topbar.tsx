@@ -20,6 +20,7 @@ const TITLES: Record<string, string> = {
   "/nsss": "Nuclear Safety, Security & Safeguards",
   "/border": "Border Scan Log",
   "/daily": "Daily Updates",
+  "/tasks": "Tasks",
   "/weekly": "Sectional Update — 2026 Work Plan",
   "/admin/users": "User Management",
   "/settings": "Settings",

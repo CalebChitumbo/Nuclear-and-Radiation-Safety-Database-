@@ -196,13 +196,20 @@ export function accessPatch(decision: {
   role: UserDoc["role"];
   section: UserDoc["section"];
   border?: string;
-}): Pick<UserDoc, "role" | "section" | "border"> {
+  /** Placement on the reporting line — "" clears it. Left out: unchanged. */
+  grade?: UserDoc["grade"];
+  reportsTo?: string;
+}): Pick<UserDoc, "role" | "section" | "border" | "grade" | "reportsTo"> {
   return {
     role: decision.role,
     section: decision.section,
     border: requiresInlandOffice(decision.section)
       ? normaliseOfficeName(decision.border || "")
       : "",
+    ...(decision.grade !== undefined ? { grade: decision.grade } : {}),
+    ...(decision.reportsTo !== undefined
+      ? { reportsTo: decision.reportsTo.trim() }
+      : {}),
   };
 }
 

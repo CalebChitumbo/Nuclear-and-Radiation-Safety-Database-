@@ -221,6 +221,16 @@ export const ROUTES: readonly RouteAccess[] = [
     group: "Workflow",
     sections: ALL_SECTIONS,
   },
+  // Every account has a desk — a posted border officer included, since their
+  // coordinator gives them work too.
+  {
+    href: "/tasks",
+    label: "Tasks",
+    icon: "☑",
+    group: "Workflow",
+    sections: ALL_SECTIONS,
+    post: true,
+  },
   // Reached from Daily Updates and the Overview rather than the sidebar.
   { href: "/weekly", label: "Sectional Update", icon: "▦", sections: ALL_SECTIONS },
   // The old Inspections tab forwards to the Inspectorate.
@@ -326,6 +336,9 @@ const TAB_PREFERENCE: readonly { href: string; label: string }[] = [
   { href: "/source-inventory", label: "Sources" },
   { href: "/verified-source-inventory", label: "Verified" },
   { href: "/reports", label: "Reports" },
+  // Last, so it fills a fourth slot where a section has one free and moves
+  // no section's existing tabs; the full menu always lists it.
+  { href: "/tasks", label: "Tasks" },
 ];
 
 export interface MobileTab {

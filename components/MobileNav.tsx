@@ -16,9 +16,11 @@ import { mobileTabsFor } from "@/lib/rules/access";
 export function MobileNav({
   onMore,
   badge = 0,
+  taskBadge = 0,
 }: {
   onMore: () => void;
   badge?: number;
+  taskBadge?: number;
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -39,6 +41,12 @@ export function MobileNav({
     >
       {tabs.map((t) => {
         const active = isActive(t.href);
+        const count =
+          t.href === "/inspection-requests"
+            ? badge
+            : t.href === "/tasks"
+              ? taskBadge
+              : 0;
         return (
           <Link
             key={t.href}
@@ -52,12 +60,12 @@ export function MobileNav({
           >
             <span className="relative text-lg leading-none" aria-hidden="true">
               {t.icon}
-              {t.href === "/inspection-requests" && badge > 0 ? (
+              {count > 0 ? (
                 <span
                   className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-black flex items-center justify-center"
                   style={{ background: "#E0A32E", color: "#1A1B1D" }}
                 >
-                  {badge > 9 ? "9+" : badge}
+                  {count > 9 ? "9+" : count}
                 </span>
               ) : null}
             </span>

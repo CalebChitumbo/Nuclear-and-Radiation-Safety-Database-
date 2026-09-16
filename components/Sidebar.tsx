@@ -19,6 +19,7 @@ export function Sidebar({
   onMobileClose,
   inspectionBadge = 0,
   requestBadge = 0,
+  taskBadge = 0,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -27,6 +28,8 @@ export function Sidebar({
   inspectionBadge?: number;
   /** Account requests waiting on an administrator (admins only). */
   requestBadge?: number;
+  /** Tasks needing this account's attention — see taskBadge in lib/rules/tasks.ts. */
+  taskBadge?: number;
 }) {
   const pathname = usePathname();
   const { isAdmin, signOut, user, postedOnly } = useAuth();
@@ -147,7 +150,9 @@ export function Sidebar({
                     badge={
                       n.href === "/inspection-requests"
                         ? inspectionBadge
-                        : undefined
+                        : n.href === "/tasks"
+                          ? taskBadge
+                          : undefined
                     }
                     onNavigate={onMobileClose}
                   />
