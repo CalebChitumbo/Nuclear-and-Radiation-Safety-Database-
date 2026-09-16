@@ -165,15 +165,16 @@ beforeEach(async () => {
     await setDoc(doc(db, "aggregates/dashboard"), { total: 1 });
     // The reporting line: the administrator at the top, a senior in each
     // section under them (peers), the second NSSS officer and the Nakonde
-    // coordinator under the NSSS senior. The NSI officer is placed too.
+    // coordinator under the NSSS senior, the Chirundu officer under the
+    // Inspectorate senior. The NSI officer is NOT placed — no directory line.
     for (const [uid, section, reportsTo] of [
       ["u-admin", "All", ""],
       ["u-as", AS, "u-admin"],
       ["u-insp", INSP, "u-admin"],
       ["u-nsss", NSSS, "u-admin"],
-      ["u-nsi", NSI, "u-admin"],
       ["u-other", NSSS, "u-nsss"],
       ["u-nak", NSSS, "u-nsss"],
+      ["u-chi", INSP, "u-insp"],
     ] as const) {
       await setDoc(doc(db, `directory/${uid}`), {
         uid,
@@ -726,9 +727,10 @@ describe("the Tasks desk", () => {
   it("hands a task to someone else only from the account that gave it, along the line", async () => {
     // The officer may not pass it sideways themselves.
     await assertFails(updateDoc(doc(insp(), "tasks/t-peer"), { assignedToUid: "u-nsss" }));
-    // The assigner may, to another peer; not to someone off their line.
+    // The assigner may, to another peer; not to someone off their line
+    // (the Chirundu officer is under the Inspectorate senior, not the NSSS one).
     await assertSucceeds(updateDoc(doc(as(), "tasks/t-peer"), { assignedToUid: "u-nsss", section: NSSS }));
-    await assertFails(updateDoc(doc(nsssDesk(), "tasks/t-nsss"), { assignedToUid: "u-as", section: AS }));
+    await assertFails(updateDoc(doc(nsssDesk(), "tasks/t-nsss"), { assignedToUid: "u-chi", section: INSP }));
   });
 
   it("is deleted by administrators only", async () => {
