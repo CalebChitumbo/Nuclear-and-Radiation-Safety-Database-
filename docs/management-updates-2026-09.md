@@ -160,11 +160,52 @@ Inspectorate can record the next enforcement action.
 ticked; it appears under *Inspection cards due* as Expired with the days
 overdue, and *Record follow-up* prefills the form.
 
+## 6. Past inspection cards, for the record
+
+**Asked for** (21 Sep 2026). The Inspectorate wants the cards it issued before
+the system carried them on the register — the day each was issued and the
+non-compliances written on it — and to see which have expired and which are
+still running. They could not log them: the log form records an inspection,
+and those visits are already counted by the back-imported 2026 register, so
+logging them again would double-count output 1.2.4.
+
+**Built.**
+
+- **A card on its own.** *Record a past inspection card* on the Inspectorate
+  tab writes an `inspectionCards` document — facility (register pick or free
+  text), day issued, card number if it has one, the non-compliances, notes.
+  It is a record, not an inspection: no output figure, no province sheet, no
+  reporting week moves. The Inspectorate may correct or remove one (unlike an
+  inspection, which is an administrator's to remove, because a card counts
+  toward nothing). Rules: `validInspectionCard` in `firestore.rules`.
+- **Its standing is derived.** Active / Expiring Soon / Expired against
+  today, +30 days from the day issued, the same arithmetic as every other
+  card — nobody types "expired", and the same card reads *running* until the
+  day it is not.
+- **One register.** `lib/rules/inspectionCards.ts` reads cards stamped on
+  logged inspections and cards recorded on their own as one list. The new
+  *Inspection card register* panel lists them for the period, filtered by
+  standing; *Inspection cards due* and the *Cards due* KPI now read the same
+  register, with a facility's **latest** card the one that stands (a card
+  re-issued at a follow-up supersedes the past one). The facility record
+  lists its recorded cards under *Inspection cards on record*.
+- **Deploy.** `npm run deploy:rules` — the rules and the
+  `(facilityId, issued)` index are new. Until they are deployed the tab
+  degrades to the logged cards alone rather than failing.
+
+**Verify.** Record a card issued 1 March 2026 against a register facility with
+two non-compliances: it appears on the register as *Expired*, on the due list
+as *Expired N days ago · recorded card*, and on the facility record; the
+Summary's *Total Inspections Conducted* and output 1.2.4 do not move. Record
+one issued last week: *Running*. Log a follow-up inspection today with the
+card ticked: the recorded card leaves the due list, superseded.
+
 ## What did not change
 
-- No collection, field or security rule changed. The functional view, the
-  enforcement standing and the card list are all read off `facilities` and
-  `inspections` as they are.
+- Items 1–5 added no collection, field or security rule: the functional
+  view, the enforcement standing and the card list are all read off
+  `facilities` and `inspections` as they are. Item 6 adds `inspectionCards`
+  and touches nothing already stored.
 - The Overview still counts the whole register; the functional view is
   beside it, not instead of it.
 - Output 1.3.12 and the screening figures are untouched — the export reads

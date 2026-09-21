@@ -75,6 +75,7 @@ import {
   type DirectoryEntry,
   type Facility,
   type Inspection,
+  type InspectionCard,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
@@ -886,6 +887,69 @@ class FirebaseStore implements DataStore {
     await deleteDoc(doc(db, "inspections", id));
   }
 
+  async listInspectionCards(): Promise<InspectionCard[]> {
+    const db = requireDb();
+    const snap = await getDocs(collection(db, "inspectionCards"));
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<InspectionCard, "id">) }))
+      .sort((a, b) => (b.issued || "").localeCompare(a.issued || ""));
+  }
+
+  async listInspectionCardsFor(facilityId: string): Promise<InspectionCard[]> {
+    const db = requireDb();
+    // Backed by the (facilityId ASC, issued DESC) composite index.
+    const snap = await getDocs(
+      query(
+        collection(db, "inspectionCards"),
+        where("facilityId", "==", facilityId),
+        orderBy("issued", "desc"),
+      ),
+    );
+    return snap.docs.map(
+      (d) => ({ id: d.id, ...(d.data() as Omit<InspectionCard, "id">) }),
+    );
+  }
+
+  async addInspectionCard(
+    card: Omit<InspectionCard, "id">,
+    actor?: string,
+  ): Promise<InspectionCard> {
+    const db = requireDb();
+    const createdAt = new Date().toISOString();
+    const data: Omit<InspectionCard, "id"> = {
+      ...card,
+      createdAt,
+      ...(actor ? { updatedBy: actor } : {}),
+    };
+    const ref = await addDoc(collection(db, "inspectionCards"), stripUndefined(data));
+    return { ...data, id: ref.id };
+  }
+
+  async updateInspectionCard(
+    id: string,
+    patch: Partial<Omit<InspectionCard, "id">>,
+    actor?: string,
+  ): Promise<InspectionCard> {
+    const db = requireDb();
+    const ref = doc(db, "inspectionCards", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("That inspection card is no longer on the register.");
+    const before = { id, ...(snap.data() as Omit<InspectionCard, "id">) };
+    const next: InspectionCard = { ...before, ...patch, id };
+    next.updatedAt = new Date().toISOString();
+    if (actor) next.updatedBy = actor;
+    const { id: _id, ...data } = next;
+    void _id;
+    // Written whole so a cleared reference or district is dropped, not kept.
+    await setDoc(ref, stripUndefined(data));
+    return next;
+  }
+
+  async deleteInspectionCard(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "inspectionCards", id));
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     const db = requireDb();
     const snap = await getDocs(collection(db, "inspectionRequests"));
@@ -1314,6 +1378,7 @@ class FirebaseStore implements DataStore {
       facilities,
       licenceEvents,
       inspections,
+      inspectionCards,
       inspectionRequests,
       activities,
       licenceWorkflows,
@@ -1328,6 +1393,8 @@ class FirebaseStore implements DataStore {
       this.listFacilities(),
       this.listLicenceEvents(),
       this.listInspections(),
+      // Degrade gracefully until the inspectionCards rules are deployed.
+      this.listInspectionCards().catch(() => [] as InspectionCard[]),
       this.listInspectionRequests(),
       this.listActivities(),
       this.listLicenceWorkflows(),
@@ -1350,6 +1417,7 @@ class FirebaseStore implements DataStore {
       facilities,
       licenceEvents,
       inspections,
+      inspectionCards,
       inspectionRequests,
       activities,
       licenceWorkflows,

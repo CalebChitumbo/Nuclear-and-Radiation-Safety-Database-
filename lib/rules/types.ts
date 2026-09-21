@@ -268,6 +268,34 @@ export interface Inspection {
 }
 
 /**
+ * An inspection card recorded on its own — the record of a card the
+ * Inspectorate issued before the log carried cards (or at a visit that was
+ * never logged here), kept for the record and the follow-up list. It is NOT
+ * an inspection: it counts toward no output and no province sheet. A card
+ * issued at a visit logged in the app is stamped on that inspection as
+ * `cardIssued` instead, and the two are read as one register on the
+ * Inspectorate tab (see lib/rules/inspectionCards.ts).
+ */
+export interface InspectionCard {
+  id: string;
+  /** The day the card was issued — its 30-day timer runs from here. */
+  issued: string;
+  facilityId: string | null;
+  facilityName: string;
+  province: Province | "";
+  /** Read from the register when the facility is on it; typed when not. */
+  district?: string;
+  /** The card's own number or reference, where the section wrote one. */
+  reference?: string;
+  /** The non-compliances the card was issued against, as written on it. */
+  nonCompliances: string;
+  notes: string;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+/**
  * Lifecycle of a cross-section inspection request — the handoff that lets the
  * Authorisation & Standards (Licensing) section ask the Inspectorate to inspect
  * a facility, and lets the Inspectorate report back when it is done. In pipeline

@@ -24,6 +24,7 @@ import type {
   DirectoryEntry,
   Facility,
   Inspection,
+  InspectionCard,
   InspectionRequest,
   LicenceEvent,
   LicenceWorkflow,
@@ -250,6 +251,34 @@ export interface DataStore {
    * of the work plan's cumulative figures.
    */
   deleteInspection(id: string): Promise<void>;
+  /**
+   * Every inspection card recorded on its own (not the ones stamped on a
+   * logged inspection — see lib/rules/inspectionCards.ts), newest issued
+   * first.
+   */
+  listInspectionCards(): Promise<InspectionCard[]>;
+  /** Recorded cards for one facility, newest issued first (indexed in Firebase). */
+  listInspectionCardsFor(facilityId: string): Promise<InspectionCard[]>;
+  /**
+   * Put a card on the register for the record — a card issued before the log
+   * carried them, or at a visit never logged here. Creates no inspection, so
+   * no output figure moves.
+   */
+  addInspectionCard(
+    card: Omit<InspectionCard, "id">,
+    actor?: string,
+  ): Promise<InspectionCard>;
+  /** Correct a recorded card — the day, the facility, what was written on it. */
+  updateInspectionCard(
+    id: string,
+    patch: Partial<Omit<InspectionCard, "id">>,
+    actor?: string,
+  ): Promise<InspectionCard>;
+  /**
+   * Take a recorded card off the register. The Inspectorate's own to do,
+   * unlike an inspection: a card counts toward no figure.
+   */
+  deleteInspectionCard(id: string): Promise<void>;
   /** Every cross-section inspection request, newest first. */
   listInspectionRequests(): Promise<InspectionRequest[]>;
   /** Inspection requests for one facility, newest first (indexed in Firebase). */
@@ -392,6 +421,7 @@ export interface DataStore {
     facilities: Facility[];
     licenceEvents: LicenceEvent[];
     inspections: Inspection[];
+    inspectionCards: InspectionCard[];
     inspectionRequests: InspectionRequest[];
     activities: Activity[];
     licenceWorkflows: LicenceWorkflow[];
