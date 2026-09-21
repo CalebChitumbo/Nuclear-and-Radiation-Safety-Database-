@@ -42,6 +42,18 @@ import type {
   WorkPlanSubprogrammeConfig,
 } from "../rules/types";
 
+/** One delivery of `watchTruckScansFor`. */
+export interface ScanWatch {
+  /** The post-day's scans, latest time first. */
+  scans: TruckScan[];
+  /** Scans on the device the server has not acknowledged yet. */
+  pendingIds: string[];
+  /** True while the list is what the device holds, not the server's answer. */
+  fromCache: boolean;
+  /** Set when the subscription itself failed (rules not deployed, no access). */
+  error?: string;
+}
+
 export interface DataStore {
   ready(): Promise<void>;
   listFacilities(): Promise<Facility[]>;
@@ -196,11 +208,28 @@ export interface DataStore {
    * one post's when the reader is posted there.
    */
   listTruckScansForWeek(week: string, border?: string): Promise<TruckScan[]>;
+  /**
+   * The shift list, live. Called at once with what the device holds and again
+   * on every change — a scan just typed shows before the server has it, and
+   * `pendingIds` says which ones the server has not confirmed yet. The
+   * capture screen reads this rather than `listTruckScansFor` so a post with
+   * no signal still sees what it logged.
+   */
+  watchTruckScansFor(
+    border: string,
+    date: string,
+    onChange: (watch: ScanWatch) => void,
+  ): () => void;
+  /**
+   * Log a scan. Resolves as soon as the write is on the device — NOT when the
+   * server has it. The offline queue sends it when it can; a scan the server
+   * later refuses is reported through `lib/store/writeQueue.ts`.
+   */
   addTruckScan(s: Omit<TruckScan, "id">): Promise<TruckScan>;
   /**
    * Remove a scan. Correcting one is a remove-and-relog on the capture screen:
    * a scan is a handful of fields typed in seconds, so an edit path would be
-   * more UI than the mistake is worth.
+   * more UI than the mistake is worth. Queued like `addTruckScan`.
    */
   deleteTruckScan(id: string): Promise<void>;
   /** Border posts (active and inactive), name order. */

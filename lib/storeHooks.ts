@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { store } from "./store";
 import type { DataStore } from "./store/types";
+import {
+  subscribeWriteQueue,
+  writeQueueState,
+  type WriteQueueState,
+} from "./store/writeQueue";
 
 /**
  * Lightweight subscribe-on-change hook. Re-runs the loader whenever the mock
@@ -60,4 +65,42 @@ export function useStoreData<T>(
   }, []);
 
   return { data, loading, error, reload: () => setTick((t) => t + 1) };
+}
+
+// ---------------------------------------------------------------------------
+// The offline queue — for screens that write from places with no signal
+// ---------------------------------------------------------------------------
+
+const NO_QUEUE: WriteQueueState = { inFlight: 0, failures: [] };
+
+/** Writes the server has refused after they were shown as saved. */
+export function useWriteQueue(): WriteQueueState {
+  return useSyncExternalStore(
+    subscribeWriteQueue,
+    writeQueueState,
+    () => NO_QUEUE,
+  );
+}
+
+function subscribeOnline(listener: () => void): () => void {
+  window.addEventListener("online", listener);
+  window.addEventListener("offline", listener);
+  return () => {
+    window.removeEventListener("online", listener);
+    window.removeEventListener("offline", listener);
+  };
+}
+
+/**
+ * The browser's own view of the connection. It says "online" whenever there
+ * is a network interface up, signal or not, so it can only ever confirm the
+ * device is offline — the pending count on the shift log is what says whether
+ * the server has actually answered.
+ */
+export function useOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
 }

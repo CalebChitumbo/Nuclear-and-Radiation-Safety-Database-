@@ -19,6 +19,13 @@
  * sign in and they are here, and every read is their own post's — the shift,
  * the week, the recent scans behind the pickers. Head office and the NSSS desk
  * see every post.
+ *
+ * Most inland posts have no signal for hours at a time, and a truck cannot
+ * wait for one. So the shift list is a live subscription to what the DEVICE
+ * holds — a scan shows the instant it is typed — and a save never waits for
+ * the server: Firestore's persistent cache queues it and sends it when it
+ * can. The strip above the capture card says what is still waiting and what
+ * the server refused; `lib/store/writeQueue.ts` is where that comes from.
  */
 import { useEffect, useMemo, useState } from "react";
 
@@ -30,6 +37,7 @@ import { LoadErrorBanner } from "@/components/LoadError";
 import { ScanCaptureCard } from "@/components/border/ScanCaptureCard";
 import { ScanTallies } from "@/components/border/ScanTallies";
 import { ShiftLog } from "@/components/border/ShiftLog";
+import { SyncStatus } from "@/components/border/SyncStatus";
 import { Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { downloadTextFile } from "@/components/downloadFile";
@@ -38,6 +46,7 @@ import { useToast } from "@/components/Toast";
 import { canEditSection, useAuth } from "@/lib/auth";
 import { dailyEntryScope } from "@/lib/rules/access";
 import { store } from "@/lib/store";
+import type { ScanWatch } from "@/lib/store/types";
 import { useStoreData } from "@/lib/storeHooks";
 import { useWeek } from "@/lib/weekContext";
 import {
@@ -62,6 +71,7 @@ import {
 
 const NSSS: Section = "Nuclear Safety, Security & Safeguards";
 const POST_KEY = "rpa-border-post";
+const EMPTY_SCANS: TruckScan[] = [];
 
 export default function BorderScanPage() {
   const { user, postedOffice } = useAuth();
@@ -103,15 +113,12 @@ export default function BorderScanPage() {
 
   const { data, error, reload } = useStoreData(
     async (s) => {
-      const [borders, recentScans, shiftScans, weekScans, entries] =
+      const [borders, recentScans, weekScans, entries] =
         await Promise.all([
           s.listBorders().catch(() => []),
           // Every read degrades to empty so the tab still renders before the
           // truckScans rules/index are deployed.
           s.listTruckScans(ownPost).catch(() => [] as TruckScan[]),
-          border
-            ? s.listTruckScansFor(border, date).catch(() => [] as TruckScan[])
-            : Promise.resolve([] as TruckScan[]),
           weekLabel
             ? s
                 .listTruckScansForWeek(weekLabel, ownPost)
@@ -119,11 +126,34 @@ export default function BorderScanPage() {
             : Promise.resolve([] as TruckScan[]),
           s.listDailyEntries(entryScope).catch(() => []),
         ]);
-      return { borders, recentScans, shiftScans, weekScans, entries };
+      return { borders, recentScans, weekScans, entries };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [border, date, weekLabel, ownPost, entryScope?.section, entryScope?.border],
   );
+
+  // The shift list is live and local-first: it is delivered from the device's
+  // cache before the server has answered (or when it never will), and again
+  // on every change — so a scan appears the moment it is saved and its
+  // pending marker clears the moment the server acknowledges it.
+  const [shift, setShift] = useState<ScanWatch | null>(null);
+  useEffect(() => {
+    if (!border) {
+      setShift({ scans: [], pendingIds: [], fromCache: false });
+      return;
+    }
+    let cancelled = false;
+    let unsubscribe = () => {};
+    void store().then((s) => {
+      if (cancelled) return;
+      unsubscribe = s.watchTruckScansFor(border, date, setShift);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [border, date]);
+  const shiftScans = shift?.scans ?? EMPTY_SCANS;
 
   // Default to the first active post the first time the tab is opened. Never
   // for a posted coordinator — their office is not a default, it is the answer.
@@ -136,10 +166,7 @@ export default function BorderScanPage() {
   const canLog = canEditSection(user, NSSS);
   const isAdmin = user?.role === "admin";
 
-  const daySummary = useMemo(
-    () => summariseScans(data?.shiftScans || []),
-    [data?.shiftScans],
-  );
+  const daySummary = useMemo(() => summariseScans(shiftScans), [shiftScans]);
   const weekSummary = useMemo(
     () => summariseWeek(data?.weekScans || [], weekLabel),
     [data?.weekScans, weekLabel],
@@ -321,6 +348,8 @@ export default function BorderScanPage() {
         />
       </section>
 
+      <SyncStatus pending={shift?.pendingIds.length ?? 0} />
+
       {canLog && border && weekLabel && user ? (
         <ScanCaptureCard
           border={border}
@@ -328,8 +357,11 @@ export default function BorderScanPage() {
           week={weekLabel}
           direction={direction}
           officer={{ uid: user.uid, name: user.displayName }}
-          todaysScans={data.shiftScans}
+          todaysScans={shiftScans}
           recentScans={data.recentScans}
+          // The shift list updates itself; this refreshes the wider window
+          // behind the pickers, and is harmless with no signal (the old data
+          // stays on screen until the read comes back).
           onSaved={reload}
         />
       ) : !weekLabel ? (
@@ -348,9 +380,9 @@ export default function BorderScanPage() {
       ) : null}
 
       <ShiftLog
-        scans={data.shiftScans}
+        scans={shiftScans}
+        pendingIds={shift?.pendingIds ?? []}
         canRemove={(s) => isAdmin || (!!user && s.officerUid === user.uid)}
-        onChanged={reload}
       />
 
       {/* Day / week switch for the summaries. */}
@@ -376,7 +408,7 @@ export default function BorderScanPage() {
               onClick={() =>
                 downloadTextFile(
                   `border-scans-${border}-${date}.csv`.replace(/\s+/g, "-"),
-                  scansToCsv(data.shiftScans),
+                  scansToCsv(shiftScans),
                 )
               }
             >

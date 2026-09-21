@@ -8,6 +8,9 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   type Firestore,
   connectFirestoreEmulator,
 } from "firebase/firestore";
@@ -60,12 +63,40 @@ export function getFirebaseAuth(): Auth | null {
   return _auth;
 }
 
+/**
+ * Firestore with its write queue and read cache kept on the device.
+ *
+ * The inland offices capture trucks where there is often no signal. With the
+ * persistent cache every write is applied locally at once, survives a reload
+ * or a phone restart, and is sent — in order — when the SDK next has a
+ * connection; every read falls back to what the device last saw. The capture
+ * screens rely on this: they do not wait for the server's answer (see
+ * `addTruckScan` and `lib/store/writeQueue.ts`).
+ *
+ * Multi-tab so two open tabs share one queue rather than one of them running
+ * without a cache. Where IndexedDB is not available (a locked-down private
+ * window) the SDK falls back to a memory cache on its own — writes still queue
+ * while the tab is open, but not across a reload.
+ */
+function initFirestore(app: FirebaseApp): Firestore {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch {
+    // Already initialised for this app (a hot reload) — take that instance.
+    return getFirestore(app);
+  }
+}
+
 export function getDb(): Firestore | null {
   if (isMockMode) return null;
   if (_db) return _db;
   const app = getFirebaseApp();
   if (!app) return null;
-  _db = getFirestore(app);
+  _db = initFirestore(app);
   if (useEmulators) {
     try {
       connectFirestoreEmulator(_db, "localhost", 8080);

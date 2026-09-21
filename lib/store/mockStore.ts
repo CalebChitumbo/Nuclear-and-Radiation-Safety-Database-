@@ -90,7 +90,7 @@ import {
   type SeedInspection,
   type SeedScreening,
 } from "./seeding";
-import type { DataStore } from "./types";
+import type { DataStore, ScanWatch } from "./types";
 
 // v5: the Inspectorate's 2026 facility inspection register, so the demo opens
 // on the same 297 inspections production does.
@@ -672,6 +672,22 @@ class MockStore implements DataStore {
     border?: string,
   ): Promise<TruckScan[]> {
     return (await this.listTruckScans(border)).filter((s) => s.week === week);
+  }
+
+  watchTruckScansFor(
+    border: string,
+    date: string,
+    onChange: (watch: ScanWatch) => void,
+  ): () => void {
+    const deliver = () => {
+      void this.listTruckScansFor(border, date).then((scans) =>
+        onChange({ scans, pendingIds: [], fromCache: false }),
+      );
+    };
+    deliver();
+    if (typeof window === "undefined") return () => {};
+    window.addEventListener("rpa-store-change", deliver);
+    return () => window.removeEventListener("rpa-store-change", deliver);
   }
 
   async addTruckScan(scan: Omit<TruckScan, "id">): Promise<TruckScan> {

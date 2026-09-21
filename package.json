@@ -1,7 +1,7 @@
 {
   "name": "rpa-system",
   "version": "1.0.0",
-  "description": "RPA Integrated Regulatory Information System \u2014 Radiation Protection Authority of Zambia",
+  "description": "RPA Integrated Regulatory Information System — Radiation Protection Authority of Zambia",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -33,12 +33,14 @@
     "deploy:hosting": "firebase deploy --only hosting"
   },
   "dependencies": {
+    "@serwist/next": "^9.5.12",
     "clsx": "2.1.1",
     "firebase": "10.13.2",
     "firebase-admin": "12.5.0",
     "next": "14.2.13",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "serwist": "^9.5.12"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

@@ -4,6 +4,10 @@
  * The running list of what this post has logged today — the shift's own record,
  * kept visible so an officer can see the last few scans without scrolling and
  * fix a mistake straight away.
+ *
+ * The list is the device's: a scan shows here before the server has it, with
+ * a "waiting" marker until the server acknowledges it. Removing one is the
+ * same — it goes from the list at once and the delete is queued.
  */
 import { useState } from "react";
 
@@ -23,13 +27,14 @@ const PAGE = 20;
 
 export function ShiftLog({
   scans,
+  pendingIds = [],
   canRemove,
-  onChanged,
 }: {
   scans: TruckScan[];
+  /** Scans saved on this device that the server has not acknowledged. */
+  pendingIds?: string[];
   /** True when the signed-in officer may remove a given scan. */
   canRemove: (s: TruckScan) => boolean;
-  onChanged: () => void;
 }) {
   const toast = useToast();
   const [shown, setShown] = useState(PAGE);
@@ -42,7 +47,6 @@ export function ShiftLog({
       const db = await store();
       await db.deleteTruckScan(s.id);
       toast.push(`${s.vehicleId} removed from the log.`, "success");
-      onChanged();
     } catch (err) {
       toast.push(`Could not remove it. ${scanWriteErrorMessage(err)}`, "error");
     } finally {
@@ -51,6 +55,16 @@ export function ShiftLog({
   };
 
   const visible = scans.slice(0, shown);
+  const pending = new Set(pendingIds);
+  const waiting = (s: TruckScan) =>
+    pending.has(s.id) ? (
+      <span
+        className="chip amber ml-1 align-middle"
+        title="Saved on this device — sent to the server when there is a connection."
+      >
+        waiting
+      </span>
+    ) : null;
 
   return (
     <Panel
@@ -80,7 +94,10 @@ export function ShiftLog({
               <tbody>
                 {visible.map((s) => (
                   <tr key={s.id}>
-                    <td className="tabular text-gunmetal/70">{s.time || "—"}</td>
+                    <td className="tabular text-gunmetal/70">
+                      {s.time || "—"}
+                      {waiting(s)}
+                    </td>
                     <td className="font-bold">
                       {s.vehicleId}
                       <span className="block text-[11px] font-normal text-gunmetal/50">
@@ -139,6 +156,7 @@ export function ShiftLog({
                     <div className="text-[11px] text-gunmetal/50">
                       {s.time || "—"} · {s.vehicleIdKind}
                       {s.direction ? ` · ${s.direction}` : ""}
+                      {waiting(s)}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
