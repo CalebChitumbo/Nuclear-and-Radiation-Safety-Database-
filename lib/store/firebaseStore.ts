@@ -10,6 +10,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   setDoc,
@@ -20,6 +21,7 @@ import {
 } from "firebase/firestore";
 
 import { getDb, getFbFunctions } from "../firebase";
+import { trackWrite } from "./writeQueue";
 import type { DailyEntryScope } from "../rules/access";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
@@ -97,7 +99,7 @@ import {
 import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
-import type { DataStore } from "./types";
+import type { DataStore, ScanWatch } from "./types";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 
 function requireDb(): Firestore {
@@ -536,19 +538,61 @@ class FirebaseStore implements DataStore {
       );
   }
 
+  watchTruckScansFor(
+    border: string,
+    date: string,
+    onChange: (watch: ScanWatch) => void,
+  ): () => void {
+    const db = requireDb();
+    return onSnapshot(
+      query(
+        collection(db, "truckScans"),
+        where("border", "==", border),
+        where("date", "==", date),
+      ),
+      // Metadata changes too, so the pending marker clears the moment the
+      // server acknowledges a scan — the document itself does not change.
+      { includeMetadataChanges: true },
+      (snap) => {
+        onChange({
+          scans: snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<TruckScan, "id">) }))
+            .sort((a, b) => (b.time || "").localeCompare(a.time || "")),
+          pendingIds: snap.docs
+            .filter((d) => d.metadata.hasPendingWrites)
+            .map((d) => d.id),
+          fromCache: snap.metadata.fromCache,
+        });
+      },
+      (err) => {
+        onChange({
+          scans: [],
+          pendingIds: [],
+          fromCache: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      },
+    );
+  }
+
   async addTruckScan(scan: Omit<TruckScan, "id">): Promise<TruckScan> {
     const db = requireDb();
     const createdAt = new Date().toISOString();
-    const ref = await addDoc(
-      collection(db, "truckScans"),
-      stripUndefined({ ...scan, createdAt }),
+    const ref = doc(collection(db, "truckScans"));
+    // Not awaited. The write lands in the local cache synchronously and the
+    // promise only settles when the SERVER has answered — minutes or hours
+    // later at a post with no signal. The truck is cleared on the local
+    // write; the tracker keeps any later refusal for the officer to see.
+    trackWrite(
+      `${scan.vehicleId}${scan.time ? ` at ${scan.time}` : ""}`,
+      setDoc(ref, stripUndefined({ ...scan, createdAt })),
     );
     return { ...scan, id: ref.id, createdAt };
   }
 
   async deleteTruckScan(id: string): Promise<void> {
     const db = requireDb();
-    await deleteDoc(doc(db, "truckScans", id));
+    trackWrite(`removing scan ${id}`, deleteDoc(doc(db, "truckScans", id)));
   }
 
   async listBorders(): Promise<Border[]> {

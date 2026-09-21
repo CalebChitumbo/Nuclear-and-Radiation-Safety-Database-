@@ -155,6 +155,10 @@ export function ScanCaptureCard({
 
     setBusy(true);
     try {
+      // Resolves once the scan is on the device, not when the server has it
+      // — the form clears at once whether or not there is signal, and the
+      // shift log shows the row with a "waiting" marker until the server
+      // answers. A later refusal surfaces on the strip above this card.
       const s = await store();
       await s.addTruckScan(
         buildScan(draft, {

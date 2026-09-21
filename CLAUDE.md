@@ -432,3 +432,24 @@ together.
 derived when the page is read; no figure is stored per task beyond its dates
 and events. A task is written whole on every move (`setDoc`, not a merge) so
 that a return drops the outcome and an answer drops the extension request.
+
+## Routine: the Border Scan Log works offline — keep it that way
+
+The inland posts have no signal for hours, so `/border` is **local-first**:
+`addTruckScan` / `deleteTruckScan` return on the local write and hand the
+server's promise to `lib/store/writeQueue.ts`; the shift list is a live
+`onSnapshot` (`watchTruckScansFor`) whose `hasPendingWrites` metadata drives
+the *waiting* chips and the strip above the form; Firestore is initialised
+with `persistentLocalCache`; `app/sw.ts` keeps the app on the device.
+`docs/border-scan-log.md` → *Working with no signal* has the full account.
+
+- **Do not `await` a scan write for the server's answer** or surface its
+  rejection with a toast — the promise can settle hours later, after the
+  officer has moved on. Route it through `trackWrite` so the refusal lands on
+  the strip.
+- The service worker is built on `next build` only (`public/sw.js`,
+  git-ignored) and is off in development, so the dev server never serves a
+  cached page. A change to what it caches is a change to `app/sw.ts`;
+  Firebase's hosts must stay `NetworkOnly` there.
+- The pending count comes from snapshot metadata, never from a counter — a
+  reload zeroes a counter while the SDK's queue is still full.

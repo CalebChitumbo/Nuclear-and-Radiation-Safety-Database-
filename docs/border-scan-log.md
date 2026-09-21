@@ -185,6 +185,65 @@ an account problem and is not one.
 
 ---
 
+## Working with no signal
+
+Most inland posts have no signal for hours at a time, and a truck at the
+barrier cannot wait for it. Before this the capture form waited for the
+server's acknowledgement on every save — a spinner until the request timed
+out, then "Could not save" — and the app itself would not open unless there
+was a connection. Now:
+
+- **A save never waits for the server.** `addTruckScan` writes to Firestore's
+  local cache and returns; the SDK's promise (which settles only when the
+  server answers) is handed to `lib/store/writeQueue.ts` rather than awaited.
+  The form clears at once, with or without signal.
+- **The queue survives a reload.** `lib/firebase.ts` initialises Firestore
+  with `persistentLocalCache` (multi-tab), so queued writes live in
+  IndexedDB and go, in order, when the SDK next has a connection — after a
+  page reload, a phone restart, an afternoon. Reads fall back to what the
+  device last saw.
+- **The shift list is live and local.** `watchTruckScansFor` is an
+  `onSnapshot` on the post-day with metadata changes included: a scan shows
+  the moment it is typed, carries a *waiting* chip while
+  `hasPendingWrites` is set, and the chip clears the moment the server
+  acknowledges it. The pending count on the strip above the form comes from
+  the same metadata — never from a counter in memory, which a reload would
+  zero while the SDK's queue is still full.
+- **The app opens without signal.** `app/sw.ts` (built by `@serwist/next`
+  into `public/sw.js` on `next build`; off in development) precaches the
+  static bundles and keeps the pages an officer has opened. Network-first
+  with a five-second limit, so a phone showing a bar of signal and no
+  throughput still gets the page. Firebase's own hosts are excluded from the
+  worker's caches — Firestore keeps its own.
+- **A refusal is reported, not swallowed.** A queued write the server rejects
+  (rules not deployed, an account revoked in the meantime) is rolled back by
+  the SDK without a word. The tracker keeps it — the officer's own label
+  ("ABC 1234 at 09:14") and the reason — on a red strip above the form until
+  dismissed, with a toast when it lands, so the truck can be logged again.
+
+What it does not cover:
+
+- **Signing in needs signal** — once. A signed-in officer stays signed in
+  (Firebase Auth persists the session) and the token refreshes on reconnect
+  before the queue flushes; but a fresh sign-in, and the first load of the
+  app on a new phone, need a connection.
+- **The duplicate check is per device.** Two phones at one post, both
+  offline, each see only their own scans until they sync.
+- **A refusal from before a reload cannot be caught.** The SDK retries the
+  queue after a reload on its own; if the server refuses one of *those*
+  writes, only the console hears it. The scan simply disappears from the
+  list. This is rare (rules and accounts do not change under a shift) and
+  the reconciliation against the post's paper tally would show it.
+- **A private window with IndexedDB blocked** falls back to a memory cache:
+  writes still queue while the tab is open, but a reload loses what has not
+  reached the server. The *waiting* count is the officer's warning before
+  closing the tab.
+- **Posting the day total** to Daily Updates still waits for the server. It
+  is an end-of-shift action, once a day, and it replaces a document rather
+  than adding one — the coordinator does it where there is signal.
+
+---
+
 ## Keeping the vocabulary honest
 
 `lib/rules/borderCargo.ts` holds the commodity list, the alias table and the

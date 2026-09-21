@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# service worker, built from app/sw.ts by @serwist/next on `next build`
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*.js
+
 # production
 /build
 

@@ -1169,6 +1169,21 @@ posts can log** (`firebase deploy --only firestore:rules,firestore:indexes`) —
 Firestore denies writes to a collection no deployed rule mentions, admin
 account or not. Until then the tab reads fine and saving reports the command.
 
+**Working with no signal.** Most inland posts have none for hours at a time,
+and a truck at the barrier cannot wait for it. So the scan log is
+**local-first**: a scan is saved to the phone the instant *Save & next* is
+pressed, the form clears, and the row appears in *Today's log* with a
+*waiting* marker until the server has it. Firestore's persistent cache
+(`lib/firebase.ts`) keeps the queue on the device — through a reload or a
+restart — and sends it, in order, when it next has a connection; the service
+worker (`app/sw.ts`) keeps the app itself on the device so `/border` opens
+without signal. A strip above the capture card says *No signal* / *N scans
+saved on this device, not yet on the server*, and — the one thing the SDK will
+not say — names any scan the server later **refused** (a rule, a revoked
+account) so the officer can log it again (`lib/store/writeQueue.ts`). The
+detail, and what it does not cover, is in
+[`docs/border-scan-log.md`](docs/border-scan-log.md#working-with-no-signal).
+
 **Export to Excel for SharePoint.** The reporting system stays where the
 figures are entered; SharePoint keeps a file of them. The panel on the NSSS
 dashboard (any office, or all) and on the Border Scan Log (a posted officer's
@@ -1431,6 +1446,10 @@ npm test
   put in the loop), the state machine and who may take which move, the derived
   standing, working days over Zambia's public holidays, the officer's desk,
   the review queue, the badge and the supervisor's per-officer summary
+- `writeQueue` — the offline queue's bookkeeping: a write in flight until the
+  server answers, a refusal kept with the officer's label and the server's
+  reason, dismissal; and the mock store's live shift list (one post-day,
+  delivered at once)
 - `taskStore` — the mock store gives, works, passes on and closes a task, and
   places an account on the line from the Users desk
 - `workflowNotes` — the application notes & history trail: comment building,
@@ -1578,7 +1597,8 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   ├── daily/              Daily Updates — per-section daily logging
 │   ├── weekly/             Sectional update — the 2026 work plan report
 │   ├── admin/users/        Approval queue + provisioning
-│   └── settings/
+│   ├── settings/
+│   └── sw.ts               Service worker — the app opens with no signal
 ├── components/weekly/      OpeningBalancePanel — where the cumulative count starts
 ├── components/inspectorate/ InspectionSummaryTable + InspectionDatabaseTable — the
 │                           workbook's Summary and province sheets, shared by the
@@ -1596,8 +1616,9 @@ Add Firestore rules tests with the emulator in a follow-up.
 │   │   ├── screeningExport.ts       The SharePoint workbook's sheets
 │   │   └── xlsx.ts         A dependency-free .xlsx writer
 │   ├── store/              DataStore interface + mockStore + firebaseStore
+│   │   └── writeQueue.ts   The offline queue's bookkeeping — refused writes
 │   ├── auth.tsx            Auth context: signed-in officer vs pending account
-│   ├── firebase.ts         Client init
+│   ├── firebase.ts         Client init — Firestore with its persistent offline cache
 │   └── weekContext.tsx     Global reporting-week selector
 ├── functions/              Cloud Functions (separate package)
 ├── scripts/seed.ts         Seeds Firestore from seed/*.json
@@ -1610,7 +1631,7 @@ Add Firestore rules tests with the emulator in a follow-up.
 │                           rais-source-inventory.seed.json (1,752 RAIS items),
 │                           rais-source-holders.seed.json (1,533 holdings, 303 facilities),
 │                           verified-source-inventory-2026.seed.json (215, Annex I)
-├── public/                 favicon, manifest
+├── public/                 favicon, manifest (sw.js is built here, git-ignored)
 ├── firestore.rules         Security rules — the real backend
 ├── firestore.indexes.json
 └── firebase.json
