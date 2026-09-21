@@ -1162,7 +1162,10 @@ paragraph. Rows and summary both export as CSV.
 **Post day total to Daily Updates** writes the day's count as a single
 `dailyEntries` count marked `source: "scan-log"`; posting again replaces it
 rather than adding, so work plan output 1.3.12's screening figure
-can never be double counted.
+can never be double counted. A shift that never pressed it — or pressed it
+and then logged more — shows under **Other days this week not yet on Daily
+Updates** with a one-tap *Post* per day (`unpostedScanDays`): the report reads
+Daily Updates, not the scans, so a day left there counts as nothing screened.
 
 `truckScans` is a new collection, so **deploy the rules and indexes before the
 posts can log** (`firebase deploy --only firestore:rules,firestore:indexes`) —

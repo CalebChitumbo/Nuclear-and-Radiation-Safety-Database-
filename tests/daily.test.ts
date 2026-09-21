@@ -15,8 +15,11 @@ import {
   postDayEntryId,
   screeningEntryId,
   sumMetricAcrossWeeks,
+  unpostedScanDays,
   vehicleScreeningKey,
 } from "../lib/rules/daily";
+import { buildScan, emptyDraft } from "../lib/rules/borderScans";
+import type { TruckScan } from "../lib/rules/types";
 import { metricKey } from "../lib/rules/weeklyDerivation";
 import {
   deriveWorkPlan,
@@ -491,5 +494,62 @@ describe("manualWeekFigures", () => {
   it("reads no keys, and an empty register, without inventing a week", () => {
     expect(manualWeekFigures([], [wm(W22, { [OTHER]: 1 })], [], ORDER)).toEqual([]);
     expect(manualWeekFigures([OTHER], [], [], ORDER)).toEqual([]);
+  });
+});
+
+describe("unpostedScanDays — the days the weekly report cannot yet see", () => {
+  let n = 0;
+  const scan = (date: string, border = "Nakonde", week = "W39"): TruckScan => ({
+    id: `s${++n}`,
+    ...buildScan(
+      { ...emptyDraft("Inbound"), vehicleId: `ABC${n}`, commodity: "Copper", transporter: "X", dose: "80" },
+      { date, week, border },
+    ),
+  });
+  const posted = (date: string, value: number, border = "Nakonde"): DailyEntry => ({
+    id: screeningEntryId(date, border),
+    date,
+    week: "W39",
+    section: "Nuclear Safety, Security & Safeguards",
+    kind: "count",
+    metricKey: vehicleScreeningKey(),
+    label: "Vehicle Screening (units)",
+    value,
+    border,
+    source: "scan-log",
+  });
+
+  const scans = [
+    scan("2026-09-21"), scan("2026-09-21"), scan("2026-09-21"),
+    scan("2026-09-22"), scan("2026-09-22"),
+    scan("2026-09-23"),
+    scan("2026-09-22", "Chirundu"),
+  ];
+
+  it("lists a day with scans and nothing posted, and a day posted before late scans", () => {
+    const out = unpostedScanDays(scans, [posted("2026-09-22", 1)], "Nakonde");
+    expect(out).toEqual([
+      { date: "2026-09-21", week: "W39", scanned: 3, posted: null },
+      { date: "2026-09-22", week: "W39", scanned: 2, posted: 1 },
+      { date: "2026-09-23", week: "W39", scanned: 1, posted: null },
+    ]);
+  });
+
+  it("is quiet when every day's figure matches the log", () => {
+    const entries = [posted("2026-09-21", 3), posted("2026-09-22", 2), posted("2026-09-23", 1)];
+    expect(unpostedScanDays(scans, entries, "Nakonde")).toEqual([]);
+  });
+
+  it("leaves out the day the capture screen's own button covers, and other posts' days", () => {
+    const out = unpostedScanDays(scans, [], "Nakonde", "2026-09-23");
+    expect(out.map((d) => d.date)).toEqual(["2026-09-21", "2026-09-22"]);
+    expect(unpostedScanDays(scans, [], "Chirundu")).toEqual([
+      { date: "2026-09-22", week: "W39", scanned: 1, posted: null },
+    ]);
+  });
+
+  it("does not mistake another post's figure for this one's", () => {
+    const out = unpostedScanDays(scans, [posted("2026-09-21", 3, "Chirundu")], "Nakonde", "2026-09-22");
+    expect(out.map((d) => [d.date, d.posted])).toEqual([["2026-09-21", null], ["2026-09-23", null]]);
   });
 });
