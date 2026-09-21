@@ -53,6 +53,7 @@ import {
   existingScreeningEntry,
   scanLogCountEntry,
   screeningEntryId,
+  unpostedScanDays,
 } from "@/lib/rules/daily";
 import {
   scansToCsv,
@@ -180,6 +181,18 @@ export default function BorderScanPage() {
     return existingScreeningEntry(data.entries, border, date);
   }, [data, border, date]);
 
+  // The other days this week whose figure Daily Updates does not have — a
+  // shift that never pressed the button, or one that did and then logged
+  // more. The weekly report reads Daily Updates, so each reads low until
+  // posted; the header day is left out because the button above covers it.
+  const unposted = useMemo(
+    () =>
+      data && border
+        ? unpostedScanDays(data.weekScans, data.entries, border, date)
+        : [],
+    [data, border, date],
+  );
+
   if (!data) {
     return error ? (
       <LoadErrorBanner error={error} onRetry={reload} />
@@ -193,31 +206,31 @@ export default function BorderScanPage() {
     daySummary.byResult.Elevated + daySummary.byResult.Alarm;
 
   /**
-   * Post the day's figure to the section's daily log.
+   * Post a day's figure to the section's daily log.
    *
-   * It goes to this post-day's own document, so re-posting after a late scan
+   * It goes to that post-day's own document, so re-posting after a late scan
    * corrects the figure rather than adding a second one — and so does a figure
    * a coordinator had typed by hand for the same day, or the workbook import's.
    * The audit log keeps whatever was replaced.
    */
-  const postDayTotal = async () => {
-    if (!weekLabel || !border || posting) return;
+  const postTotal = async (day: { date: string; week: string; total: number }) => {
+    if (!day.week || !border || posting) return;
     setPosting(true);
     try {
       const s = await store();
       await s.setDailyEntry(
-        screeningEntryId(date, border),
+        screeningEntryId(day.date, border),
         scanLogCountEntry({
-          date,
-          week: weekLabel,
+          date: day.date,
+          week: day.week,
           border,
-          total: daySummary.total,
+          total: day.total,
           uid: user?.uid,
           name: user?.displayName,
         }),
       );
       toast.push(
-        `${daySummary.total} posted to Daily Updates for ${border}.`,
+        `${day.total} posted to Daily Updates for ${border}, ${day.date}.`,
         "success",
       );
       reload();
@@ -430,7 +443,9 @@ export default function BorderScanPage() {
               <button
                 className="btn btn-primary w-full sm:w-auto"
                 disabled={posting || !daySummary.total || !weekLabel}
-                onClick={postDayTotal}
+                onClick={() =>
+                  postTotal({ date, week: weekLabel, total: daySummary.total })
+                }
                 title="Sends the day's count to Daily Updates, replacing any figure this post already posted."
               >
                 {posting
@@ -453,6 +468,46 @@ export default function BorderScanPage() {
                     : ` (${alreadyPosted.updatedByName || "typed in"})`
                 } — the log now holds ${daySummary.total}. Re-post to correct it.`}
           </p>
+        ) : null}
+
+        {canLog && unposted.length ? (
+          <div className="mt-3 pt-3 border-t border-gunmetal/8">
+            <div className="caps text-[10px] text-gunmetal/55 mb-1.5">
+              Other days this week not yet on Daily Updates
+            </div>
+            <ul className="space-y-1.5">
+              {unposted.map((d) => (
+                <li
+                  key={d.date}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="min-w-0">
+                    <span className="font-bold tabular">{d.date}</span>
+                    <span className="text-gunmetal/70">
+                      {" "}
+                      — {d.scanned} scanned,{" "}
+                      {d.posted === null ? "nothing posted" : `${d.posted} posted`}
+                    </span>
+                  </span>
+                  <button
+                    className="link-action shrink-0"
+                    disabled={posting}
+                    onClick={() =>
+                      postTotal({ date: d.date, week: d.week, total: d.scanned })
+                    }
+                    title={`Sends ${d.scanned} to Daily Updates for ${border}, ${d.date}.`}
+                  >
+                    {d.posted === null ? "Post" : "Re-post"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-gunmetal/55 mt-2">
+              The weekly report reads Daily Updates, not the scan log — a day
+              left here counts as nothing screened. For a day in an earlier
+              week, pick it in the header.
+            </p>
+          </div>
         ) : null}
       </Panel>
 

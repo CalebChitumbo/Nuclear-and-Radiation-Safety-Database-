@@ -9,7 +9,7 @@
  * inspections stay in their own collections (they are already daily-dated);
  * this module only concerns the manual metrics.
  */
-import type { DailyEntry, Section, WeekMetrics } from "./types";
+import type { DailyEntry, Section, TruckScan, WeekMetrics } from "./types";
 import {
   manualOutputsForSection,
   metricKeysForOutput,
@@ -112,6 +112,46 @@ export function existingScreeningEntry(
         e.date === date,
     ) || null
   );
+}
+
+export interface UnpostedScanDay {
+  date: string;
+  /** The reporting week the day's scans were filed under. */
+  week: string;
+  /** Trucks in the scan log for this post-day. */
+  scanned: number;
+  /** The figure Daily Updates holds for it, or null when nothing was posted. */
+  posted: number | null;
+}
+
+/**
+ * The post-days whose scan log and Daily Updates disagree — nothing posted,
+ * or a figure posted before late scans came in. The weekly report reads
+ * Daily Updates, not the scans, so each of these reads low (or as zero) on
+ * output 1.3.12 until it is posted.
+ *
+ * `except` is the day the capture screen's own button already covers.
+ */
+export function unpostedScanDays(
+  scans: TruckScan[],
+  entries: DailyEntry[],
+  border: string,
+  except?: string,
+): UnpostedScanDay[] {
+  const days = new Map<string, { week: string; scanned: number }>();
+  for (const s of scans) {
+    if (s.border !== border || s.date === except) continue;
+    const day = days.get(s.date) || { week: s.week, scanned: 0 };
+    day.scanned += 1;
+    days.set(s.date, day);
+  }
+  return [...days.entries()]
+    .map(([date, { week, scanned }]) => {
+      const entry = existingScreeningEntry(entries, border, date);
+      return { date, week, scanned, posted: entry ? (entry.value ?? 0) : null };
+    })
+    .filter((d) => d.posted !== d.scanned)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**

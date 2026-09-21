@@ -240,7 +240,11 @@ What it does not cover:
   closing the tab.
 - **Posting the day total** to Daily Updates still waits for the server. It
   is an end-of-shift action, once a day, and it replaces a document rather
-  than adding one — the coordinator does it where there is signal.
+  than adding one — the coordinator does it where there is signal. A day
+  that was never posted, or was posted before late scans came in, is listed
+  under *Other days this week not yet on Daily Updates* with a *Post* per
+  day, so a two-day gap is two taps rather than changing the header date
+  back and forth. Days in an earlier week are reached through the header.
 
 ---
 
