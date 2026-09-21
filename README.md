@@ -395,6 +395,7 @@ automatically (Production for the production branch, Preview for others).
 | `facilities/{id}` | Master register row — projection of all licences held by that facility, plus its register-import axes: `functional`, `category` (Medical/Non-Medical, veterinary counts as Medical), `stalled`, `needsReview`/`reviewNote`, `statusDetail` |
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
 | `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these. `date` is empty only on rows back-imported from the 2026 register, where the section recorded the visit but not the day |
+| `inspectionCards/{id}` | An inspection card recorded on its own — the day it was issued, the facility, the non-compliances written on it — for the cards the section issued before the log carried them, or at a visit never logged here. A record, not an inspection: it counts toward no output. A card issued at a visit logged in the app is `cardIssued` on that inspection instead; the Inspectorate tab reads both as one register (`lib/rules/inspectionCards.ts`) |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
@@ -697,6 +698,23 @@ with the facility and the suggested type — *Enforcement Action* once a notice
 has already been served — and scrolls to it. A card logged without its date,
 or on the wrong day, is corrected on the inspection editor (Daily Updates),
 and the timer follows.
+
+**Past cards, for the record.** The cards the section issued before the log
+carried them cannot be logged as inspections — the back-imported 2026 register
+already holds those visits, and logging them again would count them twice on
+output 1.2.4. So a past card is put on the register on its own: *Record a past
+inspection card* on the Inspectorate tab takes the facility, the day it was
+issued, its number if it carries one, and the non-compliances written on it,
+and writes an `inspectionCards` document that is **not** an inspection —
+nothing is counted, no province sheet moves. Its standing (Active / Expiring
+Soon / Expired) follows from the day issued exactly as it does for every card;
+nobody types "expired". The **Inspection card register** panel lists every card
+in the period either way it was recorded, filtered by standing (*Running ·
+Expiring soon · Expired*), and the *Cards due* list and KPI read the same
+register — a facility's latest card is the one that stands, so a card re-issued
+at a follow-up supersedes the past one. Recorded cards can be corrected and
+removed by the Inspectorate (they count toward nothing), and show on the
+facility record under *Inspection cards on record*.
 
 ---
 
@@ -1420,6 +1438,12 @@ npm test
   survive re-imports
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
+- `inspectionCards` — the card register read off both routes (a card stamped
+  on a logged inspection, a past card recorded on its own): standing derived
+  from the day issued, a facility's latest card superseding its earlier one,
+  the attention list expired-first, the period filter by day issued, what a
+  card needs to be recorded, and the mock store's record / correct / remove
+  round trip that creates no inspection
 - `inspectionDatabase` — the Inspectorate workbook reproduced from the register:
   the 30-day inspection card (expiry, Active / Expiring Soon / Expired, that
   the arithmetic does not move with the browser's timezone, that issuing a

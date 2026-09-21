@@ -155,6 +155,14 @@ beforeEach(async () => {
       type: "Routine Inspection",
       outcome: "Compliant",
     });
+    await setDoc(doc(db, "inspectionCards/c1"), {
+      issued: "2026-03-10",
+      facilityId: "f1",
+      facilityName: "Kitwe Central Hospital",
+      province: "Copperbelt",
+      nonCompliances: "No RPO appointed.",
+      notes: "",
+    });
     await setDoc(doc(db, "inspectionRequests/r1"), {
       facilityName: "Kitwe Central Hospital",
       type: "Pre-Authorisation",
@@ -229,6 +237,7 @@ describe("the facilities register and what hangs off it", () => {
     "facilities/f1",
     "licenceEvents/e1",
     "inspections/i1",
+    "inspectionCards/c1",
     "inspectionRequests/r1",
     "licenceWorkflows/w1",
     "aggregates/dashboard",
@@ -326,6 +335,61 @@ describe("the facilities register and what hangs off it", () => {
         ...base,
         date: "2026-08-02",
         week: "W31 2026",
+      }),
+    );
+  });
+});
+
+describe("inspection cards recorded on their own", () => {
+  const past = {
+    issued: "2026-03-10",
+    facilityId: "f1",
+    facilityName: "Kitwe Central Hospital",
+    province: "Copperbelt",
+    nonCompliances: "No RPO appointed; no dose records.",
+    notes: "",
+  };
+
+  it("are the Inspectorate's to record, correct and remove — nobody else's", async () => {
+    await assertSucceeds(setDoc(doc(insp(), "inspectionCards/c2"), past));
+    await assertSucceeds(
+      setDoc(doc(insp(), "inspectionCards/c1"), { ...past, reference: "IC/0042" }),
+    );
+    // Unlike an inspection, a card counts toward nothing, so the section may
+    // take one off the register itself.
+    await assertSucceeds(deleteDoc(doc(insp(), "inspectionCards/c1")));
+
+    await assertFails(setDoc(doc(as(), "inspectionCards/c3"), past));
+    await assertFails(setDoc(doc(nsssDesk(), "inspectionCards/c4"), past));
+    await assertFails(setDoc(doc(nsi(), "inspectionCards/c5"), past));
+    await assertFails(setDoc(doc(nakonde(), "inspectionCards/c6"), past));
+    await assertFails(setDoc(doc(pending(), "inspectionCards/c7"), past));
+    await assertFails(deleteDoc(doc(as(), "inspectionCards/c2")));
+  });
+
+  it("must carry the day issued, the facility and the card's text", async () => {
+    // A card is issued on a day, always — there is no undated card.
+    await assertFails(setDoc(doc(insp(), "inspectionCards/bad-1"), { ...past, issued: "" }));
+    await assertFails(
+      setDoc(doc(insp(), "inspectionCards/bad-2"), { ...past, issued: "10/03/2026" }),
+    );
+    await assertFails(
+      setDoc(doc(insp(), "inspectionCards/bad-3"), { ...past, facilityName: "" }),
+    );
+    const { nonCompliances: _nc, ...noText } = past;
+    void _nc;
+    await assertFails(setDoc(doc(insp(), "inspectionCards/bad-4"), noText));
+    await assertFails(
+      setDoc(doc(insp(), "inspectionCards/bad-5"), { ...past, reference: "x".repeat(81) }),
+    );
+    // A card to a facility not yet on the register names it in free text.
+    await assertSucceeds(
+      setDoc(doc(insp(), "inspectionCards/ok"), {
+        ...past,
+        facilityId: null,
+        facilityName: "Mongu Clinic",
+        province: "",
+        district: "Mongu",
       }),
     );
   });

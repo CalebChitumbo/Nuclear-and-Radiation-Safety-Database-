@@ -391,8 +391,12 @@ Notice · Suspension of License · Cancellation of License
   engagement) and the coverage pin in the same test file updated.
 - The **inspection card** timer is `cardIssued` + 30 days, derived; the due
   list and its *Record follow-up* prefill live on `/inspectorate`
-  (`cardsDue`, `describeCard`, `suggestedFollowUp`). See
-  `docs/management-updates-2026-09.md` for what was asked and verified.
+  (`cardsNeedingAttention`, `describeCard`, `suggestedFollowUp`). A card
+  issued before the log carried them is **recorded on its own**
+  (`inspectionCards`, `lib/rules/inspectionCards.ts`) — never logged as an
+  inspection, which the 2026 register already counts — and the tab reads
+  both routes as one register. See `docs/management-updates-2026-09.md` for
+  what was asked and verified.
 
 ## Routine: a new officer joins, or the reporting line changes
 

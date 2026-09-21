@@ -33,6 +33,14 @@
       ]
     },
     {
+      "collectionGroup": "inspectionCards",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "facilityId", "order": "ASCENDING" },
+        { "fieldPath": "issued", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "inspectionRequests",
       "queryScope": "COLLECTION",
       "fields": [

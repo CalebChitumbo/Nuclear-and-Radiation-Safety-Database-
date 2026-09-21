@@ -13,7 +13,7 @@ import { store } from "@/lib/store";
 import { CardStatusChip } from "@/components/inspectorate/InspectionDatabaseTable";
 import { detectType } from "@/lib/rules/detectType";
 import { enforcementByFacility } from "@/lib/rules/enforcementStatus";
-import { cardStatus } from "@/lib/rules/inspectionDatabase";
+import { cardExpiry, cardStatus } from "@/lib/rules/inspectionDatabase";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
 import { authWhen } from "@/lib/rules/licenceStats";
 import { todayISO } from "@/lib/rules/week";
@@ -24,6 +24,7 @@ import {
 import {
   type Facility,
   type Inspection,
+  type InspectionCard,
   type InspectionPriority,
   type InspectionRequest,
   type LicenceEvent,
@@ -59,6 +60,7 @@ export function FacilityDetail({
   const [notFound, setNotFound] = useState(false);
   const [events, setEvents] = useState<LicenceEvent[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [cards, setCards] = useState<InspectionCard[]>([]);
   const [requests, setRequests] = useState<InspectionRequest[]>([]);
   const [workflows, setWorkflows] = useState<LicenceWorkflow[]>([]);
   const [adding, setAdding] = useState(false);
@@ -91,6 +93,8 @@ export function FacilityDetail({
       s.listInspectionRequestsFor(id).catch(() => []),
       // The facility's tracked applications, with their officer notes/history.
       s.listLicenceWorkflowsFor(id).catch(() => []),
+      // Inspection cards recorded on their own (past cards, for the record).
+      s.listInspectionCardsFor(id).catch(() => []),
     ]);
   }, []);
 
@@ -100,7 +104,7 @@ export function FacilityDetail({
     let cancelled = false;
     setNotFound(false);
     loadFacility(facilityId)
-      .then(([f, evs, ins, reqs, wfs]) => {
+      .then(([f, evs, ins, reqs, wfs, crds]) => {
         if (cancelled) return;
         setFacility(f);
         setNotFound(!f);
@@ -108,6 +112,7 @@ export function FacilityDetail({
         setInspections(ins);
         setRequests(reqs);
         setWorkflows(wfs);
+        setCards(crds);
         onLoadedRef.current?.(f);
       })
       .catch(() => {
@@ -168,12 +173,13 @@ export function FacilityDetail({
     : "Recorded as an authorisation the facility holds. Licensing status will not change.";
 
   const refresh = async (id: string) => {
-    const [f, evs, ins, reqs, wfs] = await loadFacility(id);
+    const [f, evs, ins, reqs, wfs, crds] = await loadFacility(id);
     setFacility(f);
     setEvents(evs);
     setInspections(ins);
     setRequests(reqs);
     setWorkflows(wfs);
+    setCards(crds);
   };
 
   const submitRequest = async () => {
@@ -678,6 +684,42 @@ export function FacilityDetail({
             </ul>
           )}
         </div>
+        {/* Cards recorded on their own — issued before the log carried them,
+            or at a visit not logged here — with their standing today. */}
+        {cards.length > 0 ? (
+          <div>
+            <div className="caps text-[10px] text-gunmetal/50 mb-1.5">
+              Inspection cards on record
+            </div>
+            <ul className="divide-y divide-gunmetal/8 text-sm">
+              {cards.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-baseline justify-between gap-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold break-words">
+                      Inspection card{c.reference ? ` ${c.reference}` : ""}
+                    </div>
+                    {c.nonCompliances ? (
+                      <div className="text-xs text-gunmetal/60 whitespace-pre-line">
+                        {c.nonCompliances}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-xs tabular text-gunmetal/55 shrink-0 text-right">
+                    <div>
+                      {c.issued} → {cardExpiry(c.issued)}
+                    </div>
+                    <div className="mt-1">
+                      <CardStatusChip status={cardStatus(c.issued, todayISO())} />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </Panel>
   );

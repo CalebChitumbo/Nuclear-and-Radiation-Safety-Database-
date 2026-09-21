@@ -19,6 +19,10 @@ import {
   InspectionDatabaseTable,
 } from "@/components/inspectorate/InspectionDatabaseTable";
 import { InspectionSummaryTable } from "@/components/inspectorate/InspectionSummaryTable";
+import {
+  InspectionCardRegisterPanel,
+  RecordInspectionCardPanel,
+} from "@/components/inspectorate/InspectionCardRegister";
 import { useWeek } from "@/lib/weekContext";
 import { norm } from "@/lib/rules/matching";
 import { toCsv } from "@/lib/rules/exportCsv";
@@ -26,7 +30,6 @@ import { todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
   buildInspectionDatabase,
   cardExpiry,
-  cardsDue,
   databaseCsvRows,
   describeCard,
   suggestedFollowUp,
@@ -37,6 +40,11 @@ import {
   ENFORCEMENT_ACTIONS,
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
+import {
+  cardInPeriod,
+  cardRegister,
+  cardsNeedingAttention,
+} from "@/lib/rules/inspectionCards";
 import {
   deriveInspectorateDashboard,
   deriveInspectionSchedule,
@@ -55,6 +63,7 @@ import {
   INSPECTION_TYPES,
   type Facility,
   type Inspection,
+  type InspectionCard,
   type InspectionType,
   type InspectionOutcome,
 } from "@/lib/rules/types";
@@ -88,17 +97,19 @@ const SHEET_PAGE = 100;
  */
 export default function InspectoratePage() {
   const { user, canEditInsp } = useAuth();
-  const { selected } = useWeek();
+  const { selected, weeks } = useWeek();
   const toast = useToast();
   const { data, error, reload } = useStoreData(async (s) => {
-    const [facilities, inspections, requests] = await Promise.all([
+    const [facilities, inspections, requests, cards] = await Promise.all([
       s.listFacilities(),
       s.listInspections(),
       // Secondary: the schedule must not break the dashboard if the
       // inspectionRequests rules aren't deployed yet.
       s.listInspectionRequests().catch(() => []),
+      // Likewise the cards recorded on their own.
+      s.listInspectionCards().catch(() => []),
     ]);
-    return { facilities, inspections, requests };
+    return { facilities, inspections, requests, cards };
   });
 
   const [period, setPeriod] = useState<InspectionPeriod>("year");
@@ -109,10 +120,13 @@ export default function InspectoratePage() {
   const [round, setRound] = useState<string>(ALL_ROUNDS);
   const [coverage, setCoverage] = useState<Coverage>("inspected");
   const [limit, setLimit] = useState(SHEET_PAGE);
+  // A recorded card opened for correction in the form below the register.
+  const [editingCard, setEditingCard] = useState<InspectionCard | null>(null);
 
   const facilities = useMemo(() => data?.facilities || [], [data]);
   const inspections = useMemo(() => data?.inspections || [], [data]);
   const requests = useMemo(() => data?.requests || [], [data]);
+  const cards = useMemo(() => data?.cards || [], [data]);
 
   const today = todayISO();
   const ctx: PeriodContext = useMemo(
@@ -132,7 +146,44 @@ export default function InspectoratePage() {
     [inPeriod, facilities, today],
   );
   const summary = useMemo(() => summariseInspectionDatabase(rows), [rows]);
-  const due = useMemo(() => cardsDue(rows), [rows]);
+
+  // The card register — cards stamped on logged inspections and cards
+  // recorded on their own, read as one list over the same period — and the
+  // ones on it that need chasing.
+  const cardRows = useMemo(
+    () =>
+      cardRegister(inspections, cards, facilities, today).filter((c) =>
+        cardInPeriod(c, period, ctx, weeks),
+      ),
+    [inspections, cards, facilities, today, period, ctx, weeks],
+  );
+  const due = useMemo(() => cardsNeedingAttention(cardRows), [cardRows]);
+  // A due card's last action and last visit come off the facility's database
+  // row; a recorded card has no inspection of its own to read them from.
+  const rowByFacility = useMemo(() => {
+    const m = new Map<string, (typeof rows)[number]>();
+    for (const r of rows) {
+      const k = r.facilityId || `name:${norm(r.facility)}`;
+      const prev = m.get(k);
+      if (!prev || r.lastInspected > prev.lastInspected) m.set(k, r);
+    }
+    return m;
+  }, [rows]);
+
+  const removeCard = async (id: string) => {
+    try {
+      const s = await store();
+      await s.deleteInspectionCard(id);
+      if (editingCard?.id === id) setEditingCard(null);
+      toast.push("Card taken off the register.", "success");
+      reload();
+    } catch (err) {
+      toast.push(
+        `Removing the card failed: ${err instanceof Error ? err.message : err}`,
+        "error",
+      );
+    }
+  };
 
   const dash = useMemo(
     () => deriveInspectorateDashboard(inspections, period, ctx),
@@ -345,15 +396,16 @@ export default function InspectoratePage() {
 
       {/* Inspection cards — the column the workbook keeps to chase re-issues.
           A card starts its 30-day timer the day it is issued (the log form,
-          the wizard and the request drawer all stamp the inspection date);
-          the expired ones lead this list, most overdue first, each with the
-          last action taken and a way to record the next one. */}
+          the wizard and the request drawer all stamp the inspection date; a
+          past card is recorded with its own day); the expired ones lead this
+          list, most overdue first, each with the last action taken and a way
+          to record the next one. */}
       <Panel
         title={`Inspection cards due — ${due.length}`}
         flush
-        note={`${due.filter((r) => r.cardStatus === "Expired").length} expired · ${
-          due.filter((r) => r.cardStatus === "Expiring Soon").length
-        } inside the last fortnight. A card runs ${CARD_VALID_DAYS} days from the day it is issued.`}
+        note={`${due.filter((r) => r.status === "Expired").length} expired · ${
+          due.filter((r) => r.status === "Expiring Soon").length
+        } inside the last fortnight. A card runs ${CARD_VALID_DAYS} days from the day it is issued; a facility's latest card is the one that stands.`}
       >
         {due.length === 0 ? (
           <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
@@ -361,50 +413,58 @@ export default function InspectoratePage() {
           </p>
         ) : (
           <ul className="divide-y divide-gunmetal/8">
-            {due.map((r) => {
-              const next = suggestedFollowUp(r);
+            {due.map((c) => {
+              const row = rowByFacility.get(c.facilityId || `name:${norm(c.facility)}`);
+              const enforcement = row?.enforcement || c.enforcement;
+              const next = suggestedFollowUp({ cardStatus: c.status, enforcement });
               return (
                 <li
-                  key={`${r.round}::${r.facilityId || r.facility}`}
+                  key={c.key}
                   className="px-4 sm:px-5 py-3 flex flex-wrap items-start justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold break-words">{r.facility}</div>
+                    <div className="font-bold break-words">{c.facility}</div>
                     <div className="text-[11px] text-gunmetal/55">
-                      {r.round}
-                      {r.district ? ` · ${r.district}` : ""}
-                      {r.lastInspected ? ` · last inspected ${r.lastInspected}` : ""}
+                      {row?.round || c.province || "Unassigned"}
+                      {c.district ? ` · ${c.district}` : ""}
+                      {row?.lastInspected ? ` · last inspected ${row.lastInspected}` : ""}
+                      {c.source === "record" ? " · recorded card" : ""}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                      {r.enforcement ? (
-                        <EnforcementChip action={r.enforcement} />
+                      {enforcement ? (
+                        <EnforcementChip action={enforcement} />
                       ) : (
                         <span className="chip slate">No action on record</span>
                       )}
                       <span className="text-gunmetal/60">{next.hint}</span>
                     </div>
+                    {c.source === "record" && c.findings ? (
+                      <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
+                        {c.findings}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="text-right shrink-0">
-                    <CardStatusChip status={r.cardStatus} />
+                    <CardStatusChip status={c.status} />
                     <div className="text-[11px] text-gunmetal/55 tabular mt-1">
-                      {r.cardIssued} → {r.cardExpiry}
+                      {c.issued} → {c.expiry}
                     </div>
                     <div
                       className={`text-[11px] font-bold tabular ${
-                        r.cardStatus === "Expired"
+                        c.status === "Expired"
                           ? "text-[var(--status-stalled)]"
                           : "text-[#7a5b07]"
                       }`}
                     >
-                      {describeCard(r.cardExpiry, today)}
+                      {describeCard(c.expiry, today)}
                     </div>
                     {canEditInsp ? (
                       <button
                         className="link-action mt-1"
                         onClick={() =>
                           setPrefill({
-                            facilityId: r.facilityId,
-                            facilityName: r.facility,
+                            facilityId: c.facilityId,
+                            facilityName: c.facility,
                             type: next.type,
                             nonce: Date.now(),
                           })
@@ -420,6 +480,29 @@ export default function InspectoratePage() {
           </ul>
         )}
       </Panel>
+
+      {/* The card register — every card in the period, running or run out —
+          and, for the Inspectorate, the form that puts a past card on it. */}
+      <InspectionCardRegisterPanel
+        register={cardRows}
+        today={today}
+        canEdit={canEditInsp}
+        onEdit={(id) => setEditingCard(cards.find((c) => c.id === id) || null)}
+        onRemove={removeCard}
+      />
+      {canEditInsp && user ? (
+        <RecordInspectionCardPanel
+          facilities={facilities}
+          editing={editingCard}
+          actorUid={user.uid}
+          onSaved={() => {
+            setEditingCard(null);
+            reload();
+          }}
+          onCancelEdit={() => setEditingCard(null)}
+          toastPush={toast.push}
+        />
+      ) : null}
 
       {/* Enforcement actions taken in the period */}
       <Panel

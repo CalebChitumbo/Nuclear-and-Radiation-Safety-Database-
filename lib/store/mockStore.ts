@@ -54,6 +54,7 @@ import {
   type DirectoryEntry,
   type Facility,
   type Inspection,
+  type InspectionCard,
   type InspectionRequest,
   type LicenceEvent,
   type LicenceType,
@@ -109,6 +110,7 @@ interface State {
   facilities: Facility[];
   licenceEvents: LicenceEvent[];
   inspections: Inspection[];
+  inspectionCards: InspectionCard[];
   inspectionRequests: InspectionRequest[];
   activities: Activity[];
   licenceWorkflows: LicenceWorkflow[];
@@ -212,6 +214,7 @@ function freshState(): State {
       facilities,
       weeksSeed,
     ).inspections,
+    inspectionCards: [],
     inspectionRequests: [],
     activities: [],
     licenceWorkflows: [],
@@ -250,6 +253,8 @@ function load(): State {
     if (!parsed.licenceWorkflows) parsed.licenceWorkflows = [];
     // Back-compat: stores saved before the inspection-request workflow existed.
     if (!parsed.inspectionRequests) parsed.inspectionRequests = [];
+    // Back-compat: stores saved before past cards could be recorded on their own.
+    if (!parsed.inspectionCards) parsed.inspectionCards = [];
     // Back-compat: stores saved before the Daily Updates tab existed.
     if (!parsed.dailyEntries) parsed.dailyEntries = [];
     // Back-compat: stores saved before the work plan report existed.
@@ -1030,6 +1035,59 @@ class MockStore implements DataStore {
     dispatchChange();
   }
 
+  async listInspectionCards(): Promise<InspectionCard[]> {
+    return [...ensure().inspectionCards].sort((a, b) =>
+      (b.issued || "").localeCompare(a.issued || ""),
+    );
+  }
+
+  async listInspectionCardsFor(facilityId: string): Promise<InspectionCard[]> {
+    return ensure()
+      .inspectionCards.filter((c) => c.facilityId === facilityId)
+      .sort((a, b) => (b.issued || "").localeCompare(a.issued || ""));
+  }
+
+  async addInspectionCard(
+    card: Omit<InspectionCard, "id">,
+    actor?: string,
+  ): Promise<InspectionCard> {
+    const s = ensure();
+    const created: InspectionCard = {
+      ...card,
+      id: newId("card"),
+      createdAt: new Date().toISOString(),
+      ...(actor ? { updatedBy: actor } : {}),
+    };
+    s.inspectionCards.push(created);
+    save(s);
+    dispatchChange();
+    return created;
+  }
+
+  async updateInspectionCard(
+    id: string,
+    patch: Partial<Omit<InspectionCard, "id">>,
+    actor?: string,
+  ): Promise<InspectionCard> {
+    const s = ensure();
+    const before = s.inspectionCards.find((c) => c.id === id);
+    if (!before) throw new Error("That inspection card is no longer on the register.");
+    const next: InspectionCard = { ...before, ...patch, id };
+    next.updatedAt = new Date().toISOString();
+    if (actor) next.updatedBy = actor;
+    s.inspectionCards = s.inspectionCards.map((c) => (c.id === id ? next : c));
+    save(s);
+    dispatchChange();
+    return next;
+  }
+
+  async deleteInspectionCard(id: string): Promise<void> {
+    const s = ensure();
+    s.inspectionCards = s.inspectionCards.filter((c) => c.id !== id);
+    save(s);
+    dispatchChange();
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     return [...ensure().inspectionRequests].sort((a, b) =>
       (b.requestedAt || "").localeCompare(a.requestedAt || ""),
@@ -1371,6 +1429,7 @@ class MockStore implements DataStore {
       facilities: s.facilities,
       licenceEvents: s.licenceEvents,
       inspections: s.inspections,
+      inspectionCards: s.inspectionCards,
       inspectionRequests: s.inspectionRequests,
       activities: s.activities,
       licenceWorkflows: s.licenceWorkflows,

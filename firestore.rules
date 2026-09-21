@@ -125,6 +125,19 @@ service cloud.firestore {
         && (!('practice' in d) || d.practice is string);
     }
 
+    // A card recorded on its own (lib/rules/inspectionCards.ts): the day it
+    // was issued, who to, and what was written on it. It is a record, not an
+    // inspection — it counts toward nothing — so its shape is the card's own
+    // and its date must be a real day: a card is issued on a day, always.
+    function validInspectionCard(d) {
+      return d.issued is string && d.issued.matches('\\d{4}-\\d{2}-\\d{2}')
+        && d.facilityName is string && d.facilityName.size() > 0
+        && d.nonCompliances is string
+        && d.notes is string
+        && (!('district' in d) || d.district is string)
+        && (!('reference' in d) || (d.reference is string && d.reference.size() <= 80));
+    }
+
     function validInspectionRequest(d) {
       return d.facilityName is string && d.facilityName.size() > 0
         && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
@@ -152,6 +165,16 @@ service cloud.firestore {
       allow create: if isInsp() && validInspection(request.resource.data);
       allow update: if isInsp() && validInspection(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    // Inspection cards recorded on their own — past cards put on the register
+    // for the record. The Inspectorate's to keep, corrections and removals
+    // included: unlike an inspection, taking a card off moves no figure.
+    match /inspectionCards/{id} {
+      allow read:   if seesRegister();
+      allow create: if isInsp() && validInspectionCard(request.resource.data);
+      allow update: if isInsp() && validInspectionCard(request.resource.data);
+      allow delete: if isInsp();
     }
 
     // Cross-section inspection requests: the Licensing (A&S) ↔ Inspectorate
