@@ -11,6 +11,7 @@ import { todayISO } from "@/lib/rules/week";
 import {
   cardExpiry,
   ENFORCEMENT_ACTIONS,
+  enforcementLabel,
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
 import {
@@ -361,7 +362,9 @@ export function InspectionRequestDrawer({
                 >
                   <option value="">None</option>
                   {ENFORCEMENT_ACTIONS.map((a) => (
-                    <option key={a}>{a}</option>
+                    <option key={a} value={a}>
+                      {enforcementLabel(a)}
+                    </option>
                   ))}
                 </select>
               </Labeled>

@@ -145,6 +145,19 @@ export const ENFORCEMENT_COLUMNS = [
 
 export type EnforcementCounts = Record<EnforcementAction, number>;
 
+const ENFORCEMENT_LABELS = new Map<string, string>(
+  ENFORCEMENT_COLUMNS.map((c) => [c.key, c.label]),
+);
+
+/**
+ * How an action reads on screen — the summary's heading for it, so a record
+ * stored as "Written Warning" reads "Written Notice" wherever it is shown, the
+ * way Management's format names it. The stored value is never renamed.
+ */
+export function enforcementLabel(action: string): string {
+  return ENFORCEMENT_LABELS.get(action) ?? action;
+}
+
 /** The actions the Summary sheet bands and totals. */
 const SUMMARISED_ENFORCEMENTS = new Set<string>(
   ENFORCEMENT_COLUMNS.map((c) => c.key),

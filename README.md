@@ -637,6 +637,17 @@ day, so they show under *All time* and on the province sheets and are counted by
 no reporting period. See
 [docs/inspection-register-2026-import.md](docs/inspection-register-2026-import.md).
 
+The division's **enforcement list** of 28 September 2026 is laid on that
+register — **116 enforcement actions**, all recorded as Written Notices at the
+section's instruction: 99 on the register inspection each came out of (37 of
+them dated), and 17 on facilities the register has no inspection for, recorded
+as enforcement actions of their own. They show on the *Enforcement actions*
+panel (the dated 37 under the year, all 116 under *All time*), on the province
+sheets and in the summary's Written Notice column. Output 1.2.11 still reports
+the section's **193** — the list is inside it, so the 37 dated actions came off
+its opening balance. See
+[docs/enforcement-list-2026-import.md](docs/enforcement-list-2026-import.md).
+
 **The Summary sheet.** One row per province round, with two bands across the
 top — the inspections, then Management's six enforcement actions:
 
@@ -678,7 +689,10 @@ else the system already knows.
 The enforcement vocabulary is stored with the workbook's own spelling
 ("Suspension of License"), not the British spelling used for licences
 elsewhere in this codebase, so an exported database pastes straight back into
-the workbook's validated column.
+the workbook's validated column. The stored "Written Warning" is *shown* as
+**Written Notice** everywhere — chips, dropdowns, the summary — the way
+Management's format names it (`enforcementLabel`); the stored value is never
+renamed, so existing records keep counting.
 
 **Exports.** *Export summary* and *Export database* write the two sheets in the
 workbook's own layouts — the Summary with its banded head and footer figures,
@@ -696,17 +710,31 @@ first, most overdue first (*Expired 41 days ago*), each with the last
 enforcement action taken and a **Record follow-up →** that fills the log form
 with the facility and the suggested type — *Enforcement Action* once a notice
 has already been served — and scrolls to it. A card logged without its date,
-or on the wrong day, is corrected on the inspection editor (Daily Updates),
-and the timer follows.
+or on the wrong day, is corrected on the inspection editor, and the timer
+follows.
+
+**Correcting a past inspection — and adding the card it never got.** Every
+inspection on the Inspectorate tab's register (and on its *Enforcement actions*
+panel) carries **Edit · add card**, which opens the inspection editor in place:
+tick *Inspection card issued*, give the day, save. The register has a *Find a
+facility…* search, so one visit among hundreds is quick to reach. This works on
+the back-imported register's **undated** rows too — the visit stays undated
+(counted in no week) while the card gets its own day; giving the visit a day
+instead is allowed, and the form warns that 1.2.4's opening balance still
+carries it.
 
 **Past cards, for the record.** The cards the section issued before the log
 carried them cannot be logged as inspections — the back-imported 2026 register
 already holds those visits, and logging them again would count them twice on
-output 1.2.4. So a past card is put on the register on its own: *Record a past
-inspection card* on the Inspectorate tab takes the facility, the day it was
-issued, its number if it carries one, and the non-compliances written on it,
-and writes an `inspectionCards` document that is **not** an inspection —
-nothing is counted, no province sheet moves. Its standing (Active / Expiring
+output 1.2.4. *Record a past inspection card* on the Inspectorate tab takes the
+facility, the day it was issued, its number if it carries one, and the
+non-compliances written on it. Once the facility is picked it lists that
+facility's inspections already on the register under **Issued at**: choose the
+visit the card came out of and the card is put **on that inspection**
+(`cardIssued`, with what was written on the card added to its notes), so the
+visit and its card read as one. Otherwise it writes an `inspectionCards`
+document that is **not** an inspection. Either way nothing is counted and no
+province sheet moves. Its standing (Active / Expiring
 Soon / Expired) follows from the day issued exactly as it does for every card;
 nobody types "expired". The **Inspection card register** panel lists every card
 in the period either way it was recorded, filtered by standing (*Running ·
@@ -1045,9 +1073,11 @@ Three things keep a correction honest:
   same before/after, `X changed Vehicle Screening at Chirundu for 2026-09-02
   from 143 to 134`. Nothing here is a back door around it.
 
-An inspection is editable in type, outcome, enforcement action and day (its
+An inspection is editable in type, outcome, enforcement action, day and
+inspection card — on Daily Updates and on the Inspectorate tab's register (its
 reporting week is re-derived from the date, so a corrected day is reported in
-its own week). The **facility** is not: an inspection carries that facility's
+its own week; an undated register row may stay undated). A re-seed of the
+register keeps these corrections (`mergeSeededInspection`). The **facility** is not: an inspection carries that facility's
 province, district and practice, so one filed against the wrong facility is
 removed and logged again — and removing an inspection is an administrator's,
 since it takes a counted inspection, and any enforcement action on it, back out
@@ -1465,7 +1495,17 @@ npm test
   from the day issued, a facility's latest card superseding its earlier one,
   the attention list expired-first, the period filter by day issued, what a
   card needs to be recorded, and the mock store's record / correct / remove
-  round trip that creates no inspection
+  round trip that creates no inspection; and a past card put on an inspection
+  already logged — the facility's visits offered newest first, an undated
+  register row given a card without being dated, and a card refused if it
+  predates its visit
+- `enforcementList` — the 2026 enforcement list laid on the register: every
+  numbered row held once and applied (99 on register inspections, 17 recorded
+  on their own), each register reference naming the same facility, no
+  inspection given two actions, all 116 Written Notices in the summary's Total
+  Enforcements, the register's 297 inspections unchanged, and output 1.2.11
+  still reading the section's 193 (45 / 61 / 87); and a re-seed keeping an
+  officer's card, action, day and notes on a register inspection
 - `inspectionDatabase` — the Inspectorate workbook reproduced from the register:
   the 30-day inspection card (expiry, Active / Expiring Soon / Expired, that
   the arithmetic does not move with the browser's timezone, that issuing a

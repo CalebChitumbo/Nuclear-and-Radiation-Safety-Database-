@@ -134,7 +134,11 @@ import rather than adding to it.
    fills one in later, put the answer in and say where it came from in `note`.
 2. Update the pinned figures in `tests/inspectionSeed.test.ts` (row count,
    imported count, per-type split, dated count and quarters, linked/unlinked).
-3. **Move `INSPECTION_REGISTER_HANDOVER`** (`lib/store/seeding.ts`) to the day
+3. **Re-point the enforcement list.** `register` in
+   `seed/enforcement-2026.seed.json` is this document's row number; if the new
+   register moves rows, update them (`tests/enforcementList.test.ts` fails on a
+   reference that no longer names the same facility).
+3a. **Move `INSPECTION_REGISTER_HANDOVER`** (`lib/store/seeding.ts`) to the day
    the new register was handed over. It is the date the supersession rule turns
    on — see step 5.
 4. **Re-balance 1.2.4.** Its opening balance carries the work the register does
@@ -174,6 +178,44 @@ with them, so 1.2.11 moves too — it returned to its carried 193 from 203 at th
 first import. That is the same correction (the section reported both figures in
 one breath), but say so when it happens, because the register has no enforcement
 column and nothing replaces those records row by row.
+
+## Routine: the division hands over a new enforcement list
+
+The Inspectorate & Enforcement Division's `Enforcement_List.docx` — *No. ·
+Facility / Entity · Enforcement Date*, no action column. It is laid on the
+inspection register (`seed/enforcement-2026.seed.json`,
+`applyEnforcementList` in `lib/store/seeding.ts`) and **replaces** the previous
+list. `docs/enforcement-list-2026-import.md` is the account of the first one.
+
+1. Put its rows into the seed verbatim (`n`, `name`, `date` as DD/MM/YYYY).
+   Resolve each: `register: <row n of inspections-2026.seed.json>` where the
+   list names a register inspection (it follows the register's own order for
+   long runs), `facility: "<exact register name>"` where it names a facility
+   the matcher misses, and a `note` saying which. A row with neither is
+   recorded as an `Enforcement Action` of its own.
+2. The action: the list names none. Sep 2026 was all Written Notices
+   (`ENFORCEMENT_LIST_ACTION`, stored "Written Warning"); ask again rather than
+   assume, and give a row its own `action` where the section says otherwise.
+3. **Re-balance 1.2.11** the way 1.2.4 is: ask whether the list is inside the
+   section's reported figure (Sep 2026: yes, inside 193). If so, take the actions
+   that land on a DATED inspection off `WORK_PLAN_OPENING_BALANCE["1.2.11"]`,
+   in the quarter the inspection's reporting week starts in, so the reported
+   total and split do not move. Update the pins in `tests/workPlan.test.ts`
+   and `tests/enforcementList.test.ts`.
+4. Deploy, then write it — the register and list only, never pruned:
+
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed -- --only inspections
+   ```
+
+   Read the counts it prints and every "kept the officer's corrections" line:
+   a register inspection an officer has edited (a card, an action) keeps it
+   (`mergeSeededInspection`).
+
+**Watch out:** the list's dates are not the register's. In Sep 2026 its date
+column was shifted by a few rows (Nyimba/Minga/Kalindawalo on 01/07, the
+register says 05/08). The action sits on the register's inspection and takes
+its date; say where they disagree in the doc.
 
 ## Routine: the section supplies a new daily summary workbook
 

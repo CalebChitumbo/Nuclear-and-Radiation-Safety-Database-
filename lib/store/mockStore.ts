@@ -80,30 +80,34 @@ import { WORK_PLAN_YEAR } from "../rules/workPlan";
 import facilitiesSeed from "../../seed/facilities.seed.json";
 import screeningSeed from "../../seed/daily-screening-2026.seed.json";
 import registerSeed from "../../seed/inspections-2026.seed.json";
+import enforcementSeed from "../../seed/enforcement-2026.seed.json";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 import {
   mapAllSeed,
   mapAllSeedInspections,
   mapSeedBorders,
   mapSeedScreening,
+  type SeedEnforcement,
   type SeedFacility,
   type SeedInspection,
   type SeedScreening,
 } from "./seeding";
 import type { DataStore, ScanWatch } from "./types";
 
+// v6: the 2026 enforcement list laid on the inspection register.
 // v5: the Inspectorate's 2026 facility inspection register, so the demo opens
 // on the same 297 inspections production does.
 // v4: the August 2026 data refresh — the updated Licensing Status register and
 // the inland offices' seeded daily screening log.
 // Bumping the key makes every mock/demo browser start fresh from the new seed
 // (the old register AND the history recorded against it are gone by design).
-const STORAGE_KEY = "rpa-mock-store-v5";
+const STORAGE_KEY = "rpa-mock-store-v6";
 const OLD_STORAGE_KEYS = [
   "rpa-mock-store-v1",
   "rpa-mock-store-v2",
   "rpa-mock-store-v3",
   "rpa-mock-store-v4",
+  "rpa-mock-store-v5",
 ];
 
 interface State {
@@ -207,12 +211,14 @@ function freshState(): State {
     facilities,
     licenceEvents: [],
     // The Inspectorate's 2026 facility inspection register, so the tab opens on
-    // the section's own year rather than empty — see
-    // docs/inspection-register-2026-import.md.
+    // the section's own year rather than empty — with the 2026 enforcement
+    // list laid on it. See docs/inspection-register-2026-import.md and
+    // docs/enforcement-list-2026-import.md.
     inspections: mapAllSeedInspections(
       registerSeed as SeedInspection[],
       facilities,
       weeksSeed,
+      enforcementSeed as SeedEnforcement[],
     ).inspections,
     inspectionCards: [],
     inspectionRequests: [],

@@ -38,6 +38,10 @@ quarterly actuals moved. What changed against the previous figures:
 
 Everything else was already at the workbook's figure.
 
+*28 Sep 2026:* 1.2.11 is still **193**, but the division's enforcement list now
+stands behind 37 of it — see
+[the enforcement list import](./enforcement-list-2026-import.md).
+
 ## What this does *not* populate
 
 The sheet reports the section's outputs, not its inspections. The Inspectorate

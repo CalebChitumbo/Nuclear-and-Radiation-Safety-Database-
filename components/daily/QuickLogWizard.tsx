@@ -25,6 +25,7 @@ import {
 import {
   cardExpiry,
   ENFORCEMENT_ACTIONS,
+  enforcementLabel,
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
 import { norm } from "@/lib/rules/matching";
@@ -453,7 +454,7 @@ function InspectionFlow({
         {ENFORCEMENT_ACTIONS.map((a) => (
           <BigOption
             key={a}
-            label={a}
+            label={enforcementLabel(a)}
             onClick={() => {
               setEnforcement(a);
               setStep("confirm");
@@ -479,7 +480,7 @@ function InspectionFlow({
         <div className="flex flex-wrap gap-1">
           <span className="chip slate">{type}</span>
           <span className="chip">{outcome}</span>
-          {enforcement ? <span className="chip red">{enforcement}</span> : null}
+          {enforcement ? <span className="chip red">{enforcementLabel(enforcement)}</span> : null}
         </div>
         <div className="text-gunmetal/60 tabular">
           {date} · {weekLabel}

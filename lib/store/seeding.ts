@@ -6,6 +6,10 @@ import {
   vehicleScreeningKey,
 } from "../rules/daily";
 import { detectType } from "../rules/detectType";
+import {
+  isEnforcementAction,
+  type EnforcementAction,
+} from "../rules/inspectionDatabase";
 import { classifyMatch, matchOne, norm } from "../rules/matching";
 import { weekLabelForDate } from "../rules/week";
 import {
@@ -431,6 +435,13 @@ export const INSPECTION_REGISTER_HANDOVER = "2026-09-07";
 export const INSPECTION_REGISTER_ID_PREFIX = "reg2026-";
 
 /**
+ * The enforcement list's own records — an action on a facility the inspection
+ * register has no row for. Seeded, like the register's, so never a typed
+ * duplicate of it.
+ */
+export const ENFORCEMENT_LIST_ID_PREFIX = "enf2026-";
+
+/**
  * Whether an inspection document in the project is work the register now
  * carries, and so should not also be counted on its own.
  *
@@ -446,6 +457,7 @@ export function supersededByRegister(
   handover = INSPECTION_REGISTER_HANDOVER,
 ): boolean {
   if (id.startsWith(INSPECTION_REGISTER_ID_PREFIX)) return false;
+  if (id.startsWith(ENFORCEMENT_LIST_ID_PREFIX)) return false;
   return !!date && date <= handover;
 }
 
@@ -535,6 +547,208 @@ export interface MappedSeedInspections {
   skipped: Array<{ row: SeedInspection; reason: string }>;
   /** Rows imported without a link to a register facility. */
   unlinked: number;
+  /** What the enforcement list did to the register — see applyEnforcementList. */
+  enforcement: MappedEnforcementList;
+}
+
+// ---------------------------------------------------------------------------
+// The Inspectorate's 2026 enforcement list
+// ---------------------------------------------------------------------------
+
+/**
+ * One row of the Inspectorate & Enforcement Division's ENFORCEMENT LIST
+ * (`Enforcement_List.docx`, handed over 28 Sep 2026): the facilities on which
+ * enforcement has been carried out. `name` and `date` are the document's own;
+ * the rest is how the row was resolved, so the file stays checkable against
+ * the document. See docs/enforcement-list-2026-import.md.
+ */
+export interface SeedEnforcement {
+  /** Row number in the document. */
+  n: number;
+  /** FACILITY / ENTITY, as written. */
+  name: string;
+  /** ENFORCEMENT DATE as DD/MM/YYYY; "" where the document gives none. */
+  date: string;
+  /**
+   * The inspection register row (`n` in inspections-2026.seed.json) the action
+   * came out of. The list follows the register's own order for most of its
+   * length, and the action is recorded ON that inspection — the way the log
+   * form records one — so the visit is not counted a second time.
+   */
+  register?: number;
+  /**
+   * For a row the register has no inspection for: the register facility it
+   * names, where the document's spelling is too loose to match on its own.
+   */
+  facility?: string;
+  /** The action taken, from ENFORCEMENT_ACTIONS; ENFORCEMENT_LIST_ACTION when absent. */
+  action?: string;
+  /** Where a resolution came from, or what the document and register disagree on. */
+  note?: string;
+}
+
+/**
+ * The action every row of the list is recorded as. The document names the
+ * facility but not the action; the section's instruction (28 Sep 2026) was to
+ * record them all as Written Notices — stored as the workbook's "Written
+ * Warning", which the summary heads "Written Notice". A row can say otherwise
+ * with its own `action`, and an officer can correct any one on the
+ * Inspectorate tab.
+ */
+export const ENFORCEMENT_LIST_ACTION: EnforcementAction = "Written Warning";
+
+export interface MappedEnforcementList {
+  /** Register inspections the list's action was recorded on. */
+  stamped: number;
+  /** Actions on facilities the register has no inspection for, recorded on their own. */
+  recorded: number;
+  /** List rows that could not be applied, and why. */
+  skipped: Array<{ row: SeedEnforcement; reason: string }>;
+}
+
+function enforcementNote(row: SeedEnforcement, action: EnforcementAction): string {
+  const shown = action === "Written Warning" ? "Written Notice" : action;
+  return [
+    `Row ${row.n} of the 2026 enforcement list (${shown}).`,
+    row.note,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * The enforcement list laid onto the register.
+ *
+ * A row that names a register inspection has its action recorded on that
+ * inspection — the inspection keeps its own date, so it is counted by output
+ * 1.2.11 in the week the register puts it in. A row the register has no
+ * inspection for becomes an `Enforcement Action` record of its own: counted by
+ * 1.2.11, never by 1.2.4, and undated where the list gives no date. Nothing is
+ * invented: an undated action belongs to no reporting period, and 1.2.11's
+ * opening balance still carries it (see WORK_PLAN_OPENING_BALANCE).
+ *
+ * Mutates `inspections` (the register as mapped) and returns what it did.
+ */
+export function applyEnforcementList(
+  list: SeedEnforcement[],
+  registerByRow: Map<number, Inspection>,
+  inspections: Inspection[],
+  facilities: Facility[],
+  weeks: WeekDef[],
+): MappedEnforcementList {
+  const out: MappedEnforcementList = { stamped: 0, recorded: 0, skipped: [] };
+  const seen = new Map<string, number>();
+
+  for (const row of list) {
+    const action = row.action || ENFORCEMENT_LIST_ACTION;
+    if (!isEnforcementAction(action)) {
+      out.skipped.push({ row, reason: `"${action}" is not an enforcement action` });
+      continue;
+    }
+
+    if (row.register !== undefined) {
+      const target = registerByRow.get(row.register);
+      if (!target) {
+        out.skipped.push({
+          row,
+          reason: `register row ${row.register} was not imported`,
+        });
+        continue;
+      }
+      if (target.enforcement) {
+        out.skipped.push({
+          row,
+          reason: `register row ${row.register} already carries ${target.enforcement}`,
+        });
+        continue;
+      }
+      target.enforcement = action;
+      target.notes = [target.notes, enforcementNote(row, action)]
+        .filter(Boolean)
+        .join(" ");
+      out.stamped += 1;
+      continue;
+    }
+
+    const facility = row.facility
+      ? facilities.find((f) => norm(f.name) === norm(row.facility!)) || null
+      : matchSeedFacility(row.name, "", facilities);
+    if (row.facility && !facility) {
+      out.skipped.push({
+        row,
+        reason: `the facility "${row.facility}" is not on the register`,
+      });
+      continue;
+    }
+    const slug = norm(row.name)
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const occurrence = (seen.get(slug) || 0) + 1;
+    seen.set(slug, occurrence);
+    const date = seedInspectionDate(row.date);
+    inspections.push({
+      id: `${ENFORCEMENT_LIST_ID_PREFIX}${slug}-${occurrence}`,
+      date,
+      week: date ? weekLabelForDate(date, weeks, "") : "",
+      facilityId: facility ? facility.id : null,
+      facilityName: facility ? facility.name : row.name,
+      type: "Enforcement Action",
+      outcome: "N/A",
+      province: facility ? facility.province : "",
+      sector: facility ? facility.sector : "",
+      district: facility ? facility.district : "",
+      practice: facility ? facility.practice : "",
+      enforcement: action,
+      notes: [
+        enforcementNote(row, action),
+        "The inspection register has no inspection for it.",
+        date ? "" : "The list records no date for this action.",
+        facility ? "" : "Not matched to a facility on the register.",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      updatedBy: "seed",
+    });
+    out.recorded += 1;
+  }
+  return out;
+}
+
+/**
+ * What a re-seed writes over a register document an officer has since worked
+ * on (it carries an `updatedBy` other than "seed").
+ *
+ * The register decides which visit this is and whose — the facility link, its
+ * province, district and practice. Everything an officer can correct on the
+ * Inspectorate tab stands: the day, the type, the outcome, the notes, the
+ * enforcement action (including taking one off) and the inspection card. Left
+ * to a plain overwrite, a re-import would silently take back a card an officer
+ * put on a past inspection.
+ */
+export function mergeSeededInspection(
+  seeded: Inspection,
+  existing: Omit<Inspection, "id"> | undefined,
+): Inspection {
+  if (!existing || !existing.updatedBy || existing.updatedBy === "seed") {
+    return seeded;
+  }
+  const merged: Inspection = {
+    ...seeded,
+    date: existing.date ?? seeded.date,
+    week: existing.week ?? seeded.week,
+    type: existing.type ?? seeded.type,
+    outcome: existing.outcome ?? seeded.outcome,
+    notes: existing.notes ?? seeded.notes,
+    updatedBy: existing.updatedBy,
+  };
+  delete merged.enforcement;
+  delete merged.cardIssued;
+  delete merged.phase;
+  if (existing.enforcement) merged.enforcement = existing.enforcement;
+  if (existing.cardIssued) merged.cardIssued = existing.cardIssued;
+  if (existing.phase) merged.phase = existing.phase;
+  if (existing.updatedAt) merged.updatedAt = existing.updatedAt;
+  return merged;
 }
 
 /**
@@ -556,8 +770,10 @@ export function mapAllSeedInspections(
   rows: SeedInspection[],
   facilities: Facility[],
   weeks: WeekDef[],
+  enforcementList: SeedEnforcement[] = [],
 ): MappedSeedInspections {
   const inspections: Inspection[] = [];
+  const byRow = new Map<number, Inspection>();
   const skipped: MappedSeedInspections["skipped"] = [];
   const seen = new Map<string, number>();
   let unlinked = 0;
@@ -589,7 +805,7 @@ export function mapAllSeedInspections(
       .filter(Boolean)
       .join(" ");
 
-    inspections.push({
+    const mapped: Inspection = {
       id: seedInspectionId(row.name, type, occurrence),
       date,
       week: date ? weekLabelForDate(date, weeks, "") : "",
@@ -603,10 +819,20 @@ export function mapAllSeedInspections(
       practice: facility ? facility.practice : "",
       notes,
       updatedBy: "seed",
-    });
+    };
+    inspections.push(mapped);
+    byRow.set(row.n, mapped);
   }
+
+  const enforcement = applyEnforcementList(
+    enforcementList,
+    byRow,
+    inspections,
+    facilities,
+    weeks,
+  );
 
   // Newest first, undated rows last — the order every store hands them back in.
   inspections.sort((a, b) => b.date.localeCompare(a.date));
-  return { inspections, skipped, unlinked };
+  return { inspections, skipped, unlinked, enforcement };
 }

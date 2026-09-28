@@ -736,14 +736,19 @@ const SUB_1_3: SubprogrammeDef = {
       logLabel: "Vehicles screened",
       note: "Fed by the border scan log and the coordinators' daily counts — expand for the split by border post.",
     },
+    // The workbook's one row "Quarterly Meetings for Coordinators and TWG"
+    // (target 5) is two outputs with two targets, split at the section's
+    // request on 28 Sep 2026: the coordinators' meetings keep 1.3.13 and its
+    // target of 5; the TWG meetings, 36 a year, are 1.3.15. Figures the
+    // section once logged as "TWG Meetings" count toward 1.3.15.
     {
       id: "1.3.13",
-      description: "Quarterly Meetings for Coordinators and TWG",
-      indicator: "# of meetings'",
+      description: "Quarterly Meetings for Coordinators",
+      indicator: "# of meetings",
       target: 5,
       section: NSSS,
-      binding: manual("1.3.13", [LEGACY.nsssTwg]),
-      logLabel: "Coordinator / TWG meetings",
+      binding: manual("1.3.13"),
+      logLabel: "Coordinators' meetings",
     },
     {
       id: "1.3.14",
@@ -753,6 +758,15 @@ const SUB_1_3: SubprogrammeDef = {
       section: NSSS,
       binding: manual("1.3.14"),
       logLabel: "Detection systems enhanced",
+    },
+    {
+      id: "1.3.15",
+      description: "Conduct TWG Meetings",
+      indicator: "# of meetings",
+      target: 36,
+      section: NSSS,
+      binding: manual("1.3.15", [LEGACY.nsssTwg]),
+      logLabel: "TWG meetings held",
     },
   ],
 };
@@ -1178,8 +1192,17 @@ export function validateOutputEdit(
  *          to on 4 Sep 2026, split as before. The register's other 255 rows are
  *          undated and belong to no quarter, so they stay inside the carried
  *          figure. See docs/inspection-register-2026-import.md.
- * - 1.2.11 carried in whole — the register records no enforcement actions, so
- *          1.2.11 has nothing behind it the system counts.
+ * - 1.2.11 part carried, part counted, the way 1.2.4 is. The section reported
+ *          193 enforcement actions (45/61/87). On 28 Sep 2026 the division
+ *          handed over its enforcement list — 116 facilities, recorded as
+ *          Written Notices and laid on the inspection register — and the section
+ *          confirmed the list sits INSIDE the 193. 37 of its actions fall on
+ *          register inspections that carry a date, so those are counted off the
+ *          register and the balance sheds them quarter for quarter as the
+ *          report attributes them (20 in weeks that start in Q2, 17 in Q3):
+ *          156 carried + 37 counted = 193. The list's other 79 actions are
+ *          undated and stay inside the carried figure. See
+ *          docs/enforcement-list-2026-import.md.
  * - 1.3.12 the ONE row the system holds in full: the inland offices' daily log
  *          (seed/daily-screening-2026.seed.json, see
  *          docs/daily-screening-2026-import.md) is counted directly and runs to
@@ -1235,7 +1258,10 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   "1.2.8": [1, 0, 0, 0],
   "1.2.9": [0, 1, 0, 0],
   "1.2.10": [0, 1, 0, 0],
-  "1.2.11": [45, 61, 87, 0],
+  // The 193 the section reported, LESS the 37 actions of the 2026 enforcement
+  // list that sit on dated register inspections — those are counted off the
+  // register now (20 in Q2 weeks, 17 in Q3). See the note above.
+  "1.2.11": [45, 41, 70, 0],
   // Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
   "1.3.1": [0, 1, 0, 0],
   "1.3.2": [0, 0, 0, 0],
@@ -1253,8 +1279,12 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   // 6 Sep 2026), so nothing is carried in. See the note above before
   // changing this: a figure here would double count the log.
   "1.3.12": [0, 0, 0, 0],
-  "1.3.13": [0, 0, 26, 0],
+  // The 26 meetings the section reported against the combined "Coordinators
+  // and TWG" output, split when the two were separated (28 Sep 2026): 21
+  // coordinators' meetings stay on 1.3.13 and 5 TWG meetings move to 1.3.15.
+  "1.3.13": [0, 0, 21, 0],
   "1.3.14": [0, 0, 1, 0],
+  "1.3.15": [0, 0, 5, 0],
 };
 
 /** A quarter array that is always length 4, with whole non-negative numbers. */

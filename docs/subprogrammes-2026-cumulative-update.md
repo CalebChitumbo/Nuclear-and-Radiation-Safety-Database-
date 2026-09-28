@@ -110,6 +110,12 @@ rather than 295 carried and nothing recorded. 1.2.11 is untouched at **193**: th
 has no enforcement column. See
 [the register import](./inspection-register-2026-import.md).
 
+*28 Sep 2026:* the division's enforcement list was laid on the register — 116
+actions, recorded as Written Notices. The section confirmed the list is inside
+the 193, so 1.2.11 still reports **193** (45 / 61 / 87), now 156 carried
+(45 / 41 / 70) plus the 37 actions that sit on dated register inspections. See
+[the enforcement list import](./enforcement-list-2026-import.md).
+
 ## Subprogramme 1.3 — Nuclear Safety, Security and Safeguards
 
 | Output | Description | Target | Q1 | Q2 | Q3 | Q4 | Total | Was |
@@ -126,8 +132,15 @@ has no enforcement column. See
 | 1.3.10 | Training for ZRA Inspectors/Responders/FLO | 4 | — | 5 | 2 | — | **7** | 0 |
 | 1.3.11 | Monitoring & Evaluation of Inland Offices | — | — | — | — | — | 0 | 0 |
 | 1.3.12 | Monitoring of illicit trafficking (ZRA Asycuda) | 350,000 | 152,909 | 106,113 | 81,987 | — | **356,372** | 356,372 |
-| 1.3.13 | Quarterly Meetings for Coordinators and TWG | 5 | — | — | 26 | — | **26** | 24 |
+| 1.3.13 | Quarterly Meetings for Coordinators | 5 | — | — | 21 | — | **21** | 26 |
 | 1.3.14 | Enhance detection capacity system | 1 | — | — | 1 | — | **1** | 0 |
+| 1.3.15 | Conduct TWG Meetings | 36 | — | — | 5 | — | **5** | — |
+
+*28 Sep 2026:* the workbook's one row "Quarterly Meetings for Coordinators and
+TWG" (target 5, 26 held) was split at the section's request into two outputs
+with their own targets: **1.3.13** the coordinators' meetings (target 5, 21 of
+the 26) and **1.3.15** the TWG meetings (target 36, the other 5). Figures the
+section once logged under its old "TWG Meetings" metric count toward 1.3.15.
 
 1.3.7 is percentage points of the INSSP programme implemented, not a count —
 100 against a target of 100.

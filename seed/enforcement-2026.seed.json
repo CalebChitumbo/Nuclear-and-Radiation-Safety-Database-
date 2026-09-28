@@ -1,0 +1,696 @@
+[
+ {
+  "n": 1,
+  "name": "Lilayi Family Clinic",
+  "date": "",
+  "register": 279,
+  "note": "Register row 279 (\"Lilayi Clinic\")."
+ },
+ {
+  "n": 2,
+  "name": "Aspalt Roads",
+  "date": "",
+  "register": 270,
+  "note": "Register row 270 (\"Asphalt Roads\")."
+ },
+ {
+  "n": 3,
+  "name": "SES",
+  "date": ""
+ },
+ {
+  "n": 4,
+  "name": "Nakangea Construction",
+  "date": ""
+ },
+ {
+  "n": 5,
+  "name": "National Council for Construction",
+  "date": ""
+ },
+ {
+  "n": 6,
+  "name": "China State Construction",
+  "date": "",
+  "register": 277,
+  "note": "Register row 277 (\"China State Construction Engineering\")."
+ },
+ {
+  "n": 7,
+  "name": "China Janxi",
+  "date": "",
+  "register": 276,
+  "note": "Register row 276 (\"China Jiangxi Cooperation\")."
+ },
+ {
+  "n": 8,
+  "name": "Pearl of health Avondale",
+  "date": ""
+ },
+ {
+  "n": 9,
+  "name": "Pearl of health Avondale",
+  "date": ""
+ },
+ {
+  "n": 10,
+  "name": "Pearl of Health bwijimfumu",
+  "date": "",
+  "facility": "Pearl of Health Hospital Bwinjimfumu",
+  "note": "Facility \"Pearl of Health Hospital Bwinjimfumu\" on the register."
+ },
+ {
+  "n": 11,
+  "name": "Rankin Engineering",
+  "date": "",
+  "register": 269
+ },
+ {
+  "n": 12,
+  "name": "Sunshine Dental",
+  "date": ""
+ },
+ {
+  "n": 13,
+  "name": "China Civil Eng",
+  "date": ""
+ },
+ {
+  "n": 14,
+  "name": "China Geo Eng",
+  "date": ""
+ },
+ {
+  "n": 15,
+  "name": "Crown Dental",
+  "date": ""
+ },
+ {
+  "n": 16,
+  "name": "Makeni Islamic",
+  "date": ""
+ },
+ {
+  "n": 17,
+  "name": "Mt. Makulu Clinic",
+  "date": "",
+  "register": 283,
+  "note": "Register row 283 (\"Mount Makulu\")."
+ },
+ {
+  "n": 18,
+  "name": "National Breweries",
+  "date": ""
+ },
+ {
+  "n": 19,
+  "name": "Our Lady Hospice",
+  "date": "",
+  "facility": "Our Ladys Hospice",
+  "note": "Facility \"Our Ladys Hospice\" on the register."
+ },
+ {
+  "n": 20,
+  "name": "Sanjeevani Health Care",
+  "date": ""
+ },
+ {
+  "n": 21,
+  "name": "Smile Dental",
+  "date": ""
+ },
+ {
+  "n": 22,
+  "name": "Levy Mwanawasa Hospital",
+  "date": "",
+  "register": 1
+ },
+ {
+  "n": 23,
+  "name": "Pearl of Health",
+  "date": "",
+  "register": 2
+ },
+ {
+  "n": 24,
+  "name": "Royal Hospital",
+  "date": "",
+  "register": 3
+ },
+ {
+  "n": 25,
+  "name": "Forest Park Specialised",
+  "date": "",
+  "register": 4
+ },
+ {
+  "n": 26,
+  "name": "St Johns hospital-lusaka",
+  "date": "",
+  "register": 5
+ },
+ {
+  "n": 27,
+  "name": "Hilltop – Lusaka",
+  "date": "",
+  "register": 6
+ },
+ {
+  "n": 28,
+  "name": "Elite Dental clinic",
+  "date": "",
+  "register": 7
+ },
+ {
+  "n": 29,
+  "name": "Maxcare Hospital",
+  "date": "",
+  "register": 8
+ },
+ {
+  "n": 30,
+  "name": "Reliance dental clinic",
+  "date": "",
+  "register": 9
+ },
+ {
+  "n": 31,
+  "name": "Dazzling dental clinic",
+  "date": "",
+  "register": 10
+ },
+ {
+  "n": 32,
+  "name": "Levy Mwanawasa",
+  "date": "",
+  "register": 11
+ },
+ {
+  "n": 33,
+  "name": "National Heart",
+  "date": "",
+  "register": 12
+ },
+ {
+  "n": 34,
+  "name": "Hitech health centre",
+  "date": "",
+  "register": 13
+ },
+ {
+  "n": 35,
+  "name": "Chipata Level 1",
+  "date": "",
+  "register": 14
+ },
+ {
+  "n": 36,
+  "name": "Belt Care",
+  "date": "",
+  "register": 15
+ },
+ {
+  "n": 37,
+  "name": "Green Cross Laboratory",
+  "date": "",
+  "register": 16
+ },
+ {
+  "n": 38,
+  "name": "Lifescан diagnostic",
+  "date": "",
+  "register": 17,
+  "note": "Register row 17 (\"Lifescаn diagnostic\")."
+ },
+ {
+  "n": 39,
+  "name": "South Point – Avondale",
+  "date": "",
+  "register": 18
+ },
+ {
+  "n": 40,
+  "name": "PHI – Closed-routine inspection",
+  "date": "",
+  "register": 19,
+  "note": "Register row 19 (\"PHI – Closed\")."
+ },
+ {
+  "n": 41,
+  "name": "Sandersoni – Closed",
+  "date": "",
+  "register": 20
+ },
+ {
+  "n": 42,
+  "name": "Care for You – Closed",
+  "date": "",
+  "register": 21
+ },
+ {
+  "n": 43,
+  "name": "Sunshine dental clinic",
+  "date": "",
+  "register": 22
+ },
+ {
+  "n": 44,
+  "name": "Makeni Islami hospital",
+  "date": "",
+  "register": 23
+ },
+ {
+  "n": 45,
+  "name": "Wilmar",
+  "date": "",
+  "register": 24
+ },
+ {
+  "n": 46,
+  "name": "Zambia Breweries",
+  "date": "",
+  "register": 25
+ },
+ {
+  "n": 47,
+  "name": "Ndola Teaching Hospital",
+  "date": "",
+  "register": 26
+ },
+ {
+  "n": 48,
+  "name": "St. Dominic’s",
+  "date": "",
+  "register": 27
+ },
+ {
+  "n": 49,
+  "name": "St. Theresa",
+  "date": "",
+  "register": 28
+ },
+ {
+  "n": 50,
+  "name": "Mpongwe Mission",
+  "date": "",
+  "register": 29
+ },
+ {
+  "n": 51,
+  "name": "Roan Antelope",
+  "date": "",
+  "register": 30
+ },
+ {
+  "n": 52,
+  "name": "Luanshya Mine Hospital",
+  "date": "",
+  "register": 31
+ },
+ {
+  "n": 53,
+  "name": "Kitwe Central Hospital",
+  "date": "",
+  "register": 32
+ },
+ {
+  "n": 54,
+  "name": "Springs of Life",
+  "date": "",
+  "register": 33
+ },
+ {
+  "n": 55,
+  "name": "Sunsol Kitwe",
+  "date": "",
+  "register": 34
+ },
+ {
+  "n": 56,
+  "name": "Ivory Dental",
+  "date": "",
+  "register": 35
+ },
+ {
+  "n": 57,
+  "name": "Progress Medical Centre",
+  "date": "",
+  "register": 36
+ },
+ {
+  "n": 58,
+  "name": "Ultra Dental",
+  "date": "",
+  "register": 37
+ },
+ {
+  "n": 59,
+  "name": "Wusakile",
+  "date": "",
+  "register": 38
+ },
+ {
+  "n": 60,
+  "name": "Kakoso Level 1",
+  "date": "",
+  "register": 39
+ },
+ {
+  "n": 61,
+  "name": "Chililabombwe Hospital",
+  "date": "",
+  "register": 40
+ },
+ {
+  "n": 62,
+  "name": "Nchanga South",
+  "date": "",
+  "register": 41
+ },
+ {
+  "n": 63,
+  "name": "Nchanga North",
+  "date": "",
+  "register": 42
+ },
+ {
+  "n": 64,
+  "name": "Konkola Mine Hospital",
+  "date": "",
+  "register": 43
+ },
+ {
+  "n": 65,
+  "name": "African Medical Care",
+  "date": "",
+  "register": 44
+ },
+ {
+  "n": 66,
+  "name": "Sinozam",
+  "date": "",
+  "register": 45
+ },
+ {
+  "n": 67,
+  "name": "Thompson",
+  "date": "",
+  "register": 46
+ },
+ {
+  "n": 68,
+  "name": "Kalulushi Government Clinic",
+  "date": "",
+  "register": 47
+ },
+ {
+  "n": 69,
+  "name": "Ruth Kaluluma",
+  "date": "",
+  "register": 48
+ },
+ {
+  "n": 70,
+  "name": "ZAF – (Livingstone)",
+  "date": "",
+  "register": 49
+ },
+ {
+  "n": 71,
+  "name": "ZA Tug Angan - (Ndola)",
+  "date": "",
+  "register": 50
+ },
+ {
+  "n": 72,
+  "name": "ZA 1 Commando - (Ndola)",
+  "date": "",
+  "register": 51
+ },
+ {
+  "n": 73,
+  "name": "ZA Northern Command - (Ndola)",
+  "date": "",
+  "register": 52
+ },
+ {
+  "n": 74,
+  "name": "ZA0 kalewa-ndola",
+  "date": "",
+  "register": 53
+ },
+ {
+  "n": 75,
+  "name": "ZA ZCCF (Kitwe)",
+  "date": "",
+  "register": 54
+ },
+ {
+  "n": 76,
+  "name": "ZNS (Kitwe)",
+  "date": "",
+  "register": 55
+ },
+ {
+  "n": 77,
+  "name": "CHIKANKATA MISSION HOSPITAL",
+  "date": "",
+  "register": 168
+ },
+ {
+  "n": 78,
+  "name": "VICTORIA HOSPITAL- MAZABUKA",
+  "date": "",
+  "register": 169
+ },
+ {
+  "n": 79,
+  "name": "MAZABUKA GENERAL HOSPITAL",
+  "date": "",
+  "register": 170
+ },
+ {
+  "n": 80,
+  "name": "MONZE MISSION HOSPITAL",
+  "date": "",
+  "register": 171
+ },
+ {
+  "n": 81,
+  "name": "GWEMBE DISTRICT HOSPITAL",
+  "date": "25/06/2026",
+  "register": 172
+ },
+ {
+  "n": 82,
+  "name": "CHIKUNI MISSION HOSPITAL",
+  "date": "25/06/2026",
+  "register": 173
+ },
+ {
+  "n": 83,
+  "name": "MUNYUMBWE FIRST LEVEL HOSPITAL",
+  "date": "25/06/2026",
+  "register": 174
+ },
+ {
+  "n": 84,
+  "name": "MAAMBA GENERAL HOSPITAL",
+  "date": "26/06/2026",
+  "register": 175
+ },
+ {
+  "n": 85,
+  "name": "NAMWIANGA MISSION HOSPITAL",
+  "date": "26/06/2026",
+  "register": 176
+ },
+ {
+  "n": 86,
+  "name": "KALOMO DISTRICT HOSPITAL",
+  "date": "26/06/2026",
+  "register": 177
+ },
+ {
+  "n": 87,
+  "name": "ZIMBA MISSION HOSPITAL",
+  "date": "26/06/2026",
+  "register": 178
+ },
+ {
+  "n": 88,
+  "name": "ZAMBIA REVENUE AUTHORITY KAZUNGULA",
+  "date": "29/06/2026",
+  "register": 179
+ },
+ {
+  "n": 89,
+  "name": "KAZUNGULA DISTRICT HOSPITAL",
+  "date": "29/06/2026",
+  "register": 180
+ },
+ {
+  "n": 90,
+  "name": "MAHATMA GHANDI CLINIC",
+  "date": "29/06/2026",
+  "register": 181
+ },
+ {
+  "n": 91,
+  "name": "LIVINGSTONE UNIVERSITY TEACHIING HOSPITAL",
+  "date": "29/06/2026",
+  "register": 182
+ },
+ {
+  "n": 92,
+  "name": "MUKUNI MEDICAL CENTRE",
+  "date": "29/06/2026",
+  "register": 183
+ },
+ {
+  "n": 93,
+  "name": "HARRY MWAAGA NKUMBULA INTERNATIONA AIRPORT",
+  "date": "30/06/2026",
+  "register": 184
+ },
+ {
+  "n": 94,
+  "name": "CHOMA GENERAL HOSPITAL",
+  "date": "30/06/2026",
+  "register": 185
+ },
+ {
+  "n": 95,
+  "name": "MACHA MISSION HOSITAL",
+  "date": "01/07/2026",
+  "register": 186
+ },
+ {
+  "n": 96,
+  "name": "NAMWALA DISTRICT HOSPITAL",
+  "date": "01/07/2026",
+  "register": 187
+ },
+ {
+  "n": 97,
+  "name": "NYIMBA DISTRICT HOSPITAL",
+  "date": "01/07/2026",
+  "register": 189,
+  "note": "The list dates it 01/07/2026; the register dates the inspection 05/08/2026, and the action is recorded on that inspection."
+ },
+ {
+  "n": 98,
+  "name": "MINGA MISSION HOSPITAL",
+  "date": "01/07/2026",
+  "register": 190,
+  "note": "The list dates it 01/07/2026; the register dates the inspection 05/08/2026, and the action is recorded on that inspection."
+ },
+ {
+  "n": 99,
+  "name": "KALINDAWALO GENERAL HOSPITAL",
+  "date": "01/07/2026",
+  "register": 191,
+  "note": "The list dates it 01/07/2026; the register dates the inspection 05/08/2026, and the action is recorded on that inspection."
+ },
+ {
+  "n": 100,
+  "name": "NYANJE MISSION HOSPITAL",
+  "date": "06/08/2026",
+  "register": 192
+ },
+ {
+  "n": 101,
+  "name": "ST. FRANCIS HOSPITAL",
+  "date": "06/08/2026",
+  "register": 193
+ },
+ {
+  "n": 102,
+  "name": "CHADIZA DISTRICT HOSPITAL",
+  "date": "06/08/2026",
+  "register": 194
+ },
+ {
+  "n": 103,
+  "name": "MWAMI ADVENTIST HOSPITAL",
+  "date": "06/08/2026",
+  "register": 195
+ },
+ {
+  "n": 104,
+  "name": "VUBWI DISTRICT HOSPITAL",
+  "date": "06/08/2026",
+  "register": 196
+ },
+ {
+  "n": 105,
+  "name": "ZAMBIA REVENUE AUTHORITY MWAMI BORDER",
+  "date": "06/08/2026",
+  "register": 197
+ },
+ {
+  "n": 106,
+  "name": "MUZEYI RURAL HEALTH CENTRE",
+  "date": "07/08/2026",
+  "register": 198
+ },
+ {
+  "n": 107,
+  "name": "KOMOTO MISSION HOSPITAL MAMBWE",
+  "date": "07/08/2026",
+  "register": 199
+ },
+ {
+  "n": 108,
+  "name": "MAMBWE DISTRICT HOSPITAL",
+  "date": "07/08/2026",
+  "register": 200
+ },
+ {
+  "n": 109,
+  "name": "LUNDAZI DISTRICT HOSPITAL",
+  "date": "10/08/2026",
+  "register": 201
+ },
+ {
+  "n": 110,
+  "name": "CHAMA DISTRICT HOSPITAL",
+  "date": "10/08/2026",
+  "register": 202
+ },
+ {
+  "n": 111,
+  "name": "CHIPATA DISTRICT HOSPITAL",
+  "date": "11/08/2026",
+  "register": 203
+ },
+ {
+  "n": 112,
+  "name": "CHIPATA CENTRAL HOSPITAL",
+  "date": "11/08/2026",
+  "register": 204
+ },
+ {
+  "n": 113,
+  "name": "UNILABS CHIPATA",
+  "date": "11/08/2026",
+  "register": 205
+ },
+ {
+  "n": 114,
+  "name": "Shachitari construction",
+  "date": ""
+ },
+ {
+  "n": 115,
+  "name": "Zongmai",
+  "date": ""
+ },
+ {
+  "n": 116,
+  "name": "Bumi clinc",
+  "date": "",
+  "register": 60,
+  "note": "Register row 60 (\"Bumi clinic\")."
+ }
+]

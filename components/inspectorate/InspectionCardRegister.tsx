@@ -8,14 +8,17 @@ import { CardStatusChip, EnforcementChip } from "@/components/inspectorate/Inspe
 import { store } from "@/lib/store";
 import {
   buildInspectionCard,
+  cardOnInspectionPatch,
+  cardOnInspectionProblem,
   countCardStatuses,
   inspectionCardProblem,
+  inspectionsForCard,
   type CardRecord,
 } from "@/lib/rules/inspectionCards";
-import { cardExpiry, describeCard, CARD_VALID_DAYS } from "@/lib/rules/inspectionDatabase";
+import { cardExpiry, describeCard, CARD_VALID_DAYS, enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import { norm } from "@/lib/rules/matching";
 import { todayISO } from "@/lib/rules/week";
-import type { Facility, InspectionCard } from "@/lib/rules/types";
+import type { Facility, Inspection, InspectionCard } from "@/lib/rules/types";
 
 type StatusFilter = "all" | "Active" | "Expiring Soon" | "Expired";
 
@@ -166,17 +169,23 @@ export function InspectionCardRegisterPanel({
 }
 
 /**
- * Record an inspection card on its own — for the cards the section issued
- * before the log carried them, or at a visit that was never logged here. It
- * creates no inspection: nothing is counted, the province sheet does not
- * move. The card's standing (running / expiring / expired) follows from the
- * day it was issued, as it does for every card.
+ * Record a past inspection card — for the cards the section issued before the
+ * log carried them. It creates no inspection either way: nothing is counted,
+ * the province sheet does not move. The card's standing (running / expiring /
+ * expired) follows from the day it was issued, as it does for every card.
+ *
+ * Where the visit the card came out of IS on the register (a logged inspection,
+ * or a row of the back-imported 2026 register), the card can be put on that
+ * inspection — `cardIssued`, the same field the log form stamps — so the visit
+ * and its card read as one. Otherwise it is recorded on its own
+ * (`inspectionCards`).
  *
  * `editing` opens an existing recorded card in the same form; saving then
  * corrects it in place.
  */
 export function RecordInspectionCardPanel({
   facilities,
+  inspections,
   editing,
   actorUid,
   onSaved,
@@ -184,6 +193,8 @@ export function RecordInspectionCardPanel({
   toastPush,
 }: {
   facilities: Facility[];
+  /** The register, for putting the card on the visit it came out of. */
+  inspections: Inspection[];
   editing: InspectionCard | null;
   actorUid: string;
   onSaved: () => void;
@@ -199,6 +210,8 @@ export function RecordInspectionCardPanel({
   const [reference, setReference] = useState("");
   const [nonCompliances, setNonCompliances] = useState("");
   const [notes, setNotes] = useState("");
+  // The logged inspection the card goes on; "" records it on its own.
+  const [inspectionId, setInspectionId] = useState("");
   const [busy, setBusy] = useState(false);
 
   const suggestions = useMemo(() => {
@@ -220,6 +233,7 @@ export function RecordInspectionCardPanel({
     setReference("");
     setNonCompliances("");
     setNotes("");
+    setInspectionId("");
   };
 
   // Opening a recorded card for correction fills the form with it and brings
@@ -251,7 +265,19 @@ export function RecordInspectionCardPanel({
     nonCompliances,
     notes,
   };
-  const problem = inspectionCardProblem(input, today);
+  // The facility's visits already on the register — a recorded card being
+  // corrected stays a recorded card, so the choice is for a new one only.
+  const visits = useMemo(
+    () =>
+      editing
+        ? []
+        : inspectionsForCard(inspections, input.facilityId, input.facilityName),
+    [editing, inspections, input.facilityId, input.facilityName],
+  );
+  const visit = visits.find((i) => i.id === inspectionId) || null;
+  const problem = visit
+    ? cardOnInspectionProblem(visit, input, today)
+    : inspectionCardProblem(input, today);
 
   const submit = async () => {
     if (problem) {
@@ -261,6 +287,16 @@ export function RecordInspectionCardPanel({
     setBusy(true);
     try {
       const s = await store();
+      if (visit) {
+        await s.updateInspection(visit.id, cardOnInspectionPatch(visit, input), actorUid);
+        toastPush(
+          `Card put on the ${visit.date || "undated"} ${visit.type.toLowerCase()} of ${visit.facilityName}.`,
+          "success",
+        );
+        clear();
+        onSaved();
+        return;
+      }
       const record = buildInspectionCard(input, facilities);
       if (editing) {
         await s.updateInspectionCard(editing.id, record, actorUid);
@@ -286,7 +322,7 @@ export function RecordInspectionCardPanel({
       <span id="record-card" className="block scroll-mt-4" aria-hidden />
       <Panel
         title={editing ? `Correct the card for ${editing.facilityName}` : "Record a past inspection card"}
-        note={`For a card issued before the log carried them, or at a visit not logged here. It creates no inspection — nothing is counted — and its standing follows from the day it was issued: a card runs ${CARD_VALID_DAYS} days.`}
+        note={`For a card issued before the log carried them. Put it on the inspection it was issued at when that visit is on the register, or record it on its own. It creates no inspection — nothing is counted — and its standing follows from the day it was issued: a card runs ${CARD_VALID_DAYS} days.`}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -303,6 +339,7 @@ export function RecordInspectionCardPanel({
                   setFacilityQuery(e.target.value);
                   setFacilityId(null);
                   setFacilityNameFreeText(e.target.value);
+                  setInspectionId("");
                 }}
               />
               {suggestions.length > 0 && !selected ? (
@@ -313,6 +350,7 @@ export function RecordInspectionCardPanel({
                       onClick={() => {
                         setFacilityId(f.id);
                         setFacilityQuery(f.name);
+                        setInspectionId("");
                       }}
                       className="px-3 py-2.5 text-sm hover:bg-mist cursor-pointer"
                     >
@@ -350,7 +388,41 @@ export function RecordInspectionCardPanel({
             </p>
           </div>
 
-          {!selected ? (
+          {visits.length > 0 ? (
+            <div className="md:col-span-2">
+              <label className="field-label" htmlFor="card-inspection">
+                Issued at
+              </label>
+              <select
+                id="card-inspection"
+                className="input"
+                value={inspectionId}
+                onChange={(e) => {
+                  setInspectionId(e.target.value);
+                  const picked = visits.find((i) => i.id === e.target.value);
+                  if (picked?.date && !issued) setIssued(picked.date);
+                }}
+              >
+                <option value="">A visit not on the register — record the card on its own</option>
+                {visits.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.date || "undated"} · {i.type}
+                    {i.enforcement ? ` · ${enforcementLabel(i.enforcement)}` : ""}
+                    {i.cardIssued ? ` · card ${i.cardIssued} (replaced)` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gunmetal/55 mt-1">
+                {visit
+                  ? `The card goes on this inspection — the register shows the visit and its card as one. Nothing is counted again.${
+                      visit.cardIssued ? ` Its card of ${visit.cardIssued} is replaced.` : ""
+                    }`
+                  : `${visits.length} inspection${visits.length === 1 ? "" : "s"} of this facility on the register. Pick the one the card was issued at to put it there.`}
+              </p>
+            </div>
+          ) : null}
+
+          {!selected && !visit ? (
             <div>
               <label className="field-label" htmlFor="card-district">
                 District
@@ -410,7 +482,13 @@ export function RecordInspectionCardPanel({
             className="btn btn-primary w-full sm:w-auto"
             onClick={submit}
           >
-            {busy ? "Saving…" : editing ? "Save the correction" : "Put the card on the register"}
+            {busy
+              ? "Saving…"
+              : editing
+                ? "Save the correction"
+                : visit
+                  ? "Put the card on this inspection"
+                  : "Put the card on the register"}
           </button>
           {editing ? (
             <button className="btn btn-ghost" disabled={busy} onClick={onCancelEdit}>
