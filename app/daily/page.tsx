@@ -29,6 +29,7 @@ import {
   needsTypeClassification,
 } from "@/lib/rules/licenceFamily";
 import { parseISO, toISO, todayISO, weekLabelForDate } from "@/lib/rules/week";
+import { enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import {
   applyWorkPlanConfig,
   deriveWorkPlan,
@@ -377,7 +378,7 @@ export default function DailyUpdatesPage() {
                           <span className="chip slate">{i.type}</span>
                           <span className="chip">{i.outcome}</span>
                           {i.enforcement ? (
-                            <span className="chip amber">{i.enforcement}</span>
+                            <span className="chip amber">{enforcementLabel(i.enforcement)}</span>
                           ) : null}
                           {editable ? (
                             <button

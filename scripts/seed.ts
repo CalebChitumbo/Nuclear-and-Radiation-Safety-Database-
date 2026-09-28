@@ -31,6 +31,13 @@
  * there is no reason for one to overwrite a screening figure a coordinator has
  * since corrected.
  *
+ * ONLY THE INSPECTIONS (`--only inspections`): writes the inspection register
+ * and the enforcement list laid on it, and nothing else — the facility register
+ * is read, not written. Use it for an enforcement list or inspection register
+ * hand-over. A register inspection an officer has since corrected (a card put
+ * on it, an action changed) keeps the officer's corrections — see
+ * mergeSeededInspection — and each one is printed.
+ *
  * PRUNING (`--prune`): a register re-import can supersede a facility document
  * rather than update it (the workbook dropped it, or RAIS has since issued it a
  * RAN and its id changed). Those are reported on every run and deleted only
@@ -63,9 +70,11 @@ import {
   supersededByRegister,
   mapAllSeed,
   mergeSeededFacility,
+  mergeSeededInspection,
   mapAllSeedInspections,
   mapSeedBorders,
   mapSeedScreening,
+  type SeedEnforcement,
   type SeedFacility,
   type SeedInspection,
   type SeedScreening,
@@ -83,7 +92,10 @@ import {
 const SEED_DIR = join(process.cwd(), "seed");
 const FRESH = process.argv.includes("--fresh");
 const PRUNE = process.argv.includes("--prune");
-/** `--only facilities` / `--only=facilities`: the register and nothing else. */
+/**
+ * `--only facilities` / `--only=facilities`: the register and nothing else.
+ * `--only inspections`: the inspection register and enforcement list, nothing else.
+ */
 const ONLY = (() => {
   const args = process.argv.slice(2);
   const eq = args.find((a) => a.startsWith("--only="));
@@ -91,11 +103,12 @@ const ONLY = (() => {
   const i = args.indexOf("--only");
   return i >= 0 ? args[i + 1] || "" : "";
 })();
-if (ONLY && ONLY !== "facilities") {
-  console.error(`--only takes "facilities"; got "${ONLY}"`);
+if (ONLY && ONLY !== "facilities" && ONLY !== "inspections") {
+  console.error(`--only takes "facilities" or "inspections"; got "${ONLY}"`);
   process.exit(1);
 }
 const REGISTER_ONLY = ONLY === "facilities";
+const INSPECTIONS_ONLY = ONLY === "inspections";
 
 /** Collections wiped by --fresh: the register + everything keyed to it. */
 const FRESH_WIPE_COLLECTIONS = [
@@ -428,6 +441,23 @@ async function main() {
   const registerRows = JSON.parse(
     readFileSync(join(SEED_DIR, "inspections-2026.seed.json"), "utf-8"),
   ) as SeedInspection[];
+  const enforcementList = JSON.parse(
+    readFileSync(join(SEED_DIR, "enforcement-2026.seed.json"), "utf-8"),
+  ) as SeedEnforcement[];
+
+  if (INSPECTIONS_ONLY) {
+    if (FRESH) {
+      console.error("--fresh wipes the register; it cannot be combined with --only inspections");
+      process.exit(1);
+    }
+    // The facilities the rows link to, as the project holds them now.
+    const snap = await db.collection("facilities").get();
+    const held = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Facility);
+    console.log(`--only inspections: linking to the ${held.length} facilities on file`);
+    await seedInspections(db, held, registerRows, enforcementList, weeks);
+    console.log("Done.");
+    return;
+  }
 
   if (FRESH) {
     console.log(
@@ -448,7 +478,14 @@ async function main() {
   if (REGISTER_ONLY) {
     console.log("--only facilities: leaving the screening log and inspection register as they are");
   } else {
-    await seedScreeningAndInspections(db, facilities, screening, registerRows, weeks);
+    await seedScreeningAndInspections(
+      db,
+      facilities,
+      screening,
+      registerRows,
+      enforcementList,
+      weeks,
+    );
   }
 
   console.log("Writing reference lists + week calendar…");
@@ -478,6 +515,7 @@ async function seedScreeningAndInspections(
   facilities: Facility[],
   screening: SeedScreening,
   registerRows: SeedInspection[],
+  enforcementList: SeedEnforcement[],
   weeks: WeekDef[],
 ) {
   // The inland offices and their daily screening figures. Seeded as ordinary
@@ -504,14 +542,26 @@ async function seedScreeningAndInspections(
   });
   await reportSupersededScreening(screeningEntries);
 
+  await seedInspections(db, facilities, registerRows, enforcementList, weeks);
+}
+
+async function seedInspections(
+  db: FirebaseFirestore.Firestore,
+  facilities: Facility[],
+  registerRows: SeedInspection[],
+  enforcementList: SeedEnforcement[],
+  weeks: WeekDef[],
+) {
   // The Inspectorate's 2026 facility inspection register. Seeded as ordinary
   // inspections so the Inspectorate tab, its database and summary sheets and the
   // weekly report all read them, and officers log new ones on top — see
-  // docs/inspection-register-2026-import.md.
+  // docs/inspection-register-2026-import.md. The 2026 enforcement list is laid
+  // on it (docs/enforcement-list-2026-import.md).
   const register = mapAllSeedInspections(
     registerRows,
     facilities,
     weeks as WeekDef[],
+    enforcementList,
   );
   console.log(
     `Seeding ${register.inspections.length} register inspections ` +
@@ -523,7 +573,34 @@ async function seedScreeningAndInspections(
       `  row ${held.row.n} "${held.row.name}" not imported — ${held.reason}`,
     );
   }
-  await chunkedBatchWrite(register.inspections, 400, (i, batch) => {
+  const { enforcement } = register;
+  console.log(
+    `  enforcement list: ${enforcement.stamped} action(s) recorded on register ` +
+      `inspections, ${enforcement.recorded} on facilities the register has no ` +
+      `inspection for`,
+  );
+  for (const held of enforcement.skipped) {
+    console.log(
+      `  enforcement row ${held.row.n} "${held.row.name}" not applied — ${held.reason}`,
+    );
+  }
+
+  // A register inspection an officer has since worked on keeps their
+  // corrections — see mergeSeededInspection.
+  const existing = new Map(
+    (await db.collection("inspections").get()).docs.map((d) => [
+      d.id,
+      d.data() as Omit<Inspection, "id">,
+    ]),
+  );
+  const toWrite = register.inspections.map((i) => {
+    const merged = mergeSeededInspection(i, existing.get(i.id));
+    if (merged !== i) {
+      console.log(`  kept the officer's corrections on ${i.id}  ${i.facilityName}`);
+    }
+    return merged;
+  });
+  await chunkedBatchWrite(toWrite, 400, (i, batch) => {
     const { id, ...rest } = i;
     batch.set(db.doc(`inspections/${id}`), rest);
   });

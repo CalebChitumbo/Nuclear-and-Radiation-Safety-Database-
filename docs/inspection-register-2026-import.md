@@ -91,8 +91,10 @@ app never creates an undated inspection — only this import holds them.
 stored as **N/A** rather than assumed compliant.
 
 **It records no enforcement action.** The document has no enforcement column
-either, so output **1.2.11** still carries its whole figure as an opening
-balance and no inspection here counts toward it.
+either, so output **1.2.11** carried its whole figure as an opening balance.
+*Since 28 Sep 2026* the division's enforcement list is laid on these rows — 99
+of its actions are recorded on the register inspection they came out of — see
+[the enforcement list import](./enforcement-list-2026-import.md).
 
 **It links a facility only when the province agrees.** A row is attached to a
 register facility at `classifyMatch`'s own "auto" bar, searching only facilities
@@ -306,4 +308,11 @@ inspection the section logged since the last hand-over, and re-importing would
 count them twice.
 
 The figures pinned in `tests/inspectionSeed.test.ts` are this document's own —
-update them with the register.
+update them with the register. The enforcement list points at this document's
+row numbers (`register` in `seed/enforcement-2026.seed.json`); re-point them
+when a new register moves its rows — `tests/enforcementList.test.ts` fails when
+one no longer names the same facility.
+
+A register row an officer has since corrected — a card put on it, an action
+changed, a day given — keeps those corrections through a re-seed
+(`mergeSeededInspection`); the run prints each one.

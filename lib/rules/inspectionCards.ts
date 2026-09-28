@@ -237,3 +237,66 @@ export function buildInspectionCard(
     notes: input.notes.trim(),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Putting a past card on an inspection already logged
+// ---------------------------------------------------------------------------
+
+/**
+ * The inspections a past card could have been issued at: the facility's own,
+ * newest first, undated register rows last. A facility on the register is
+ * matched by its id; one typed as free text by name, among the inspections
+ * that are not linked to a register facility either.
+ */
+export function inspectionsForCard(
+  inspections: Inspection[],
+  facilityId: string | null,
+  facilityName: string,
+): Inspection[] {
+  const name = norm(facilityName);
+  if (!facilityId && !name) return [];
+  return inspections
+    .filter((i) =>
+      facilityId ? i.facilityId === facilityId : !i.facilityId && norm(i.facilityName) === name,
+    )
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
+
+/**
+ * Why a card cannot go on this inspection, or null when it can — the card's
+ * own test first, then that it was not issued before the visit it came out of.
+ */
+export function cardOnInspectionProblem(
+  inspection: Inspection,
+  input: InspectionCardInput,
+  today: string,
+): string | null {
+  const own = inspectionCardProblem(input, today);
+  if (own) return own;
+  if (inspection.date && input.issued < inspection.date) {
+    return `The card cannot have been issued before the inspection it came out of (${inspection.date}).`;
+  }
+  return null;
+}
+
+/**
+ * The correction that puts a past card on an inspection already logged: the
+ * issue date on `cardIssued`, where the register and the due list read it, and
+ * what was written on the card added to the inspection's notes — the register
+ * reads a logged inspection's findings from there. A card already on the
+ * inspection is replaced (a card is re-issued; the latest stands).
+ */
+export function cardOnInspectionPatch(
+  inspection: Inspection,
+  input: InspectionCardInput,
+): Pick<Inspection, "cardIssued" | "notes"> {
+  const reference = (input.reference || "").trim();
+  const card = [
+    `Inspection card${reference ? ` ${reference}` : ""} issued ${input.issued}`,
+    input.nonCompliances.trim() ? `: ${input.nonCompliances.trim()}` : ".",
+  ].join("");
+  const notes = [inspection.notes?.trim(), card, input.notes.trim()]
+    .filter(Boolean)
+    .join("\n");
+  return { cardIssued: input.issued, notes };
+}

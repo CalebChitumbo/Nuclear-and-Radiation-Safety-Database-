@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  enforcementLabel,
   enforcementTone,
   INSPECTION_COLUMNS,
   type CardStatus,
@@ -19,7 +20,9 @@ export function CardStatusChip({ status }: { status: CardStatus | "" }) {
 }
 
 export function EnforcementChip({ action }: { action: string }) {
-  return <span className={`chip ${enforcementTone(action)}`}>{action}</span>;
+  return (
+    <span className={`chip ${enforcementTone(action)}`}>{enforcementLabel(action)}</span>
+  );
 }
 
 /**

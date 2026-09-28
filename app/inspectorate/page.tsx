@@ -13,6 +13,7 @@ import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
+import { InspectionEditor } from "@/components/daily/InspectionEditor";
 import {
   CardStatusChip,
   EnforcementChip,
@@ -38,6 +39,7 @@ import {
   CARD_VALID_DAYS,
   DATABASE_CSV_HEADER,
   ENFORCEMENT_ACTIONS,
+  enforcementLabel,
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
 import {
@@ -96,7 +98,7 @@ const SHEET_PAGE = 100;
  * the weekly report at once.
  */
 export default function InspectoratePage() {
-  const { user, canEditInsp } = useAuth();
+  const { user, canEditInsp, isAdmin } = useAuth();
   const { selected, weeks } = useWeek();
   const toast = useToast();
   const { data, error, reload } = useStoreData(async (s) => {
@@ -122,6 +124,9 @@ export default function InspectoratePage() {
   const [limit, setLimit] = useState(SHEET_PAGE);
   // A recorded card opened for correction in the form below the register.
   const [editingCard, setEditingCard] = useState<InspectionCard | null>(null);
+  // A logged inspection opened for correction in place — a past visit given
+  // the card or the action it was never recorded with.
+  const [editingInspection, setEditingInspection] = useState<string | null>(null);
 
   const facilities = useMemo(() => data?.facilities || [], [data]);
   const inspections = useMemo(() => data?.inspections || [], [data]);
@@ -253,6 +258,40 @@ export default function InspectoratePage() {
     () => inPeriod.filter((i) => !!i.enforcement || i.type === "Enforcement Action"),
     [inPeriod],
   );
+  // Actions the 2026 enforcement list gives no day to: they belong to no week,
+  // month or year, so only "All time" lists them. Said on the panel, so a
+  // shorter period does not read as the list having gone missing.
+  const undatedEnforced = useMemo(
+    () =>
+      period === "all"
+        ? 0
+        : inspections.filter(
+            (i) => !i.date && (!!i.enforcement || i.type === "Enforcement Action"),
+          ).length,
+    [inspections, period],
+  );
+
+  // What an inspection row needs to open its editor — the Inspectorate only.
+  const rowEditing: RowEditing | undefined =
+    canEditInsp && user
+      ? {
+          openId: editingInspection,
+          toggle: (id) => setEditingInspection((cur) => (cur === id ? null : id)),
+          render: (i) => (
+            <InspectionEditor
+              inspection={i}
+              weeks={weeks}
+              canRemove={isAdmin}
+              actorUid={user.uid}
+              onSaved={() => {
+                setEditingInspection(null);
+                reload();
+              }}
+              onCancel={() => setEditingInspection(null)}
+            />
+          ),
+        }
+      : undefined;
 
   // What is on screen is what is exported: the consolidated database, or the
   // picked round's whole sheet (zeros included, as the workbook keeps it).
@@ -493,6 +532,7 @@ export default function InspectoratePage() {
       {canEditInsp && user ? (
         <RecordInspectionCardPanel
           facilities={facilities}
+          inspections={inspections}
           editing={editingCard}
           actorUid={user.uid}
           onSaved={() => {
@@ -504,11 +544,15 @@ export default function InspectoratePage() {
         />
       ) : null}
 
-      {/* Enforcement actions taken in the period */}
+      {/* Enforcement actions taken in the period — the enforcement list */}
       <Panel
         title={`Enforcement actions — ${enforced.length}`}
         flush
-        note="Every action recorded against an inspection, newest first."
+        note={`Every action recorded against an inspection, newest first — including the division's 2026 enforcement list.${
+          undatedEnforced
+            ? ` ${undatedEnforced} action${undatedEnforced === 1 ? "" : "s"} on that list carry no date and show under All time.`
+            : ""
+        }`}
       >
         {enforced.length === 0 ? (
           <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
@@ -519,7 +563,7 @@ export default function InspectoratePage() {
             {[...enforced]
               .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
               .map((i) => (
-                <InspectionRow key={i.id} inspection={i} showType />
+                <InspectionRow key={i.id} inspection={i} showType editing={rowEditing} />
               ))}
           </ul>
         )}
@@ -676,40 +720,64 @@ export default function InspectoratePage() {
         />
       ) : null}
 
-      <RegisterPanel inspections={inPeriod} period={period} ctx={ctx} />
+      <RegisterPanel
+        inspections={inPeriod}
+        period={period}
+        ctx={ctx}
+        editing={rowEditing}
+      />
     </div>
   );
+}
+
+/** Opening one inspection of a list for correction, in place. */
+interface RowEditing {
+  openId: string | null;
+  toggle: (id: string) => void;
+  render: (i: Inspection) => React.ReactNode;
 }
 
 function InspectionRow({
   inspection: i,
   showType,
+  editing,
 }: {
   inspection: Inspection;
   showType?: boolean;
+  /** Absent for a reader who cannot correct the register. */
+  editing?: RowEditing;
 }) {
+  const open = editing?.openId === i.id;
   return (
-    <li className="px-4 sm:px-5 py-3 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <div className="font-bold break-words">{i.facilityName}</div>
-        <div className="text-xs text-gunmetal/60 mt-1 flex flex-wrap gap-1 items-center">
-          {showType ? <span className="chip slate">{i.type}</span> : null}
-          <OutcomeChip outcome={i.outcome} />
-          {i.enforcement ? <EnforcementChip action={i.enforcement} /> : null}
-          {i.province ? <span>{i.province}</span> : null}
-          {i.phase ? <span>· {i.phase}</span> : null}
-        </div>
-        {i.notes ? (
-          <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
-            {i.notes}
+    <li className="px-4 sm:px-5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-bold break-words">{i.facilityName}</div>
+          <div className="text-xs text-gunmetal/60 mt-1 flex flex-wrap gap-1 items-center">
+            {showType ? <span className="chip slate">{i.type}</span> : null}
+            <OutcomeChip outcome={i.outcome} />
+            {i.enforcement ? <EnforcementChip action={i.enforcement} /> : null}
+            {i.province ? <span>{i.province}</span> : null}
+            {i.phase ? <span>· {i.phase}</span> : null}
           </div>
-        ) : null}
+          {i.notes ? (
+            <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
+              {i.notes}
+            </div>
+          ) : null}
+        </div>
+        <div className="text-xs tabular text-gunmetal/55 text-right shrink-0">
+          <div>{i.date || "undated"}</div>
+          <div>{i.week}</div>
+          {i.cardIssued ? <div>card {i.cardIssued}</div> : null}
+          {editing ? (
+            <button className="link-action mt-1" onClick={() => editing.toggle(i.id)}>
+              {open ? "Close" : i.cardIssued ? "Edit" : "Edit · add card"}
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="text-xs tabular text-gunmetal/55 text-right shrink-0">
-        <div>{i.date}</div>
-        <div>{i.week}</div>
-        {i.cardIssued ? <div>card {i.cardIssued}</div> : null}
-      </div>
+      {open && editing ? editing.render(i) : null}
     </li>
   );
 }
@@ -985,7 +1053,9 @@ function LogInspectionPanel({
           >
             <option value="">None</option>
             {ENFORCEMENT_ACTIONS.map((a) => (
-              <option key={a}>{a}</option>
+              <option key={a} value={a}>
+                {enforcementLabel(a)}
+              </option>
             ))}
           </select>
           <p className="text-[11px] text-gunmetal/55 mt-1">
@@ -1058,28 +1128,51 @@ function RegisterPanel({
   inspections,
   period,
   ctx,
+  editing,
 }: {
   inspections: Inspection[];
   period: InspectionPeriod;
   ctx: PeriodContext;
+  editing?: RowEditing;
 }) {
   const [filter, setFilter] = useState<InspectionType | "">("");
+  // Finding one past visit among hundreds — to put its card on it, say.
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(SHEET_PAGE);
 
-  const filtered = useMemo(
-    () => inspections.filter((i) => !filter || i.type === filter),
-    [inspections, filter],
-  );
+  const filtered = useMemo(() => {
+    const q = norm(query);
+    return inspections.filter(
+      (i) =>
+        (!filter || i.type === filter) &&
+        (!q || norm(i.facilityName).includes(q)),
+    );
+  }, [inspections, filter, query]);
 
   return (
     <Panel
       title={`${filtered.length} inspections · ${periodLabel(period, ctx)}`}
       flush
     >
-      <div className="px-4 sm:px-5">
+      <div className="px-4 sm:px-5 space-y-2">
+        <input
+          className="input"
+          type="search"
+          aria-label="Find a facility's inspections"
+          placeholder="Find a facility…"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setLimit(SHEET_PAGE);
+          }}
+        />
         <Segmented
           ariaLabel="Inspection type"
           value={filter}
-          onChange={setFilter}
+          onChange={(t) => {
+            setFilter(t);
+            setLimit(SHEET_PAGE);
+          }}
           options={[
             { value: "" as InspectionType | "", label: "All" },
             ...INSPECTION_TYPES.map((t) => ({
@@ -1090,15 +1183,27 @@ function RegisterPanel({
         />
       </div>
       <ul className="divide-y divide-gunmetal/8 mt-3">
-        {filtered.map((i) => (
-          <InspectionRow key={i.id} inspection={i} showType />
+        {filtered.slice(0, limit).map((i) => (
+          <InspectionRow key={i.id} inspection={i} showType editing={editing} />
         ))}
         {filtered.length === 0 ? (
           <li className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">
-            No inspections recorded for this period.
+            {query
+              ? "No inspection of that facility in this period."
+              : "No inspections recorded for this period."}
           </li>
         ) : null}
       </ul>
+      {filtered.length > limit ? (
+        <div className="px-4 sm:px-5 py-3 border-t border-gunmetal/8">
+          <button
+            className="btn btn-ghost w-full sm:w-auto"
+            onClick={() => setLimit(filtered.length)}
+          >
+            Show all {filtered.length} inspections
+          </button>
+        </div>
+      ) : null}
     </Panel>
   );
 }

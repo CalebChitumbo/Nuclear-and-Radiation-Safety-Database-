@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildInspectionCard,
   cardInPeriod,
+  cardOnInspectionPatch,
+  cardOnInspectionProblem,
   cardRegister,
   cardsNeedingAttention,
   countCardStatuses,
   currentCards,
   inspectionCardProblem,
+  inspectionsForCard,
 } from "../lib/rules/inspectionCards";
 import { cardDaysLeft } from "../lib/rules/inspectionDatabase";
 import { mockStore, resetMockStore } from "../lib/store/mockStore";
@@ -305,5 +308,62 @@ describe("mock store — recorded cards (the integration seam)", () => {
     await mockStore.addInspectionCard(card({ facilityId: null }));
     const dump = await mockStore.exportAll();
     expect(dump.inspectionCards).toHaveLength(1);
+  });
+});
+
+describe("a past card put on an inspection already logged", () => {
+  const input = {
+    issued: "2026-06-24",
+    facilityId: "f1",
+    facilityName: "Braceline Centre",
+    reference: "IC/0042",
+    nonCompliances: "No RPO appointed.",
+    notes: "Handed to the in-charge.",
+  };
+
+  it("offers the facility's own inspections, undated register rows last", () => {
+    const dated = insp({ id: "a", date: "2026-06-24" });
+    const later = insp({ id: "b", date: "2026-08-02" });
+    const undated = insp({ id: "c", date: "", week: "" });
+    const other = insp({ id: "d", facilityId: "f9" });
+    expect(
+      inspectionsForCard([undated, dated, other, later], "f1", "Braceline Centre").map(
+        (i) => i.id,
+      ),
+    ).toEqual(["b", "a", "c"]);
+  });
+
+  it("matches a facility typed as free text by name, among unlinked visits", () => {
+    const unlinked = insp({ id: "u", facilityId: null, facilityName: "SES" });
+    const linked = insp({ id: "l", facilityId: "f3", facilityName: "SES" });
+    expect(inspectionsForCard([unlinked, linked], null, " ses ").map((i) => i.id)).toEqual([
+      "u",
+    ]);
+    expect(inspectionsForCard([unlinked], null, "")).toEqual([]);
+  });
+
+  it("stamps the card on the inspection and keeps what was written on it", () => {
+    const visit = insp({ date: "2026-06-24", notes: "Row 168 of the register." });
+    expect(cardOnInspectionPatch(visit, input)).toEqual({
+      cardIssued: "2026-06-24",
+      notes:
+        "Row 168 of the register.\nInspection card IC/0042 issued 2026-06-24: No RPO appointed.\nHanded to the in-charge.",
+    });
+  });
+
+  it("puts a card on an undated register row without dating the visit", () => {
+    const visit = insp({ date: "", week: "", notes: "" });
+    const patch = cardOnInspectionPatch(visit, { ...input, reference: "", notes: "", nonCompliances: "" });
+    expect(patch).toEqual({ cardIssued: "2026-06-24", notes: "Inspection card issued 2026-06-24." });
+    expect(patch).not.toHaveProperty("date");
+    expect(cardOnInspectionProblem(visit, input, TODAY)).toBeNull();
+  });
+
+  it("refuses a card issued before the visit it came out of", () => {
+    const visit = insp({ date: "2026-07-01" });
+    expect(cardOnInspectionProblem(visit, input, TODAY)).toMatch(/before the inspection/);
+    expect(cardOnInspectionProblem(visit, { ...input, issued: "" }, TODAY)).toMatch(
+      /date the card was issued/,
+    );
   });
 });

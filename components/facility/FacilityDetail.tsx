@@ -13,7 +13,7 @@ import { store } from "@/lib/store";
 import { CardStatusChip } from "@/components/inspectorate/InspectionDatabaseTable";
 import { detectType } from "@/lib/rules/detectType";
 import { enforcementByFacility } from "@/lib/rules/enforcementStatus";
-import { cardExpiry, cardStatus } from "@/lib/rules/inspectionDatabase";
+import { cardExpiry, cardStatus, enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
 import { authWhen } from "@/lib/rules/licenceStats";
 import { todayISO } from "@/lib/rules/week";
@@ -663,7 +663,7 @@ export function FacilityDetail({
                     <div className="text-xs text-gunmetal/60">{i.outcome}</div>
                     {i.enforcement ? (
                       <div className="mt-1">
-                        <span className="chip red">{i.enforcement}</span>
+                        <span className="chip red">{enforcementLabel(i.enforcement)}</span>
                       </div>
                     ) : null}
                   </div>

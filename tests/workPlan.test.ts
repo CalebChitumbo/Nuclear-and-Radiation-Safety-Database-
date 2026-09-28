@@ -140,7 +140,9 @@ describe("the plan itself", () => {
     const planOutputs = WORK_PLAN_OUTPUTS.filter((o) => !o.supporting);
     expect(planOutputs.filter((o) => o.id.startsWith("1.1."))).toHaveLength(10);
     expect(planOutputs.filter((o) => o.id.startsWith("1.2."))).toHaveLength(11);
-    expect(planOutputs.filter((o) => o.id.startsWith("1.3."))).toHaveLength(14);
+    // 14 in the workbook, and 1.3.13's "Coordinators and TWG" split in two
+    // on 28 Sep 2026 — 1.3.15 is the TWG meetings.
+    expect(planOutputs.filter((o) => o.id.startsWith("1.3."))).toHaveLength(15);
   });
 
   it("keeps the workbook's targets", () => {
@@ -149,6 +151,11 @@ describe("the plan itself", () => {
     expect(findOutput("1.2.6")?.target).toBe(36);
     expect(findOutput("1.2.11")?.target).toBe(50);
     expect(findOutput("1.3.12")?.target).toBe(350000);
+    // The combined meetings row, split: coordinators 5 a year, TWG 36.
+    expect(findOutput("1.3.13")?.description).toBe("Quarterly Meetings for Coordinators");
+    expect(findOutput("1.3.13")?.target).toBe(5);
+    expect(findOutput("1.3.15")?.description).toBe("Conduct TWG Meetings");
+    expect(findOutput("1.3.15")?.target).toBe(36);
     // "-" in the sheet — no numeric target to measure against.
     expect(findOutput("1.3.11")?.target).toBeNull();
   });
@@ -166,9 +173,14 @@ describe("the plan itself", () => {
   });
 
   it("still counts figures logged under the pre-work-plan metric names", () => {
+    // The section's old "TWG Meetings" figures are TWG meetings — they count
+    // toward 1.3.15, not the coordinators' 1.3.13 they once shared a row with.
+    expect(metricKeysForOutput(findOutput("1.3.15")!)).toEqual([
+      outputMetricKey("1.3.15"),
+      metricKey("Nuclear Safety, Security & Safeguards", "TWG Meetings"),
+    ]);
     expect(metricKeysForOutput(findOutput("1.3.13")!)).toEqual([
       outputMetricKey("1.3.13"),
-      metricKey("Nuclear Safety, Security & Safeguards", "TWG Meetings"),
     ]);
   });
 });
@@ -548,13 +560,22 @@ describe("opening balance — the plan is cumulative for the year", () => {
       WORK_PLAN_OPENING_BALANCE["1.2.4"].reduce((a, b) => a + b, 0),
     ).toBe(253);
     expect(WORK_PLAN_OPENING_BALANCE["1.2.6"]).toEqual([8, 8, 7, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 61, 87, 0]);
+    // 1.2.11: the section's 193 (45/61/87), less the 37 actions of the
+    // 28 Sep 2026 enforcement list that sit on dated register inspections and
+    // are counted off the register (20 in Q2 weeks, 17 in Q3) — see
+    // docs/enforcement-list-2026-import.md and tests/enforcementList.test.ts.
+    expect(WORK_PLAN_OPENING_BALANCE["1.2.11"]).toEqual([45, 41, 70, 0]);
+    expect(
+      WORK_PLAN_OPENING_BALANCE["1.2.11"].reduce((a, b) => a + b, 0),
+    ).toBe(156);
     // 1.3.x — Nuclear Safety, Security & Safeguards.
     expect(WORK_PLAN_OPENING_BALANCE["1.3.5"]).toEqual([0, 9, 1, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.7"]).toEqual([0, 0, 100, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.9"]).toEqual([0, 0, 65, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.10"]).toEqual([0, 5, 2, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 26, 0]);
+    // The 26 meetings of the combined row: 21 coordinators', 5 TWG.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 21, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.15"]).toEqual([0, 0, 5, 0]);
   });
 
   it("carries in nothing for screening — the daily log holds all of it", () => {
@@ -599,10 +620,11 @@ describe("opening balance — the plan is cumulative for the year", () => {
       valuesByWeek: new Map(),
       baseline: null,
     });
-    // 193 enforcement actions carried in against a target of 50.
+    // 156 enforcement actions carried in against a target of 50 (the other
+    // 37 of the section's 193 are counted off the register).
     const enforcement = row(reports, "1.2.11");
-    expect(enforcement.total).toBe(193);
-    expect(formatPercent(enforcement.percent)).toBe("386%");
+    expect(enforcement.total).toBe(156);
+    expect(formatPercent(enforcement.percent)).toBe("312%");
     expect(enforcement.status).toBe("Achieved");
     // Nothing carried in and nothing recorded stays Not Started.
     expect(row(reports, "1.1.8").total).toBe(0);

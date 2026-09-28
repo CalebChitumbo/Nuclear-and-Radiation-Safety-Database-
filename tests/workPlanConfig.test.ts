@@ -455,7 +455,7 @@ describe("editing the plan", () => {
     const plan = applyWorkPlanConfig({
       year: 2026,
       outputs: {
-        "1.3.15": {
+        "1.3.16": {
           added: true,
           subprogramme: "1.3",
           description: "Detector calibrations",
@@ -463,8 +463,8 @@ describe("editing the plan", () => {
         },
       },
     });
-    expect(metricKeysForOutput(findOutput("1.3.15", plan)!)).toEqual([
-      outputMetricKey("1.3.15"),
+    expect(metricKeysForOutput(findOutput("1.3.16", plan)!)).toEqual([
+      outputMetricKey("1.3.16"),
     ]);
   });
 });

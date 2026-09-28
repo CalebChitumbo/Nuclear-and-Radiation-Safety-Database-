@@ -12,17 +12,24 @@
  * Everything except the facility is editable here: type, outcome, enforcement
  * action, the day, and whether (and when) an inspection card was issued — the
  * card's 30-day timer is derived from that date, so correcting it here moves
- * the card on the Inspectorate tab's due list. The facility is not, because an
+ * the card on the Inspectorate tab's due list. It is also how a card that was
+ * never put on a past inspection is added to it afterwards — on Daily Updates
+ * and on the Inspectorate tab's register alike. The facility is not, because an
  * inspection filed against the wrong facility carries that facility's
  * province, district and practice with it — that one is removed and logged
  * again. Removing is an administrator's, since it takes a counted inspection
  * back out of the year.
+ *
+ * An undated row of the back-imported 2026 register may stay undated: adding a
+ * card or an action to it must not force a day onto it. Giving it one moves it
+ * into that week's count while output 1.2.4's opening balance still carries it,
+ * so the form says so.
  */
 import { useState } from "react";
 
 import { store } from "@/lib/store";
 import { useToast } from "@/components/Toast";
-import { ENFORCEMENT_ACTIONS, cardExpiry } from "@/lib/rules/inspectionDatabase";
+import { ENFORCEMENT_ACTIONS, cardExpiry, enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import { weekLabelForDate } from "@/lib/rules/week";
 import {
   INSPECTION_OUTCOMES,
@@ -57,6 +64,7 @@ export function InspectionEditor({
   const [notes, setNotes] = useState(inspection.notes || "");
   const [cardIssued, setCardIssued] = useState(!!inspection.cardIssued);
   const [cardDate, setCardDate] = useState(inspection.cardIssued || inspection.date);
+  const wasUndated = !inspection.date;
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -64,11 +72,17 @@ export function InspectionEditor({
 
   const save = async () => {
     if (busy) return;
-    if (!date || !week) {
+    // A dated inspection must stay inside the calendar; an undated register
+    // row may stay undated.
+    if (date ? !week : !wasUndated) {
       toast.push(
         `${date || "That day"} is outside the reporting calendar — pick a day inside it.`,
         "error",
       );
+      return;
+    }
+    if (cardIssued && !(cardDate || date)) {
+      toast.push("Please give the day the inspection card was issued.", "error");
       return;
     }
     setBusy(true);
@@ -136,7 +150,7 @@ export function InspectionEditor({
             onChange={(e) => setDate(e.target.value)}
           />
           <div className="text-[11px] text-gunmetal/50 mt-0.5">
-            {week || "outside the calendar"}
+            {date ? week || "outside the calendar" : "undated — counted in no week"}
           </div>
         </div>
         <div>
@@ -192,7 +206,7 @@ export function InspectionEditor({
             <option value="">None</option>
             {ENFORCEMENT_ACTIONS.map((a) => (
               <option key={a} value={a}>
-                {a}
+                {enforcementLabel(a)}
               </option>
             ))}
           </select>
@@ -225,7 +239,9 @@ export function InspectionEditor({
               onChange={(e) => setCardDate(e.target.value)}
             />
             <div className="text-[11px] text-gunmetal/50 mt-0.5 tabular">
-              valid to {cardExpiry(cardDate || date) || "—"} (30 days)
+              {cardDate || date
+                ? `valid to ${cardExpiry(cardDate || date)} (30 days)`
+                : "the day the card was issued"}
             </div>
           </div>
         ) : null}
@@ -244,6 +260,15 @@ export function InspectionEditor({
         />
       </div>
 
+      {wasUndated && date ? (
+        <p className="text-xs text-[#7a5b07]">
+          This inspection came from the 2026 register without a day. Giving it
+          one counts it in {week || "that week"} — and output 1.2.4&apos;s opening
+          balance still carries it, so tell the administrator to take one off
+          the balance on /weekly, or it is counted twice.
+        </p>
+      ) : null}
+
       <p className="text-xs text-gunmetal/55">
         Logged against the wrong facility? Remove it and log it again — the
         province, district and practice on the record are that facility&apos;s.
@@ -252,7 +277,7 @@ export function InspectionEditor({
       <div className="flex flex-wrap gap-2">
         <button
           className="btn btn-primary"
-          disabled={busy || !week}
+          disabled={busy || (date ? !week : !wasUndated)}
           onClick={save}
         >
           {busy ? "Saving…" : "Save the correction"}
