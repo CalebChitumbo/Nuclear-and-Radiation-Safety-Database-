@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getDocsFromCache,
   limit,
   onSnapshot,
   orderBy,
@@ -18,6 +19,8 @@ import {
   where,
   writeBatch,
   type Firestore,
+  type Query,
+  type QuerySnapshot,
 } from "firebase/firestore";
 
 import { getDb, getFbFunctions } from "../firebase";
@@ -99,7 +102,7 @@ import {
 import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
-import type { DataStore, ScanWatch } from "./types";
+import type { DataStore, ReadFreshness, ScanWatch } from "./types";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 
 function requireDb(): Firestore {
@@ -123,6 +126,80 @@ const RECENT_SCAN_LIMIT = 4000;
  * the panel exists to answer.
  */
 const AUDIT_LOG_LIMIT = 300;
+
+// ---------------------------------------------------------------------------
+// Reads the device may answer itself
+// ---------------------------------------------------------------------------
+
+const READ_STAMP_PREFIX = "rpa-read:";
+
+interface ReadStamp {
+  /** When this device last had the server's answer, epoch ms. */
+  at: number;
+  /** How many documents that answer held. */
+  count: number;
+}
+
+function readStamp(key: string): ReadStamp | null {
+  try {
+    const raw = window.localStorage.getItem(READ_STAMP_PREFIX + key);
+    if (!raw) return null;
+    const stamp = JSON.parse(raw) as ReadStamp;
+    return typeof stamp.at === "number" && typeof stamp.count === "number"
+      ? stamp
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStamp(key: string, stamp: ReadStamp): void {
+  try {
+    window.localStorage.setItem(READ_STAMP_PREFIX + key, JSON.stringify(stamp));
+  } catch {
+    /* no storage (private window) — every read goes to the server */
+  }
+}
+
+/**
+ * A query answered from the persistent cache when this device fetched it from
+ * the server within `fresh.maxAgeMs`, and from the server otherwise.
+ *
+ * Firestore bills each document a server query returns; a cache read costs
+ * nothing. The cache already holds the last answer (and every scan this
+ * device has written since, and every scan the live shift list has delivered),
+ * so what is skipped is only what other devices wrote in the meantime — which
+ * is why callers choose the window.
+ *
+ * The cached answer is trusted only if it is about as large as the server's
+ * was: a device whose cache was cleared, or that fell back to a memory cache,
+ * would otherwise hand back a fragment. A few short allows for scans removed.
+ */
+async function getDocsWithin(
+  q: Query,
+  key: string,
+  fresh: ReadFreshness | undefined,
+): Promise<QuerySnapshot> {
+  const canStamp = typeof window !== "undefined";
+  if (fresh && canStamp) {
+    const stamp = readStamp(key);
+    if (stamp && Date.now() - stamp.at < fresh.maxAgeMs) {
+      try {
+        const cached = await getDocsFromCache(q);
+        const slack = Math.max(5, Math.ceil(stamp.count * 0.02));
+        if (cached.size >= stamp.count - slack) return cached;
+      } catch {
+        /* not in the cache — ask the server */
+      }
+    }
+  }
+  const snap = await getDocs(q);
+  // An offline getDocs comes back from the cache; that is not a server answer.
+  if (canStamp && !snap.metadata.fromCache) {
+    writeStamp(key, { at: Date.now(), count: snap.size });
+  }
+  return snap;
+}
 
 /**
  * Drop keys whose value is `undefined`. The web Firestore SDK rejects undefined
@@ -486,17 +563,22 @@ class FirebaseStore implements DataStore {
     await deleteDoc(doc(db, "dailyEntries", id));
   }
 
-  async listTruckScans(border?: string): Promise<TruckScan[]> {
+  async listTruckScans(
+    border?: string,
+    fresh?: ReadFreshness,
+  ): Promise<TruckScan[]> {
     const db = requireDb();
     // With a post: border == X ordered by date desc — the (border, date desc)
     // composite index in firestore.indexes.json.
-    const snap = await getDocs(
+    const snap = await getDocsWithin(
       query(
         collection(db, "truckScans"),
         ...(border ? [where("border", "==", border)] : []),
         orderBy("date", "desc"),
         limit(RECENT_SCAN_LIMIT),
       ),
+      `truckScans:recent:${border || "*"}`,
+      fresh,
     );
     return snap.docs.map((d) => ({
       id: d.id,
@@ -521,14 +603,17 @@ class FirebaseStore implements DataStore {
   async listTruckScansForWeek(
     week: string,
     border?: string,
+    fresh?: ReadFreshness,
   ): Promise<TruckScan[]> {
     const db = requireDb();
-    const snap = await getDocs(
+    const snap = await getDocsWithin(
       query(
         collection(db, "truckScans"),
         where("week", "==", week),
         ...(border ? [where("border", "==", border)] : []),
       ),
+      `truckScans:week:${week}:${border || "*"}`,
+      fresh,
     );
     return snap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<TruckScan, "id">) }))

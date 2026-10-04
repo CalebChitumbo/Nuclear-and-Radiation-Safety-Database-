@@ -791,3 +791,43 @@ export function lastSeenDetails(
     transporter: previous.transporter,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Keeping a loaded window current from the live shift list
+// ---------------------------------------------------------------------------
+
+/**
+ * One list of scans from two, each scan once — the first list's copy wins.
+ * The capture screen lays the live shift list over the recent window behind
+ * the pickers, so a truck logged a minute ago is "last seen" without the
+ * window being read again.
+ */
+export function mergeScans(first: TruckScan[], second: TruckScan[]): TruckScan[] {
+  const seen = new Set(first.map((s) => s.id));
+  return [...first, ...second.filter((s) => !seen.has(s.id))];
+}
+
+/**
+ * The week's scans with one post-day taken from the live shift list.
+ *
+ * The week is read once; the shift list is a subscription that changes with
+ * every scan typed or removed. Once the server has answered the subscription
+ * its list IS that post-day, removals included, so it replaces the week's
+ * copy. While it is still only what the device holds it may be short of what
+ * the week read brought down, so the two are joined instead — nothing the
+ * server already counted drops out of the week while the signal is gone.
+ */
+export function withLiveShift(
+  weekScans: TruckScan[],
+  shift: { scans: TruckScan[]; fromCache: boolean; error?: string } | null,
+  border: string,
+  date: string,
+): TruckScan[] {
+  if (!shift || shift.error || !border) return weekScans;
+  const isPostDay = (s: TruckScan) => s.border === border && s.date === date;
+  const others = weekScans.filter((s) => !isPostDay(s));
+  const postDay = shift.fromCache
+    ? mergeScans(shift.scans, weekScans.filter(isPostDay))
+    : shift.scans;
+  return [...others, ...postDay];
+}

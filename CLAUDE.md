@@ -495,3 +495,8 @@ with `persistentLocalCache`; `app/sw.ts` keeps the app on the device.
   Firebase's hosts must stay `NetworkOnly` there.
 - The pending count comes from snapshot metadata, never from a counter — a
   reload zeroes a counter while the SDK's queue is still full.
+- **Never re-read after a save.** Re-reading the scan windows per truck is what
+  ran up the $43 Sep 2026 bill (Firestore read ops). The live shift list is laid
+  over the week and the pickers (`withLiveShift`, `mergeScans`); the windows
+  come off the device within a day (`ReadFreshness`). See
+  `docs/firestore-read-costs.md`.

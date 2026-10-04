@@ -56,7 +56,6 @@ export function ScanCaptureCard({
   officer,
   todaysScans,
   recentScans,
-  onSaved,
 }: {
   border: string;
   date: string;
@@ -67,7 +66,6 @@ export function ScanCaptureCard({
   todaysScans: TruckScan[];
   /** The wider recent window — transporter list and "last seen" lookups. */
   recentScans: TruckScan[];
-  onSaved: () => void;
 }) {
   const toast = useToast();
   const [draft, setDraft] = useState<ScanDraft>(() => emptyDraft(direction));
@@ -178,7 +176,6 @@ export function ScanCaptureCard({
         );
       }
       reset();
-      onSaved();
     } catch (err) {
       toast.push(`Could not save the scan. ${scanWriteErrorMessage(err)}`, "error");
     } finally {

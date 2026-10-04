@@ -56,11 +56,13 @@ import {
   unpostedScanDays,
 } from "@/lib/rules/daily";
 import {
+  mergeScans,
   scansToCsv,
   summariseScans,
   summariseWeek,
   summaryToCsv,
   weeklyNarrative,
+  withLiveShift,
 } from "@/lib/rules/borderScans";
 import { todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
@@ -73,6 +75,20 @@ import {
 const NSSS: Section = "Nuclear Safety, Security & Safeguards";
 const POST_KEY = "rpa-border-post";
 const EMPTY_SCANS: TruckScan[] = [];
+
+/**
+ * How long head office's every-post week may come off the device. Its other
+ * posts' scans are not on the live shift list, so a window this short keeps
+ * their figures near the minute without a read on every visit.
+ */
+const ALL_POSTS_WEEK_MAX_AGE_MS = 30 * 60 * 1000;
+
+/** Milliseconds since this device's midnight — "fetched from the server today". */
+function sinceMidnight(): number {
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  return Date.now() - midnight.getTime();
+}
 
 export default function BorderScanPage() {
   const { user, postedOffice } = useAuth();
@@ -114,15 +130,25 @@ export default function BorderScanPage() {
 
   const { data, error, reload } = useStoreData(
     async (s) => {
+      // The scan windows are read from the server once a day per device and
+      // come off the device after that — the live shift list below carries
+      // this post-day's changes into both, so nothing on screen goes stale.
+      // Re-reading them on every visit is what ran up the Sep 2026 bill.
+      // Head office's every-post week holds other posts' days, which the
+      // shift list does not, so it goes back to the server more often.
+      const today = { maxAgeMs: sinceMidnight() };
+      const weekFresh = ownPost
+        ? today
+        : { maxAgeMs: Math.min(today.maxAgeMs, ALL_POSTS_WEEK_MAX_AGE_MS) };
       const [borders, recentScans, weekScans, entries] =
         await Promise.all([
           s.listBorders().catch(() => []),
           // Every read degrades to empty so the tab still renders before the
           // truckScans rules/index are deployed.
-          s.listTruckScans(ownPost).catch(() => [] as TruckScan[]),
+          s.listTruckScans(ownPost, today).catch(() => [] as TruckScan[]),
           weekLabel
             ? s
-                .listTruckScansForWeek(weekLabel, ownPost)
+                .listTruckScansForWeek(weekLabel, ownPost, weekFresh)
                 .catch(() => [] as TruckScan[])
             : Promise.resolve([] as TruckScan[]),
           s.listDailyEntries(entryScope).catch(() => []),
@@ -167,10 +193,21 @@ export default function BorderScanPage() {
   const canLog = canEditSection(user, NSSS);
   const isAdmin = user?.role === "admin";
 
+  // The week and the pickers' window are read once; the live shift list
+  // keeps this post-day current in both, so a saved scan never re-reads them.
+  const weekScans = useMemo(
+    () => withLiveShift(data?.weekScans || EMPTY_SCANS, shift, border, date),
+    [data?.weekScans, shift, border, date],
+  );
+  const pickerScans = useMemo(
+    () => mergeScans(shiftScans, data?.recentScans || EMPTY_SCANS),
+    [shiftScans, data?.recentScans],
+  );
+
   const daySummary = useMemo(() => summariseScans(shiftScans), [shiftScans]);
   const weekSummary = useMemo(
-    () => summariseWeek(data?.weekScans || [], weekLabel),
-    [data?.weekScans, weekLabel],
+    () => summariseWeek(weekScans, weekLabel),
+    [weekScans, weekLabel],
   );
 
   // Whatever figure Daily Updates holds for this post-day, whoever put it
@@ -188,9 +225,9 @@ export default function BorderScanPage() {
   const unposted = useMemo(
     () =>
       data && border
-        ? unpostedScanDays(data.weekScans, data.entries, border, date)
+        ? unpostedScanDays(weekScans, data.entries, border, date)
         : [],
-    [data, border, date],
+    [data, weekScans, border, date],
   );
 
   if (!data) {
@@ -371,11 +408,7 @@ export default function BorderScanPage() {
           direction={direction}
           officer={{ uid: user.uid, name: user.displayName }}
           todaysScans={shiftScans}
-          recentScans={data.recentScans}
-          // The shift list updates itself; this refreshes the wider window
-          // behind the pickers, and is harmless with no signal (the old data
-          // stays on screen until the read comes back).
-          onSaved={reload}
+          recentScans={pickerScans}
         />
       ) : !weekLabel ? (
         <Panel>
