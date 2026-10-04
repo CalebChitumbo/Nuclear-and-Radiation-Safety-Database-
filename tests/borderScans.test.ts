@@ -13,6 +13,7 @@ import {
   findSameDayScan,
   knownTransporters,
   lastSeenDetails,
+  mergeScans,
   normaliseVehicleId,
   runTogetherReading,
   scanWriteErrorMessage,
@@ -23,6 +24,7 @@ import {
   validateScan,
   vehicleIdKind,
   weeklyNarrative,
+  withLiveShift,
   type ScanDraft,
 } from "../lib/rules/borderScans";
 import {
@@ -530,5 +532,53 @@ describe("posting the day total to the daily log", () => {
     expect(screeningEntryId("2026-06-01", "Nakonde")).toBe(
       screeningEntryId("2026-06-01", "nakonde"),
     );
+  });
+});
+
+describe("keeping the loaded window current from the shift list", () => {
+  const monday = scan({ id: "mon", date: "2026-06-01" });
+  const earlier = scan({ id: "t1", date: "2026-06-02" });
+  const otherPost = scan({ id: "kz", date: "2026-06-02", border: "Kazungula" });
+  const week = [monday, earlier, otherPost];
+
+  it("merges each scan once, the live copy first", () => {
+    const live = { ...earlier, transporter: "Corrected" };
+    const merged = mergeScans([live], week);
+    expect(merged.map((s) => s.id)).toEqual(["t1", "mon", "kz"]);
+    expect(merged[0].transporter).toBe("Corrected");
+  });
+
+  it("replaces the post-day with the server's live list, removals included", () => {
+    const added = scan({ id: "t2", date: "2026-06-02" });
+    const out = withLiveShift(
+      week,
+      { scans: [added], fromCache: false },
+      "Nakonde",
+      "2026-06-02",
+    );
+    expect(out.map((s) => s.id).sort()).toEqual(["kz", "mon", "t2"]);
+  });
+
+  it("only adds to the post-day while the list is the device's own", () => {
+    const added = scan({ id: "t2", date: "2026-06-02" });
+    const out = withLiveShift(
+      week,
+      { scans: [added], fromCache: true },
+      "Nakonde",
+      "2026-06-02",
+    );
+    expect(out.map((s) => s.id).sort()).toEqual(["kz", "mon", "t1", "t2"]);
+  });
+
+  it("leaves the week alone before the list arrives or when it failed", () => {
+    expect(withLiveShift(week, null, "Nakonde", "2026-06-02")).toBe(week);
+    expect(
+      withLiveShift(
+        week,
+        { scans: [], fromCache: false, error: "denied" },
+        "Nakonde",
+        "2026-06-02",
+      ),
+    ).toBe(week);
   });
 });

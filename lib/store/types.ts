@@ -54,6 +54,19 @@ export interface ScanWatch {
   error?: string;
 }
 
+/**
+ * How old a device's copy of a read may be before it goes back to the server.
+ *
+ * Firestore bills every document a query returns from the server, so a screen
+ * that re-reads a few thousand scans on every open is what ran the Sep 2026
+ * bill up. With this set, a read this device made from the server within
+ * `maxAgeMs` is answered from the persistent cache instead — free. Anything
+ * that must be exact (the SharePoint export) leaves it out.
+ */
+export interface ReadFreshness {
+  maxAgeMs: number;
+}
+
 export interface DataStore {
   ready(): Promise<void>;
   listFacilities(): Promise<Facility[]>;
@@ -199,15 +212,23 @@ export interface DataStore {
    *
    * A posted officer reads their own post and no other, so they pass it; the
    * rules refuse the unscoped read from such an account.
+   *
+   * `fresh.maxAgeMs` lets the answer come off the device when this device
+   * fetched the same window from the server that recently (see
+   * `ReadFreshness`). Without it the read always goes to the server.
    */
-  listTruckScans(border?: string): Promise<TruckScan[]>;
+  listTruckScans(border?: string, fresh?: ReadFreshness): Promise<TruckScan[]>;
   /** One post's scans for one day — the shift list on the capture screen. */
   listTruckScansFor(border: string, date: string): Promise<TruckScan[]>;
   /**
    * Scans for one reporting week — every post's for the weekly rollup, or
    * one post's when the reader is posted there.
    */
-  listTruckScansForWeek(week: string, border?: string): Promise<TruckScan[]>;
+  listTruckScansForWeek(
+    week: string,
+    border?: string,
+    fresh?: ReadFreshness,
+  ): Promise<TruckScan[]>;
   /**
    * The shift list, live. Called at once with what the device holds and again
    * on every change — a scan just typed shows before the server has it, and

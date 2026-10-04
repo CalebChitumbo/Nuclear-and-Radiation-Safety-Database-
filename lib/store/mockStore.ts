@@ -92,7 +92,7 @@ import {
   type SeedInspection,
   type SeedScreening,
 } from "./seeding";
-import type { DataStore, ScanWatch } from "./types";
+import type { DataStore, ReadFreshness, ScanWatch } from "./types";
 
 // v6: the 2026 enforcement list laid on the inspection register.
 // v5: the Inspectorate's 2026 facility inspection register, so the demo opens
@@ -658,7 +658,10 @@ class MockStore implements DataStore {
       .slice(0, max);
   }
 
-  async listTruckScans(border?: string): Promise<TruckScan[]> {
+  async listTruckScans(
+    border?: string,
+    _fresh?: ReadFreshness,
+  ): Promise<TruckScan[]> {
     return ensure()
       .truckScans.filter((s) => !border || s.border === border)
       .sort(
@@ -676,6 +679,7 @@ class MockStore implements DataStore {
   async listTruckScansForWeek(
     week: string,
     border?: string,
+    _fresh?: ReadFreshness,
   ): Promise<TruckScan[]> {
     return (await this.listTruckScans(border)).filter((s) => s.week === week);
   }
