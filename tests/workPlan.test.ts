@@ -573,9 +573,10 @@ describe("opening balance — the plan is cumulative for the year", () => {
     expect(WORK_PLAN_OPENING_BALANCE["1.3.7"]).toEqual([0, 0, 100, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.9"]).toEqual([0, 0, 65, 0]);
     expect(WORK_PLAN_OPENING_BALANCE["1.3.10"]).toEqual([0, 5, 2, 0]);
-    // The 26 meetings of the combined row: 21 coordinators', 5 TWG.
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 21, 0]);
-    expect(WORK_PLAN_OPENING_BALANCE["1.3.15"]).toEqual([0, 0, 5, 0]);
+    // Re-baselined 12 Oct 2026: 3 coordinators' meetings; 27 TWG meetings,
+    // 9 carried + the 18 typed in the week of 5 Oct.
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.13"]).toEqual([0, 0, 3, 0]);
+    expect(WORK_PLAN_OPENING_BALANCE["1.3.15"]).toEqual([0, 0, 9, 0]);
   });
 
   it("carries in nothing for screening — the daily log holds all of it", () => {

@@ -1279,12 +1279,13 @@ export const WORK_PLAN_OPENING_BALANCE: Record<string, number[]> = {
   // 6 Sep 2026), so nothing is carried in. See the note above before
   // changing this: a figure here would double count the log.
   "1.3.12": [0, 0, 0, 0],
-  // The 26 meetings the section reported against the combined "Coordinators
-  // and TWG" output, split when the two were separated (28 Sep 2026): 21
-  // coordinators' meetings stay on 1.3.13 and 5 TWG meetings move to 1.3.15.
-  "1.3.13": [0, 0, 21, 0],
+  // The combined "Coordinators and TWG" row was split on 28 Sep 2026 (21
+  // coordinators' meetings, 5 TWG). Re-baselined at the section's instruction
+  // on 12 Oct 2026: 1.3.13 reads 3 in total; 1.3.15 reads 27, of which 18 are
+  // typed in the week of 5 Oct, so 9 are carried here.
+  "1.3.13": [0, 0, 3, 0],
   "1.3.14": [0, 0, 1, 0],
-  "1.3.15": [0, 0, 5, 0],
+  "1.3.15": [0, 0, 9, 0],
 };
 
 /** A quarter array that is always length 4, with whole non-negative numbers. */
