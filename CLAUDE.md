@@ -456,6 +456,15 @@ supervisor, who passes it on. `docs/task-desk.md` is the design note.
    `directory/{uid}` (the readable slice the picker and the rules use), and
    the Users desk writes it directly too.
 
+**Watch out:** someone who works in two sections is set on the same Edit form
+(*Also works in*; `extraSections`), never at sign-up. The claim is only
+re-minted when the account document is written, so after deploying the
+rules and functions, **re-save** any account that already had extras. Deploy
+`npm run deploy:rules` and `npm run deploy:functions` BEFORE merging the app
+(both are compatible with the old app). The section list is typed in three
+places — `lib/rules/types.ts`, `firestore.rules`, `functions/src/index.ts` —
+and a new section needs all three.
+
 **Watch out:** accounts that existed before the directory did have no line
 until they are next written. After deploying, run once:
 

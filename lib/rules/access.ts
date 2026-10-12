@@ -32,28 +32,52 @@ const INSP: Section = "Inspectorate";
 const NSI: Section = "National Source Inventory";
 
 /** What the access rules need to know about an account. */
-export type Viewer = Pick<UserDoc, "role" | "section" | "border"> | null;
+export type Viewer =
+  | (Pick<UserDoc, "role" | "section" | "border"> &
+      Partial<Pick<UserDoc, "extraSections">>)
+  | null;
 
 /** Where an account works from — see the module note. */
 export type Workspace =
   | { kind: "department" }
-  | { kind: "section"; section: Section }
+  | { kind: "section"; section: Section; sections: Section[] }
   | { kind: "post"; office: string };
+
+/**
+ * The sections an ordinary account works in: its primary one first, then any
+ * the administrator added (see `UserDoc.extraSections`). Unknown names and
+ * repeats are dropped, so a hand-edited document cannot widen access past the
+ * four real sections.
+ */
+function heldSections(
+  user: NonNullable<Viewer>,
+  primary: Section,
+): Section[] {
+  const held: Section[] = [primary];
+  for (const s of user.extraSections || []) {
+    if (SECTIONS.includes(s) && !held.includes(s)) held.push(s);
+  }
+  return held;
+}
 
 /**
  * The workspace an account holds. A posting to an inland office only means
  * anything for an NSSS officer — the sign-up rules never attach one to any
- * other section, and an administrator is never confined by one.
+ * other section, and an administrator is never confined by one. An NSSS
+ * officer who ALSO works in another section is not confined to the scan log
+ * (they have other screens to open), but their NSSS records stay filed against
+ * the post: see `dailyEntryScopes`.
  */
 export function workspaceFor(user: Viewer): Workspace | null {
   if (!user) return null;
   if (user.role === "admin" || user.section === "All") {
     return { kind: "department" };
   }
-  if (user.section === NSSS_SECTION && user.border) {
+  const sections = heldSections(user, user.section);
+  if (user.section === NSSS_SECTION && user.border && sections.length === 1) {
     return { kind: "post", office: user.border };
   }
-  return { kind: "section", section: user.section };
+  return { kind: "section", section: user.section, sections };
 }
 
 /** An NSSS officer posted to an inland office — the scan-log-only account. */
@@ -63,15 +87,15 @@ export function isPostedOfficer(user: Viewer): boolean {
 
 /**
  * The sections whose records this account is shown: all four for the
- * department, one for a section officer, and NSSS for a posted officer (whose
- * one screen belongs to that section).
+ * department, the account's own (one, or several) for a section officer, and
+ * NSSS for a posted officer (whose one screen belongs to that section).
  */
 export function sectionsFor(user: Viewer): Section[] {
   const ws = workspaceFor(user);
   if (!ws) return [];
   if (ws.kind === "department") return [...SECTIONS];
   if (ws.kind === "post") return [NSSS_SECTION];
-  return [ws.section];
+  return ws.sections;
 }
 
 /**
@@ -86,20 +110,26 @@ export function seesRegister(user: Viewer): boolean {
 }
 
 /**
- * The narrowest daily-log read an account is entitled to: the department reads
- * every entry, a section its own, a posted officer their post's. The store
- * turns this into the query, and the security rules refuse anything wider.
+ * The narrowest daily-log reads an account is entitled to: the department
+ * reads every entry (`undefined`), a section officer each of their sections'
+ * entries, a posted officer their post's. The store runs one query per scope
+ * and merges them - the security rules allow exactly these, and refuse
+ * anything wider. An NSSS section carries the account's post when it has one.
  */
 export interface DailyEntryScope {
   section?: Section;
   border?: string;
 }
 
-export function dailyEntryScope(user: Viewer): DailyEntryScope | undefined {
+export function dailyEntryScopes(user: Viewer): DailyEntryScope[] | undefined {
   const ws = workspaceFor(user);
   if (!ws || ws.kind === "department") return undefined;
-  if (ws.kind === "post") return { section: NSSS_SECTION, border: ws.office };
-  return { section: ws.section };
+  if (ws.kind === "post") return [{ section: NSSS_SECTION, border: ws.office }];
+  return ws.sections.map((section) =>
+    section === NSSS_SECTION && user?.border
+      ? { section, border: user.border }
+      : { section },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +296,7 @@ export function mayOpen(user: Viewer, route: RouteAccess): boolean {
   if (route.admin) return user?.role === "admin";
   if (ws.kind === "department") return true;
   if (ws.kind === "post") return !!route.post;
-  return route.sections.includes(ws.section);
+  return route.sections.some((s) => ws.sections.includes(s));
 }
 
 /**

@@ -44,7 +44,7 @@ import { downloadTextFile } from "@/components/downloadFile";
 import { ScreeningExportPanel } from "@/components/nsss/ScreeningExportPanel";
 import { useToast } from "@/components/Toast";
 import { canEditSection, useAuth } from "@/lib/auth";
-import { dailyEntryScope } from "@/lib/rules/access";
+import { dailyEntryScopes } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import type { ScanWatch } from "@/lib/store/types";
 import { useStoreData } from "@/lib/storeHooks";
@@ -126,7 +126,9 @@ export default function BorderScanPage() {
   // A posted officer reads their own post and nothing else — the security
   // rules refuse the wider read — so every query carries the posting.
   const ownPost = postedOffice || undefined;
-  const entryScope = dailyEntryScope(user);
+  const entryScope = dailyEntryScopes(user);
+  // A fresh array each render; the effect keys on what it says.
+  const scopeKey = JSON.stringify(entryScope ?? null);
 
   const { data, error, reload } = useStoreData(
     async (s) => {
@@ -156,7 +158,7 @@ export default function BorderScanPage() {
       return { borders, recentScans, weekScans, entries };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [border, date, weekLabel, ownPost, entryScope?.section, entryScope?.border],
+    [border, date, weekLabel, ownPost, scopeKey],
   );
 
   // The shift list is live and local-first: it is delivered from the device's

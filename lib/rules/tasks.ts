@@ -46,6 +46,7 @@ export function directoryEntry(user: UserDoc): DirectoryEntry {
     uid: user.uid,
     displayName: user.displayName,
     section: user.section,
+    ...(user.extraSections?.length ? { extraSections: user.extraSections } : {}),
     ...(user.border ? { border: user.border } : {}),
     ...(user.grade ? { grade: user.grade } : {}),
     ...(user.reportsTo ? { reportsTo: user.reportsTo } : {}),
@@ -268,16 +269,23 @@ export function sharedSupervisor(
  */
 export interface TaskReadScope {
   uid: string;
-  section: Section | "All" | "";
+  /** The sections whose tasks are read: all the account's own, or "All". */
+  sections: (Section | "All")[];
   department: boolean;
 }
 
 export function taskScopeFor(
-  user: Pick<UserDoc, "uid" | "role" | "section"> | null,
+  user: Pick<UserDoc, "uid" | "role" | "section" | "extraSections"> | null,
 ): TaskReadScope | null {
   if (!user) return null;
   const department = user.role === "admin" || user.section === "All";
-  return { uid: user.uid, section: department ? "All" : user.section, department };
+  const sections: TaskReadScope["sections"] = department
+    ? ["All"]
+    : [
+        user.section,
+        ...(user.extraSections || []).filter((s) => s !== user.section),
+      ];
+  return { uid: user.uid, sections, department };
 }
 
 /** Whether a task falls inside a read scope — the client-side half of the rule. */
@@ -287,7 +295,7 @@ export function inTaskScope(task: Task, scope: TaskReadScope): boolean {
     task.assignedToUid === scope.uid ||
     task.assignedByUid === scope.uid ||
     task.watcherUids.includes(scope.uid) ||
-    (!!scope.section && task.section === scope.section)
+    scope.sections.some((s) => !!s && task.section === s)
   );
 }
 

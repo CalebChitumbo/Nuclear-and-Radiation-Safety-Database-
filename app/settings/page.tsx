@@ -92,6 +92,7 @@ export default function SettingsPage() {
         </div>
         <div className="text-xs text-gunmetal/55 mt-1">
           {user?.role} · {user?.section}
+          {user?.extraSections?.length ? ` · also ${user.extraSections.join(", ")}` : ""}
         </div>
       </Panel>
 

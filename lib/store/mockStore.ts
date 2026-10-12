@@ -598,14 +598,19 @@ class MockStore implements DataStore {
     return Object.values(ensure().weekMetrics);
   }
 
-  async listDailyEntries(scope: DailyEntryScope = {}): Promise<DailyEntry[]> {
-    // The same slice the Firebase store's query returns, so a screen behaves
+  async listDailyEntries(
+    scope: DailyEntryScope | DailyEntryScope[] = {},
+  ): Promise<DailyEntry[]> {
+    // The same slice the Firebase store's queries return, so a screen behaves
     // alike in demo and in production.
+    const scopes = Array.isArray(scope) ? scope : [scope];
     return ensure()
-      .dailyEntries.filter(
-        (e) =>
-          (!scope.section || e.section === scope.section) &&
-          (!scope.border || e.border === scope.border),
+      .dailyEntries.filter((e) =>
+        scopes.some(
+          (sc) =>
+            (!sc.section || e.section === sc.section) &&
+            (!sc.border || e.border === sc.border),
+        ),
       )
       .sort((a, b) => b.date.localeCompare(a.date));
   }
@@ -645,14 +650,17 @@ class MockStore implements DataStore {
   }
 
   async listAuditLog(
-    scope: DailyEntryScope = {},
+    scope: DailyEntryScope | DailyEntryScope[] = {},
     max = 300,
   ): Promise<AuditEntry[]> {
+    const scopes = Array.isArray(scope) ? scope : [scope];
     return ensure()
-      .auditLog.filter(
-        (e) =>
-          (!scope.section || e.section === scope.section) &&
-          (!scope.border || e.border === scope.border),
+      .auditLog.filter((e) =>
+        scopes.some(
+          (sc) =>
+            (!sc.section || e.section === sc.section) &&
+            (!sc.border || e.border === sc.border),
+        ),
       )
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, max);
@@ -1419,6 +1427,8 @@ class MockStore implements DataStore {
     decision: {
       role: UserDoc["role"];
       section: UserDoc["section"];
+      /** Further sections the account also works in. */
+      extraSections?: readonly string[];
       border?: string;
       grade?: UserDoc["grade"];
       reportsTo?: string;

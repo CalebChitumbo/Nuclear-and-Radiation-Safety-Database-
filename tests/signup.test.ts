@@ -176,7 +176,41 @@ describe("accessPatch", () => {
   it("changes only the role, section and office", () => {
     expect(
       accessPatch({ role: "officer", section: NSSS, border: "nakonde" }),
-    ).toEqual({ role: "officer", section: NSSS, border: "Nakonde" });
+    ).toEqual({ role: "officer", section: NSSS, extraSections: [], border: "Nakonde" });
+  });
+
+  it("keeps the further sections an administrator adds, cleaned", () => {
+    expect(
+      accessPatch({
+        role: "officer",
+        section: "Authorisation & Standards",
+        extraSections: ["Inspectorate", "Authorisation & Standards", "Finance", "Inspectorate"],
+      }).extraSections,
+    ).toEqual(["Inspectorate"]);
+    // "All" already sees everything, so it takes none.
+    expect(
+      accessPatch({ role: "officer", section: "All", extraSections: ["Inspectorate"] })
+        .extraSections,
+    ).toEqual([]);
+  });
+
+  it("keeps the office when NSSS is a further section, drops it when NSSS is not held", () => {
+    expect(
+      accessPatch({
+        role: "officer",
+        section: "Inspectorate",
+        extraSections: [NSSS],
+        border: "nakonde",
+      }).border,
+    ).toBe("Nakonde");
+    expect(
+      accessPatch({
+        role: "officer",
+        section: "Inspectorate",
+        extraSections: ["Authorisation & Standards"],
+        border: "Nakonde",
+      }).border,
+    ).toBe("");
   });
 
   it("drops the office when the account leaves NSSS", () => {
@@ -199,7 +233,7 @@ describe("accessPatch", () => {
 
   it("never touches the approval record or the disabled flag", () => {
     const patch = accessPatch({ role: "admin", section: "All" });
-    expect(Object.keys(patch).sort()).toEqual(["border", "role", "section"]);
+    expect(Object.keys(patch).sort()).toEqual(["border", "extraSections", "role", "section"]);
   });
 });
 

@@ -36,6 +36,8 @@ import {
   accessChangeBlocker,
   officeOptions,
   pendingRequests,
+  mayHoldInlandOffice,
+  normaliseExtraSections,
   requiresInlandOffice,
   settledAccounts,
 } from "@/lib/rules/signup";
@@ -330,7 +332,14 @@ export default function AdminUsersPage() {
                         {u.role}
                       </span>
                     </td>
-                    <td className="text-xs">{u.section}</td>
+                    <td className="text-xs">
+                      {u.section}
+                      {u.extraSections?.length ? (
+                        <span className="block text-gunmetal/60">
+                          + {u.extraSections.join(" · ")}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="text-xs">
                       {u.grade ? (
                         <span title={GRADE_META[u.grade].post}>
@@ -657,12 +666,15 @@ function AccessEditor({
   const toast = useToast();
   const [role, setRole] = useState<Role>(account.role);
   const [section, setSection] = useState<Section | "All">(account.section);
+  const [extras, setExtras] = useState<Section[]>(account.extraSections || []);
   const [border, setBorder] = useState(account.border || "");
   const [grade, setGrade] = useState<Grade | "">(account.grade || "");
   const [reportsTo, setReportsTo] = useState(account.reportsTo || "");
   const [busy, setBusy] = useState(false);
 
-  const needsOffice = requiresInlandOffice(section);
+  // The further sections as they will be saved: never the primary one.
+  const savedExtras = normaliseExtraSections(section, extras);
+  const needsOffice = mayHoldInlandOffice(section, savedExtras);
   const blocker =
     accessChangeBlocker(actorUid, account, { role }) ||
     (reportsTo === account.uid ? "An account cannot report to itself." : "");
@@ -670,6 +682,8 @@ function AccessEditor({
   const unchanged =
     role === account.role &&
     section === account.section &&
+    savedExtras.join("|") ===
+      normaliseExtraSections(account.section, account.extraSections).join("|") &&
     office.toLowerCase() === (account.border || "").toLowerCase() &&
     grade === (account.grade || "") &&
     reportsTo === (account.reportsTo || "");
@@ -687,7 +701,7 @@ function AccessEditor({
       const s = await store();
       await s.updateUserAccess(
         account.uid,
-        { role, section, border: office, grade, reportsTo },
+        { role, section, extraSections: savedExtras, border: office, grade, reportsTo },
         actorUid,
       );
       toast.push(
@@ -731,7 +745,7 @@ function AccessEditor({
             className="field-label"
             htmlFor={`edit-section-${account.uid}`}
           >
-            Section
+            {section === "All" ? "Section" : "Main section"}
           </label>
           <select
             id={`edit-section-${account.uid}`}
@@ -747,6 +761,32 @@ function AccessEditor({
             ))}
           </select>
         </div>
+        {section !== "All" ? (
+          <fieldset>
+            <legend className="field-label">Also works in</legend>
+            <div className="flex flex-col gap-1">
+              {SECTIONS.filter((x) => x !== section).map((x) => (
+                <label key={x} className="flex items-center gap-2 text-[12px]">
+                  <input
+                    type="checkbox"
+                    checked={extras.includes(x)}
+                    onChange={(e) =>
+                      setExtras((cur) =>
+                        e.target.checked
+                          ? [...cur.filter((c) => c !== x), x]
+                          : cur.filter((c) => c !== x),
+                      )
+                    }
+                  />
+                  {x}
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-gunmetal/60 mt-1.5">
+              Opens that section's screens and records alongside the main one.
+            </p>
+          </fieldset>
+        ) : null}
         {needsOffice ? (
           <div>
             <label
@@ -765,12 +805,20 @@ function AccessEditor({
             />
             <p className="text-[11px] text-gunmetal/60 mt-1.5">
               {!border.trim()
-                ? "Blank: a head-office officer who sees the whole section. Name an office to post them there — they then see the Border Scan Log only."
+                ? "Blank: a head-office officer who sees the whole section. Name an office to post them there — " +
+                  (savedExtras.length
+                    ? "their NSSS figures are then filed against it, and their other sections stay open."
+                    : "they then see the Border Scan Log only.")
                 : !offices.some(
                       (o) => o.toLowerCase() === border.trim().toLowerCase(),
                     )
-                  ? "New office — saving registers it. Posted there, this officer sees the Border Scan Log only."
-                  : "Posted here, this officer sees the Border Scan Log only."}
+                  ? "New office — saving registers it. " +
+                    (savedExtras.length
+                      ? "Posted there, their NSSS figures are filed against it."
+                      : "Posted there, this officer sees the Border Scan Log only.")
+                  : savedExtras.length
+                    ? "Posted here, their NSSS figures are filed against this office."
+                    : "Posted here, this officer sees the Border Scan Log only."}
             </p>
           </div>
         ) : null}

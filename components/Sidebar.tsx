@@ -220,7 +220,7 @@ export function Sidebar({
                   >
                     {postedOnly
                       ? `${user.border} · border post`
-                      : `${user.section} · ${user.role}`}
+                      : `${user.section}${user.extraSections?.length ? ` +${user.extraSections.length}` : ""} · ${user.role}`}
                   </div>
                 </>
               ) : (

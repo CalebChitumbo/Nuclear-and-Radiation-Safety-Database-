@@ -74,6 +74,21 @@ const nsi = () =>
 const admin = () =>
   env.authenticatedContext("u-admin", { role: "admin", section: "All" }).firestore();
 const pending = () => env.authenticatedContext("u-pending", {}).firestore();
+// Accounts that work in more than one section: Licensing + Inspectorate, and
+// an NSSS officer posted to Nakonde who also works in Licensing.
+const asInsp = () =>
+  env
+    .authenticatedContext("u-as2", { role: "officer", section: AS, extra: [INSP] })
+    .firestore();
+const nakondeAs = () =>
+  env
+    .authenticatedContext("u-nakas", {
+      role: "officer",
+      section: NSSS,
+      border: "Nakonde",
+      extra: [AS],
+    })
+    .firestore();
 
 // --- the records -----------------------------------------------------------
 
@@ -800,5 +815,131 @@ describe("the Tasks desk", () => {
   it("is deleted by administrators only", async () => {
     await assertFails(deleteDoc(doc(as(), "tasks/t-peer")));
     await assertSucceeds(deleteDoc(doc(admin(), "tasks/t-peer")));
+  });
+});
+
+// --- accounts in more than one section ---------------------------------------
+
+describe("an account that works in more than one section", () => {
+  it("opens the register and the Inspectorate's records through either section", async () => {
+    const db = asInsp();
+    await assertSucceeds(getDoc(doc(db, "facilities/f1")));
+    await assertSucceeds(getDoc(doc(db, "inspections/i1")));
+    await assertSucceeds(getDoc(doc(db, "inspectionCards/c1")));
+    await assertSucceeds(
+      setDoc(doc(db, "inspections/i-new"), {
+        date: "2026-08-03",
+        week: "W31 2026",
+        type: "Routine Inspection",
+        outcome: "Compliant",
+      }),
+    );
+  });
+
+  it("stays out of the sections it does not hold", async () => {
+    const db = asInsp();
+    await assertFails(getDoc(doc(db, "truckScans/s-nak")));
+    await assertFails(getDoc(doc(db, "inventoryEdits/rais:RAN1")));
+    await assertFails(getDoc(doc(db, "dailyEntries/d-nsss")));
+  });
+
+  it("reads the daily log one section at a time, for each section it holds", async () => {
+    const db = asInsp();
+    await assertSucceeds(
+      getDocs(query(collection(db, "dailyEntries"), where("section", "==", AS))),
+    );
+    await assertSucceeds(
+      getDocs(query(collection(db, "dailyEntries"), where("section", "==", INSP))),
+    );
+    await assertFails(
+      getDocs(query(collection(db, "dailyEntries"), where("section", "==", NSSS))),
+    );
+    await assertFails(getDocs(collection(db, "dailyEntries")));
+    await assertSucceeds(setDoc(doc(db, "dailyEntries/m1"), entry(INSP, undefined, "u-as2")));
+    await assertSucceeds(setDoc(doc(db, "dailyEntries/m2"), entry(AS, undefined, "u-as2")));
+    await assertFails(setDoc(doc(db, "dailyEntries/m3"), entry(NSSS, undefined, "u-as2")));
+  });
+
+  it("reads the audit log and the section's tasks for each section it holds", async () => {
+    const db = asInsp();
+    await assertSucceeds(
+      getDocs(query(collection(db, "auditLog"), where("section", "==", AS))),
+    );
+    await assertSucceeds(getDoc(doc(db, "tasks/t-peer"))); // filed under Inspectorate
+    await assertSucceeds(
+      getDocs(query(collection(db, "tasks"), where("section", "==", INSP))),
+    );
+    await assertFails(getDoc(doc(db, "tasks/t-nsss")));
+    await assertFails(getDoc(doc(db, "auditLog/a-nak")));
+  });
+
+  it("is not confined to the scan log by a post when it also works elsewhere", async () => {
+    const db = nakondeAs();
+    await assertSucceeds(getDoc(doc(db, "facilities/f1")));
+    await assertSucceeds(getDocs(collection(db, "weekMetrics")));
+  });
+
+  it("still files and reads its NSSS figures against its own post only", async () => {
+    const db = nakondeAs();
+    await assertSucceeds(getDoc(doc(db, "truckScans/s-nak")));
+    await assertFails(getDoc(doc(db, "truckScans/s-chi")));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, "dailyEntries"),
+          where("section", "==", NSSS),
+          where("border", "==", "Nakonde"),
+        ),
+      ),
+    );
+    await assertFails(
+      getDocs(query(collection(db, "dailyEntries"), where("section", "==", NSSS))),
+    );
+    await assertFails(setDoc(doc(db, "dailyEntries/p1"), entry(NSSS, "Chirundu", "u-nakas")));
+    await assertSucceeds(setDoc(doc(db, "dailyEntries/p2"), entry(NSSS, "Nakonde", "u-nakas")));
+    // Its Licensing records carry no post, and need none.
+    await assertSucceeds(setDoc(doc(db, "dailyEntries/p3"), entry(AS, undefined, "u-nakas")));
+    await assertSucceeds(
+      getDocs(query(collection(db, "dailyEntries"), where("section", "==", AS))),
+    );
+    await assertSucceeds(
+      getDocs(query(collection(db, "auditLog"), where("section", "==", AS))),
+    );
+  });
+
+  it("cannot be granted by the account itself", async () => {
+    const uid = "u-new";
+    const db = env
+      .authenticatedContext(uid, { email_verified: true, email: "n@rpa.zm" })
+      .firestore();
+    const request = {
+      uid,
+      email: "n@rpa.zm",
+      displayName: "New Officer",
+      role: "officer",
+      section: AS,
+      pending: true,
+      disabled: false,
+      origin: "self",
+    };
+    await assertSucceeds(setDoc(doc(db, `users/${uid}`), request));
+    await env.clearFirestore();
+    await assertFails(setDoc(doc(db, `users/${uid}`), { ...request, extraSections: [INSP] }));
+  });
+
+  it("is set by administrators, to real sections only", async () => {
+    const base = {
+      uid: "u-x",
+      email: "x@rpa.zm",
+      displayName: "X",
+      role: "officer",
+      section: AS,
+      pending: false,
+      disabled: false,
+    };
+    await assertSucceeds(setDoc(doc(admin(), "users/u-x"), { ...base, extraSections: [INSP] }));
+    await assertFails(setDoc(doc(admin(), "users/u-x"), { ...base, extraSections: ["Finance"] }));
+    await assertFails(setDoc(doc(admin(), "users/u-x"), { ...base, extraSections: "Inspectorate" }));
+    await assertFails(setDoc(doc(as(), "users/u-x"), { ...base, extraSections: [INSP] }));
   });
 });

@@ -23,7 +23,7 @@ import {
   type Workspace,
 } from "./rules/access";
 import { newAccountRequest, type SignupInput } from "./rules/signup";
-import type { Role, Section, UserDoc } from "./rules/types";
+import { SECTIONS, type Role, type Section, type UserDoc } from "./rules/types";
 
 /**
  * An account that exists but holds nothing yet: someone who has signed up and
@@ -139,12 +139,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       setPendingAccount(null);
+      // The further sections an administrator added, if any. The claim is
+      // trusted no further than the four real section names.
+      const claimed = tokenResult.claims.extra;
+      const extraSections = (Array.isArray(claimed) ? claimed : []).filter(
+        (s): s is Section => SECTIONS.includes(s as Section) && s !== section,
+      );
       setUser({
         uid: fbUser.uid,
         email: fbUser.email || "",
         displayName: fbUser.displayName || fbUser.email || "Officer",
         role,
         section,
+        ...(extraSections.length ? { extraSections } : {}),
         border: (tokenResult.claims.border as string) || undefined,
       });
     },
@@ -401,16 +408,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       refresh,
       isAdmin: user?.role === "admin",
-      canEditAS:
-        !!user &&
-        (user.role === "admin" ||
-          user.section === "All" ||
-          user.section === "Authorisation & Standards"),
-      canEditInsp:
-        !!user &&
-        (user.role === "admin" ||
-          user.section === "All" ||
-          user.section === "Inspectorate"),
+      canEditAS: canEditSection(user, "Authorisation & Standards"),
+      canEditInsp: canEditSection(user, "Inspectorate"),
       postedOffice: user?.border || null,
       workspace: workspaceFor(user),
       sections: sectionsFor(user),
@@ -430,8 +429,9 @@ export function useAuth(): AuthState {
 
 /**
  * May this user log/edit entries for the given section? Admins and "All"
- * accounts may act for any section; officers only for their own. Mirrors the
- * canEditAS / canEditInsp flags for the two sections that predate this helper.
+ * accounts may act for any section; officers only for their own (the primary
+ * section and any the administrator added). Backs the canEditAS / canEditInsp
+ * flags for the two sections that predate this helper.
  */
 export function canEditSection(
   user: UserDoc | null,
@@ -439,6 +439,9 @@ export function canEditSection(
 ): boolean {
   return (
     !!user &&
-    (user.role === "admin" || user.section === "All" || user.section === section)
+    (user.role === "admin" ||
+      user.section === "All" ||
+      user.section === section ||
+      !!user.extraSections?.includes(section))
   );
 }
