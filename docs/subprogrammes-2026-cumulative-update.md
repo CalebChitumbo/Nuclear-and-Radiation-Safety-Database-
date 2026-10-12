@@ -132,15 +132,24 @@ the 193, so 1.2.11 still reports **193** (45 / 61 / 87), now 156 carried
 | 1.3.10 | Training for ZRA Inspectors/Responders/FLO | 4 | — | 5 | 2 | — | **7** | 0 |
 | 1.3.11 | Monitoring & Evaluation of Inland Offices | — | — | — | — | — | 0 | 0 |
 | 1.3.12 | Monitoring of illicit trafficking (ZRA Asycuda) | 350,000 | 152,909 | 106,113 | 81,987 | — | **356,372** | 356,372 |
-| 1.3.13 | Quarterly Meetings for Coordinators | 5 | — | — | 21 | — | **21** | 26 |
+| 1.3.13 | Quarterly Meetings for Coordinators | 5 | — | — | 3 | — | **3** | 26 |
 | 1.3.14 | Enhance detection capacity system | 1 | — | — | 1 | — | **1** | 0 |
-| 1.3.15 | Conduct TWG Meetings | 36 | — | — | 5 | — | **5** | — |
+| 1.3.15 | Conduct TWG Meetings | 36 | — | — | 9 | — | **9** | — |
 
 *28 Sep 2026:* the workbook's one row "Quarterly Meetings for Coordinators and
 TWG" (target 5, 26 held) was split at the section's request into two outputs
 with their own targets: **1.3.13** the coordinators' meetings (target 5, 21 of
 the 26) and **1.3.15** the TWG meetings (target 36, the other 5). Figures the
 section once logged under its old "TWG Meetings" metric count toward 1.3.15.
+
+*12 Oct 2026:* re-baselined at the section's instruction. **1.3.13** now
+carries 3 (was 21), and that is its whole reported figure. **1.3.15** carries 9
+(was 5); with the 18 TWG meetings typed for the week of 5 Oct it reports
+**27**. **1.3.1** (RPO conference, Medical) was being reported as 3: the 1
+carried in Q2 plus two daily entries for the same conference (13 Aug and
+4 Sep). The section confirmed it is one conference, held in Q2, so the
+two daily entries were deleted from the live log (the audit log on `/nsss`
+records both) and 1.3.1 reports **1** again.
 
 1.3.7 is percentage points of the INSSP programme implemented, not a count —
 100 against a target of 100.
