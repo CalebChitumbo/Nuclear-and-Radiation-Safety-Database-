@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { canEditSection, useAuth } from "@/lib/auth";
-import { dailyEntryScope, seesRegister } from "@/lib/rules/access";
+import { dailyEntryScopes, seesRegister } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { LoadErrorBanner } from "@/components/LoadError";
@@ -93,7 +93,9 @@ export default function DailyUpdatesPage() {
   // Only the sections that work the facilities register read it; the others'
   // wizards never need it, and the rules would refuse them anyway.
   const register = seesRegister(user);
-  const entryScope = dailyEntryScope(user);
+  const entryScope = dailyEntryScopes(user);
+  // A fresh array each render; the effect keys on what it says.
+  const scopeKey = JSON.stringify(entryScope ?? null);
 
   const weekLabel = useMemo(
     () => weekLabelForDate(date, weeks, ""),
@@ -143,7 +145,7 @@ export default function DailyUpdatesPage() {
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [register, entryScope?.section, entryScope?.border],
+    [register, scopeKey],
   );
 
   const plan = useMemo(

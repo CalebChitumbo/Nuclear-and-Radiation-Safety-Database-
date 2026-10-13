@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { mockStore, resetMockStore } from "../lib/store/mockStore";
-import { dailyEntryScope } from "../lib/rules/access";
+import { dailyEntryScopes } from "../lib/rules/access";
 import type { TruckScan } from "../lib/rules/types";
 
 const NSSS = "Nuclear Safety, Security & Safeguards" as const;
@@ -29,8 +29,8 @@ describe("mock store — the scoped reads the security rules require", () => {
   beforeEach(() => resetMockStore());
 
   it("hands a section its own daily log and a post its own post's", async () => {
-    const nakonde = dailyEntryScope({ role: "officer", section: NSSS, border: "Nakonde" });
-    const desk = dailyEntryScope({ role: "officer", section: NSSS });
+    const nakonde = dailyEntryScopes({ role: "officer", section: NSSS, border: "Nakonde" });
+    const desk = dailyEntryScopes({ role: "officer", section: NSSS });
     const all = await mockStore.listDailyEntries();
     const nsss = await mockStore.listDailyEntries(desk);
     const post = await mockStore.listDailyEntries(nakonde);

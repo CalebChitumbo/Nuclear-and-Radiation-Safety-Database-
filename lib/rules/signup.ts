@@ -51,6 +51,35 @@ export function requiresInlandOffice(section: Section | "" | "All"): boolean {
 }
 
 /**
+ * The further sections an administrator may add to an account, cleaned: real
+ * section names only, never the primary one, no repeats, in SECTIONS order.
+ * "All" already sees every section, so it takes none.
+ */
+export function normaliseExtraSections(
+  primary: Section | "" | "All",
+  extra: readonly string[] | undefined,
+): Section[] {
+  if (!primary || primary === "All") return [];
+  return SECTIONS.filter((s) => s !== primary && (extra || []).includes(s));
+}
+
+/**
+ * Does an account holding these sections have to name an inland office? The
+ * office is asked for when NSSS is the primary section; an account that holds
+ * NSSS as a further section may carry one too (to be posted), so it is kept
+ * rather than stripped.
+ */
+export function mayHoldInlandOffice(
+  primary: Section | "" | "All",
+  extra: readonly string[] | undefined,
+): boolean {
+  return (
+    requiresInlandOffice(primary) ||
+    normaliseExtraSections(primary, extra).includes(NSSS_SECTION)
+  );
+}
+
+/**
  * Tidy an office name so "nakonde ", "NAKONDE" and "Nakonde" are one office
  * rather than three columns in the screening report. A name that matches a
  * known office (or one already in the register, when the caller passes it in)
@@ -195,15 +224,21 @@ export function approvalPatch(
 export function accessPatch(decision: {
   role: UserDoc["role"];
   section: UserDoc["section"];
+  /** Further sections the account works in; left out: none. */
+  extraSections?: readonly string[];
   border?: string;
   /** Placement on the reporting line — "" clears it. Left out: unchanged. */
   grade?: UserDoc["grade"];
   reportsTo?: string;
-}): Pick<UserDoc, "role" | "section" | "border" | "grade" | "reportsTo"> {
+}): Pick<
+  UserDoc,
+  "role" | "section" | "extraSections" | "border" | "grade" | "reportsTo"
+> {
   return {
     role: decision.role,
     section: decision.section,
-    border: requiresInlandOffice(decision.section)
+    extraSections: normaliseExtraSections(decision.section, decision.extraSections),
+    border: mayHoldInlandOffice(decision.section, decision.extraSections)
       ? normaliseOfficeName(decision.border || "")
       : "",
     ...(decision.grade !== undefined ? { grade: decision.grade } : {}),

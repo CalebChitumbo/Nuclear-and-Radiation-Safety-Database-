@@ -434,7 +434,7 @@ describe("read scope", () => {
     const admin = taskScopeFor({ uid: "dnrs", role: "admin", section: "All" })!;
     expect(admin.department).toBe(true);
     const officer = taskScopeFor({ uid: "of-as", role: "officer", section: "Authorisation & Standards" })!;
-    expect(officer).toEqual({ uid: "of-as", section: "Authorisation & Standards", department: false });
+    expect(officer).toEqual({ uid: "of-as", sections: ["Authorisation & Standards"], department: false });
     expect(taskScopeFor(null)).toBeNull();
 
     const mine = give("sn-as", "of-as");
@@ -448,5 +448,15 @@ describe("read scope", () => {
     expect(manager.department).toBe(true);
     const inspOfficer = taskScopeFor({ uid: "of-insp", role: "officer", section: "Inspectorate" })!;
     expect(inTaskScope(peers, inspOfficer)).toBe(true); // their section's
+    // An officer in two sections reads the tasks filed under either.
+    const both = taskScopeFor({
+      uid: "of-as",
+      role: "officer",
+      section: "Authorisation & Standards",
+      extraSections: ["Inspectorate"],
+    })!;
+    expect(both.sections).toEqual(["Authorisation & Standards", "Inspectorate"]);
+    expect(inTaskScope(peers, both)).toBe(true);
+    expect(inTaskScope(give("sn-as", "sn-nsss"), both)).toBe(false);
   });
 });

@@ -179,7 +179,9 @@ export interface DataStore {
    * refuse a wider read than the account's claims allow, so a section officer
    * asking for every entry gets a permission error, not the department's log.
    */
-  listDailyEntries(scope?: DailyEntryScope): Promise<DailyEntry[]>;
+  listDailyEntries(
+    scope?: DailyEntryScope | DailyEntryScope[],
+  ): Promise<DailyEntry[]>;
   addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry>;
   /**
    * Write a daily entry to a KNOWN id, replacing whatever is there.
@@ -199,7 +201,10 @@ export interface DataStore {
    * The rows are written by a Cloud Function, never by the app, so a store with
    * no functions behind it (the demo store) keeps its own local trail instead.
    */
-  listAuditLog(scope?: DailyEntryScope, max?: number): Promise<AuditEntry[]>;
+  listAuditLog(
+    scope?: DailyEntryScope | DailyEntryScope[],
+    max?: number,
+  ): Promise<AuditEntry[]>;
   deleteDailyEntry(id: string): Promise<void>;
   /**
    * Recent truck scans across the border posts, newest date first. One record
@@ -418,6 +423,8 @@ export interface DataStore {
     decision: {
       role: UserDoc["role"];
       section: UserDoc["section"];
+      /** Further sections the account also works in. */
+      extraSections?: readonly string[];
       border?: string;
       /** Placement on the reporting line — see GRADES. "" clears. */
       grade?: UserDoc["grade"];

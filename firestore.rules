@@ -5,6 +5,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function role()     { return request.auth.token.role; }
     function section()  { return request.auth.token.section; }
+    // The further sections an administrator has added to the account (the
+    // `extra` claim), as a list - empty for the usual one-section account.
+    function extra()    { return request.auth.token.get('extra', []); }
     function isAdmin()  { return signedIn() && role() == 'admin'; }
 
     // An account an administrator has approved and not disabled. Claims are the
@@ -45,16 +48,30 @@ service cloud.firestore {
     // A daily entry a posted officer writes must name their own post; anyone
     // else may file with or without one.
     function filedAtOwnPost(d) {
-      return !posted() || (('border' in d) && d.border == postedOffice());
+      return !posted()
+        || d.section != 'Nuclear Safety, Security & Safeguards'
+        || (('border' in d) && d.border == postedOffice());
     }
+    // An NSSS record is read against the post it was filed at; the same
+    // account's records in any other section carry no post and are not.
+    function readableAtPost(d) {
+      return d.section != 'Nuclear Safety, Security & Safeguards'
+        || filesFor(d.get('border', ''));
+    }
+    // Confined to the Border Scan Log: posted to an inland office and working
+    // in no other section. An account that ALSO works in another section has
+    // other screens to open, so it is not confined - but its NSSS figures are
+    // still filed against the post (filedAtOwnPost / readableAtPost).
+    function confinedToPost() { return posted() && extra().size() == 0; }
 
     // Approved, and not confined to a border post. An administrator is never
     // confined, whatever claims they carry.
     function atHeadOffice() {
-      return approved() && (isAdmin() || !posted());
+      return approved() && (isAdmin() || !confinedToPost());
     }
     function inSection(name) {
-      return section() == name || section() == 'All' || isAdmin();
+      return section() == name || section() == 'All' || isAdmin()
+        || name in extra();
     }
 
     function isAS()   { return atHeadOffice() && inSection('Authorisation & Standards'); }
@@ -234,7 +251,8 @@ service cloud.firestore {
         && d.kind in ['count','note'];
     }
     function ownSectionEntry(d) {
-      return isAdmin() || section() == 'All' || d.section == section();
+      return isAdmin() || section() == 'All' || d.section == section()
+        || d.section in extra();
     }
     // The one kind of daily entry anyone in the section may overwrite: a count
     // filed against a named post for a named day, replaced by a count for the
@@ -252,7 +270,7 @@ service cloud.firestore {
     match /dailyEntries/{id} {
       allow read: if approved()
         && ownSectionEntry(resource.data)
-        && filesFor(resource.data.get('border', ''));
+        && readableAtPost(resource.data);
       allow create: if approved()
         && validDailyEntry(request.resource.data)
         && ownSectionEntry(request.resource.data)
@@ -426,8 +444,9 @@ service cloud.firestore {
       allow read: if approved()
         && (isAdmin()
             || section() == 'All'
-            || resource.data.section == section())
-        && filesFor(resource.data.get('border', ''));
+            || resource.data.section == section()
+            || resource.data.section in extra())
+        && readableAtPost(resource.data);
       allow create, update, delete: if false;
     }
 
@@ -509,6 +528,12 @@ service cloud.firestore {
           'Nuclear Safety, Security & Safeguards','National Source Inventory','All'
         ]
         && (!('border' in d) || (d.border is string && d.border.size() <= 80))
+        // Further sections the account also works in (the Users desk).
+        && (!('extraSections' in d)
+            || (d.extraSections is list && d.extraSections.size() <= 3
+                && d.extraSections.hasOnly([
+                     'Authorisation & Standards','Inspectorate',
+                     'Nuclear Safety, Security & Safeguards','National Source Inventory'])))
         && (!('pending' in d) || d.pending is bool)
         && (!('disabled' in d) || d.disabled is bool)
         // Placement on the reporting line (the Tasks desk). '' clears either.
@@ -566,7 +591,8 @@ service cloud.firestore {
       allow read: if approved()
         && (isAdmin() || section() == 'All'
             || onTask(resource.data)
-            || resource.data.section == section());
+            || resource.data.section == section()
+            || resource.data.section in extra());
       // Given by the account writing it, opened Assigned, to someone on the
       // account's line.
       allow create: if approved()
@@ -613,7 +639,10 @@ service cloud.firestore {
             || (d.border is string && d.border.size() > 0))
         && (!('border' in d) || (d.border is string && d.border.size() <= 80))
         // Approval-only fields may not be smuggled in on the request itself.
-        && !('approvedAt' in d) && !('approvedBy' in d);
+        && !('approvedAt' in d) && !('approvedBy' in d)
+        // Likewise further sections: an administrator's to grant, never asked
+        // for on the request, or approval would carry them through.
+        && !('extraSections' in d);
     }
 
     match /users/{uid} {

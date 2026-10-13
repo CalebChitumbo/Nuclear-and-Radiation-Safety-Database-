@@ -238,7 +238,15 @@ export function dailyEntryEditScope(
   if (!editor) return "none";
   if (editor.admin) return "full";
   if (!editor.sections.includes(entry.section)) return "none";
-  if (editor.postedOffice && entry.border !== editor.postedOffice) return "none";
+  // The post confines NSSS figures only; the same account's records in another
+  // section carry no post.
+  if (
+    editor.postedOffice &&
+    entry.section === NSSS_SECTION &&
+    entry.border !== editor.postedOffice
+  ) {
+    return "none";
+  }
   if (editor.uid && entry.updatedBy === editor.uid) return "full";
   return postDayEntryId(entry) === entry.id ? "figure" : "none";
 }

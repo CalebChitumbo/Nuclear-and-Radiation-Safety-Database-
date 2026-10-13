@@ -961,7 +961,16 @@ export interface UserDoc {
   email: string;
   displayName: string;
   role: Role;
+  /** The primary section — where the account lands and is posted from. */
   section: Section | "All";
+  /**
+   * Further sections the account also works in, set by an administrator on
+   * the Users desk. Never holds the primary `section` or duplicates; absent
+   * (or empty) for the common one-section account, and meaningless alongside
+   * "All" or an administrator, who already see every section. Mirrored onto
+   * the `extra` claim so the security rules can read it.
+   */
+  extraSections?: Section[];
   disabled?: boolean;
   /**
    * Waiting on an administrator. The account holds no access at all while this
@@ -1007,6 +1016,7 @@ export interface DirectoryEntry {
   uid: string;
   displayName: string;
   section: Section | "All";
+  extraSections?: Section[];
   border?: string;
   grade?: Grade;
   reportsTo?: string;

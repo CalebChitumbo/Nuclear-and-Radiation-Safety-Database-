@@ -211,7 +211,7 @@ nothing on its own**:
 | So a pending account can read | **nothing** |
 | Clearing `pending` is | an **update**, and updates to `users/` are admin-only |
 
-`onUserDocWrite` is the single gate: it mints `{role, section, border}` onto the
+`onUserDocWrite` is the single gate: it mints `{role, section, extra, border}` onto the
 Auth user **only** for an account that is neither pending, declined nor
 disabled, and strips them again the moment it becomes any of those. Disabling an
 account now also disables the Auth user, so the sign-in itself stops working
@@ -322,6 +322,27 @@ drops their posting; naming an office the register does not hold registers it,
 as approval does. The one thing an administrator may not do is remove their own
 administrator role — that would lock them out of the very desk they are
 working from — so another administrator has to make that change.
+
+#### Working in more than one section
+
+An account has one **main section** (`section`) and, optionally, further ones
+(`extraSections`, ticked under *Also works in* on the same Edit form). Only an
+administrator can add them — a sign-up request that carries `extraSections` is
+refused by the rules, or approval would carry them through. The further
+sections are cleaned by `normaliseExtraSections` (real names only, never the
+main one, none for "All"), minted onto the `extra` claim by `onUserDocWrite`
+and mirrored to `directory/{uid}`.
+
+What it means: the account opens the **union** of its sections' screens
+(`mayOpen` in `lib/rules/access.ts`), lands on its main section's front door,
+and is shown each section's rows of the daily log, audit log and tasks — the
+stores run one query per section and merge them, because the rules answer a
+list query only when it names its section. An NSSS officer who is posted to an
+inland office **and** works in another section is no longer confined to the
+Border Scan Log, but their NSSS figures are still filed against, and read for,
+that post (`readableAtPost`, `filedAtOwnPost` in `firestore.rules`); their
+other sections' records carry no post. Tasks keep the section they were
+assigned under — a snapshot, not re-pointed when someone's sections change.
 
 The rules live in `lib/rules/signup.ts` and are exercised by
 `tests/signup.test.ts`.

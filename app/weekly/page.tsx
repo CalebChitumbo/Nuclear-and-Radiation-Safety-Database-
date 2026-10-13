@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { canEditSection, useAuth } from "@/lib/auth";
-import { dailyEntryScope, seesRegister } from "@/lib/rules/access";
+import { dailyEntryScopes, seesRegister } from "@/lib/rules/access";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { downloadTextFile } from "@/components/downloadFile";
@@ -177,7 +177,9 @@ export default function WeeklyPage() {
   // only Licensing and the Inspectorate read; the other sections' rows never
   // need it. The daily log is read as narrowly as the account is entitled to.
   const register = seesRegister(user);
-  const entryScope = dailyEntryScope(user);
+  const entryScope = dailyEntryScopes(user);
+  // A fresh array each render; the effect keys on what it says.
+  const scopeKey = JSON.stringify(entryScope ?? null);
 
   const { data, error, reload } = useStoreData(
     async (s) => {
@@ -222,7 +224,7 @@ export default function WeeklyPage() {
     };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [register, entryScope?.section, entryScope?.border],
+    [register, scopeKey],
   );
 
   const derived = useMemo(() => {

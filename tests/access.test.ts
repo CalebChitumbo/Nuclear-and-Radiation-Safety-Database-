@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ROUTES,
   canOpen,
-  dailyEntryScope,
+  dailyEntryScopes,
   homeFor,
   isPostedOfficer,
   mobileTabsFor,
@@ -25,6 +25,18 @@ const inspector: Viewer = { role: "officer", section: "Inspectorate" };
 const nsssDesk: Viewer = { role: "officer", section: NSSS };
 const nakonde: Viewer = { role: "officer", section: NSSS, border: "Nakonde" };
 const nsi: Viewer = { role: "officer", section: "National Source Inventory" };
+// Accounts an administrator has placed in more than one section.
+const licensingInsp: Viewer = {
+  role: "officer",
+  section: "Authorisation & Standards",
+  extraSections: ["Inspectorate"],
+};
+const nakondeLicensing: Viewer = {
+  role: "officer",
+  section: NSSS,
+  border: "Nakonde",
+  extraSections: ["Authorisation & Standards"],
+};
 
 /** Every path the table knows, so a matrix can say who opens what. */
 const every = ROUTES.map((r) => r.href);
@@ -43,8 +55,9 @@ describe("workspaceFor", () => {
     expect(workspaceFor(licensing)).toEqual({
       kind: "section",
       section: "Authorisation & Standards",
+      sections: ["Authorisation & Standards"],
     });
-    expect(workspaceFor(nsssDesk)).toEqual({ kind: "section", section: NSSS });
+    expect(workspaceFor(nsssDesk)).toEqual({ kind: "section", section: NSSS, sections: [NSSS] });
   });
 
   it("puts an NSSS officer with a posting at their post", () => {
@@ -60,7 +73,7 @@ describe("workspaceFor", () => {
 
   it("ignores a posting on a section that has none", () => {
     const odd: Viewer = { role: "officer", section: "Inspectorate", border: "Nakonde" };
-    expect(workspaceFor(odd)).toEqual({ kind: "section", section: "Inspectorate" });
+    expect(workspaceFor(odd)).toEqual({ kind: "section", section: "Inspectorate", sections: ["Inspectorate"] });
   });
 
   it("has nothing for a signed-out visitor", () => {
@@ -90,11 +103,70 @@ describe("seesRegister", () => {
   });
 });
 
-describe("dailyEntryScope", () => {
+describe("dailyEntryScopes", () => {
   it("reads the whole log for the department, a section's for a section, a post's for a post", () => {
-    expect(dailyEntryScope(admin)).toBeUndefined();
-    expect(dailyEntryScope(nsi)).toEqual({ section: "National Source Inventory" });
-    expect(dailyEntryScope(nakonde)).toEqual({ section: NSSS, border: "Nakonde" });
+    expect(dailyEntryScopes(admin)).toBeUndefined();
+    expect(dailyEntryScopes(nsi)).toEqual([{ section: "National Source Inventory" }]);
+    expect(dailyEntryScopes(nakonde)).toEqual([{ section: NSSS, border: "Nakonde" }]);
+  });
+
+  it("gives an account in several sections one scope each, keeping the post on NSSS's", () => {
+    expect(dailyEntryScopes(licensingInsp)).toEqual([
+      { section: "Authorisation & Standards" },
+      { section: "Inspectorate" },
+    ]);
+    expect(dailyEntryScopes(nakondeLicensing)).toEqual([
+      { section: NSSS, border: "Nakonde" },
+      { section: "Authorisation & Standards" },
+    ]);
+  });
+});
+
+describe("an account in more than one section", () => {
+  it("works from a section workspace holding all of them, main section first", () => {
+    expect(workspaceFor(licensingInsp)).toEqual({
+      kind: "section",
+      section: "Authorisation & Standards",
+      sections: ["Authorisation & Standards", "Inspectorate"],
+    });
+    expect(sectionsFor(licensingInsp)).toEqual(["Authorisation & Standards", "Inspectorate"]);
+  });
+
+  it("opens the union of the sections' screens and nothing of the others", () => {
+    const union = new Set([...opens(licensing), ...opens(inspector)]);
+    expect(opens(licensingInsp).sort()).toEqual([...union].sort());
+    expect(canOpen(licensingInsp, "/nsss")).toBe(false);
+    expect(canOpen(licensingInsp, "/source-inventory")).toBe(false);
+    expect(canOpen(licensingInsp, "/admin/users")).toBe(false);
+    expect(seesRegister(licensingInsp)).toBe(true);
+    expect(seesRegister({ role: "officer", section: NSSS, extraSections: ["Inspectorate"] })).toBe(true);
+  });
+
+  it("lands on the main section's front door", () => {
+    expect(homeFor(licensingInsp)).toBe("/");
+    expect(homeFor({ role: "officer", section: "Inspectorate", extraSections: ["National Source Inventory"] })).toBe("/inspectorate");
+  });
+
+  it("is not confined to the scan log by a post when it works elsewhere too", () => {
+    expect(isPostedOfficer(nakondeLicensing)).toBe(false);
+    expect(canOpen(nakondeLicensing, "/facilities")).toBe(true);
+    expect(canOpen(nakondeLicensing, "/border")).toBe(true);
+    expect(canOpen(nakondeLicensing, "/inspectorate")).toBe(false);
+    expect(mobileTabsFor(nakondeLicensing).length).toBeGreaterThan(0);
+  });
+
+  it("ignores a repeat of the main section and names that are not sections", () => {
+    const odd = {
+      role: "officer",
+      section: "Inspectorate",
+      extraSections: ["Inspectorate", "Finance"],
+    } as unknown as Viewer;
+    expect(sectionsFor(odd)).toEqual(["Inspectorate"]);
+  });
+
+  it("gives a plain one-section account exactly what it had", () => {
+    expect(sectionsFor(licensing)).toEqual(["Authorisation & Standards"]);
+    expect(sectionsFor({ ...licensing!, extraSections: [] })).toEqual(["Authorisation & Standards"]);
   });
 });
 

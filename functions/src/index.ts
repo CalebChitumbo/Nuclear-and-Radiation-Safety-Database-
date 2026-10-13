@@ -231,6 +231,24 @@ export const setUserClaims = onCall(async (request) => {
   return { uid: userRecord.uid };
 });
 
+const SECTION_NAMES = [
+  "Authorisation & Standards",
+  "Inspectorate",
+  "Nuclear Safety, Security & Safeguards",
+  "National Source Inventory",
+];
+
+/**
+ * The further sections an account works in, cleaned the way the app cleans
+ * them (normaliseExtraSections in lib/rules/signup.ts): real section names
+ * only, never the primary one, no repeats - and none for "All". They become the
+ * `extra` claim the security rules read.
+ */
+function cleanExtraSections(primary: string | undefined, extra: unknown): string[] {
+  if (!primary || primary === "All" || !Array.isArray(extra)) return [];
+  return SECTION_NAMES.filter((s) => s !== primary && extra.includes(s));
+}
+
 /**
  * Mirror an account document onto the Auth user's custom claims — and, just as
  * importantly, refuse to when it should hold none.
@@ -252,6 +270,7 @@ export const onUserDocWrite = onDocumentWritten(
           displayName?: string;
           role?: string;
           section?: string;
+          extraSections?: string[];
           border?: string;
           pending?: boolean;
           disabled?: boolean;
@@ -264,6 +283,7 @@ export const onUserDocWrite = onDocumentWritten(
     // can say who may give work to whom. Mirrored on every write; written
     // whole so a cleared field is cleared there too.
     const directory = getFirestore().doc(`directory/${uid}`);
+    const extra = cleanExtraSections(after?.section, after?.extraSections);
     try {
       if (!after) {
         // The user doc was deleted: revoke the mirrored claims so the Auth
@@ -276,6 +296,7 @@ export const onUserDocWrite = onDocumentWritten(
         uid,
         displayName: after.displayName || "",
         section: after.section || "",
+        ...(extra.length ? { extraSections: extra } : {}),
         ...(after.border ? { border: after.border } : {}),
         ...(after.grade ? { grade: after.grade } : {}),
         ...(after.reportsTo ? { reportsTo: after.reportsTo } : {}),
@@ -290,6 +311,7 @@ export const onUserDocWrite = onDocumentWritten(
         await getAuth().setCustomUserClaims(uid, {
           role: after.role || "officer",
           section: after.section || "",
+          ...(extra.length ? { extra } : {}),
           ...(after.border ? { border: after.border } : {}),
         });
       }

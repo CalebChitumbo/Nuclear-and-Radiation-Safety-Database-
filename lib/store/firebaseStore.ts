@@ -452,6 +452,7 @@ class FirebaseStore implements DataStore {
     decision: {
       role: UserDoc["role"];
       section: UserDoc["section"];
+      extraSections?: readonly string[];
       border?: string;
       grade?: UserDoc["grade"];
       reportsTo?: string;
@@ -503,18 +504,32 @@ class FirebaseStore implements DataStore {
     return snap.docs.map((d) => d.data() as WeekMetrics);
   }
 
-  async listDailyEntries(scope: DailyEntryScope = {}): Promise<DailyEntry[]> {
+  async listDailyEntries(
+    scope: DailyEntryScope | DailyEntryScope[] = {},
+  ): Promise<DailyEntry[]> {
     const db = requireDb();
     // Equality filters only, so no composite index is needed; the rules require
-    // exactly these clauses from a section or posted account.
-    const clauses = [
-      ...(scope.section ? [where("section", "==", scope.section)] : []),
-      ...(scope.border ? [where("border", "==", scope.border)] : []),
-    ];
-    const snap = await getDocs(query(collection(db, "dailyEntries"), ...clauses));
-    return snap.docs
-      .map((d) => ({ id: d.id, ...(d.data() as Omit<DailyEntry, "id">) }))
-      .sort((a, b) => b.date.localeCompare(a.date));
+    // exactly these clauses from a section or posted account. An account in
+    // several sections reads one query per section and the union is its log.
+    const scopes = Array.isArray(scope) ? scope : [scope];
+    const snaps = await Promise.all(
+      scopes.map((sc) =>
+        getDocs(
+          query(
+            collection(db, "dailyEntries"),
+            ...(sc.section ? [where("section", "==", sc.section)] : []),
+            ...(sc.border ? [where("border", "==", sc.border)] : []),
+          ),
+        ),
+      ),
+    );
+    const byId = new Map<string, DailyEntry>();
+    for (const snap of snaps) {
+      for (const d of snap.docs) {
+        byId.set(d.id, { id: d.id, ...(d.data() as Omit<DailyEntry, "id">) });
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => b.date.localeCompare(a.date));
   }
 
   async addDailyEntry(e: Omit<DailyEntry, "id">): Promise<DailyEntry> {
@@ -538,24 +553,35 @@ class FirebaseStore implements DataStore {
   }
 
   async listAuditLog(
-    scope: DailyEntryScope = {},
+    scope: DailyEntryScope | DailyEntryScope[] = {},
     max = AUDIT_LOG_LIMIT,
   ): Promise<AuditEntry[]> {
     const db = requireDb();
     // The log grows with every scan, so this is always a bounded, ordered read
     // - unlike the daily log, it can never be pulled down whole. The (section,
     // at desc) and (section, border, at desc) composite indexes are in
-    // firestore.indexes.json.
-    const snap = await getDocs(
-      query(
-        collection(db, "auditLog"),
-        ...(scope.section ? [where("section", "==", scope.section)] : []),
-        ...(scope.border ? [where("border", "==", scope.border)] : []),
-        orderBy("at", "desc"),
-        limit(max),
+    // firestore.indexes.json. An account in several sections reads each
+    // section's newest `max` and keeps the newest `max` of the union.
+    const scopes = Array.isArray(scope) ? scope : [scope];
+    const snaps = await Promise.all(
+      scopes.map((sc) =>
+        getDocs(
+          query(
+            collection(db, "auditLog"),
+            ...(sc.section ? [where("section", "==", sc.section)] : []),
+            ...(sc.border ? [where("border", "==", sc.border)] : []),
+            orderBy("at", "desc"),
+            limit(max),
+          ),
+        ),
       ),
     );
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, "id">) }));
+    return snaps
+      .flatMap((snap) =>
+        snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, "id">) })),
+      )
+      .sort((a, b) => b.at.localeCompare(a.at))
+      .slice(0, max);
   }
 
   async deleteDailyEntry(id: string): Promise<void> {
@@ -1409,9 +1435,9 @@ class FirebaseStore implements DataStore {
           query(col, where("assignedToUid", "==", scope.uid)),
           query(col, where("assignedByUid", "==", scope.uid)),
           query(col, where("watcherUids", "array-contains", scope.uid)),
-          ...(scope.section
-            ? [query(col, where("section", "==", scope.section))]
-            : []),
+          ...scope.sections.map((section) =>
+            query(col, where("section", "==", section)),
+          ),
         ];
     const snaps = await Promise.all(queries.map((q) => getDocs(q)));
     const byId = new Map<string, Task>();
