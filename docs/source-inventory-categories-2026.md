@@ -1,86 +1,130 @@
-# Source inventory — the reported equipment categories (September 2026)
-
-The Seniors' Monday Briefing on the inventory exercise asked for the inventory's
-equipment categories to be split further. This is that split: what was asked,
-what each category now holds in the two registers, and what the change exposed.
+# Source inventory — practice groups and equipment types (October 2026)
 
 Both inventory tabs — **Source Inventory** (the RAIS register, 1,752 items) and
-**Verified Source Inventory** (the 215 items confirmed in the field) — now
-report against **one list**, `SOURCE_CATEGORIES` in
-[`lib/rules/sourceCategories.ts`](../lib/rules/sourceCategories.ts). Before this
-they had a list each, in different words for the same machines, so the register
-and the field exercise could not be read line against line. They can now.
+**Verified Source Inventory** (the 215 items confirmed in the field) — report
+against **one two-level list**: fifteen practice groups, each holding the
+machine or source types beneath it (`SOURCE_GROUPS` in
+[`lib/rules/sourceCategories.ts`](../lib/rules/sourceCategories.ts)). This
+replaces the flat 25-category list the Seniors' Monday Briefing set in
+September 2026.
 
-## What the briefing asked for
+## Checked against the IAEA
 
-| # | Asked | Done as |
-| --- | --- | --- |
-| 1 | Fixed and digital X-ray split; a category for Conventional Fixed Digital Radiography | **Fixed X-Ray Machines** · **Conventional Fixed Digital Radiography** |
-| 2 | Dental split | **General Dental X-Ray** · **Dental CBCT** |
-| 3 | Radiotherapy split | **Brachytherapy** · **Teletherapy** |
-| 4 | Linear accelerators standalone, medical and industrial | **Linear Accelerators** |
-| 5 | CT split | **General CT** · **PET-CT** · **SPECT-CT** |
-| 6 | Fluoroscopy and angiography split | **Fluoroscopy** · **Angiography & Cath Lab** |
-| 7 | Security screening split | **Cargo Scanners** · **Baggage Scanners** · **Portal Monitors** |
-| 8 | XRF split | **Portable XRF** · **Fixed XRF** (· *XRF (Type Not Specified)* — see below) |
-| 9 | Sealed sources split by type of source | by **nuclide**, on both tabs |
-| 10 | Other specialised equipment | **Other Specialised Equipment** |
-| 11 | Say what "other specialised" covers | the equipment is **listed under the row** on both tabs |
+The IAEA publishes no single "list of source groups". What it does is divide
+radiation protection by **practice**, one safety guide per practice, and the
+fifteen groups follow that division:
 
-Categories nothing is registered under yet — Dental CBCT, SPECT-CT, Portal
-Monitors — still exist. They are the vocabulary officers file against, not a
-summary of what is on the books today, so the pages name them under the
-breakdown ("Nothing registered yet under …") rather than hiding them.
+| Group | IAEA guidance it lines up with |
+| --- | --- |
+| Radiotherapy · Nuclear Medicine · Interventional · Diagnostic · Dental | SSG-46, *Radiation Protection and Safety in Medical Uses of Ionizing Radiation* (2018) — diagnostic radiology (dentistry included) and image-guided interventional procedures, nuclear medicine, radiation therapy |
+| Veterinary | Safety Reports Series No. 104, *Radiation Protection and Safety in Veterinary Medicine* (2021) |
+| Blood Irradiators · Irradiation Facilities | SSG-8, *Radiation Safety of Gamma, Electron and X Ray Irradiation Facilities*; RS-G-1.9 lists blood/tissue irradiators beside the other irradiators |
+| Industrial Radiography | SSG-11, *Radiation Safety in Industrial Radiography* |
+| Nuclear Gauges | SSG-58, *Radiation Safety in the Use of Nuclear Gauges* (2020) — radioactive-source and X-ray gauges alike |
+| Well Logging | SSG-57, *Radiation Safety in Well Logging* (2020) — sources and neutron generators |
+| Security & Inspection | SSG-55, *X Ray Generators and Other Radiation Sources Used for Inspection Purposes and for Non-medical Human Imaging* (2020) |
+| Other / Consumer Products | SSG-36, *Radiation Safety for Consumer Products* (2016); static eliminators and lightning preventors are RS-G-1.9 practices |
 
-Unchanged, because the briefing did not ask and the registers use them:
-Mobile & Portable X-Ray, Mammography Systems, C-Arm Units, and
-Industrial X-Ray & Gauging (thickness gauges, industrial radiography and
-NDT fluoroscopy — what is left of the old *Industrial & Analytical X-Ray* once
-XRF became its own family).
+Where the list departs from the IAEA's own arrangement, on purpose:
 
-## What the categories hold
+- **Interventional is its own group.** SSG-46 treats it in one section with
+  diagnostic radiology. Splitting it out is fine for an inventory and keeps
+  cath labs and C-arms visible.
+- **Kilovoltage X-ray therapy was added** under Radiotherapy. The list as
+  handed over had no home for superficial/orthovoltage units, which SSG-46
+  counts as external-beam therapy. RAIS holds two (`Deep Xray treatment`);
+  they used to be filed as Teletherapy, which in the IAEA's usage means a
+  Co-60 head.
+- **Portal monitors were dropped.** They detect radiation; they are not
+  sources. Nothing was registered under the old category.
+- **This is not the IAEA source category 1–5** (RS-G-1.9). That ranks sealed
+  sources by hazard, and stays withheld from the tab, as before.
+
+## What the groups hold
 
 ### RAIS register — 963 radiation generators
 
-| Category | Count | RAIS `Type` entries folded into it |
+| Group | Total | Types (RAIS `Type` entries folded in) |
 | --- | ---: | --- |
-| Mobile & Portable X-Ray | 191 | Portable Xray radiography 86 · Digital Mobile X-ray 77 · Mobile X-Ray Machine 20 · Portable Conventional Xray generator 8 |
-| Fixed X-Ray Machines | 172 | Fixed Xray radiography 138 · Conventional Xray generator 34 |
-| Type Not Recorded | 109 | *(blank)* |
-| Conventional Fixed Digital Radiography | 108 | Digital radiography DR x-ray 108 |
-| Fixed XRF | 23 | XRF 23 — determined from the model, see below |
-| Portable XRF | 18 | XRF 18 — determined from the model, see below |
-| XRF (Type Not Specified) | 23 | XRF 23 |
-| General Dental X-Ray | 53 | Conventional dental 27 · Panoramic 15 · Portable Dental 9 · Cephalometric 2 |
-| C-Arm Units | 52 | C-arm Xray generator 40 · Digital C-arm X-ray 12 |
-| General CT | 50 | CT scanner 50 |
-| Baggage Scanners | 36 | Baggage Scanner 36 |
-| Fluoroscopy | 33 | Fluoroscopic Xray generator 20 · Digital Fluoroscopy X-ray 13 |
-| Industrial X-Ray & Gauging | 29 | Xray thickness gauge 16 · Industrial Xray fluoroscopy 13 |
-| Mammography Systems | 26 | Mammography generator 13 · Digital Mammography 13 |
-| Other Specialised Equipment | 13 | Calibration Xray generator 10 · Bone densitometer 1 · Cyclotron 1 · Other type of particle radiation generators 1 |
-| Cargo Scanners | 10 | Cargo Scanner 10 |
-| Linear Accelerators | 6 | Linear accelerator 6 |
-| Angiography & Cath Lab | 5 | Angiography generator 3 · Cathlab 2 |
-| Brachytherapy | 2 | Brachytherapy Afterloader 2 |
-| Teletherapy | 2 | Deep Xray treatment 2 |
-| PET-CT | 2 | PET-CT 2 |
+| Radiotherapy | 10 | Linear Accelerators 6 · Kilovoltage X-Ray Therapy 2 (`Deep Xray treatment`) · HDR/MDR Brachytherapy 2 (`Brachytherapy Afterloader`) |
+| Nuclear Medicine | 3 | PET-CT 2 · Cyclotron 1 |
+| Interventional Radiology & Cardiology | 57 | Mobile C-Arm Units 52 (`C-arm Xray generator` 40 · `Digital C-arm X-ray` 12) · Angiography & Cath Lab 5 (`Angiography generator` 3 · `Cathlab` 2) |
+| Diagnostic Radiology | 581 | Fixed Radiography (CR/DR) 280 (`Fixed Xray radiography` 138 · `Digital radiography DR x-ray` 108 · `Conventional Xray generator` 34) · Mobile Radiography 191 · General CT 50 · Fluoroscopy (Fixed R/F Rooms) 33 · Mammography 26 · Bone Densitometry (DXA) 1 |
+| Dental Radiology | 53 | Intraoral Dental 27 (`Conventional dental`) · Panoramic & Cephalometric 17 · Handheld Dental X-Ray 9 (`Portable Dental X Ray`) |
+| Industrial Radiography | 13 | Industrial X-Ray Radiography 13 (`Industrial Xray fluoroscopy`) |
+| Nuclear Gauges | 16 | Fixed Gauges 16 (`Xray thickness gauge`) |
+| Security & Inspection | 46 | Baggage Scanners 36 · Cargo & Vehicle Scanners 10 |
+| Analytical Instruments | 64 | Fixed XRF 23 · Portable XRF 18 · *XRF (Type Not Specified)* 23 |
+| Research, Education & Calibration | 11 | Calibration X-Ray Generators 10 · Research Accelerators 1 (`Other type of particle radiation generators`) |
+| *Not Classified* | 109 | *Type Not Recorded* 109 |
 
-The register's **789 sealed sources** keep their own axes — by nuclide (Cs-137
-618, Am-241 23, Co-60 14, …) and by IAEA category — which is the type-of-source
-split the briefing asked for at item 9.
+Empty today: Veterinary, Blood Irradiators, Irradiation Facilities, Well
+Logging, Other / Consumer Products — named under the breakdown on the tab.
+
+### RAIS register — 789 sealed sources, by what they are used for
+
+RAIS does not record what a sealed source is used for, so
+[`lib/rules/sourcePractice.ts`](../lib/rules/sourcePractice.ts) reads it, in
+this order, and says which it was (the CSV's *Practice Basis* column):
+
+1. **The record** (477): a maker or model only one kind of device uses —
+   Troxler, Humboldt, Instrotek, CPN and their 3430/3440/5001 models are
+   portable moisture/density gauges; Process Automation NDG, Endress+Hauser,
+   Berthold, VEGA, Thermo Ramsey/Electron, Krones and Jasch are fixed gauges;
+   Elekta Flexitron is an afterloader; Ni-63 is an electron capture detector;
+   Ir-192 outside a hospital is a radiography camera; Kr-85 is a basis-weight
+   gauge.
+2. **The holder** (290), the section's rule of thumb of October 2026: a gauge
+   source at a **construction or roads** company is a portable gauge, one at a
+   **mine or process plant** is a fixed gauge; a wireline company's source is a
+   logging source; a hospital's check sources are reference sources and an
+   Ir-192 there is brachytherapy. It only fires for a nuclide a gauge uses (or
+   none recorded), so ZCCM's Ra-226, U-238 and Ac-225 are not made into gauges.
+3. **Neither** (22): a worklist, *Sealed Source (Use Not Determined)*.
+
+| Type | Sources | of which placed by the holder |
+| --- | ---: | ---: |
+| Fixed Gauges | 670 | 275 |
+| Portable Gauges | 79 | 4 |
+| Gamma Radiography | 5 | — |
+| Well Logging Sources | 5 | 5 |
+| Calibration & Reference Sources | 4 | 4 |
+| HDR/MDR Brachytherapy | 3 | 2 |
+| Electron Capture Detectors | 1 | — |
+| *Sealed Source (Use Not Determined)* | 22 | |
+
+**ZCCM is most of the holder figure.** ZCCM Investment Holdings holds 233
+sources with no maker or model, and the facilities register lists it under
+*radioactive waste storage*: it is the store of disused sources from the old
+mines. Read by the mine rule they are fixed gauges, which is what they were in
+service; whether they should count while disused is the section's call.
+
+**The 22 left over:** ZCCM's Ra-226 ×3, U-238 ×2 and Ac-225; six with no
+holder recorded (Thermo Pu-238 ×2, Cs-137 ×2, two Cf-252); NISIR's Co-60
+(CEA-ORIS); the RPA Clinic, Proctor Engineering and ZRA Nakonde rows with
+nothing recorded; and **six that look like X-ray instruments entered on the
+source register** — an Olympus Vanta and a Spectro Xepos at Mimbula, a Malvern
+Panalytical at Mopani, a Fujifilm GXR-V32 at Express Diagnostic, a RAY Co. unit
+at Smile Dental and an Astrophysics scanner at ZRA Nakonde. Those belong on the
+generator register and should be corrected there.
+
+The sources also keep their nuclide breakdown (Cs-137 618, Am-241 23, Co-60
+14, …).
 
 ### Field verification annex — 215 items
 
-Fixed X-Ray Machines 51 · General Dental X-Ray 46 · Mobile & Portable X-Ray 32 ·
-C-Arm Units 28 · General CT 21 · Sealed Sources 14 · Mammography Systems 12 ·
-Fluoroscopy 4 · Industrial X-Ray & Gauging 2 · Other Specialised Equipment 2 ·
-Conventional Fixed Digital Radiography 1 · Baggage Scanners 1 ·
-XRF (Type Not Specified) 1.
+Diagnostic Radiology 121 (Fixed Radiography 52 · Mobile Radiography 32 ·
+General CT 21 · Mammography 12 · Fluoroscopy 4) · Dental Radiology 46
+(Intraoral 30 · Handheld 10 · Panoramic & Cephalometric 6) · Interventional 28
+(Mobile C-Arm 27 · Angiography & Cath Lab 1) · Nuclear Gauges 2 (Fixed) ·
+Security & Inspection 1 (Baggage) · Analytical 1 (*XRF unspecified*) ·
+Research, Education & Calibration 13 (Calibration & Reference Sources) ·
+Nuclear Medicine 1 (Radionuclide Therapy) · *Not Classified* 2
+(*Unrecognised Type*: `Dexter`, `X-ray Tube`).
 
-Its 14 sealed sources now break down by type of source as well: Co-57 5 ·
-Cs-137 4 · Co-60 2 · Ba-133 1 · I-129 1 · I-131 1. *Other Specialised* holds a
-`Dexter` and an `X-ray Tube` — both as the annex wrote them.
+Its 14 sealed sources are all at UTH Nuclear Medicine, so the holder rule reads
+them as the department's check sources (Co-57 5 · Cs-137 4 · Co-60 2 · Ba-133 1
+· I-129 1) and one I-131 therapy source.
 
 ## The XRF split, and the one worklist left
 
@@ -147,30 +191,35 @@ number rather than RAN, so it has no determination table of its own.
 generator whose type RAIS never captured at all. Both buckets are shown muted
 and counted on the register-gaps panel.
 
+
 ## Judgement calls worth knowing
 
-- **"Deep Xray treatment" → Teletherapy.** Orthovoltage external-beam treatment.
-  The two rows are RAIS' own wording and are not corrected.
-- **The XRF forms are determined, not guessed at random, and never overwrite.**
-  See the section above: model first, manufacturer only where that maker's whole
-  XRF line is one form, and the record's own words always win.
-- **A cyclotron is not a linac.** Item 4 made linear accelerators standalone; a
-  cyclotron and RAIS' "Other type of particle radiation generators" are named
-  under *Other Specialised Equipment* rather than counted as radiotherapy, which
-  is where they sat before.
-- **A C-arm is a C-arm wherever it stands.** The annex's `C-arm (Cath Lab)` is a
-  C-arm, not an angiography suite; RAIS' `Cathlab` and `Angiography generator`
-  are.
-- **Industrial fluoroscopy is NDT kit**, not a fluoroscopy suite, so it is
-  claimed by Industrial X-Ray & Gauging before the fluoroscopy test.
-- **Nuclear gauges moved.** The annex's two `Industrial Nuclear Gauge` rows were
-  under the old *Other Specialized / Gauge Equipment*; they are now
-  Industrial X-Ray & Gauging, which is why *Other Specialised* on that tab
-  reads 2 rather than 6.
+- **Fixed conventional and fixed digital are one type again** — *Fixed
+  Radiography (CR/DR)*, as the October list has it. The September briefing had
+  split them (172 + 108); the CSV keeps RAIS' own `Type` text, so the split can
+  still be read off it.
+- **A C-arm in a cath lab is the lab's fixed C-arm** (Angiography & Cath Lab);
+  every other C-arm is a mobile unit.
+- **"Portable dental" is read as handheld dental.** RAIS' `Portable Dental X
+  Ray` (9) and the annex's portable/mobile dental rows. If some are wheeled
+  units rather than hand-held, they belong under Intraoral.
+- **A bare "Dental X-ray" is intraoral** — the commonest set; a bare `OPD` or
+  `DPG` is a misspelt OPG, but `Dental X-ray (OPD)` is an out-patient
+  department's dental set.
+- **An unqualified nuclear gauge is fixed** unless the entry says portable,
+  moisture or Troxler. The annex's two `Industrial Nuclear Gauge` rows are
+  filed Fixed.
+- **X-ray thickness gauges are nuclear gauges** (SSG-58 covers X-ray gauges),
+  and **industrial fluoroscopy is industrial X-ray radiography** (NDT).
+- **RAIS' "Other type of particle radiation generators" is a research
+  accelerator** — the only group that fits a non-medical particle machine.
+- **A cyclotron is nuclear medicine** (PET radiopharmaceutical production).
+- **The annex's `Dexter` is not guessed.** It may be a DEXA scanner; until an
+  officer corrects the row it sits in *Unrecognised Type*.
 
 ## Changing the categories again
 
-1. Edit `SOURCE_CATEGORIES` and `sourceCategory` in
+1. Edit `SOURCE_GROUPS` and `sourceCategory` in
    `lib/rules/sourceCategories.ts` — one list and one classifier serve both
    tabs, the CSV exports and the filter dropdowns.
    **Order is the logic**: a specific machine must be tested before the generic

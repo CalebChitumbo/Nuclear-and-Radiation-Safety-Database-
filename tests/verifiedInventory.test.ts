@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SOURCE_CATEGORIES,
   categorizeEquipment,
+  categoryOf,
   sealedSourceNuclide,
   isSerialProvided,
   loadVerifiedInventory,
@@ -61,19 +62,24 @@ describe("summary figures reconcile to the detail rows", () => {
         .map((c) => [c.category, c.count]),
     );
     expect(counts).toEqual({
-      "Fixed X-Ray Machines": 51,
-      "Conventional Fixed Digital Radiography": 1,
-      "Mobile & Portable X-Ray": 32,
-      "General Dental X-Ray": 46,
-      "Mammography Systems": 12,
-      "C-Arm Units": 28,
-      Fluoroscopy: 4,
+      "Angiography & Cath Lab": 1,
+      "Mobile C-Arm Units": 27,
       "General CT": 21,
+      "Fluoroscopy (Fixed R/F Rooms)": 4,
+      "Fixed Radiography (CR/DR)": 52,
+      "Mobile Radiography": 32,
+      Mammography: 12,
+      "Intraoral Dental": 30,
+      "Panoramic & Cephalometric": 6,
+      "Handheld Dental X-Ray": 10,
+      "Fixed Gauges": 2,
       "Baggage Scanners": 1,
       "XRF (Type Not Specified)": 1,
-      "Industrial X-Ray & Gauging": 2,
-      "Other Specialised Equipment": 2,
-      "Sealed Sources": 14,
+      // The 14 sources are all at UTH Nuclear Medicine: check sources, and
+      // one I-131 therapy source.
+      "Calibration & Reference Sources": 13,
+      "Radionuclide Therapy": 1,
+      "Unrecognised Type": 2,
     });
   });
 
@@ -91,8 +97,8 @@ describe("summary figures reconcile to the detail rows", () => {
     );
   });
 
-  it("spells out the equipment under Other Specialised", () => {
-    expect(SUMMARY.otherSpecialised).toEqual([
+  it("spells out what the annex wrote that the list does not recognise", () => {
+    expect(SUMMARY.unrecognised).toEqual([
       { type: "Dexter", count: 1 },
       { type: "X-ray Tube", count: 1 },
     ]);
@@ -120,36 +126,49 @@ describe("summary figures reconcile to the detail rows", () => {
 
 describe("categorizeEquipment", () => {
   it("keeps sealed sources and gauges out of the X-ray families", () => {
-    expect(categorizeEquipment("Source: Cs-137")).toBe("Sealed Sources");
-    expect(categorizeEquipment("Source: Co-60")).toBe("Sealed Sources");
+    expect(categorizeEquipment("Source: Cs-137")).toBe(
+      "Sealed Source (Use Not Determined)",
+    );
+    expect(
+      categoryOf({
+        no: 1,
+        facility: "University Teaching Hospital - Nuclear Medicine",
+        equipmentType: "Source: Co-57",
+        serialNumber: "",
+        status: "Active",
+      }),
+    ).toBe("Calibration & Reference Sources");
     expect(categorizeEquipment("Industrial Nuclear Gauge")).toBe(
-      "Industrial X-Ray & Gauging",
+      "Fixed Gauges",
     );
     expect(categorizeEquipment("XRF-3000")).toBe("XRF (Type Not Specified)");
     expect(categorizeEquipment("X-Ray Baggage Scan")).toBe("Baggage Scanners");
   });
 
   it("recognises the imaging families across spelling variants", () => {
-    expect(categorizeEquipment("Fixed X-ray")).toBe("Fixed X-Ray Machines");
-    expect(categorizeEquipment("Fixed Xray")).toBe("Fixed X-Ray Machines");
+    expect(categorizeEquipment("Fixed X-ray")).toBe("Fixed Radiography (CR/DR)");
+    expect(categorizeEquipment("Fixed Xray")).toBe("Fixed Radiography (CR/DR)");
     expect(categorizeEquipment("Fixed Digital X-Ray")).toBe(
-      "Conventional Fixed Digital Radiography",
+      "Fixed Radiography (CR/DR)",
     );
     expect(categorizeEquipment("CT-Scanner")).toBe("General CT");
     expect(categorizeEquipment("CT Scanner")).toBe("General CT");
-    expect(categorizeEquipment("C-arm (Mini)")).toBe("C-Arm Units");
-    // The annex's one cath-lab entry is a C-arm installed in a cath lab.
-    expect(categorizeEquipment("C-arm (Cath Lab)")).toBe("C-Arm Units");
-    expect(categorizeEquipment("Mammograph")).toBe("Mammography Systems");
-    expect(categorizeEquipment("Fluoroscopy")).toBe("Fluoroscopy");
-    expect(categorizeEquipment("OPG")).toBe("General Dental X-Ray");
+    expect(categorizeEquipment("C-arm (Mini)")).toBe("Mobile C-Arm Units");
+    // The annex's one cath-lab entry is the fixed C-arm of a cath lab.
+    expect(categorizeEquipment("C-arm (Cath Lab)")).toBe(
+      "Angiography & Cath Lab",
+    );
+    expect(categorizeEquipment("Mammograph")).toBe("Mammography");
+    expect(categorizeEquipment("Fluoroscopy")).toBe(
+      "Fluoroscopy (Fixed R/F Rooms)",
+    );
+    expect(categorizeEquipment("OPG")).toBe("Panoramic & Cephalometric");
+    expect(categorizeEquipment("Dental X-ray")).toBe("Intraoral Dental");
     expect(categorizeEquipment("Portable Dental X-ray")).toBe(
-      "General Dental X-Ray",
+      "Handheld Dental X-Ray",
     );
-    expect(categorizeEquipment("Mobile X-ray")).toBe("Mobile & Portable X-Ray");
-    expect(categorizeEquipment("Portable X-ray")).toBe(
-      "Mobile & Portable X-Ray",
-    );
+    expect(categorizeEquipment("Mobile X-ray")).toBe("Mobile Radiography");
+    expect(categorizeEquipment("Portable X-ray")).toBe("Mobile Radiography");
   });
 
   it("maps every equipment type in the annex to a declared category", () => {
@@ -198,7 +217,7 @@ describe("verifiedInventoryToCsv", () => {
     const csv = verifiedInventoryToCsv(INVENTORY);
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(
-      "No,Facility,Equipment Type,Category,Serial Number,Status,Status Group",
+      "No,Facility,Equipment Type,Practice Group,Category,Serial Number,Status,Status Group",
     );
     expect(lines.length).toBe(216); // header + 215 rows
   });
