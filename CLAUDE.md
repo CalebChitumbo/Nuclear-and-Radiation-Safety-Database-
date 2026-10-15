@@ -352,11 +352,14 @@ to say.
 ## Routine: the source inventory's equipment categories
 
 Both inventory tabs — Source Inventory (RAIS) and Verified Source Inventory
-(the field annex) — report against **one list**, `SOURCE_CATEGORIES` in
+(the field annex) — report against **one two-level list**, `SOURCE_GROUPS`
+(15 practice groups → types; `SOURCE_CATEGORIES` is the flat list of types) in
 `lib/rules/sourceCategories.ts`, folded from each register's free-form text by
-`sourceCategory`. The split follows the Seniors' Monday Briefing of Sep 2026;
-`docs/source-inventory-categories-2026.md` holds the memo, the mapping and the
-counts.
+`sourceCategory`. The groups follow the IAEA safety standards' division of
+practices (Oct 2026, replacing the Seniors' Briefing list of Sep 2026);
+`docs/source-inventory-categories-2026.md` holds the IAEA check, the mapping
+and the counts. Type names must stay unique across groups — `groupOf` reads a
+group off its type.
 
 1. Edit the list and the classifier in `lib/rules/sourceCategories.ts`. **Order
    is the logic** — nearly every entry contains a generic X-ray word, so each
@@ -367,6 +370,13 @@ counts.
    `tests/verifiedInventory.test.ts`.
 3. Update the tables in `docs/source-inventory-categories-2026.md` and the
    Source Inventory section of the README.
+
+**Watch out:** a sealed source's use (Fixed Gauges, Well Logging …) is read by
+`sourcePractice` (`lib/rules/sourcePractice.ts`) from its maker/model, then from
+its holder's name (construction/roads → portable gauge, mine/plant → fixed),
+using the holdings export — so it moves when a holder does. A new gauge maker
+or holder spelling goes in its regexes, with a case in
+`tests/sourcePractice.test.ts` and the pins in `tests/raisInventory.test.ts`.
 
 **Watch out:** nothing is stored per category — every figure is derived when the
 page is read — so a category change needs no re-seed and no migration, and the

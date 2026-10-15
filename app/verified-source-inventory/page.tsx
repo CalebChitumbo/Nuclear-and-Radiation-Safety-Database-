@@ -12,12 +12,16 @@ import {
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
-import { GAP_CATEGORIES } from "@/lib/rules/sourceCategories";
+import {
+  GAP_CATEGORIES,
+  SOURCE_GROUPS,
+  UNRECOGNISED_TYPE,
+  groupCounts,
+  groupOf,
+} from "@/lib/rules/sourceCategories";
 import { mergeVerifiedInventory } from "@/lib/rules/inventoryEdits";
 import {
-  SEALED_SOURCES,
-  SOURCE_CATEGORIES,
-  categorizeEquipment,
+  categoryOf,
   isSerialProvided,
   loadVerifiedInventory,
   verifiedInventoryToCsv,
@@ -80,7 +84,10 @@ const PAGE_SIZE = 50;
 
 export default function VerifiedSourceInventoryPage() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<"" | SourceCategory>("");
+  /** A category, or a whole practice group as `group:<name>`. */
+  const [category, setCategory] = useState<
+    "" | SourceCategory | `group:${string}`
+  >("");
   const [status, setStatus] = useState<"all" | StatusGroup>("all");
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -97,14 +104,16 @@ export default function VerifiedSourceInventoryPage() {
     [inventory],
   );
   const maxCategory = Math.max(1, ...summary.byCategory.map((c) => c.count));
-  // A category with nothing in it is still one the inventory reports against,
-  // so it is named under the breakdown rather than dropped from it.
-  const categoriesInUse = summary.byCategory.filter((c) => c.count > 0);
-  const emptyCategories = summary.byCategory
-    .filter((c) => c.count === 0 && !GAP_CATEGORIES.includes(c.category))
-    .map((c) => c.category);
-  // The briefing asked for the catch-all to say what it holds.
-  const otherSpecialised = summary.otherSpecialised
+  // The categories laid out under their practice groups. A group with nothing
+  // in it is still one the inventory reports against, so it is named under the
+  // breakdown rather than dropped from it.
+  const categoryGroups = groupCounts(summary.byCategory, (c) => c.category);
+  const groupsInUse = categoryGroups.filter((g) => g.total > 0);
+  const emptyGroups = categoryGroups
+    .filter((g) => g.total === 0 && g.sector !== "Not classified")
+    .map((g) => g.group);
+  // The gap bucket says what it holds.
+  const unrecognised = summary.unrecognised
     .map((t) => `${t.type} (${t.count})`)
     .join(" · ");
   const maxSourceType = Math.max(
@@ -132,7 +141,7 @@ export default function VerifiedSourceInventoryPage() {
     () =>
       inventory.map((r) => ({
         r,
-        category: categorizeEquipment(r.equipmentType),
+        category: categoryOf(r),
         group: statusGroup(r.status),
         hay: [r.facility, r.equipmentType, r.serialNumber, r.status]
           .map(norm)
@@ -145,7 +154,9 @@ export default function VerifiedSourceInventoryPage() {
     const q = norm(search);
     return indexed
       .filter(({ r, category: c, group, hay }) => {
-        if (category && c !== category) return false;
+        if (category.startsWith("group:")) {
+          if (groupOf(c) !== category.slice("group:".length)) return false;
+        } else if (category && c !== category) return false;
         if (status !== "all" && group !== status) return false;
         return !q || hay.includes(q);
       })
@@ -170,7 +181,7 @@ export default function VerifiedSourceInventoryPage() {
     setPage(0);
   };
 
-  const pickCategory = (c: SourceCategory) => {
+  const pickCategory = (c: SourceCategory | `group:${string}`) => {
     setCategory((prev) => (prev === c ? "" : c));
     setPage(0);
   };
@@ -243,59 +254,100 @@ export default function VerifiedSourceInventoryPage() {
       </section>
 
       <Panel
-        title="By equipment category"
-        note="Tap a category to filter the list below."
+        title="By practice and equipment type"
+        note="Grouped by practice, the way the IAEA safety standards divide the field. Tap a group or a type to filter the list below."
       >
-        <ul className="mt-1 space-y-1.5">
-          {categoriesInUse.map(({ category: c, count }) => {
-            const active = category === c;
+        <div className="mt-1 space-y-3">
+          {groupsInUse.map(({ group, sector, total, rows }) => {
+            const groupActive = category === `group:${group}`;
             return (
-              <li key={c}>
+              <div key={group}>
                 <button
                   type="button"
-                  onClick={() => pickCategory(c)}
-                  aria-pressed={active}
-                  className="w-full text-left rounded-lg px-2 py-1.5 transition-colors"
+                  onClick={() => pickCategory(`group:${group}`)}
+                  aria-pressed={groupActive}
+                  className="w-full text-left rounded-lg px-2 py-1 transition-colors flex items-baseline justify-between gap-3"
                   style={{
-                    background: active ? "rgba(0,160,80,0.10)" : "transparent",
+                    background: groupActive
+                      ? "rgba(0,160,80,0.10)"
+                      : "transparent",
                   }}
                 >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span
-                      className={`text-sm ${active ? "font-black" : "font-bold"}`}
-                    >
-                      {c}
+                  <span className="min-w-0">
+                    <span className="text-[11px] font-black uppercase tracking-wide text-[var(--rpa-green-dark)]">
+                      {group}
+                    </span>{" "}
+                    <span className="text-[10px] text-gunmetal/45">
+                      {sector}
                     </span>
-                    <span className="tabular font-black shrink-0">{count}</span>
-                  </div>
-                  {c === "Other Specialised Equipment" && otherSpecialised ? (
-                    <div className="text-[11px] leading-relaxed text-gunmetal/55">
-                      {otherSpecialised}
-                    </div>
-                  ) : null}
-                  <div
-                    className="mt-1 h-1.5 rounded-full overflow-hidden"
-                    style={{ background: "rgba(26,27,29,0.06)" }}
-                  >
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${(count / maxCategory) * 100}%`,
-                        background: active
-                          ? "var(--rpa-green-dark)"
-                          : "var(--rpa-green, #00A050)",
-                      }}
-                    />
-                  </div>
+                  </span>
+                  <span className="tabular font-black shrink-0">{total}</span>
                 </button>
-              </li>
+                <ul className="mt-1 space-y-1.5 pl-3 border-l-2 border-gunmetal/10">
+                  {rows
+                    .filter((r) => r.count > 0)
+                    .map(({ category: c, count }) => {
+                      const active = category === c;
+                      const muted = GAP_CATEGORIES.includes(c);
+                      return (
+                        <li key={c}>
+                          <button
+                            type="button"
+                            onClick={() => pickCategory(c)}
+                            aria-pressed={active}
+                            className="w-full text-left rounded-lg px-2 py-1.5 transition-colors"
+                            style={{
+                              background: active
+                                ? "rgba(0,160,80,0.10)"
+                                : "transparent",
+                            }}
+                          >
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span
+                                className={`text-sm ${active ? "font-black" : "font-bold"} ${
+                                  muted ? "text-gunmetal/55 italic" : ""
+                                }`}
+                              >
+                                {c}
+                              </span>
+                              <span className="tabular font-black shrink-0">
+                                {count}
+                              </span>
+                            </div>
+                            {c === UNRECOGNISED_TYPE && unrecognised ? (
+                              <div className="text-[11px] leading-relaxed text-gunmetal/55">
+                                {unrecognised}
+                              </div>
+                            ) : null}
+                            <div
+                              className="mt-1 h-1.5 rounded-full overflow-hidden"
+                              style={{ background: "rgba(26,27,29,0.06)" }}
+                            >
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${(count / maxCategory) * 100}%`,
+                                  background: muted
+                                    ? "rgba(26,27,29,0.25)"
+                                    : active
+                                      ? "var(--rpa-green-dark)"
+                                      : "var(--rpa-green, #00A050)",
+                                }}
+                              />
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
             );
           })}
-        </ul>
-        {emptyCategories.length > 0 ? (
+        </div>
+        {emptyGroups.length > 0 ? (
           <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
             Nothing confirmed in this exercise under{" "}
-            {emptyCategories.join(" · ")}.
+            {emptyGroups.join(" · ")}.
           </p>
         ) : null}
       </Panel>
@@ -311,7 +363,7 @@ export default function VerifiedSourceInventoryPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCategory(SEALED_SOURCES);
+                    setCategory("");
                     setSearch(nuclide);
                     setPage(0);
                   }}
@@ -418,15 +470,22 @@ export default function VerifiedSourceInventoryPage() {
                 className="input"
                 value={category}
                 onChange={(e) => {
-                  setCategory(e.target.value as SourceCategory | "");
+                  setCategory(
+                    e.target.value as "" | SourceCategory | `group:${string}`,
+                  );
                   setPage(0);
                 }}
               >
                 <option value="">All categories</option>
-                {SOURCE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                {SOURCE_GROUPS.map((g) => (
+                  <optgroup key={g.group} label={g.group}>
+                    <option value={`group:${g.group}`}>All {g.group}</option>
+                    {g.categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -597,7 +656,7 @@ const SourceRow = memo(function SourceRow({
       <td>
         <div>{r.equipmentType}</div>
         <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-          {categorizeEquipment(r.equipmentType)}
+          {categoryOf(r)}
         </div>
       </td>
       <td className={`tabular ${provided ? "" : "text-gunmetal/45 italic"}`}>
@@ -642,7 +701,7 @@ const SourceCard = memo(function SourceCard({
             {r.equipmentType}
             <span className="text-gunmetal/40">
               {" "}
-              · {categorizeEquipment(r.equipmentType)}
+              · {categoryOf(r)}
             </span>
           </div>
         </div>

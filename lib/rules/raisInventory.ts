@@ -1,15 +1,22 @@
 import { toCsv } from "./exportCsv";
 import {
   SEALED_SOURCES,
+  UNRECOGNISED_TYPE,
   SOURCE_CATEGORIES,
   TYPE_NOT_RECORDED,
   XRF_UNSPECIFIED,
+  groupOf,
   sourceCategory,
   typesInCategory,
   type SourceCategory,
 } from "./sourceCategories";
 import { XRF_FORM_BY_RAN } from "./xrfDeterminations";
 import { holderFor, type SourceHolderIndex } from "./sourceHolders";
+import {
+  sourcePractice,
+  type PracticeBasis,
+  type SourcePractice,
+} from "./sourcePractice";
 
 /**
  * The Source Inventory tab — the national register of radiation generators and
@@ -90,8 +97,7 @@ export interface RaisInventorySeed {
  * categories (`sourceCategories.ts`) less the sealed-source bucket, which no
  * generator can land in. RAIS records a free-form `Type` (33 spellings across
  * the export, plus 109 rows with none), and the shared classifier folds those
- * into the categories the Seniors' Briefing asked the inventory to report
- * against, so this tab and the field-verified one now name a machine the same
+ * into the practice groups and types the inventory reports against, so this tab and the field-verified one now name a machine the same
  * way.
  */
 export const GENERATOR_FAMILIES = SOURCE_CATEGORIES.filter(
@@ -126,6 +132,24 @@ export function generatorFamilyOf(record: RaisRecord): GeneratorFamily {
   const family = sourceCategory(record.type);
   if (family !== XRF_UNSPECIFIED) return family;
   return XRF_FORM_BY_RAN[record.ran.trim()] || family;
+}
+
+/**
+ * The practice type a whole record reports under, generators and sealed
+ * sources alike, with what the answer rests on. A generator is its family. A
+ * sealed source's use is not in RAIS at all: it is read from the record's maker
+ * and model, then from the facility the location export says holds it (see
+ * `sourcePractice`). Without the holder index only the record is read.
+ */
+export function practiceOf(
+  record: RaisRecord,
+  holders?: SourceHolderIndex,
+): SourcePractice {
+  if (record.kind === "Radiation Generator") {
+    return { category: generatorFamilyOf(record), basis: "record" };
+  }
+  const held = holders ? holderFor(holders, record.ran) : null;
+  return sourcePractice(record, held);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +275,8 @@ export interface RaisDataQuality {
    * is a row for an officer to resolve rather than a family of its own.
    */
   xrfTypeUnspecified: number;
+  /** Sealed sources neither the record nor the holder places under a use. */
+  sourceUseUndetermined: number;
   missingNuclide: number;
   missingActivity: number;
   uncategorisedSources: number;
@@ -267,24 +293,43 @@ export interface RaisSummary {
   distinctNuclides: number;
   byFamily: { family: GeneratorFamily; count: number }[];
   /**
-   * What the catch-all family actually holds, commonest first — the briefing
-   * asked for the equipment under "Other Specialised" to be spelled out rather
-   * than left to the label.
+   * What the *Unrecognised Type* gap actually holds, commonest first, so the
+   * equipment text the classifier could not place is spelled out rather than
+   * left to the label.
    */
-  otherSpecialised: { type: string; count: number }[];
+  unrecognised: { type: string; count: number }[];
   /**
    * How many of the Portable / Fixed XRF counts come from the Authority's
    * determination rather than from the register's own words, so the tab can
    * say so where it reports them.
    */
   xrfDetermined: { portable: number; fixed: number };
+  /**
+   * Sealed sources by the use they were placed under (only the uses that hold
+   * one), and what the placing rests on — the record's own maker or model, the
+   * holder, or neither. Without a holder index only the record is read.
+   */
+  bySourcePractice: { category: SourceCategory; count: number }[];
+  sourcePracticeBasis: Record<PracticeBasis, number>;
+  /** Per use, how many of its sources were placed by the holder rule. */
+  placedByHolder: { category: SourceCategory; count: number }[];
   byNuclide: { nuclide: string; count: number }[];
   byCategory: { category: SealedCategoryLabel; count: number }[];
   dataQuality: RaisDataQuality;
 }
 
 /** Roll the detail rows up into the figures shown on the page. */
-export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
+export function summarizeRaisInventory(
+  records: RaisRecord[],
+  holders?: SourceHolderIndex,
+): RaisSummary {
+  const sourcePracticeCounts = new Map<SourceCategory, number>();
+  const sourcePracticeBasis: Record<PracticeBasis, number> = {
+    record: 0,
+    holder: 0,
+    undetermined: 0,
+  };
+  const placedByHolder = new Map<SourceCategory, number>();
   const familyCounts = new Map<GeneratorFamily, number>(
     GENERATOR_FAMILIES.map((f) => [f, 0]),
   );
@@ -301,6 +346,7 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
     missingSerial: 0,
     missingType: 0,
     xrfTypeUnspecified: 0,
+    sourceUseUndetermined: 0,
     missingNuclide: 0,
     missingActivity: 0,
     uncategorisedSources: 0,
@@ -326,6 +372,19 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
     }
 
     sealedSources += 1;
+    const practice = practiceOf(r, holders);
+    sourcePracticeCounts.set(
+      practice.category,
+      (sourcePracticeCounts.get(practice.category) || 0) + 1,
+    );
+    sourcePracticeBasis[practice.basis] += 1;
+    if (practice.basis === "holder") {
+      placedByHolder.set(
+        practice.category,
+        (placedByHolder.get(practice.category) || 0) + 1,
+      );
+    }
+    if (practice.basis === "undetermined") quality.sourceUseUndetermined += 1;
     const nuclide = nuclideLabel(r);
     nuclideCounts.set(nuclide, (nuclideCounts.get(nuclide) || 0) + 1);
     if (nuclide === NUCLIDE_NOT_RECORDED) quality.missingNuclide += 1;
@@ -350,13 +409,22 @@ export function summarizeRaisInventory(records: RaisRecord[]): RaisSummary {
       family,
       count: familyCounts.get(family) || 0,
     })),
-    otherSpecialised: typesInCategory(
+    unrecognised: typesInCategory(
       records
         .filter((r) => r.kind === "Radiation Generator")
         .map((r) => r.type),
-      "Other Specialised Equipment",
+      UNRECOGNISED_TYPE,
     ),
     xrfDetermined: determined,
+    bySourcePractice: SOURCE_CATEGORIES.map((category) => ({
+      category,
+      count: sourcePracticeCounts.get(category) || 0,
+    })).filter((c) => c.count > 0),
+    sourcePracticeBasis,
+    placedByHolder: [...placedByHolder.entries()].map(([category, count]) => ({
+      category,
+      count,
+    })),
     // Commonest nuclide first; the not-recorded bucket always sits last so it
     // reads as a gap rather than as one more nuclide in the register.
     byNuclide: [...nuclideCounts.entries()]
@@ -415,7 +483,9 @@ export function raisInventoryToCsv(
     "RAN",
     "Kind",
     "Type",
+    "Practice Group",
     "Family",
+    "Practice Basis",
     "Manufacturer",
     "Model",
     "Serial Number",
@@ -439,12 +509,15 @@ export function raisInventoryToCsv(
   const rows = records.map((r) => {
     const source = r.kind === "Sealed Source";
     const h = holders ? holderFor(holders, r.ran) : null;
+    const practice = practiceOf(r, holders);
     return [
       String(r.no),
       r.ran,
       r.kind,
       r.type,
-      source ? "" : generatorFamilyOf(r),
+      groupOf(practice.category),
+      practice.category,
+      source ? practice.basis : "",
       r.manufacturer,
       r.model,
       r.serialNumber,

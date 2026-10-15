@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { groupCounts } from "../lib/rules/sourceCategories";
 import {
   GENERATOR_FAMILIES,
   NUCLIDE_NOT_RECORDED,
@@ -19,7 +20,12 @@ import {
   type RaisRecord,
 } from "../lib/rules/raisInventory";
 import { XRF_FORM_BY_RAN } from "../lib/rules/xrfDeterminations";
+import {
+  loadSourceHolders,
+  type SourceHoldersSeed,
+} from "../lib/rules/sourceHolders";
 import seed from "../seed/rais-source-inventory.seed.json";
+import holderSeed from "../seed/rais-source-holders.seed.json";
 
 /**
  * The Source Inventory tab is seeded from the two RAIS register exports. These
@@ -27,7 +33,8 @@ import seed from "../seed/rais-source-inventory.seed.json";
  * that every derived grouping still reconciles to the 1,752 detail rows.
  */
 const INVENTORY = loadRaisInventory(seed as RaisInventorySeed);
-const SUMMARY = summarizeRaisInventory(INVENTORY);
+const HOLDERS = loadSourceHolders(holderSeed as SourceHoldersSeed);
+const SUMMARY = summarizeRaisInventory(INVENTORY, HOLDERS);
 const META = (seed as RaisInventorySeed).meta;
 
 /** A minimal sealed source, so a case can set just the field under test. */
@@ -114,49 +121,90 @@ describe("summary figures reconcile to the detail rows", () => {
 
   it("breaks the generators down by family", () => {
     const counts = Object.fromEntries(
-      SUMMARY.byFamily.map((f) => [f.family, f.count]),
+      SUMMARY.byFamily
+        .filter((f) => f.count > 0)
+        .map((f) => [f.family, f.count]),
     );
     expect(counts).toEqual({
-      "Fixed X-Ray Machines": 172,
-      "Conventional Fixed Digital Radiography": 108,
-      "Mobile & Portable X-Ray": 191,
-      "General Dental X-Ray": 53,
-      "Dental CBCT": 0,
-      "Mammography Systems": 26,
-      "C-Arm Units": 52,
-      Fluoroscopy: 33,
-      "Angiography & Cath Lab": 5,
-      "General CT": 50,
-      "PET-CT": 2,
-      "SPECT-CT": 0,
-      Brachytherapy: 2,
-      Teletherapy: 2,
       "Linear Accelerators": 6,
-      "Cargo Scanners": 10,
+      "Kilovoltage X-Ray Therapy": 2,
+      "HDR/MDR Brachytherapy": 2,
+      "PET-CT": 2,
+      Cyclotron: 1,
+      "Angiography & Cath Lab": 5,
+      "Mobile C-Arm Units": 52,
+      "General CT": 50,
+      "Fluoroscopy (Fixed R/F Rooms)": 33,
+      "Fixed Radiography (CR/DR)": 280,
+      "Mobile Radiography": 191,
+      Mammography: 26,
+      "Bone Densitometry (DXA)": 1,
+      "Intraoral Dental": 27,
+      "Panoramic & Cephalometric": 17,
+      "Handheld Dental X-Ray": 9,
+      "Industrial X-Ray Radiography": 13,
+      "Fixed Gauges": 16,
+      "Cargo & Vehicle Scanners": 10,
       "Baggage Scanners": 36,
-      "Portal Monitors": 0,
       "Portable XRF": 18,
       "Fixed XRF": 23,
       "XRF (Type Not Specified)": 23,
-      "Industrial X-Ray & Gauging": 29,
-      "Other Specialised Equipment": 13,
+      "Research Accelerators": 1,
+      "Calibration X-Ray Generators": 10,
       "Type Not Recorded": 109,
     });
   });
 
-  it("spells out the equipment under Other Specialised", () => {
-    expect(SUMMARY.otherSpecialised).toEqual([
-      { type: "Calibration Xray generator", count: 10 },
-      { type: "Bone densitometer", count: 1 },
-      { type: "Cyclotron", count: 1 },
-      { type: "Other type of particle radiation generators", count: 1 },
-    ]);
-    expect(
-      SUMMARY.otherSpecialised.reduce((a, t) => a + t.count, 0),
-    ).toBe(
-      SUMMARY.byFamily.find((f) => f.family === "Other Specialised Equipment")
-        ?.count,
+  it("totals the generators by practice group", () => {
+    const groups = Object.fromEntries(
+      groupCounts(SUMMARY.byFamily, (f) => f.family)
+        .filter((g) => g.total > 0)
+        .map((g) => [g.group, g.total]),
     );
+    expect(groups).toEqual({
+      Radiotherapy: 10,
+      "Nuclear Medicine": 3,
+      "Interventional Radiology & Cardiology": 57,
+      "Diagnostic Radiology": 581,
+      "Dental Radiology": 53,
+      "Industrial Radiography": 13,
+      "Nuclear Gauges": 16,
+      "Security & Inspection": 46,
+      "Analytical Instruments": 64,
+      "Research, Education & Calibration": 11,
+      "Not Classified": 109,
+    });
+  });
+
+  it("places the sealed sources under a use, saying what each rests on", () => {
+    expect(
+      Object.fromEntries(
+        SUMMARY.bySourcePractice.map((p) => [p.category, p.count]),
+      ),
+    ).toEqual({
+      "HDR/MDR Brachytherapy": 3,
+      "Gamma Radiography": 5,
+      "Fixed Gauges": 670,
+      "Portable Gauges": 79,
+      "Well Logging Sources": 5,
+      "Electron Capture Detectors": 1,
+      "Calibration & Reference Sources": 4,
+      "Sealed Source (Use Not Determined)": 22,
+    });
+    // 477 from the record's own maker, model or nuclide; 290 from the holder
+    // (ZCCM's store of disused mine sources is most of it); 22 neither.
+    expect(SUMMARY.sourcePracticeBasis).toEqual({
+      record: 477,
+      holder: 290,
+      undetermined: 22,
+    });
+    expect(
+      SUMMARY.bySourcePractice.reduce((a, p) => a + p.count, 0),
+    ).toBe(SUMMARY.sealedSources);
+  });
+
+  it("leaves no generator text unrecognised", () => {
+    expect(SUMMARY.unrecognised).toEqual([]);
   });
 
   it("puts every source in exactly one IAEA category, totalling 789", () => {
@@ -200,6 +248,7 @@ describe("summary figures reconcile to the detail rows", () => {
       missingSerial: 110,
       missingType: 109,
       xrfTypeUnspecified: 23,
+      sourceUseUndetermined: 22,
       missingNuclide: 69,
       missingActivity: 345,
       uncategorisedSources: 591,
@@ -223,50 +272,61 @@ describe("summary figures reconcile to the detail rows", () => {
 describe("generatorFamily", () => {
   it("claims the treatment and screening machines before the X-ray words", () => {
     expect(generatorFamily("Linear accelerator")).toBe("Linear Accelerators");
-    expect(generatorFamily("Brachytherapy Afterloader")).toBe("Brachytherapy");
-    expect(generatorFamily("Deep Xray treatment")).toBe("Teletherapy");
-    // A cyclotron is neither a linac nor a treatment machine; it is named
-    // under Other Specialised rather than counted as radiotherapy.
-    expect(generatorFamily("Cyclotron")).toBe("Other Specialised Equipment");
+    expect(generatorFamily("Brachytherapy Afterloader")).toBe(
+      "HDR/MDR Brachytherapy",
+    );
+    // Orthovoltage external beam — kilovoltage therapy, not Co-60.
+    expect(generatorFamily("Deep Xray treatment")).toBe(
+      "Kilovoltage X-Ray Therapy",
+    );
+    // A cyclotron makes PET radiopharmaceuticals: nuclear medicine, not
+    // radiotherapy.
+    expect(generatorFamily("Cyclotron")).toBe("Cyclotron");
     expect(generatorFamily("Baggage Scanner")).toBe("Baggage Scanners");
-    expect(generatorFamily("Cargo Scanner")).toBe("Cargo Scanners");
+    expect(generatorFamily("Cargo Scanner")).toBe("Cargo & Vehicle Scanners");
   });
 
   it("reads the specific machine before the generic word it contains", () => {
-    // "Digital Mammography" would otherwise fall to digital radiography.
-    expect(generatorFamily("Digital Mammography")).toBe("Mammography Systems");
-    // "Digital Mobile X-ray" is mobile, not digital radiography.
-    expect(generatorFamily("Digital Mobile X-ray")).toBe(
-      "Mobile & Portable X-Ray",
+    // "Digital Mammography" would otherwise fall to fixed radiography.
+    expect(generatorFamily("Digital Mammography")).toBe("Mammography");
+    // "Digital Mobile X-ray" is mobile, not a fixed room.
+    expect(generatorFamily("Digital Mobile X-ray")).toBe("Mobile Radiography");
+    // "Portable Dental X Ray" is dental, not mobile radiography.
+    expect(generatorFamily("Portable Dental X Ray")).toBe(
+      "Handheld Dental X-Ray",
     );
-    // "Portable Dental X Ray" is dental, not portable radiography.
-    expect(generatorFamily("Portable Dental X Ray")).toBe("General Dental X-Ray");
     // "Digital C-arm X-ray" is a C-arm.
-    expect(generatorFamily("Digital C-arm X-ray")).toBe("C-Arm Units");
-    // Industrial fluoroscopy is NDT kit, not a fluoroscopy suite.
+    expect(generatorFamily("Digital C-arm X-ray")).toBe("Mobile C-Arm Units");
+    // Industrial fluoroscopy is NDT kit, not a fluoroscopy room.
     expect(generatorFamily("Industrial Xray fluoroscopy")).toBe(
-      "Industrial X-Ray & Gauging",
+      "Industrial X-Ray Radiography",
     );
-    expect(generatorFamily("Digital Fluoroscopy X-ray")).toBe("Fluoroscopy");
+    expect(generatorFamily("Digital Fluoroscopy X-ray")).toBe(
+      "Fluoroscopy (Fixed R/F Rooms)",
+    );
   });
 
   it("recognises the imaging families across the export's spellings", () => {
+    // Fixed rooms, conventional and digital (CR/DR) alike.
     expect(generatorFamily("Fixed Xray radiography")).toBe(
-      "Fixed X-Ray Machines",
+      "Fixed Radiography (CR/DR)",
     );
     expect(generatorFamily("Conventional Xray generator")).toBe(
-      "Fixed X-Ray Machines",
+      "Fixed Radiography (CR/DR)",
     );
     expect(generatorFamily("Digital radiography DR x-ray")).toBe(
-      "Conventional Fixed Digital Radiography",
+      "Fixed Radiography (CR/DR)",
     );
     expect(generatorFamily("CT scanner")).toBe("General CT");
     expect(generatorFamily("PET-CT")).toBe("PET-CT");
+    expect(generatorFamily("Conventional dental Xray generator")).toBe(
+      "Intraoral Dental",
+    );
     expect(generatorFamily("Panoramic dental X-ray generator")).toBe(
-      "General Dental X-Ray",
+      "Panoramic & Cephalometric",
     );
     expect(generatorFamily("Cephalometric dental Xray generator")).toBe(
-      "General Dental X-Ray",
+      "Panoramic & Cephalometric",
     );
     expect(generatorFamily("Cathlab")).toBe("Angiography & Cath Lab");
     expect(generatorFamily("Angiography generator")).toBe(
@@ -275,14 +335,16 @@ describe("generatorFamily", () => {
     // The register's XRF rows do not say portable or fixed, so they wait in
     // their own bucket rather than being guessed into one.
     expect(generatorFamily("XRF")).toBe("XRF (Type Not Specified)");
-    expect(generatorFamily("Xray thickness gauge")).toBe(
-      "Industrial X-Ray & Gauging",
-    );
+    // An X-ray thickness gauge is a nuclear gauge in the IAEA's sense (SSG-58).
+    expect(generatorFamily("Xray thickness gauge")).toBe("Fixed Gauges");
     expect(generatorFamily("Bone densitometer")).toBe(
-      "Other Specialised Equipment",
+      "Bone Densitometry (DXA)",
     );
     expect(generatorFamily("Calibration Xray generator")).toBe(
-      "Other Specialised Equipment",
+      "Calibration X-Ray Generators",
+    );
+    expect(generatorFamily("Other type of particle radiation generators")).toBe(
+      "Research Accelerators",
     );
   });
 
@@ -475,7 +537,7 @@ describe("raisInventoryToCsv", () => {
     const csv = raisInventoryToCsv(INVENTORY);
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(
-      "No,RAN,Kind,Type,Family,Manufacturer,Model,Serial Number,Nuclide," +
+      "No,RAN,Kind,Type,Practice Group,Family,Practice Basis,Manufacturer,Model,Serial Number,Nuclide," +
         "Activity,Activity Date,IAEA Category,Category Source," +
         "RAIS Calculated Category,Security Level,ISO 2919,Working Life," +
         "Located At,Facility Code,Department,District,Province," +
@@ -500,7 +562,7 @@ describe("raisInventoryToCsv", () => {
     const [, sourceLine, generatorLine] = csv.split("\r\n");
     expect(sourceLine).toContain("Cs-137");
     expect(sourceLine).toContain("Category 3");
-    expect(generatorLine).toContain("General CT");
+    expect(generatorLine).toContain("Diagnostic Radiology,General CT");
     // A generator has no nuclide or category to report.
     expect(generatorLine.split(",").filter((v) => v === "Cs-137")).toEqual([]);
   });

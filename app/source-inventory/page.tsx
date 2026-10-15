@@ -12,19 +12,27 @@ import {
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
 import { norm } from "@/lib/rules/matching";
-import { GAP_CATEGORIES } from "@/lib/rules/sourceCategories";
+import {
+  GAP_CATEGORIES,
+  SEALED_SOURCES,
+  SOURCE_CATEGORIES,
+  SOURCE_GROUPS,
+  UNRECOGNISED_TYPE,
+  groupCounts,
+  groupOf,
+  type SourceCategory,
+} from "@/lib/rules/sourceCategories";
 import { mergeRaisInventory } from "@/lib/rules/inventoryEdits";
 import {
-  GENERATOR_FAMILIES,
   IAEA_CATEGORIES,
   RAIS_KINDS,
   generatorFamilyOf,
+  practiceOf,
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
   raisInventoryToCsv,
   summarizeRaisInventory,
-  type GeneratorFamily,
   type RaisInventorySeed,
   type RaisKind,
   type RaisRecord,
@@ -138,9 +146,14 @@ const RAIS_FIELDS: readonly EditField[] = [
 /**
  * One select drives both breakdowns, because a generator family and a nuclide
  * are never both meaningful for the same row. The prefix says which axis the
- * value belongs to, so the filter stays a single piece of state.
+ * value belongs to, so the filter stays a single piece of state. A `group:` is
+ * a whole practice group of families (Diagnostic Radiology, Nuclear Gauges …).
  */
-type Grouping = "" | `family:${string}` | `nuclide:${string}`;
+type Grouping =
+  | ""
+  | `group:${string}`
+  | `family:${string}`
+  | `nuclide:${string}`;
 
 /**
  * Where an item is held, as one piece of filter state: a province, or one
@@ -167,7 +180,7 @@ export default function SourceInventoryPage() {
   const merged = useMemo(() => mergeRaisInventory(BASELINE, edits), [edits]);
   const inventory = merged.records;
   const summary = useMemo(
-    () => summarizeRaisInventory(inventory),
+    () => summarizeRaisInventory(inventory, HOLDERS),
     [inventory],
   );
   const holders = useMemo(
@@ -178,28 +191,40 @@ export default function SourceInventoryPage() {
   const facilitiesShown = showAllFacilities
     ? holders.byFacility
     : holders.byFacility.slice(0, FACILITY_PREVIEW);
-  const maxFamily = Math.max(1, ...summary.byFamily.map((f) => f.count));
-  // A category with nothing in it is still a category the inventory reports
-  // against, so it is named under the breakdown rather than dropped from it.
-  const familiesInUse = summary.byFamily.filter((f) => f.count > 0);
-  const emptyFamilies = summary.byFamily
-    .filter((f) => f.count === 0 && !GAP_CATEGORIES.includes(f.family))
-    .map((f) => f.family);
-  // The briefing asked for the catch-all to say what it holds, and the XRF
-  // rows to say how much of them the register did not itself supply.
-  const otherSpecialised = summary.otherSpecialised
+  // The gap bucket says what it holds, and the XRF rows say how much of them
+  // the register did not itself supply.
+  const unrecognised = summary.unrecognised
     .map((t) => `${t.type} (${t.count})`)
     .join(" · ");
-  const familyDetail = (family: GeneratorFamily): string | undefined => {
-    if (family === "Other Specialised Equipment") return otherSpecialised;
+  const placedByHolder = new Map(
+    summary.placedByHolder.map((p) => [p.category, p.count]),
+  );
+  const familyDetail = (family: SourceCategory): string | undefined => {
+    if (family === UNRECOGNISED_TYPE) return unrecognised || undefined;
+    const notes: string[] = [];
     const determined =
-      family === "Portable XRF"
+      showGenerators && family === "Portable XRF"
         ? summary.xrfDetermined.portable
-        : family === "Fixed XRF"
+        : showGenerators && family === "Fixed XRF"
           ? summary.xrfDetermined.fixed
           : 0;
-    if (!determined) return undefined;
-    return `${determined} determined from the instrument's model — RAIS types them only as "XRF"`;
+    if (determined) {
+      notes.push(
+        `${determined} determined from the instrument's model — RAIS types them only as "XRF"`,
+      );
+    }
+    const byHolder = showSources ? placedByHolder.get(family) || 0 : 0;
+    if (byHolder) {
+      notes.push(
+        `${byHolder} sealed source${byHolder === 1 ? "" : "s"} placed by who holds ${byHolder === 1 ? "it" : "them"} — the record names no maker or model`,
+      );
+    }
+    if (family === SEALED_SOURCES) {
+      notes.push(
+        "neither the record nor the facility holding it says what the source is used for",
+      );
+    }
+    return notes.length ? notes.join(" · ") : undefined;
   };
   const maxNuclide = Math.max(1, ...summary.byNuclide.map((n) => n.count));
 
@@ -219,8 +244,7 @@ export default function SourceInventoryPage() {
         const holder = holderFor(HOLDERS, r.ran);
         return {
           r,
-          family:
-            r.kind === "Radiation Generator" ? generatorFamilyOf(r) : null,
+          family: practiceOf(r, HOLDERS).category,
           nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
           holder,
           hay: [
@@ -240,12 +264,43 @@ export default function SourceInventoryPage() {
     [inventory],
   );
 
+  // The practice breakdown is counted off the rows themselves, for whichever
+  // register the toggle shows, so it always agrees with the list it filters:
+  // Nuclear Gauges is the X-ray thickness gauges AND the gauge sources.
+  const familyGroups = useMemo(() => {
+    const counts = new Map<SourceCategory, number>();
+    for (const row of indexed) {
+      if (kind !== "all" && row.r.kind !== kind) continue;
+      counts.set(row.family, (counts.get(row.family) || 0) + 1);
+    }
+    return groupCounts(
+      SOURCE_CATEGORIES.map((family) => ({
+        family,
+        count: counts.get(family) || 0,
+      })),
+      (f) => f.family,
+    );
+  }, [indexed, kind]);
+  const maxFamily = Math.max(
+    1,
+    ...familyGroups.flatMap((g) => g.rows.map((r) => r.count)),
+  );
+  // A group with nothing in it is still one the inventory reports against, so
+  // it is named under the breakdown rather than dropped from it.
+  const groupsInUse = familyGroups.filter((g) => g.total > 0);
+  const emptyGroups = familyGroups
+    .filter((g) => g.total === 0 && g.sector !== "Not classified")
+    .map((g) => g.group);
+
   const filtered = useMemo(() => {
     const q = norm(search);
     return indexed
       .filter((row) => {
         if (kind !== "all" && row.r.kind !== kind) return false;
-        if (grouping.startsWith("family:")) {
+        if (grouping.startsWith("group:")) {
+          const want = grouping.slice("group:".length);
+          if (groupOf(row.family) !== want) return false;
+        } else if (grouping.startsWith("family:")) {
           if (row.family !== grouping.slice("family:".length)) return false;
         } else if (grouping.startsWith("nuclide:")) {
           if (row.nuclide !== grouping.slice("nuclide:".length)) return false;
@@ -284,14 +339,18 @@ export default function SourceInventoryPage() {
     setPage(0);
   };
 
-  // Picking a family or a nuclide also narrows the kind, so the list and the
-  // breakdown the click came from always agree. Clicking the active row again
-  // clears both.
-  const pickFamily = (family: GeneratorFamily) => {
+  // A practice group or type spans both registers (a gauge can be an X-ray set
+  // or a sealed source), so picking one keeps the kind the toggle shows. A
+  // nuclide narrows the kind to sources. Clicking the active row again clears.
+  const pickFamily = (family: SourceCategory) => {
     const next: Grouping = `family:${family}`;
-    const off = grouping === next;
-    setGrouping(off ? "" : next);
-    setKind(off ? "all" : "Radiation Generator");
+    setGrouping(grouping === next ? "" : next);
+    setPage(0);
+  };
+
+  const pickGroup = (group: string) => {
+    const next: Grouping = `group:${group}`;
+    setGrouping(grouping === next ? "" : next);
     setPage(0);
   };
 
@@ -398,41 +457,61 @@ export default function SourceInventoryPage() {
             if (v === "Radiation Generator" && grouping.startsWith("nuclide:")) {
               setGrouping("");
             }
-            if (v === "Sealed Source" && grouping.startsWith("family:")) {
-              setGrouping("");
-            }
             setPage(0);
           }}
           options={KIND_FILTERS}
         />
       </Panel>
 
-      {showGenerators ? (
-        <Panel
-          title="Radiation generators by type"
-          note="Tap a family to filter the list below."
+      <Panel
+          title={
+            kind === "Radiation Generator"
+              ? "Radiation generators by practice and type"
+              : kind === "Sealed Source"
+                ? "Sealed sources by practice and type"
+                : "By practice and type"
+          }
+          note={`Grouped by practice, the way the IAEA safety standards divide the field.${
+            showSources
+              ? ` RAIS does not record what a sealed source is used for: ${summary.sourcePracticeBasis.record} are placed from their maker or model, ${summary.sourcePracticeBasis.holder} from the facility holding them (construction and roads → portable gauges, mines and plants → fixed gauges), ${summary.sourcePracticeBasis.undetermined} not determined.`
+              : ""
+          } Tap a group or a type to filter the list below.`}
         >
-          <ul className="mt-1 space-y-1.5">
-            {familiesInUse.map(({ family, count }) => (
-              <BreakdownRow
-                key={family}
-                label={family}
-                count={count}
-                max={maxFamily}
-                detail={familyDetail(family)}
-                active={grouping === `family:${family}`}
-                muted={GAP_CATEGORIES.includes(family)}
-                onClick={() => pickFamily(family)}
-              />
+          <div className="mt-1 space-y-3">
+            {groupsInUse.map(({ group, sector, total, rows }) => (
+              <div key={group}>
+                <GroupHeader
+                  label={group}
+                  sector={sector}
+                  total={total}
+                  active={grouping === `group:${group}`}
+                  onClick={() => pickGroup(group)}
+                />
+                <ul className="mt-1 space-y-1.5 pl-3 border-l-2 border-gunmetal/10">
+                  {rows
+                    .filter((r) => r.count > 0)
+                    .map(({ family, count }) => (
+                      <BreakdownRow
+                        key={family}
+                        label={family}
+                        count={count}
+                        max={maxFamily}
+                        detail={familyDetail(family)}
+                        active={grouping === `family:${family}`}
+                        muted={GAP_CATEGORIES.includes(family)}
+                        onClick={() => pickFamily(family)}
+                      />
+                    ))}
+                </ul>
+              </div>
             ))}
-          </ul>
-          {emptyFamilies.length > 0 ? (
+          </div>
+          {emptyGroups.length > 0 ? (
             <p className="mt-3 text-[11px] leading-relaxed text-gunmetal/55">
-              Nothing registered yet under {emptyFamilies.join(" · ")}.
+              Nothing registered yet under {emptyGroups.join(" · ")}.
             </p>
           ) : null}
         </Panel>
-      ) : null}
 
       {showSources ? (
         <>
@@ -570,6 +649,11 @@ export default function SourceInventoryPage() {
             of={summary.generators}
           />
           <GapRow
+            label="Sealed source's use not determined"
+            count={gaps.sourceUseUndetermined}
+            of={summary.sealedSources}
+          />
+          <GapRow
             label="Nuclide not recorded"
             count={gaps.missingNuclide}
             of={summary.sealedSources}
@@ -681,21 +765,26 @@ export default function SourceInventoryPage() {
                 onChange={(e) => {
                   const next = e.target.value as Grouping;
                   setGrouping(next);
-                  if (next.startsWith("family:")) setKind("Radiation Generator");
                   if (next.startsWith("nuclide:")) setKind("Sealed Source");
                   setPage(0);
                 }}
               >
                 <option value="">All types &amp; nuclides</option>
-                {showGenerators ? (
-                  <optgroup label="Radiation generators">
-                    {GENERATOR_FAMILIES.map((f) => (
-                      <option key={f} value={`family:${f}`}>
-                        {f}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
+                {SOURCE_GROUPS.map((g) => {
+                      const families = g.categories as readonly SourceCategory[];
+                      return (
+                        <optgroup key={g.group} label={g.group}>
+                          <option value={`group:${g.group}`}>
+                            All {g.group}
+                          </option>
+                          {families.map((f) => (
+                            <option key={f} value={`family:${f}`}>
+                              {f}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                 {showSources ? (
                   <optgroup label="Sealed sources">
                     {summary.byNuclide.map(({ nuclide }) => (
@@ -858,6 +947,39 @@ export default function SourceInventoryPage() {
 }
 
 /** A click-to-filter row with a proportional bar, shared by both breakdowns. */
+/** A practice group's heading in the breakdown: its name, sector and total. */
+function GroupHeader({
+  label,
+  sector,
+  total,
+  active,
+  onClick,
+}: {
+  label: string;
+  sector: string;
+  total: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="w-full text-left rounded-lg px-2 py-1 transition-colors flex items-baseline justify-between gap-3"
+      style={{ background: active ? "rgba(0,160,80,0.10)" : "transparent" }}
+    >
+      <span className="min-w-0">
+        <span className="text-[11px] font-black uppercase tracking-wide text-[var(--rpa-green-dark)]">
+          {label}
+        </span>{" "}
+        <span className="text-[10px] text-gunmetal/45">{sector}</span>
+      </span>
+      <span className="tabular font-black shrink-0">{total}</span>
+    </button>
+  );
+}
+
 function BreakdownRow({
   label,
   count,
@@ -1021,7 +1143,7 @@ function ItemCell({ r }: { r: RaisRecord }) {
           {nuclide}
         </div>
         <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-          Sealed source
+          Sealed source · {practiceOf(r, HOLDERS).category}
         </div>
       </>
     );
@@ -1136,7 +1258,9 @@ const RaisCard = memo(function RaisCard({
           {/* Only sources earn the right-hand chip, so the generator's family
               rides in the sub-line rather than squeezing the title. */}
           <div className="caps text-[10px] text-gunmetal/50 mt-0.5">
-            {source ? "Sealed source" : generatorFamilyOf(r)}
+            {source
+              ? `Sealed source · ${practiceOf(r, HOLDERS).category}`
+              : generatorFamilyOf(r)}
           </div>
           <div className="text-xs mt-1 break-words">
             {holder ? (

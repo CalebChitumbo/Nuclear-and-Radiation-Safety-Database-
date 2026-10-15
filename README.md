@@ -1392,27 +1392,38 @@ page is `app/verified-source-inventory/page.tsx`.
 
 ### The equipment categories
 
-Both tabs report against **one list of categories**, `SOURCE_CATEGORIES` in
+Both tabs report against **one two-level list** — fifteen practice groups,
+each holding the machine or source types under it — `SOURCE_GROUPS` in
 `lib/rules/sourceCategories.ts`, so the register and the field exercise name a
-machine the same way and can be read line against line. The split follows the
-Seniors' Monday Briefing of September 2026:
+machine the same way and can be read line against line. The groups follow the
+way the IAEA safety standards divide the field (October 2026, replacing the flat
+Seniors' Briefing list of September):
 
-| | |
+| Group | Types |
 | --- | --- |
-| **Radiography** | Fixed X-Ray Machines · Conventional Fixed Digital Radiography · Mobile & Portable X-Ray |
-| **Dental** | General Dental X-Ray · Dental CBCT |
-| **Other imaging** | Mammography Systems · C-Arm Units · Fluoroscopy · Angiography & Cath Lab |
-| **CT** | General CT · PET-CT · SPECT-CT |
-| **Radiotherapy** | Brachytherapy · Teletherapy · Linear Accelerators |
-| **Screening** | Cargo Scanners · Baggage Scanners · Portal Monitors |
-| **Analytical & industrial** | Portable XRF · Fixed XRF · *XRF (Type Not Specified)* · Industrial X-Ray & Gauging |
-| **The rest** | Other Specialised Equipment · Sealed Sources · *Type Not Recorded* |
+| **Radiotherapy** | Linear Accelerators · Teletherapy (Co-60) · Gamma Knife · Kilovoltage X-Ray Therapy · HDR/MDR Brachytherapy · LDR Brachytherapy · RT Simulators & CT Simulators |
+| **Nuclear Medicine** | PET-CT · PET-MR · SPECT-CT · Gamma Camera / SPECT · Radionuclide Therapy · Radiopharmacy / Hot Lab · Cyclotron |
+| **Interventional Radiology & Cardiology** | Angiography & Cath Lab · Mobile C-Arm Units |
+| **Diagnostic Radiology** | General CT · Fluoroscopy (Fixed R/F Rooms) · Fixed Radiography (CR/DR) · Mobile Radiography · Mammography · Bone Densitometry (DXA) |
+| **Dental Radiology** | Intraoral Dental · Panoramic & Cephalometric · Dental CBCT · Handheld Dental X-Ray |
+| **Veterinary** | Veterinary X-Ray · Handheld Veterinary X-Ray · Veterinary NM & Radiotherapy |
+| **Blood Irradiators** | Gamma Blood Irradiators · X-Ray Blood Irradiators |
+| **Industrial Radiography** | Gamma Radiography · Industrial X-Ray Radiography · Pipeline Crawlers |
+| **Irradiation Facilities** | Gamma Irradiators · Electron Beam & X-Ray Irradiators |
+| **Nuclear Gauges** | Fixed Gauges · Portable Gauges |
+| **Well Logging** | Well Logging Sources · Neutron Generators |
+| **Security & Inspection** | Cargo & Vehicle Scanners · Baggage Scanners · Body Scanners |
+| **Analytical Instruments** | Portable XRF · Fixed XRF · *XRF (Type Not Specified)* · XRD · Electron Capture Detectors |
+| **Research, Education & Calibration** | Research Accelerators · Calibration X-Ray Generators · Calibration & Reference Sources · Teaching Sources |
+| **Other / Consumer Products** | Static Eliminators · Lightning Preventors · Smoke Detectors · Luminous Devices |
+| *Not Classified* | *Sealed Source (Use Not Determined)* · *Unrecognised Type* · *Type Not Recorded* |
 
 One classifier reads both registers' vocabularies, and **order is the logic**:
 each specific machine claims its rows before the generic X-ray word they also
-contain. A category the briefing asked for exists whether or not anything is
-registered under it yet — Dental CBCT, SPECT-CT and Portal Monitors are empty
-today, and are named under the breakdown rather than hidden.
+contain. A type exists whether or not anything is registered under it yet; the
+breakdowns show each group with its total, the types beneath it, and name the
+empty groups underneath. Tapping a group filters the list to the whole group,
+and the CSV exports carry a *Practice Group* column beside the type.
 
 **The XRF split** cannot come from the type column: RAIS types all 64 analysers
 as the bare word `XRF`. It comes from the instrument — the model the register
@@ -1426,10 +1437,17 @@ counted as a register gap. The determinations are a table keyed by **RAN** in
 nothing but `XRF` — so a correction, or a later export that spells the type out,
 wins over the determination. The tab says so on the two XRF rows.
 
-*Other Specialised Equipment* lists what it holds under its own row — calibration
-sets, a bone densitometer, a cyclotron — so the catch-all says what is in it.
-Sealed sources are split by **type of source**, i.e. the nuclide as recorded, on
-both tabs.
+*Unrecognised Type* lists what it holds under its own row (the annex's `Dexter`
+and `X-ray Tube`) — it is a gap for an officer to resolve, not a family.
+Sealed sources sit in the same groups. Neither export records what a source is
+used for, so `lib/rules/sourcePractice.ts` reads it from the record's maker or
+model first (a Troxler is a portable gauge, an Endress+Hauser a fixed one), then
+from who holds it — construction and roads → portable gauges, mines and plants
+→ fixed gauges — and says which it was. Of RAIS' 789: 477 from the record, 290
+from the holder (mostly ZCCM's store of disused mine sources), 22 not
+determined. The breakdown follows the Register toggle, so *Nuclear Gauges*
+counts the X-ray thickness gauges and the gauge sources together. The nuclide
+split is still shown.
 
 Nothing is stored per category: every figure is derived from the registers' own
 text when the page is read, so a category change needs no re-seed and leaves

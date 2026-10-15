@@ -1,11 +1,14 @@
 import { toCsv } from "./exportCsv";
 import {
   SEALED_SOURCES,
+  UNRECOGNISED_TYPE,
+  groupOf,
   SOURCE_CATEGORIES,
   sourceCategory,
   typesInCategory,
   type SourceCategory,
 } from "./sourceCategories";
+import { sourcePractice, type SourcePractice } from "./sourcePractice";
 
 /**
  * The Verified Source Inventory tab — the radiation sources and radiation-
@@ -72,11 +75,34 @@ export type { SourceCategory };
 
 /**
  * Bucket a free-form equipment type into one of the categories above. The annex
- * writes a sealed source as "Source: <nuclide>"; those land in Sealed Sources
- * and are broken down by nuclide in `sourceTypeBreakdown` below.
+ * writes a sealed source as "Source: <nuclide>"; the text alone cannot say what
+ * the source is used for, so those land in the not-determined bucket here —
+ * `categoryOf` below places a whole row, holder included.
  */
 export function categorizeEquipment(equipmentType: string): SourceCategory {
   return sourceCategory(equipmentType);
+}
+
+/**
+ * The category a whole annex row reports under. A machine is read from its
+ * equipment text alone; a sealed source ("Source: Co-57") names only its
+ * nuclide, so its use is read from that and the facility holding it — see
+ * `sourcePractice`. Every figure on the tab reads a row, so this is the
+ * function to use; `categorizeEquipment` remains for a bare piece of text.
+ */
+export function practiceOf(record: VerifiedRecord): SourcePractice {
+  const nuclide = sealedSourceNuclide(record.equipmentType);
+  if (nuclide === null) {
+    return { category: categorizeEquipment(record.equipmentType), basis: "record" };
+  }
+  return sourcePractice(
+    { nuclide: nuclide === "Not recorded" ? "" : nuclide },
+    { facility: record.facility },
+  );
+}
+
+export function categoryOf(record: VerifiedRecord): SourceCategory {
+  return practiceOf(record).category;
 }
 
 /**
@@ -155,8 +181,8 @@ export interface VerifiedInventorySummary {
   byCategory: { category: SourceCategory; count: number }[];
   /** Sealed sources by nuclide — the type-of-source split. */
   bySourceType: { nuclide: string; count: number }[];
-  /** What the catch-all category actually holds, commonest first. */
-  otherSpecialised: { type: string; count: number }[];
+  /** What the *Unrecognised Type* gap actually holds, commonest first. */
+  unrecognised: { type: string; count: number }[];
   byStatus: { group: StatusGroup; count: number }[];
   radioactiveSources: number;
   inUse: number;
@@ -172,12 +198,12 @@ export function summarizeVerifiedInventory(records: VerifiedRecord[]): VerifiedI
   );
   const facilities = new Set<string>();
   let serialsProvided = 0;
+  let radioactiveSources = 0;
 
   for (const r of records) {
-    catCounts.set(
-      categorizeEquipment(r.equipmentType),
-      (catCounts.get(categorizeEquipment(r.equipmentType)) || 0) + 1,
-    );
+    const category = categoryOf(r);
+    catCounts.set(category, (catCounts.get(category) || 0) + 1);
+    if (sealedSourceNuclide(r.equipmentType) !== null) radioactiveSources += 1;
     const g = statusGroup(r.status);
     statusCounts.set(g, (statusCounts.get(g) || 0) + 1);
     facilities.add(r.facility.trim().toLowerCase());
@@ -193,15 +219,15 @@ export function summarizeVerifiedInventory(records: VerifiedRecord[]): VerifiedI
       count: catCounts.get(category) || 0,
     })),
     bySourceType: sourceTypeBreakdown(records),
-    otherSpecialised: typesInCategory(
+    unrecognised: typesInCategory(
       records.map((r) => r.equipmentType),
-      "Other Specialised Equipment",
+      UNRECOGNISED_TYPE,
     ),
     byStatus: STATUS_GROUPS.map((group) => ({
       group,
       count: statusCounts.get(group) || 0,
     })),
-    radioactiveSources: catCounts.get(SEALED_SOURCES) || 0,
+    radioactiveSources,
     inUse: statusCounts.get("In Use") || 0,
   };
 }
@@ -230,6 +256,7 @@ export function verifiedInventoryToCsv(records: VerifiedRecord[]): string {
     "No",
     "Facility",
     "Equipment Type",
+    "Practice Group",
     "Category",
     "Serial Number",
     "Status",
@@ -239,7 +266,8 @@ export function verifiedInventoryToCsv(records: VerifiedRecord[]): string {
     String(r.no),
     r.facility,
     r.equipmentType,
-    categorizeEquipment(r.equipmentType),
+    groupOf(categoryOf(r)),
+    categoryOf(r),
     r.serialNumber,
     r.status,
     statusGroup(r.status),
