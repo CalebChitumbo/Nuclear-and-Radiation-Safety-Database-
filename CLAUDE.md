@@ -353,7 +353,7 @@ to say.
 
 Both inventory tabs — Source Inventory (RAIS) and Verified Source Inventory
 (the field annex) — report against **one two-level list**, `SOURCE_GROUPS`
-(15 practice groups → types; `SOURCE_CATEGORIES` is the flat list of types) in
+(13 practice groups → types; `SOURCE_CATEGORIES` is the flat list of types) in
 `lib/rules/sourceCategories.ts`, folded from each register's free-form text by
 `sourceCategory`. The groups follow the IAEA safety standards' division of
 practices (Oct 2026, replacing the Seniors' Briefing list of Sep 2026);

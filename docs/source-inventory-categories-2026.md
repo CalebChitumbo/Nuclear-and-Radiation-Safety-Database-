@@ -2,22 +2,30 @@
 
 Both inventory tabs — **Source Inventory** (the RAIS register, 1,752 items) and
 **Verified Source Inventory** (the 215 items confirmed in the field) — report
-against **one two-level list**: fifteen practice groups, each holding the
+against **one two-level list**: thirteen practice groups, each holding the
 machine or source types beneath it (`SOURCE_GROUPS` in
 [`lib/rules/sourceCategories.ts`](../lib/rules/sourceCategories.ts)). This
 replaces the flat 25-category list the Seniors' Monday Briefing set in
 September 2026.
 
+**Corrected 16 October 2026.** Nuclear Medicine is PET-CT · PET-MR · SPECT-CT ·
+SPECT · Cyclotron (gamma camera reads as SPECT; radionuclide therapy and the
+radiopharmacy are no longer types). Interventional is Mobile · Fixed ·
+Ceiling-Mounted C-Arm Units. Diagnostic Radiology now holds dental and
+veterinary imaging, and splits plain radiography by mounting (fixed, mobile)
+and technology (conventional, digital, computed). The Dental and Veterinary
+groups are gone, so there are thirteen groups, not fifteen.
+
 ## Checked against the IAEA
 
 The IAEA publishes no single "list of source groups". What it does is divide
 radiation protection by **practice**, one safety guide per practice, and the
-fifteen groups follow that division:
+groups follow that division:
 
 | Group | IAEA guidance it lines up with |
 | --- | --- |
-| Radiotherapy · Nuclear Medicine · Interventional · Diagnostic · Dental | SSG-46, *Radiation Protection and Safety in Medical Uses of Ionizing Radiation* (2018) — diagnostic radiology (dentistry included) and image-guided interventional procedures, nuclear medicine, radiation therapy |
-| Veterinary | Safety Reports Series No. 104, *Radiation Protection and Safety in Veterinary Medicine* (2021) |
+| Radiotherapy · Nuclear Medicine · Interventional · Diagnostic (dental included) | SSG-46, *Radiation Protection and Safety in Medical Uses of Ionizing Radiation* (2018) — diagnostic radiology (dentistry included) and image-guided interventional procedures, nuclear medicine, radiation therapy |
+| Veterinary imaging (inside Diagnostic) | Safety Reports Series No. 104, *Radiation Protection and Safety in Veterinary Medicine* (2021) |
 | Blood Irradiators · Irradiation Facilities | SSG-8, *Radiation Safety of Gamma, Electron and X Ray Irradiation Facilities*; RS-G-1.9 lists blood/tissue irradiators beside the other irradiators |
 | Industrial Radiography | SSG-11, *Radiation Safety in Industrial Radiography* |
 | Nuclear Gauges | SSG-58, *Radiation Safety in the Use of Nuclear Gauges* (2020) — radioactive-source and X-ray gauges alike |
@@ -48,9 +56,8 @@ Where the list departs from the IAEA's own arrangement, on purpose:
 | --- | ---: | --- |
 | Radiotherapy | 10 | Linear Accelerators 6 · Kilovoltage X-Ray Therapy 2 (`Deep Xray treatment`) · HDR/MDR Brachytherapy 2 (`Brachytherapy Afterloader`) |
 | Nuclear Medicine | 3 | PET-CT 2 · Cyclotron 1 |
-| Interventional Radiology & Cardiology | 57 | Mobile C-Arm Units 52 (`C-arm Xray generator` 40 · `Digital C-arm X-ray` 12) · Angiography & Cath Lab 5 (`Angiography generator` 3 · `Cathlab` 2) |
-| Diagnostic Radiology | 581 | Fixed Radiography (CR/DR) 280 (`Fixed Xray radiography` 138 · `Digital radiography DR x-ray` 108 · `Conventional Xray generator` 34) · Mobile Radiography 191 · General CT 50 · Fluoroscopy (Fixed R/F Rooms) 33 · Mammography 26 · Bone Densitometry (DXA) 1 |
-| Dental Radiology | 53 | Intraoral Dental 27 (`Conventional dental`) · Panoramic & Cephalometric 17 · Handheld Dental X-Ray 9 (`Portable Dental X Ray`) |
+| Interventional Radiology & Cardiology | 57 | Mobile C-Arm Units 52 (`C-arm Xray generator` 40 · `Digital C-arm X-ray` 12) · Fixed C-Arm Units 5 (`Angiography generator` 3 · `Cathlab` 2) |
+| Diagnostic Radiology | 634 | Fixed Conventional Radiography 172 (`Fixed Xray radiography` 138 · `Conventional Xray generator` 34) · Fixed Digital Radiography 108 (`Digital radiography DR x-ray`) · Mobile Conventional Radiography 114 (`Portable Xray radiography` 86 · `Mobile X-Ray Machine` 20 · `Portable Conventional Xray generator` 8) · Mobile Digital Radiography 77 (`Digital Mobile X-ray`) · General CT 50 · Fixed X-Ray Fluoroscopy 33 · Mammography 26 · Bone Densitometry (DXA) 1 · Intraoral Dental 27 (`Conventional dental`) · Panoramic & Cephalometric Dental 17 · Handheld Dental X-Ray 9 (`Portable Dental X Ray`) |
 | Industrial Radiography | 13 | Industrial X-Ray Radiography 13 (`Industrial Xray fluoroscopy`) |
 | Nuclear Gauges | 16 | Fixed Gauges 16 (`Xray thickness gauge`) |
 | Security & Inspection | 46 | Baggage Scanners 36 · Cargo & Vehicle Scanners 10 |
@@ -58,8 +65,10 @@ Where the list departs from the IAEA's own arrangement, on purpose:
 | Research, Education & Calibration | 11 | Calibration X-Ray Generators 10 · Research Accelerators 1 (`Other type of particle radiation generators`) |
 | *Not Classified* | 109 | *Type Not Recorded* 109 |
 
-Empty today: Veterinary, Blood Irradiators, Irradiation Facilities, Well
-Logging, Other / Consumer Products — named under the breakdown on the tab.
+Empty today: Blood Irradiators, Irradiation Facilities, Well Logging, Other /
+Consumer Products — named under the breakdown on the tab. Nothing in either
+register says *computed* radiography (CR), so the two CR types are empty too;
+veterinary sets are registered as plain X-ray and are not told apart.
 
 ### RAIS register — 789 sealed sources, by what they are used for
 
@@ -113,18 +122,19 @@ The sources also keep their nuclide breakdown (Cs-137 618, Am-241 23, Co-60
 
 ### Field verification annex — 215 items
 
-Diagnostic Radiology 121 (Fixed Radiography 52 · Mobile Radiography 32 ·
-General CT 21 · Mammography 12 · Fluoroscopy 4) · Dental Radiology 46
-(Intraoral 30 · Handheld 10 · Panoramic & Cephalometric 6) · Interventional 28
-(Mobile C-Arm 27 · Angiography & Cath Lab 1) · Nuclear Gauges 2 (Fixed) ·
-Security & Inspection 1 (Baggage) · Analytical 1 (*XRF unspecified*) ·
-Research, Education & Calibration 13 (Calibration & Reference Sources) ·
-Nuclear Medicine 1 (Radionuclide Therapy) · *Not Classified* 2
-(*Unrecognised Type*: `Dexter`, `X-ray Tube`).
+Diagnostic Radiology 167 (Fixed Conventional 51 · Fixed Digital 1 · Mobile
+Conventional 30 · Mobile Digital 2 · General CT 21 · Mammography 12 ·
+Fluoroscopy 4 · Intraoral Dental 30 · Handheld Dental 10 · Panoramic &
+Cephalometric Dental 6) · Interventional 28 (Mobile C-Arm 27 · Fixed C-Arm 1,
+the `C-arm (Cath Lab)`) · Nuclear Gauges 2 (Fixed) · Security & Inspection 1
+(Baggage) · Analytical 1 (*XRF unspecified*) · Research, Education &
+Calibration 13 (Calibration & Reference Sources) · *Not Classified* 3 (one
+sealed source whose use is not determined; *Unrecognised Type*: `Dexter`,
+`X-ray Tube`).
 
 Its 14 sealed sources are all at UTH Nuclear Medicine, so the holder rule reads
 them as the department's check sources (Co-57 5 · Cs-137 4 · Co-60 2 · Ba-133 1
-· I-129 1) and one I-131 therapy source.
+· I-129 1). The I-131 is left undetermined: the list has no therapy type.
 
 ## The XRF split, and the one worklist left
 
@@ -194,12 +204,15 @@ and counted on the register-gaps panel.
 
 ## Judgement calls worth knowing
 
-- **Fixed conventional and fixed digital are one type again** — *Fixed
-  Radiography (CR/DR)*, as the October list has it. The September briefing had
-  split them (172 + 108); the CSV keeps RAIS' own `Type` text, so the split can
-  still be read off it.
-- **A C-arm in a cath lab is the lab's fixed C-arm** (Angiography & Cath Lab);
-  every other C-arm is a mobile unit.
+- **Unqualified radiography reads as conventional.** RAIS' `Fixed Xray
+  radiography` (138) and `Portable Xray radiography` (86) name no technology;
+  they are filed conventional, as the September briefing filed them. Digital
+  needs "digital" or "DR" in the entry, computed needs "computed" or "CR".
+- **Mobile C-arms are interventional only** (16 Oct 2026). The corrected list
+  named them under both Interventional and Diagnostic; a machine counts once.
+- **Angiography and cath-lab systems are fixed C-arms**, the annex's
+  `C-arm (Cath Lab)` included; *Ceiling-Mounted* takes only an entry that says
+  "ceiling". Every other C-arm is mobile.
 - **"Portable dental" is read as handheld dental.** RAIS' `Portable Dental X
   Ray` (9) and the annex's portable/mobile dental rows. If some are wheeled
   units rather than hand-held, they belong under Intraoral.

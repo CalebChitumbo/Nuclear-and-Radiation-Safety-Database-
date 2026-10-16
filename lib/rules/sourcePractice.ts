@@ -73,7 +73,6 @@ const GAUGE_NUCLIDE = /cs-?13[27]|ce-?137|ba-137|co-60|am-241|cf-252|pu-238|sr-9
 
 const WIRELINE = /wireline|well logging|logging|schlumberger|halliburton|baker hughes|weatherford/;
 const HOSPITAL = /hospital|cancer|clinic|medical|health|teaching hospital|\buth\b/;
-const NUCLEAR_MEDICINE = /nuclear medicine/;
 const CONSTRUCTION =
   /construct|\broads?\b|railway|engenharia|engineering|asphalt|sinohydro|const lab|civil|paving|bridge/;
 const MINE_OR_PLANT =
@@ -116,9 +115,6 @@ export function sourcePractice(
   if (!held) return UNDETERMINED;
   if (WIRELINE.test(where)) return holder("Well Logging Sources");
   if (atHospital) {
-    if (NUCLEAR_MEDICINE.test(where) && /i-131|lu-177|ra-223/.test(nuclide)) {
-      return holder("Radionuclide Therapy");
-    }
     // The long-lived check sources a dose calibrator, gamma camera or
     // ionisation chamber is tested against.
     if (/co-57|cs-137|ba-133|co-60|i-129|ge-68|na-22|sr-90/.test(nuclide)) {

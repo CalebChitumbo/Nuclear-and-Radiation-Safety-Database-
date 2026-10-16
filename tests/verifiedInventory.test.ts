@@ -62,23 +62,25 @@ describe("summary figures reconcile to the detail rows", () => {
         .map((c) => [c.category, c.count]),
     );
     expect(counts).toEqual({
-      "Angiography & Cath Lab": 1,
+      "Fixed C-Arm Units": 1,
       "Mobile C-Arm Units": 27,
       "General CT": 21,
-      "Fluoroscopy (Fixed R/F Rooms)": 4,
-      "Fixed Radiography (CR/DR)": 52,
-      "Mobile Radiography": 32,
+      "Fixed X-Ray Fluoroscopy": 4,
+      "Fixed Conventional Radiography": 51,
+      "Fixed Digital Radiography": 1,
+      "Mobile Conventional Radiography": 30,
+      "Mobile Digital Radiography": 2,
       Mammography: 12,
       "Intraoral Dental": 30,
-      "Panoramic & Cephalometric": 6,
+      "Panoramic & Cephalometric Dental": 6,
       "Handheld Dental X-Ray": 10,
       "Fixed Gauges": 2,
       "Baggage Scanners": 1,
       "XRF (Type Not Specified)": 1,
-      // The 14 sources are all at UTH Nuclear Medicine: check sources, and
-      // one I-131 therapy source.
+      // The 14 sources are all at UTH Nuclear Medicine: 13 check sources, and
+      // an I-131 whose use the list has no type for.
       "Calibration & Reference Sources": 13,
-      "Radionuclide Therapy": 1,
+      "Sealed Source (Use Not Determined)": 1,
       "Unrecognised Type": 2,
     });
   });
@@ -146,29 +148,37 @@ describe("categorizeEquipment", () => {
   });
 
   it("recognises the imaging families across spelling variants", () => {
-    expect(categorizeEquipment("Fixed X-ray")).toBe("Fixed Radiography (CR/DR)");
-    expect(categorizeEquipment("Fixed Xray")).toBe("Fixed Radiography (CR/DR)");
+    expect(categorizeEquipment("Fixed X-ray")).toBe(
+      "Fixed Conventional Radiography",
+    );
+    expect(categorizeEquipment("Fixed Xray")).toBe(
+      "Fixed Conventional Radiography",
+    );
     expect(categorizeEquipment("Fixed Digital X-Ray")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Digital Radiography",
     );
     expect(categorizeEquipment("CT-Scanner")).toBe("General CT");
     expect(categorizeEquipment("CT Scanner")).toBe("General CT");
     expect(categorizeEquipment("C-arm (Mini)")).toBe("Mobile C-Arm Units");
     // The annex's one cath-lab entry is the fixed C-arm of a cath lab.
     expect(categorizeEquipment("C-arm (Cath Lab)")).toBe(
-      "Angiography & Cath Lab",
+      "Fixed C-Arm Units",
     );
     expect(categorizeEquipment("Mammograph")).toBe("Mammography");
     expect(categorizeEquipment("Fluoroscopy")).toBe(
-      "Fluoroscopy (Fixed R/F Rooms)",
+      "Fixed X-Ray Fluoroscopy",
     );
-    expect(categorizeEquipment("OPG")).toBe("Panoramic & Cephalometric");
+    expect(categorizeEquipment("OPG")).toBe("Panoramic & Cephalometric Dental");
     expect(categorizeEquipment("Dental X-ray")).toBe("Intraoral Dental");
     expect(categorizeEquipment("Portable Dental X-ray")).toBe(
       "Handheld Dental X-Ray",
     );
-    expect(categorizeEquipment("Mobile X-ray")).toBe("Mobile Radiography");
-    expect(categorizeEquipment("Portable X-ray")).toBe("Mobile Radiography");
+    expect(categorizeEquipment("Mobile X-ray")).toBe(
+      "Mobile Conventional Radiography",
+    );
+    expect(categorizeEquipment("Portable X-ray")).toBe(
+      "Mobile Conventional Radiography",
+    );
   });
 
   it("maps every equipment type in the annex to a declared category", () => {

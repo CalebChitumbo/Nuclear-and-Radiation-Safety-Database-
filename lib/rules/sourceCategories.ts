@@ -4,9 +4,10 @@
  *
  * Two levels, grouped by practice the way the IAEA's safety standards divide
  * the field (October 2026, replacing the flat Seniors' Briefing list of
- * September): medical — radiotherapy, nuclear medicine, interventional,
- * diagnostic and dental radiology (SSG-46), veterinary (Safety Reports Series
- * No. 104) and blood irradiators — then non-medical — industrial radiography
+ * September; corrected 16 Oct 2026): medical — radiotherapy, nuclear medicine,
+ * interventional, and diagnostic radiology with dental and veterinary imaging
+ * inside it (SSG-46, Safety Reports Series No. 104), and blood irradiators —
+ * then non-medical — industrial radiography
  * (SSG-11), irradiation facilities (SSG-8), nuclear gauges (SSG-58), well
  * logging (SSG-57), security and inspection (SSG-55), analytical instruments,
  * research / education / calibration, and consumer-type products (SSG-36).
@@ -52,46 +53,40 @@ export const SOURCE_GROUPS = [
       "PET-CT",
       "PET-MR",
       "SPECT-CT",
-      "Gamma Camera / SPECT",
-      "Radionuclide Therapy",
-      "Radiopharmacy / Hot Lab",
+      "SPECT",
       "Cyclotron",
     ],
   },
   {
     group: "Interventional Radiology & Cardiology",
     sector: "Medical",
-    categories: ["Angiography & Cath Lab", "Mobile C-Arm Units"],
+    categories: [
+      "Mobile C-Arm Units",
+      "Fixed C-Arm Units",
+      "Ceiling-Mounted C-Arm Units",
+    ],
   },
   {
     group: "Diagnostic Radiology",
     sector: "Medical",
     categories: [
       "General CT",
-      "Fluoroscopy (Fixed R/F Rooms)",
-      "Fixed Radiography (CR/DR)",
-      "Mobile Radiography",
+      "Fixed X-Ray Fluoroscopy",
+      "Fixed Conventional Radiography",
+      "Fixed Digital Radiography",
+      "Fixed Computed Radiography",
+      "Mobile Conventional Radiography",
+      "Mobile Digital Radiography",
+      "Mobile Computed Radiography",
       "Mammography",
       "Bone Densitometry (DXA)",
-    ],
-  },
-  {
-    group: "Dental Radiology",
-    sector: "Medical",
-    categories: [
       "Intraoral Dental",
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
       "Dental CBCT",
       "Handheld Dental X-Ray",
-    ],
-  },
-  {
-    group: "Veterinary",
-    sector: "Medical",
-    categories: [
-      "Veterinary X-Ray",
+      "Fixed Veterinary X-Ray",
+      "Mobile Veterinary X-Ray",
       "Handheld Veterinary X-Ray",
-      "Veterinary NM & Radiotherapy",
     ],
   },
   {
@@ -261,6 +256,23 @@ export function groupCounts<T extends { count: number }>(
   });
 }
 
+/** Plain radiography, by mounting and imaging technology. */
+const RADIOGRAPHY: Record<
+  "fixed" | "mobile",
+  Record<"conventional" | "digital" | "computed", SourceCategory>
+> = {
+  fixed: {
+    conventional: "Fixed Conventional Radiography",
+    digital: "Fixed Digital Radiography",
+    computed: "Fixed Computed Radiography",
+  },
+  mobile: {
+    conventional: "Mobile Conventional Radiography",
+    digital: "Mobile Digital Radiography",
+    computed: "Mobile Computed Radiography",
+  },
+};
+
 const has = (s: string, ...words: string[]) => words.some((w) => s.includes(w));
 
 /**
@@ -281,15 +293,18 @@ export function sourceCategory(equipmentType: string): SourceCategory {
   // The field annex writes a sealed source as "Source: <nuclide>".
   if (/^sources?\s*:/.test(s)) return SEALED_SOURCES;
 
-  // Veterinary first: a veterinary X-ray set is not a hospital one.
-  if (has(s, "veterinary", "vet ", "animal")) {
-    if (has(s, "nuclear", "radiotherap", "linac", "iodine", "i-131")) {
-      return "Veterinary NM & Radiotherapy";
-    }
+  // Veterinary X-ray first: a veterinary set is not a hospital one. (The list
+  // has no veterinary nuclear medicine or radiotherapy; that text falls
+  // through to the human machines below.)
+  if (
+    has(s, "veterinary", "vet ", "animal") &&
+    !has(s, "nuclear", "radiotherap", "linac", "iodine", "i-131")
+  ) {
     if (has(s, "handheld", "hand-held", "hand held")) {
       return "Handheld Veterinary X-Ray";
     }
-    return "Veterinary X-Ray";
+    if (has(s, "mobile", "portable", "trolley")) return "Mobile Veterinary X-Ray";
+    return "Fixed Veterinary X-Ray";
   }
 
   // Blood irradiators before the irradiators and the gamma words.
@@ -339,14 +354,11 @@ export function sourceCategory(equipmentType: string): SourceCategory {
     return has(s, "mr") ? "PET-MR" : "PET-CT";
   }
   if (s.includes("spect")) {
-    return /\bct\b|spect-ct|spect\/ct/.test(s) ? "SPECT-CT" : "Gamma Camera / SPECT";
+    return /\bct\b|spect-ct|spect\/ct/.test(s) ? "SPECT-CT" : "SPECT";
   }
-  if (s.includes("gamma camera")) return "Gamma Camera / SPECT";
+  // A gamma camera is the SPECT system without the CT.
+  if (s.includes("gamma camera")) return "SPECT";
   if (s.includes("cyclotron")) return "Cyclotron";
-  if (has(s, "radiopharm", "hot lab")) return "Radiopharmacy / Hot Lab";
-  if (has(s, "radionuclide therapy", "radioiodine", "i-131 therapy")) {
-    return "Radionuclide Therapy";
-  }
 
   // Security and inspection, before "scanner" can pull a baggage set to CT.
   if (has(s, "cargo", "vehicle scan", "container scan")) {
@@ -434,7 +446,7 @@ export function sourceCategory(equipmentType: string): SourceCategory {
     has(s, "opg", "orthopantom", "cephalometric", "panoramic") || s === "opd" || s === "dpg";
   if (s.includes("dental") || panoramic) {
     if (cbct) return "Dental CBCT";
-    if (panoramic) return "Panoramic & Cephalometric";
+    if (panoramic) return "Panoramic & Cephalometric Dental";
     if (has(s, "portable", "handheld", "hand-held", "hand held", "mobile")) {
       return "Handheld Dental X-Ray";
     }
@@ -442,21 +454,36 @@ export function sourceCategory(equipmentType: string): SourceCategory {
   }
   if (cbct) return "Dental CBCT";
 
-  // Interventional. A C-arm in a cath lab is the fixed C-arm of an angiography
-  // suite; any other C-arm is the mobile kind used in theatre.
-  if (has(s, "cathlab", "cath lab", "angiograph")) return "Angiography & Cath Lab";
-  if (s.includes("c-arm") || s.includes("c arm")) return "Mobile C-Arm Units";
+  // Interventional. Ceiling-mounted only where the entry says so; an
+  // angiography suite or cath lab — including the annex's "C-arm (Cath Lab)" —
+  // is a fixed C-arm; any other C-arm is the mobile kind used in theatre.
+  const cArm = s.includes("c-arm") || s.includes("c arm");
+  if ((cArm || has(s, "angiograph", "cathlab", "cath lab")) && s.includes("ceiling")) {
+    return "Ceiling-Mounted C-Arm Units";
+  }
+  if (has(s, "cathlab", "cath lab", "angiograph")) return "Fixed C-Arm Units";
+  if (cArm) {
+    return has(s, "fixed", "floor") ? "Fixed C-Arm Units" : "Mobile C-Arm Units";
+  }
 
-  if (s.includes("fluoro")) return "Fluoroscopy (Fixed R/F Rooms)";
+  if (s.includes("fluoro")) return "Fixed X-Ray Fluoroscopy";
   if (/\bct\b/.test(s) || s.includes("ct-") || s === "scanners") return "General CT";
 
-  if (has(s, "mobile", "portable", "trolley")) return "Mobile Radiography";
-
-  // What is left of the plain radiography sets — fixed rooms, conventional or
-  // digital (CR/DR) alike.
-  if (has(s, "radiograph", "fixed", "x-ray", "xray", "x ray", "conventional")) {
+  // The plain radiography sets, mobile or fixed, each by imaging technology:
+  // computed (CR plates) and digital (DR panels) where the entry says so, and
+  // conventional (film) otherwise — the register's unqualified "Fixed Xray
+  // radiography" and "Portable Xray radiography" read as conventional, which
+  // is what the September briefing's split took them for too.
+  const technology =
+    has(s, "computed radiograph") || /\bcr\b/.test(s)
+      ? "computed"
+      : has(s, "digital") || /\bdr\b/.test(s)
+        ? "digital"
+        : "conventional";
+  if (has(s, "mobile", "portable", "trolley")) return RADIOGRAPHY.mobile[technology];
+  if (has(s, "radiograph", "fixed", "x-ray", "xray", "x ray", "conventional", "digital")) {
     if (has(s, "tube")) return UNRECOGNISED_TYPE;
-    return "Fixed Radiography (CR/DR)";
+    return RADIOGRAPHY.fixed[technology];
   }
 
   return UNRECOGNISED_TYPE;
