@@ -22,14 +22,12 @@ import {
  * wins.
  */
 describe("the reported groups and types", () => {
-  it("carries the fifteen practice groups, medical first", () => {
+  it("carries the thirteen practice groups, medical first", () => {
     expect(SOURCE_GROUPS.map((g) => [g.group, g.sector])).toEqual([
       ["Radiotherapy", "Medical"],
       ["Nuclear Medicine", "Medical"],
       ["Interventional Radiology & Cardiology", "Medical"],
       ["Diagnostic Radiology", "Medical"],
-      ["Dental Radiology", "Medical"],
-      ["Veterinary", "Medical"],
       ["Blood Irradiators", "Medical"],
       ["Industrial Radiography", "Non-medical"],
       ["Irradiation Facilities", "Non-medical"],
@@ -55,25 +53,28 @@ describe("the reported groups and types", () => {
       "PET-CT",
       "PET-MR",
       "SPECT-CT",
-      "Gamma Camera / SPECT",
-      "Radionuclide Therapy",
-      "Radiopharmacy / Hot Lab",
+      "SPECT",
       "Cyclotron",
-      "Angiography & Cath Lab",
       "Mobile C-Arm Units",
+      "Fixed C-Arm Units",
+      "Ceiling-Mounted C-Arm Units",
       "General CT",
-      "Fluoroscopy (Fixed R/F Rooms)",
-      "Fixed Radiography (CR/DR)",
-      "Mobile Radiography",
+      "Fixed X-Ray Fluoroscopy",
+      "Fixed Conventional Radiography",
+      "Fixed Digital Radiography",
+      "Fixed Computed Radiography",
+      "Mobile Conventional Radiography",
+      "Mobile Digital Radiography",
+      "Mobile Computed Radiography",
       "Mammography",
       "Bone Densitometry (DXA)",
       "Intraoral Dental",
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
       "Dental CBCT",
       "Handheld Dental X-Ray",
-      "Veterinary X-Ray",
+      "Fixed Veterinary X-Ray",
+      "Mobile Veterinary X-Ray",
       "Handheld Veterinary X-Ray",
-      "Veterinary NM & Radiotherapy",
       "Gamma Blood Irradiators",
       "X-Ray Blood Irradiators",
       "Gamma Radiography",
@@ -136,18 +137,27 @@ describe("the reported groups and types", () => {
 });
 
 describe("sourceCategory", () => {
-  it("files fixed rooms together, conventional and digital alike", () => {
-    expect(sourceCategory("Fixed Xray radiography")).toBe("Fixed Radiography (CR/DR)");
+  it("splits radiography by mounting and technology", () => {
+    // Unqualified reads as conventional (film).
+    expect(sourceCategory("Fixed Xray radiography")).toBe(
+      "Fixed Conventional Radiography",
+    );
     expect(sourceCategory("Conventional Xray generator")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Conventional Radiography",
     );
     expect(sourceCategory("Digital radiography DR x-ray")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Digital Radiography",
     );
-    expect(sourceCategory("Fixed Digital X-Ray")).toBe("Fixed Radiography (CR/DR)");
-    // Mobile before fixed, and before the digital word.
-    expect(sourceCategory("Digital Mobile X-ray")).toBe("Mobile Radiography");
-    expect(sourceCategory("Portable Xray radiography")).toBe("Mobile Radiography");
+    expect(sourceCategory("Fixed Digital X-Ray")).toBe("Fixed Digital Radiography");
+    expect(sourceCategory("Computed radiography (CR)")).toBe(
+      "Fixed Computed Radiography",
+    );
+    // Mobile before fixed.
+    expect(sourceCategory("Digital Mobile X-ray")).toBe("Mobile Digital Radiography");
+    expect(sourceCategory("Portable Xray radiography")).toBe(
+      "Mobile Conventional Radiography",
+    );
+    expect(sourceCategory("Mobile CR x-ray")).toBe("Mobile Computed Radiography");
   });
 
   it("splits dental four ways", () => {
@@ -158,13 +168,13 @@ describe("sourceCategory", () => {
     // An out-patient department's dental set, not a misspelt OPG.
     expect(sourceCategory("Dental X-ray (OPD)")).toBe("Intraoral Dental");
     expect(sourceCategory("Panoramic dental X-ray generator")).toBe(
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
     );
     expect(sourceCategory("Cephalometric dental Xray generator")).toBe(
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
     );
-    expect(sourceCategory("OPG")).toBe("Panoramic & Cephalometric");
-    expect(sourceCategory("OPD")).toBe("Panoramic & Cephalometric");
+    expect(sourceCategory("OPG")).toBe("Panoramic & Cephalometric Dental");
+    expect(sourceCategory("OPD")).toBe("Panoramic & Cephalometric Dental");
     expect(sourceCategory("Portable Dental X Ray")).toBe("Handheld Dental X-Ray");
     expect(sourceCategory("Dental CBCT")).toBe("Dental CBCT");
     expect(sourceCategory("Cone beam CT")).toBe("Dental CBCT");
@@ -193,29 +203,35 @@ describe("sourceCategory", () => {
     expect(sourceCategory("PET-CT")).toBe("PET-CT");
     expect(sourceCategory("PET/MR")).toBe("PET-MR");
     expect(sourceCategory("SPECT-CT")).toBe("SPECT-CT");
-    expect(sourceCategory("SPECT")).toBe("Gamma Camera / SPECT");
-    expect(sourceCategory("Gamma camera")).toBe("Gamma Camera / SPECT");
+    expect(sourceCategory("SPECT")).toBe("SPECT");
+    expect(sourceCategory("Gamma camera")).toBe("SPECT");
     expect(sourceCategory("Cyclotron")).toBe("Cyclotron");
     expect(sourceCategory("CT scanner")).toBe("General CT");
     expect(sourceCategory("CT-Scan")).toBe("General CT");
   });
 
   it("splits interventional from diagnostic fluoroscopy", () => {
-    expect(sourceCategory("Angiography generator")).toBe("Angiography & Cath Lab");
-    expect(sourceCategory("Cathlab")).toBe("Angiography & Cath Lab");
+    expect(sourceCategory("Angiography generator")).toBe("Fixed C-Arm Units");
+    expect(sourceCategory("Cathlab")).toBe("Fixed C-Arm Units");
     // A C-arm in a cath lab is that lab's fixed C-arm.
-    expect(sourceCategory("C-arm (Cath Lab)")).toBe("Angiography & Cath Lab");
+    expect(sourceCategory("C-arm (Cath Lab)")).toBe("Fixed C-Arm Units");
+    expect(sourceCategory("Ceiling mounted C-arm")).toBe(
+      "Ceiling-Mounted C-Arm Units",
+    );
     expect(sourceCategory("C-arm Xray generator")).toBe("Mobile C-Arm Units");
     expect(sourceCategory("Digital C-arm X-ray")).toBe("Mobile C-Arm Units");
     expect(sourceCategory("Fluoroscopic Xray generator")).toBe(
-      "Fluoroscopy (Fixed R/F Rooms)",
+      "Fixed X-Ray Fluoroscopy",
     );
     expect(sourceCategory("Digital Mammography")).toBe("Mammography");
     expect(sourceCategory("Bone densitometer")).toBe("Bone Densitometry (DXA)");
   });
 
   it("files veterinary and blood irradiators apart from hospital kit", () => {
-    expect(sourceCategory("Veterinary X-ray")).toBe("Veterinary X-Ray");
+    expect(sourceCategory("Veterinary X-ray")).toBe("Fixed Veterinary X-Ray");
+    expect(sourceCategory("Mobile veterinary X-ray")).toBe(
+      "Mobile Veterinary X-Ray",
+    );
     expect(sourceCategory("Handheld veterinary X-ray")).toBe(
       "Handheld Veterinary X-Ray",
     );

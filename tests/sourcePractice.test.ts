@@ -82,9 +82,8 @@ describe("sourcePractice", () => {
     expect(sourcePractice({ nuclide: "Co-57" }, nm).category).toBe(
       "Calibration & Reference Sources",
     );
-    expect(sourcePractice({ nuclide: "I-131" }, nm).category).toBe(
-      "Radionuclide Therapy",
-    );
+    // The list has no therapy type, so an I-131 is left for an officer.
+    expect(sourcePractice({ nuclide: "I-131" }, nm).basis).toBe("undetermined");
     expect(
       sourcePractice({ nuclide: "Ni-63", manufacturer: "Thermo scientific" }, null),
     ).toEqual({ category: "Electron Capture Detectors", basis: "record" });

@@ -131,16 +131,18 @@ describe("summary figures reconcile to the detail rows", () => {
       "HDR/MDR Brachytherapy": 2,
       "PET-CT": 2,
       Cyclotron: 1,
-      "Angiography & Cath Lab": 5,
+      "Fixed C-Arm Units": 5,
       "Mobile C-Arm Units": 52,
       "General CT": 50,
-      "Fluoroscopy (Fixed R/F Rooms)": 33,
-      "Fixed Radiography (CR/DR)": 280,
-      "Mobile Radiography": 191,
+      "Fixed X-Ray Fluoroscopy": 33,
+      "Fixed Conventional Radiography": 172,
+      "Fixed Digital Radiography": 108,
+      "Mobile Conventional Radiography": 114,
+      "Mobile Digital Radiography": 77,
       Mammography: 26,
       "Bone Densitometry (DXA)": 1,
       "Intraoral Dental": 27,
-      "Panoramic & Cephalometric": 17,
+      "Panoramic & Cephalometric Dental": 17,
       "Handheld Dental X-Ray": 9,
       "Industrial X-Ray Radiography": 13,
       "Fixed Gauges": 16,
@@ -165,8 +167,8 @@ describe("summary figures reconcile to the detail rows", () => {
       Radiotherapy: 10,
       "Nuclear Medicine": 3,
       "Interventional Radiology & Cardiology": 57,
-      "Diagnostic Radiology": 581,
-      "Dental Radiology": 53,
+      // Dental imaging sits inside diagnostic radiology (581 + 53).
+      "Diagnostic Radiology": 634,
       "Industrial Radiography": 13,
       "Nuclear Gauges": 16,
       "Security & Inspection": 46,
@@ -290,7 +292,9 @@ describe("generatorFamily", () => {
     // "Digital Mammography" would otherwise fall to fixed radiography.
     expect(generatorFamily("Digital Mammography")).toBe("Mammography");
     // "Digital Mobile X-ray" is mobile, not a fixed room.
-    expect(generatorFamily("Digital Mobile X-ray")).toBe("Mobile Radiography");
+    expect(generatorFamily("Digital Mobile X-ray")).toBe(
+      "Mobile Digital Radiography",
+    );
     // "Portable Dental X Ray" is dental, not mobile radiography.
     expect(generatorFamily("Portable Dental X Ray")).toBe(
       "Handheld Dental X-Ray",
@@ -302,20 +306,20 @@ describe("generatorFamily", () => {
       "Industrial X-Ray Radiography",
     );
     expect(generatorFamily("Digital Fluoroscopy X-ray")).toBe(
-      "Fluoroscopy (Fixed R/F Rooms)",
+      "Fixed X-Ray Fluoroscopy",
     );
   });
 
   it("recognises the imaging families across the export's spellings", () => {
-    // Fixed rooms, conventional and digital (CR/DR) alike.
+    // Fixed rooms by technology; unqualified reads as conventional.
     expect(generatorFamily("Fixed Xray radiography")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Conventional Radiography",
     );
     expect(generatorFamily("Conventional Xray generator")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Conventional Radiography",
     );
     expect(generatorFamily("Digital radiography DR x-ray")).toBe(
-      "Fixed Radiography (CR/DR)",
+      "Fixed Digital Radiography",
     );
     expect(generatorFamily("CT scanner")).toBe("General CT");
     expect(generatorFamily("PET-CT")).toBe("PET-CT");
@@ -323,14 +327,14 @@ describe("generatorFamily", () => {
       "Intraoral Dental",
     );
     expect(generatorFamily("Panoramic dental X-ray generator")).toBe(
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
     );
     expect(generatorFamily("Cephalometric dental Xray generator")).toBe(
-      "Panoramic & Cephalometric",
+      "Panoramic & Cephalometric Dental",
     );
-    expect(generatorFamily("Cathlab")).toBe("Angiography & Cath Lab");
+    expect(generatorFamily("Cathlab")).toBe("Fixed C-Arm Units");
     expect(generatorFamily("Angiography generator")).toBe(
-      "Angiography & Cath Lab",
+      "Fixed C-Arm Units",
     );
     // The register's XRF rows do not say portable or fixed, so they wait in
     // their own bucket rather than being guessed into one.

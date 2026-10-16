@@ -1392,21 +1392,19 @@ page is `app/verified-source-inventory/page.tsx`.
 
 ### The equipment categories
 
-Both tabs report against **one two-level list** — fifteen practice groups,
+Both tabs report against **one two-level list** — thirteen practice groups,
 each holding the machine or source types under it — `SOURCE_GROUPS` in
 `lib/rules/sourceCategories.ts`, so the register and the field exercise name a
 machine the same way and can be read line against line. The groups follow the
 way the IAEA safety standards divide the field (October 2026, replacing the flat
-Seniors' Briefing list of September):
+Seniors' Briefing list of September; corrected 16 October):
 
 | Group | Types |
 | --- | --- |
 | **Radiotherapy** | Linear Accelerators · Teletherapy (Co-60) · Gamma Knife · Kilovoltage X-Ray Therapy · HDR/MDR Brachytherapy · LDR Brachytherapy · RT Simulators & CT Simulators |
-| **Nuclear Medicine** | PET-CT · PET-MR · SPECT-CT · Gamma Camera / SPECT · Radionuclide Therapy · Radiopharmacy / Hot Lab · Cyclotron |
-| **Interventional Radiology & Cardiology** | Angiography & Cath Lab · Mobile C-Arm Units |
-| **Diagnostic Radiology** | General CT · Fluoroscopy (Fixed R/F Rooms) · Fixed Radiography (CR/DR) · Mobile Radiography · Mammography · Bone Densitometry (DXA) |
-| **Dental Radiology** | Intraoral Dental · Panoramic & Cephalometric · Dental CBCT · Handheld Dental X-Ray |
-| **Veterinary** | Veterinary X-Ray · Handheld Veterinary X-Ray · Veterinary NM & Radiotherapy |
+| **Nuclear Medicine** | PET-CT · PET-MR · SPECT-CT · SPECT · Cyclotron |
+| **Interventional Radiology & Cardiology** | Mobile C-Arm Units · Fixed C-Arm Units · Ceiling-Mounted C-Arm Units |
+| **Diagnostic Radiology** | General CT · Fixed X-Ray Fluoroscopy · Fixed Conventional / Digital / Computed Radiography · Mobile Conventional / Digital / Computed Radiography · Mammography · Bone Densitometry (DXA) · Intraoral Dental · Panoramic & Cephalometric Dental · Dental CBCT · Handheld Dental X-Ray · Fixed / Mobile / Handheld Veterinary X-Ray |
 | **Blood Irradiators** | Gamma Blood Irradiators · X-Ray Blood Irradiators |
 | **Industrial Radiography** | Gamma Radiography · Industrial X-Ray Radiography · Pipeline Crawlers |
 | **Irradiation Facilities** | Gamma Irradiators · Electron Beam & X-Ray Irradiators |
