@@ -8,14 +8,47 @@ import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { isMockMode } from "@/lib/firebase";
 import { PROVINCES, type Facility } from "@/lib/rules/types";
+import { MIN_PASSWORD_LENGTH, validatePasswordChange } from "@/lib/rules/signup";
 
 export default function SettingsPage() {
-  const { user, workspace } = useAuth();
+  const { user, workspace, changePassword } = useAuth();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   // A full export reads every collection, which only the department may do.
   const canExport = workspace?.kind === "department";
+
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNext, setPwNext] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState("");
+
+  const submitPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const problems = validatePasswordChange({
+      current: pwCurrent,
+      next: pwNext,
+      confirm: pwConfirm,
+    });
+    if (problems.length) {
+      setPwError(problems[0]);
+      return;
+    }
+    setPwBusy(true);
+    setPwError("");
+    try {
+      await changePassword(pwCurrent, pwNext);
+      setPwCurrent("");
+      setPwNext("");
+      setPwConfirm("");
+      toast.push("Your password has been changed.", "success");
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : "Could not change the password.");
+    } finally {
+      setPwBusy(false);
+    }
+  };
 
   const exportJson = async () => {
     setBusy(true);
@@ -94,6 +127,68 @@ export default function SettingsPage() {
           {user?.role} · {user?.section}
           {user?.extraSections?.length ? ` · also ${user.extraSections.join(", ")}` : ""}
         </div>
+      </Panel>
+
+      <Panel
+        title="Change password"
+        note="Use this after an administrator gives you a temporary password."
+      >
+        <form onSubmit={submitPassword} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="field-label" htmlFor="pw-current">
+              Current password
+            </label>
+            <input
+              id="pw-current"
+              type="password"
+              className="input"
+              autoComplete="current-password"
+              value={pwCurrent}
+              onChange={(e) => setPwCurrent(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="pw-next">
+              New password
+            </label>
+            <input
+              id="pw-next"
+              type="password"
+              className="input"
+              autoComplete="new-password"
+              value={pwNext}
+              onChange={(e) => setPwNext(e.target.value)}
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="pw-confirm">
+              Repeat new password
+            </label>
+            <input
+              id="pw-confirm"
+              type="password"
+              className="input"
+              autoComplete="new-password"
+              value={pwConfirm}
+              onChange={(e) => setPwConfirm(e.target.value)}
+            />
+          </div>
+          <div className="md:col-span-3 flex flex-col sm:flex-row sm:items-center gap-2">
+            <button
+              type="submit"
+              className="btn btn-primary sm:w-auto"
+              disabled={pwBusy || !pwCurrent || !pwNext || !pwConfirm}
+            >
+              {pwBusy ? "Changing…" : "Change password"}
+            </button>
+            {pwError ? (
+              <p role="alert" className="text-[12px] text-red-700">
+                {pwError}
+              </p>
+            ) : null}
+          </div>
+        </form>
       </Panel>
 
       {canExport ? (
