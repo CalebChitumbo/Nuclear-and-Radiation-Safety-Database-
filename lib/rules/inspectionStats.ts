@@ -12,6 +12,7 @@ import { isActiveRequest } from "./inspectionRequests";
 import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
+  inspectionOutcome,
   type Inspection,
   type InspectionOutcome,
   type InspectionPriority,
@@ -43,6 +44,16 @@ export function periodLabel(period: InspectionPeriod, ctx: PeriodContext): strin
   }
 }
 
+/**
+ * The year the undated rows belong to. Only the Inspectorate's 2026 facility
+ * inspection register creates inspections with no date (both logging forms
+ * require one), so an undated row is a 2026 inspection whose day the section
+ * no longer has. It counts toward that year — so the year's total is the
+ * register's, the same figure output 1.2.4 reports — but toward no week or
+ * month, because nothing says which one it fell in.
+ */
+export const UNDATED_INSPECTION_YEAR = 2026;
+
 export function inspectionInPeriod(
   i: Inspection,
   period: InspectionPeriod,
@@ -54,7 +65,9 @@ export function inspectionInPeriod(
     case "month":
       return (i.date || "").slice(0, 7) === ctx.today.slice(0, 7);
     case "year":
-      return (i.date || "").slice(0, 4) === ctx.today.slice(0, 4);
+      return i.date
+        ? i.date.slice(0, 4) === ctx.today.slice(0, 4)
+        : ctx.today.slice(0, 4) === String(UNDATED_INSPECTION_YEAR);
     default:
       return true;
   }
@@ -67,9 +80,11 @@ export interface InspectorateDashboard {
   facilities: number;
   byType: Record<InspectionType, number>;
   byOutcome: Record<InspectionOutcome, number>;
+  /** Inspections with no outcome recorded (the register's imported rows). */
+  outcomeNotRecorded: number;
   /** Enforcement actions in the period, newest first. */
   enforcement: Inspection[];
-  /** Major findings + non-compliant outcomes — the follow-up workload. */
+  /** Non-compliant outcomes — the follow-up workload. */
   needsFollowUp: number;
 }
 
@@ -86,18 +101,17 @@ export function deriveInspectorateDashboard(
   const distinct = new Set<string>();
   const enforcement: Inspection[] = [];
   let total = 0;
-  let needsFollowUp = 0;
+  let outcomeNotRecorded = 0;
 
   for (const i of inspections) {
     if (!inspectionInPeriod(i, period, ctx)) continue;
     total += 1;
     distinct.add(i.facilityId || i.facilityName);
     if (i.type in byType) byType[i.type] += 1;
-    if (i.outcome in byOutcome) byOutcome[i.outcome] += 1;
+    const outcome = inspectionOutcome(i.outcome);
+    if (outcome) byOutcome[outcome] += 1;
+    else outcomeNotRecorded += 1;
     if (i.type === "Enforcement Action") enforcement.push(i);
-    if (i.outcome === "Major findings" || i.outcome === "Non-compliant") {
-      needsFollowUp += 1;
-    }
   }
 
   enforcement.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -107,8 +121,9 @@ export function deriveInspectorateDashboard(
     facilities: distinct.size,
     byType,
     byOutcome,
+    outcomeNotRecorded,
     enforcement,
-    needsFollowUp,
+    needsFollowUp: byOutcome["Non-compliant"],
   };
 }
 

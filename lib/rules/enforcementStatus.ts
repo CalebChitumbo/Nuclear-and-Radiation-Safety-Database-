@@ -17,6 +17,7 @@
  */
 import {
   ENFORCEMENT_ACTIONS,
+  enforcementLabel,
   isEnforcementAction,
   type EnforcementAction,
 } from "./inspectionDatabase";
@@ -144,5 +145,5 @@ export function standingLabel(
     : facility.currentStatus || facility.stage;
   if (!enforcement) return base;
   const when = enforcement.date ? ` (${enforcement.date})` : "";
-  return `${base} — ${enforcement.action}${when}`;
+  return `${base} — ${enforcementLabel(enforcement.action)}${when}`;
 }

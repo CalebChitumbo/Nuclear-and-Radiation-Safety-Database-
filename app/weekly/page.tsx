@@ -10,9 +10,11 @@ import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { downloadTextFile } from "@/components/downloadFile";
 import { LoadErrorBanner } from "@/components/LoadError";
+import { UNDATED_INSPECTION_YEAR } from "@/lib/rules/inspectionStats";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
 import { useToast } from "@/components/Toast";
+import { JumpLinks, JumpTarget } from "@/components/JumpLinks";
 import { OpeningBalancePanel } from "@/components/weekly/OpeningBalancePanel";
 import {
   InspectionSummaryFooter,
@@ -63,6 +65,7 @@ import {
   SECTIONS,
   type Activity,
   type DailyEntry,
+  type DashboardAggregate,
   type Inspection,
   type Section,
   type WorkPlanBaseline,
@@ -192,6 +195,7 @@ export default function WeeklyPage() {
       workPlanNotes,
       baseline,
       config,
+      aggregate,
     ] = await Promise.all([
       register ? s.listLicenceEvents() : Promise.resolve([]),
       register ? s.listInspections() : Promise.resolve([]),
@@ -211,6 +215,11 @@ export default function WeeklyPage() {
       s.getWorkPlanConfig(WORK_PLAN_YEAR).catch(
         () => null as WorkPlanConfig | null,
       ),
+      // One document: the register's authorisations, which 1.1.4 reports —
+      // the same figure the Overview shows, so the two move together.
+      register
+        ? s.getAggregate().catch(() => null as DashboardAggregate | null)
+        : Promise.resolve(null as DashboardAggregate | null),
     ]);
     return {
       events,
@@ -221,6 +230,7 @@ export default function WeeklyPage() {
       workPlanNotes,
       baseline,
       config,
+      aggregate,
     };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -261,6 +271,7 @@ export default function WeeklyPage() {
       fromDaily,
       notes,
       baseline: data.baseline?.values ?? null,
+      registerAuthorisations: data.aggregate?.auths ?? null,
     });
     const quarter = buildQuarterIndex(weeks).get(selected.label) ?? null;
     const retired = retiredOutputs(data.config).filter((o) =>
@@ -490,7 +501,21 @@ export default function WeeklyPage() {
         />
       </div>
 
-      <Panel>
+      <JumpLinks
+        links={[
+          { id: "at-a-glance", label: "At a glance" },
+          { id: "opening-balance", label: "Opening balance" },
+          ...reports.map((r) => ({
+            id: subprogrammeAnchor(r.id),
+            label: `${r.id} ${r.title.split(/ \/ |, /)[0]}`,
+          })),
+          { id: "plan-changes", label: "Plan changes" },
+          { id: "inspection-summary", label: "Inspection summary" },
+          { id: "activities", label: "Additional activities" },
+        ]}
+      />
+
+      <Panel id="at-a-glance">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Figure label="Outputs on the plan" value={planRows.length} />
           <Figure label="Moved this week" value={movedThisWeek} />
@@ -540,14 +565,16 @@ export default function WeeklyPage() {
         </p>
       </Panel>
 
-      <OpeningBalancePanel
-        year={WORK_PLAN_YEAR}
-        plan={ownPlan}
-        baseline={data.baseline}
-        canEdit={user?.role === "admin"}
-        uid={user?.uid || ""}
-        onSaved={reload}
-      />
+      <JumpTarget id="opening-balance">
+        <OpeningBalancePanel
+          year={WORK_PLAN_YEAR}
+          plan={ownPlan}
+          baseline={data.baseline}
+          canEdit={user?.role === "admin"}
+          uid={user?.uid || ""}
+          onSaved={reload}
+        />
+      </JumpTarget>
 
       {reports.map((sub) => (
         <SubprogrammeTable
@@ -625,6 +652,11 @@ export default function WeeklyPage() {
   );
 }
 
+/** The id a subprogramme's table is jumped to by — "1.2" → "subprogramme-1-2". */
+function subprogrammeAnchor(id: string): string {
+  return `subprogramme-${id.replace(/[^a-z0-9]+/gi, "-")}`;
+}
+
 function printPdf() {
   window.print();
 }
@@ -654,8 +686,12 @@ function InspectionSummaryPanel({
   const summary = useMemo(() => {
     const slice = weekOnly
       ? inspections.filter((i) => i.week === weekLabel)
-      : inspections.filter(
-          (i) => (i.date || "").slice(0, 4) === String(WORK_PLAN_YEAR),
+      : inspections.filter((i) =>
+          // The register's undated rows are 2026 inspections: they are in
+          // 1.2.4's figure, so they are in this table too.
+          i.date
+            ? i.date.slice(0, 4) === String(WORK_PLAN_YEAR)
+            : WORK_PLAN_YEAR === UNDATED_INSPECTION_YEAR,
         );
     // District and practice come off the inspection itself here — the summary
     // needs only province and phase, so the register is not re-read.
@@ -668,6 +704,7 @@ function InspectionSummaryPanel({
 
   return (
     <Panel
+      id="inspection-summary"
       title={`Inspection database summary — ${span}`}
       flush
       note="Derived from the inspection register: pre-auth, planned, follow-up and investigative inspections by province, with the enforcement actions taken."
@@ -725,6 +762,7 @@ function RetiredOutputsPanel({
 
   return (
     <Panel
+      id="plan-changes"
       title={`Changes to the ${WORK_PLAN_YEAR} plan`}
       note={`${customised} row${customised === 1 ? "" : "s"} changed from the approved workbook${
         retired.length
@@ -1009,6 +1047,7 @@ function SubprogrammeTable({
 
   return (
     <Panel
+      id={subprogrammeAnchor(sub.id)}
       title={sub.heading}
       note={note}
       flush
@@ -2045,6 +2084,7 @@ function ActivitiesPanel({
 
   return (
     <Panel
+      id="activities"
       title={`Additional activities — ${weekLabel}`}
       note="Work that carries no work plan output — meetings attended, ad-hoc requests, anything the plan has no row for."
       flush

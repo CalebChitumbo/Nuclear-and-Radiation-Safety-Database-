@@ -140,7 +140,7 @@ describe("enforcement standing", () => {
         inspectionId: "b",
         history: [],
       }),
-    ).toBe("No Application Submitted — Suspension of Practice (2026-06-15)");
+    ).toBe("No Application Submitted — Sealed (2026-06-15)");
     expect(
       standingLabel(fac({ id: "l", licensed: true, stage: "Licensed" }), {
         action: "Written Warning",
@@ -149,7 +149,7 @@ describe("enforcement standing", () => {
         inspectionId: "z",
         history: [],
       }),
-    ).toBe("Licensed — Written Warning");
+    ).toBe("Licensed — Written Notice");
     expect(
       standingLabel(fac({ id: "s", stage: "Waiting for Payment", currentStatus: "Invoice Generated" as never }), undefined),
     ).toBe("Invoice Generated");
@@ -251,10 +251,10 @@ describe("deriveFunctionalDashboard", () => {
       "priv-warned",
     ]);
     const warned = d.sectors.Private.rows.find((r) => r.facility.id === "priv-warned")!;
-    expect(warned.standing).toBe("No Application Submitted — Written Warning (2026-05-06)");
+    expect(warned.standing).toBe("No Application Submitted — Written Notice (2026-05-06)");
     expect(warned.enforcement?.severity).toBe("notice");
     const closed = d.rows.find((r) => r.facility.id === "pub-closed")!;
-    expect(closed.standing).toBe("No Application Submitted — Suspension of Practice (2026-05-05)");
+    expect(closed.standing).toBe("No Application Submitted — Sealed (2026-05-05)");
     // Public rows come first in the combined list, then private.
     expect(d.rows.map((r) => r.facility.sector)).toEqual([
       "Public",

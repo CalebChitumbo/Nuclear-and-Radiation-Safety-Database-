@@ -34,8 +34,9 @@ import { weekLabelForDate } from "@/lib/rules/week";
 import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
+  inspectionOutcome,
   type Inspection,
-  type InspectionOutcome,
+  type StoredInspectionOutcome,
   type InspectionType,
   type WeekDef,
 } from "@/lib/rules/types";
@@ -59,7 +60,11 @@ export function InspectionEditor({
   const toast = useToast();
   const [date, setDate] = useState(inspection.date);
   const [type, setType] = useState<InspectionType>(inspection.type);
-  const [outcome, setOutcome] = useState<InspectionOutcome>(inspection.outcome);
+  // A findings grade from before Oct 2026 opens as Non-compliant; a register
+  // row with no outcome stays "N/A" until one is picked.
+  const [outcome, setOutcome] = useState<StoredInspectionOutcome>(
+    inspectionOutcome(inspection.outcome) ?? "N/A",
+  );
   const [enforcement, setEnforcement] = useState(inspection.enforcement || "");
   const [notes, setNotes] = useState(inspection.notes || "");
   const [cardIssued, setCardIssued] = useState(!!inspection.cardIssued);
@@ -181,8 +186,9 @@ export function InspectionEditor({
             id={`insp-outcome-${inspection.id}`}
             className="input"
             value={outcome}
-            onChange={(e) => setOutcome(e.target.value as InspectionOutcome)}
+            onChange={(e) => setOutcome(e.target.value as StoredInspectionOutcome)}
           >
+            {outcome === "N/A" ? <option value="N/A">Not recorded</option> : null}
             {INSPECTION_OUTCOMES.map((o) => (
               <option key={o} value={o}>
                 {o}

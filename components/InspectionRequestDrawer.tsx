@@ -22,6 +22,7 @@ import {
 } from "@/lib/rules/inspectionRequests";
 import {
   INSPECTION_OUTCOMES,
+  inspectionOutcome,
   type InspectionOutcome,
   type InspectionRequest,
   type InspectionRequestEvent,
@@ -214,7 +215,7 @@ export function InspectionRequestDrawer({
             />
           ) : null}
           {shown.outcome ? (
-            <Field label="Outcome" value={shown.outcome} />
+            <Field label="Outcome" value={inspectionOutcome(shown.outcome) ?? shown.outcome} />
           ) : null}
           {shown.workflowRan ? (
             <div className="col-span-2">

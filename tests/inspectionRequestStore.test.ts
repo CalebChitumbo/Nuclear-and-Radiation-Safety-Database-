@@ -113,7 +113,7 @@ describe("mock store — inspection request lifecycle (the integration seam)", (
       req.id,
       {
         kind: "complete",
-        outcome: "Minor findings",
+        outcome: "Non-compliant",
         reportRef: "R/2",
         completedDate: "2026-05-01",
       },

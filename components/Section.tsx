@@ -66,7 +66,10 @@ export function Panel({
   flush,
   className = "",
   bleed = true,
+  id,
 }: {
+  /** Makes the panel a destination for the page's `JumpLinks`. */
+  id?: string;
   title?: ReactNode;
   action?: ReactNode;
   note?: ReactNode;
@@ -78,9 +81,10 @@ export function Panel({
 }) {
   return (
     <section
+      id={id}
       className={`card ${bleed ? "bleed" : ""} ${
         flush ? "py-4 sm:py-5" : "p-4 sm:p-5"
-      } ${className}`}
+      } ${id ? "jump-target" : ""} ${className}`}
     >
       {title ? (
         <div className={flush ? "px-4 sm:px-5" : ""}>

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Bars } from "@/components/Bars";
 import { Kpi } from "@/components/Kpi";
+import { JumpLinks } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { useStoreData } from "@/lib/storeHooks";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/rules/licenceStats";
 import {
   WORK_PLAN_YEAR,
+  countAuthorisations,
   licencesIssuedNote,
   licencesIssuedRow,
 } from "@/lib/rules/workPlan";
@@ -112,8 +114,8 @@ export default function LicencesPage() {
     () => (data ? computeLicenceStats(data.facilities, year) : null),
     [data, year],
   );
-  // Licences issued this plan year, exactly as the weekly report counts them:
-  // the section's opening balance plus every dated licence since.
+  // Licences issued, exactly as the weekly report counts them: every
+  // authorisation on the register, with the dated licences in their quarters.
   const issued = useMemo(
     () =>
       data
@@ -123,6 +125,7 @@ export default function LicencesPage() {
             week: selected.label,
             baseline: data.baseline?.values ?? null,
             config: data.config,
+            registerAuthorisations: countAuthorisations(data.facilities),
           })
         : null,
     [data, weeks, selected.label],
@@ -233,6 +236,15 @@ export default function LicencesPage() {
         }
       />
 
+      <JumpLinks
+        links={[
+          { id: "by-type", label: "By type" },
+          { id: "authorisations", label: "Authorisations on record" },
+          { id: "use-held", label: "Use licence held" },
+          { id: "pipeline", label: "Renewal pipeline" },
+        ]}
+      />
+
       {/* Totals — renewal + import + transit + every other type */}
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         {issued ? (
@@ -272,13 +284,17 @@ export default function LicencesPage() {
       </section>
 
       {/* Issued by type */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="by-type"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <Bars title="Use / Possession licences by type" rows={useRows} />
         <Bars title="Standalone authorisations by type" rows={otherRows} />
       </section>
 
       {/* Itemized authorisations — which facility holds which licence */}
       <Panel
+        id="authorisations"
         title={`Authorisations on record — ${filteredAuthRows.length} shown`}
         flush
       >
@@ -414,6 +430,7 @@ export default function LicencesPage() {
 
       {/* Who holds a current use licence this year */}
       <Panel
+        id="use-held"
         title={`Use licence held — ${year}`}
         note="The licence year is read from each facility's most recent use/possession licence date. Facilities seeded before date tracking show under “renewal not yet confirmed” until their next dated renewal is recorded."
       >
@@ -441,13 +458,14 @@ export default function LicencesPage() {
 
       {/* Renewal pipeline for the unlicensed */}
       {stageRows.length === 0 ? (
-        <Panel title="Renewal pipeline">
+        <Panel id="pipeline" title="Renewal pipeline">
           <p className="text-sm text-gunmetal/60">
             Every facility holds a use licence.
           </p>
         </Panel>
       ) : (
         <Panel
+          id="pipeline"
           title="Renewal pipeline — where the unlicensed facilities are"
           action={
             <Link className="link-action" href="/facilities">

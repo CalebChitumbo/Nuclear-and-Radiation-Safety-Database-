@@ -8,6 +8,7 @@ import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { ApplicationHistoryDrawer } from "@/components/ApplicationHistoryDrawer";
 import { FacilitySelect } from "@/components/FacilitySelect";
+import { JumpLinks, JumpTarget } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { Kpi } from "@/components/Kpi";
 import { Panel } from "@/components/Section";
@@ -453,16 +454,26 @@ export default function LicenceStatusPage() {
         onChanged={reload}
       />
 
-      {/* The inbox — incoming RAIS emails, each with its status, ready to accept */}
-      <IncomingInbox
-        items={needsReview}
-        facilities={facilities || []}
-        busy={saving}
-        onAccept={applyReviewed}
-        onAcceptAllReady={acceptAllReady}
-        onAddFacility={setAddingFor}
-        onOpenHistory={openHistory}
+      <JumpLinks
+        links={[
+          { id: "inbox", label: "Inbox" },
+          { id: "ready-to-license", label: "Ready to license" },
+          { id: "manual-paste", label: "Manual paste & pipeline" },
+        ]}
       />
+
+      {/* The inbox — incoming RAIS emails, each with its status, ready to accept */}
+      <JumpTarget id="inbox">
+        <IncomingInbox
+          items={needsReview}
+          facilities={facilities || []}
+          busy={saving}
+          onAccept={applyReviewed}
+          onAcceptAllReady={acceptAllReady}
+          onAddFacility={setAddingFor}
+          onOpenHistory={openHistory}
+        />
+      </JumpTarget>
 
       {/* Create a brand-new register facility from an incoming email, then link it. */}
       <AddFacilityDialog
@@ -478,16 +489,18 @@ export default function LicenceStatusPage() {
 
       {/* The two licence-issuing emails (§4): confirm the type, record via R1–R6 */}
       {readyToLicense.length ? (
-        <ReadyToLicense
-          items={readyToLicense}
-          busy={saving}
-          onApprove={approveLicence}
-          onOpenHistory={openHistory}
-        />
+        <JumpTarget id="ready-to-license">
+          <ReadyToLicense
+            items={readyToLicense}
+            busy={saving}
+            onApprove={approveLicence}
+            onOpenHistory={openHistory}
+          />
+        </JumpTarget>
       ) : null}
 
       {/* Manual paste + full pipeline board — secondary, tucked behind a disclosure */}
-      <details className="card bleed p-4 sm:p-5">
+      <details id="manual-paste" className="card bleed p-4 sm:p-5 jump-target">
         <summary className="font-black cursor-pointer select-none py-1">
           Manual paste &amp; pipeline board
           <span className="block sm:inline text-xs text-gunmetal/55 font-normal sm:ml-2">

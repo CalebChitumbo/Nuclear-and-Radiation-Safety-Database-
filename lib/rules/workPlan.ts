@@ -41,6 +41,7 @@ import {
 import {
   WORK_PLAN_STATUSES,
   type DailyEntry,
+  type Facility,
   type Inspection,
   type InspectionType,
   type LicenceEvent,
@@ -1451,6 +1452,12 @@ export interface WorkPlanRow {
   quarters: number[];
   openingTotal: number;
   recordedTotal: number;
+  /**
+   * How far the opening balance was moved so the row reads what the register
+   * holds (`registerTarget`) — 0 for a row that is not reconciled. Already
+   * inside `opening`; carried so the report can say so.
+   */
+  registerAdjustment: number;
   /** Total Actual — the sum of the four quarters, opening balance included. */
   total: number;
   /** Total ÷ target × 100, or null where the output has no numeric target. */
@@ -1511,6 +1518,13 @@ export interface WorkPlanInput {
    * counts only what the system has recorded.
    */
   baseline?: Record<string, number[]> | null;
+  /**
+   * Every authorisation on the facility register — the Overview's
+   * "Authorisations on record" (`DashboardAggregate.auths`). When given, the
+   * row counting every licence (1.1.4) reads this figure; see
+   * `registerTarget`. Omit to report opening balance + dated events only.
+   */
+  registerAuthorisations?: number | null;
   year?: number;
 }
 
@@ -1616,9 +1630,14 @@ function buildBreakdown(
   }
 
   if (spec.kind === "inspectionTypes") {
-    return INSPECTION_BREAKDOWN.filter((b) => spec.match(b.type)).map((b) =>
-      count(b.label, input.inspections.filter((i) => i.type === b.type)),
-    );
+    // The register's undated rows are in the year's figure (see
+    // registerTarget), so they are in its split too.
+    return INSPECTION_BREAKDOWN.filter((b) => spec.match(b.type)).map((b) => {
+      const ofType = input.inspections.filter((i) => i.type === b.type);
+      const row = count(b.label, ofType);
+      row.total += ofType.filter((i) => isUndated(i, quarterByWeek)).length;
+      return row;
+    });
   }
 
   if (spec.kind === "enforcementActions") {
@@ -1663,6 +1682,82 @@ function buildBreakdown(
   }
 }
 
+/** Every authorisation on the facility register — what 1.1.4 reports. */
+export function countAuthorisations(facilities: ReadonlyArray<Pick<Facility, "auths">>): number {
+  let n = 0;
+  for (const f of facilities) n += (f.auths || []).length;
+  return n;
+}
+
+/** An inspection the report can place in no quarter: a register row with no date. */
+function isUndated(
+  r: { week: string; date: string },
+  quarterByWeek: Map<string, Quarter>,
+): boolean {
+  return !r.date && !quarterByWeek.get(r.week);
+}
+
+/**
+ * The figure a row must read because the dashboard reads it straight off a
+ * register — null for every other row.
+ *
+ * Management's instruction (Oct 2026) is that the dashboard and the sectional
+ * update move together, and that the dashboard's figures are the right ones:
+ *
+ * - **1.2.4** (every inspection visit) reads the inspection register's total —
+ *   its dated visits plus the 2026 register's undated rows, the Inspectorate
+ *   tab's *Total Inspections Conducted*.
+ * - **1.1.4** (every licence) reads the facility register's authorisations —
+ *   the Overview's *Authorisations on record*.
+ *
+ * The rows are found by what they count (an unfiltered link), not by number,
+ * so a renumbered row is still found.
+ */
+function registerTarget(
+  output: WorkPlanOutput,
+  input: WorkPlanInput,
+  recorded: Tally,
+  quarterByWeek: Map<string, Quarter>,
+): number | null {
+  const b = output.binding;
+  if (b.kind === "licences" && !b.types?.length) {
+    const n = input.registerAuthorisations;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  }
+  if (b.kind === "inspections" && !b.types?.length) {
+    const undated = input.inspections.filter(
+      (i) => isInspectionVisit(i.type) && isUndated(i, quarterByWeek),
+    ).length;
+    return recorded.total + undated;
+  }
+  return null;
+}
+
+/**
+ * Move an opening balance by `diff` so the row lands on the register's figure.
+ * The movement goes into the latest quarter the balance carries anything in —
+ * the earlier quarters keep the figures the section reported — and a cut runs
+ * back through the earlier quarters if that one cannot absorb it. A balance
+ * is never taken below zero.
+ */
+export function shiftOpeningBalance(opening: number[], diff: number): number[] {
+  const out = normaliseQuarters(opening);
+  if (!diff) return out;
+  let at = 3;
+  while (at > 0 && !out[at]) at -= 1;
+  if (diff > 0) {
+    out[at] += diff;
+    return out;
+  }
+  let left = -diff;
+  for (let q = at; q >= 0 && left > 0; q -= 1) {
+    const take = Math.min(out[q], left);
+    out[q] -= take;
+    left -= take;
+  }
+  return out;
+}
+
 function deriveRow(
   output: WorkPlanOutput,
   input: WorkPlanInput,
@@ -1696,6 +1791,17 @@ function deriveRow(
     );
   }
 
+  // A row the dashboard reads off a register reports the register's figure:
+  // the opening balance takes up the difference, so the dated records still
+  // fall in their own quarters.
+  const target = registerTarget(output, input, tally, quarterByWeek);
+  const baseTotal = opening.reduce((a, b) => a + b, 0) + tally.total;
+  if (target !== null && target !== baseTotal) {
+    opening = shiftOpeningBalance(opening, target - baseTotal);
+  }
+  const registerAdjustment =
+    opening.reduce((a, b) => a + b, 0) + tally.total - baseTotal;
+
   // The plan is cumulative for the year: what the output had already achieved
   // when it came onto the system, plus everything recorded since.
   const quarters = tally.quarters.map((v, i) => v + (opening[i] || 0));
@@ -1717,6 +1823,7 @@ function deriveRow(
     quarters,
     openingTotal: opening.reduce((a, b) => a + b, 0),
     recordedTotal: tally.total,
+    registerAdjustment,
     total,
     percent: percentAchieved(total, output.target),
     status: note?.status || derivedStatus,
@@ -1776,6 +1883,8 @@ export function licencesIssuedRow(input: {
   week?: string;
   baseline?: Record<string, number[]> | null;
   config?: WorkPlanConfig | null;
+  /** The register's authorisations — the figure the row reads, when given. */
+  registerAuthorisations?: number | null;
   year?: number;
 }): WorkPlanRow | null {
   const plan = applyWorkPlanConfig(input.config);
@@ -1787,6 +1896,7 @@ export function licencesIssuedRow(input: {
     inspections: [],
     valuesByWeek: new Map(),
     baseline: input.baseline,
+    registerAuthorisations: input.registerAuthorisations,
     year: input.year,
   });
   for (const r of reports) {

@@ -18,7 +18,7 @@
  *    headline figures — Total Inspections Conducted and Total Enforcements.
  *
  *    The enforcement band is Management's six-column format (Written Notice ·
- *    Suspension of Practice · Seizure of Device · Enforcement Notice ·
+ *    Sealed · Seizure of Device · Enforcement Notice ·
  *    Suspension of License · Cancellation of License). Engagements are still
  *    recorded against an inspection and still show on the province sheet's
  *    ENFORCEMENT ACTION TAKEN column, but the summary no longer bands them and
@@ -100,7 +100,8 @@ export function inspectionColumn(t: InspectionType): InspectionColumnKey | null 
  * The Summary sheet's enforcement band — the six ENFORCEMENT ACTIONS in the
  * order Management's summary prints them. Label and action are separate
  * because the summary heads the register's "Written Warning" as "Written
- * Notice"; the stored value is left alone so existing records keep counting.
+ * Notice", and "Suspension of Practice" as "Sealed" (Management's word for it,
+ * Oct 2026); the stored value is left alone so existing records keep counting.
  *
  * The three engagements are deliberately not columns here: they stay in the
  * vocabulary (the province sheet shows them), but the summary reports
@@ -114,7 +115,7 @@ export const ENFORCEMENT_COLUMNS = [
   },
   {
     key: "Suspension of Practice",
-    label: "Suspension of Practice",
+    label: "Sealed",
     group: "ENFORCEMENT ACTIONS",
   },
   {
@@ -695,11 +696,11 @@ export function suggestedFollowUp(row: Pick<DatabaseRow, "cardStatus" | "enforce
   if (isSummarisedEnforcement(row.enforcement)) {
     return {
       type: "Enforcement Action",
-      hint: `Card expired after ${row.enforcement} — record the next enforcement step.`,
+      hint: `Card expired after ${enforcementLabel(row.enforcement)} — record the next enforcement step.`,
     };
   }
   return {
     type: "Follow-up",
-    hint: `Card expired after an ${row.enforcement.toLowerCase()} — a follow-up, and a formal notice if nothing has changed.`,
+    hint: `Card expired after an ${enforcementLabel(row.enforcement).toLowerCase()} — a follow-up, and a formal notice if nothing has changed.`,
   };
 }

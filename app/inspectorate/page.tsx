@@ -9,6 +9,7 @@ import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { downloadTextFile } from "@/components/downloadFile";
 import { Kpi } from "@/components/Kpi";
+import { JumpLinks, JumpTarget } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
@@ -63,11 +64,13 @@ import {
 import {
   INSPECTION_OUTCOMES,
   INSPECTION_TYPES,
+  inspectionOutcome,
   type Facility,
   type Inspection,
   type InspectionCard,
   type InspectionType,
   type InspectionOutcome,
+  type StoredInspectionOutcome,
 } from "@/lib/rules/types";
 
 const PERIOD_OPTIONS: Array<{ value: InspectionPeriod; label: string }> = [
@@ -258,18 +261,21 @@ export default function InspectoratePage() {
     () => inPeriod.filter((i) => !!i.enforcement || i.type === "Enforcement Action"),
     [inPeriod],
   );
-  // Actions the 2026 enforcement list gives no day to: they belong to no week,
-  // month or year, so only "All time" lists them. Said on the panel, so a
-  // shorter period does not read as the list having gone missing.
+  // Actions the 2026 enforcement list gives no day to: they belong to no week
+  // or month (they count toward 2026 as a whole), so only the year and "All
+  // time" list them. Said on the panel, so a shorter period does not read as
+  // the list having gone missing.
   const undatedEnforced = useMemo(
     () =>
-      period === "all"
-        ? 0
-        : inspections.filter(
-            (i) => !i.date && (!!i.enforcement || i.type === "Enforcement Action"),
-          ).length,
-    [inspections, period],
+      inspections.filter(
+        (i) =>
+          !i.date &&
+          (!!i.enforcement || i.type === "Enforcement Action") &&
+          !inspectionInPeriod(i, period, ctx),
+      ).length,
+    [inspections, period, ctx],
   );
+
 
   // What an inspection row needs to open its editor — the Inspectorate only.
   const rowEditing: RowEditing | undefined =
@@ -329,6 +335,20 @@ export default function InspectoratePage() {
         }
       />
 
+      <JumpLinks
+        links={[
+          { id: "summary", label: "Summary" },
+          { id: "database", label: "Database" },
+          { id: "cards-due", label: "Cards due" },
+          { id: "cards", label: "Card register" },
+          { id: "enforcement", label: "Enforcement" },
+          { id: "outcomes", label: "Outcomes" },
+          { id: "schedule", label: "Schedule" },
+          { id: "log-inspection", label: "Log inspection" },
+          { id: "register", label: "Inspection log" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Total inspections conducted"
@@ -356,6 +376,7 @@ export default function InspectoratePage() {
 
       {/* The Summary sheet — province rounds down, the workbook's bands across */}
       <Panel
+        id="summary"
         title={`Summary — ${periodLabel(period, ctx)}`}
         flush
         note="Tap a province to open its sheet."
@@ -374,6 +395,7 @@ export default function InspectoratePage() {
 
       {/* A province sheet — or the consolidated database when none is picked */}
       <Panel
+        id="database"
         title={
           round === ALL_ROUNDS
             ? `Database — ${shown.length} facilities`
@@ -440,6 +462,7 @@ export default function InspectoratePage() {
           list, most overdue first, each with the last action taken and a way
           to record the next one. */}
       <Panel
+        id="cards-due"
         title={`Inspection cards due — ${due.length}`}
         flush
         note={`${due.filter((r) => r.status === "Expired").length} expired · ${
@@ -522,6 +545,7 @@ export default function InspectoratePage() {
 
       {/* The card register — every card in the period, running or run out —
           and, for the Inspectorate, the form that puts a past card on it. */}
+      <JumpTarget id="cards" className="space-y-4">
       <InspectionCardRegisterPanel
         register={cardRows}
         today={today}
@@ -543,14 +567,16 @@ export default function InspectoratePage() {
           toastPush={toast.push}
         />
       ) : null}
+      </JumpTarget>
 
       {/* Enforcement actions taken in the period — the enforcement list */}
       <Panel
+        id="enforcement"
         title={`Enforcement actions — ${enforced.length}`}
         flush
         note={`Every action recorded against an inspection, newest first — including the division's 2026 enforcement list.${
           undatedEnforced
-            ? ` ${undatedEnforced} action${undatedEnforced === 1 ? "" : "s"} on that list carry no date and show under All time.`
+            ? ` ${undatedEnforced} action${undatedEnforced === 1 ? "" : "s"} on that list carry no date and show under the year and All time.`
             : ""
         }`}
       >
@@ -569,11 +595,16 @@ export default function InspectoratePage() {
         )}
       </Panel>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="outcomes"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <Panel title={`Outcomes — ${periodLabel(period, ctx)}`}>
           {outcomeRows.length === 0 ? (
             <p className="text-sm text-gunmetal/60">
-              No inspections in this period yet.
+              {dash.outcomeNotRecorded
+                ? "No outcome recorded in this period yet."
+                : "No inspections in this period yet."}
             </p>
           ) : (
             <ul className="divide-y divide-gunmetal/8">
@@ -582,27 +613,36 @@ export default function InspectoratePage() {
                   key={r.label}
                   className="flex items-center justify-between gap-3 py-2"
                 >
-                  <OutcomeChip outcome={r.label as InspectionOutcome} />
+                  <OutcomeChip outcome={r.label} />
                   <span className="tabular font-black">{r.total}</span>
                 </li>
               ))}
             </ul>
           )}
+          {dash.outcomeNotRecorded > 0 ? (
+            <p className="mt-2 text-[11px] text-gunmetal/55">
+              {dash.outcomeNotRecorded.toLocaleString()}{" "}
+              {outcomeRows.length ? "more carry" : "inspections carry"} no
+              outcome — rows of the inspection register, which has no outcome
+              column.
+            </p>
+          ) : null}
         </Panel>
         <Panel
           title={`Needs follow-up — ${dash.needsFollowUp}`}
-          note="Major findings or non-compliant outcomes in the period."
+          note="Non-compliant outcomes in the period."
         >
           <p className="text-sm text-gunmetal/60">
             {dash.needsFollowUp === 0
               ? "Nothing outstanding from this period's findings."
-              : `${dash.needsFollowUp} inspection${dash.needsFollowUp === 1 ? "" : "s"} closed with major findings or a non-compliant outcome. Each one is a follow-up inspection waiting to be logged against the same facility.`}
+              : `${dash.needsFollowUp} inspection${dash.needsFollowUp === 1 ? "" : "s"} closed non-compliant. Each one is a follow-up inspection waiting to be logged against the same facility.`}
           </p>
         </Panel>
       </section>
 
       {/* Forward schedule from the Licensing ↔ Inspectorate requests */}
       <Panel
+        id="schedule"
         title={`Inspection schedule — ${schedule.length} in the pipeline`}
         flush
         action={
@@ -720,12 +760,14 @@ export default function InspectoratePage() {
         />
       ) : null}
 
-      <RegisterPanel
-        inspections={inPeriod}
-        period={period}
-        ctx={ctx}
-        editing={rowEditing}
-      />
+      <JumpTarget id="register">
+        <RegisterPanel
+          inspections={inPeriod}
+          period={period}
+          ctx={ctx}
+          editing={rowEditing}
+        />
+      </JumpTarget>
     </div>
   );
 }
@@ -912,10 +954,10 @@ function LogInspectionPanel({
 
   return (
     <>
-      {/* The scroll target for "Record follow-up" — sits above the panel so
-          the whole form, title included, comes into view. */}
-      <span id="log-inspection" className="block scroll-mt-4" aria-hidden />
+      {/* The scroll target for "Record follow-up" and the page's jump links:
+          the panel lands under the top bar, title included. */}
     <Panel
+      id="log-inspection"
       title="Log inspection"
       note="One entry moves the facility row, the province summary, the card list and this week's report."
     >
@@ -1208,13 +1250,11 @@ function RegisterPanel({
   );
 }
 
-function OutcomeChip({ outcome }: { outcome: InspectionOutcome }) {
-  const map: Record<InspectionOutcome, "green" | "amber" | "red" | "slate"> = {
-    Compliant: "green",
-    "Minor findings": "amber",
-    "Major findings": "amber",
-    "Non-compliant": "red",
-    "N/A": "slate",
-  };
-  return <span className={`chip ${map[outcome]}`}>{outcome}</span>;
+/** A stored outcome as it reads now: Compliant, Non-compliant, or none. */
+function OutcomeChip({ outcome }: { outcome: StoredInspectionOutcome }) {
+  const read = inspectionOutcome(outcome);
+  if (!read) return <span className="chip slate">N/A</span>;
+  return (
+    <span className={`chip ${read === "Compliant" ? "green" : "red"}`}>{read}</span>
+  );
 }

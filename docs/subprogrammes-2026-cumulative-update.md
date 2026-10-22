@@ -69,6 +69,15 @@ HOSPITAL, and a "SOUTH POINT CLINIC" that names none of that clinic's three
 branches); they are inside the 392, so the total is right, but they are on no
 facility's record until the section says which.
 
+*22 Oct 2026:* Management asked that the dashboard and the sectional update
+move together, with the dashboard's figure the right one. 1.1.4 now reads **the
+register's authorisations** — the Overview's *Authorisations on record*, **431**
+on the day — not the carried balance plus dated events (423). The opening
+balance takes up the difference in its latest quarter (152 / 125 / 154 with the
+dated licences); see `registerTarget` in `lib/rules/workPlan.ts`. The constant
+`WORK_PLAN_OPENING_BALANCE["1.1.4"]` is unchanged: what the report adds to it
+is derived, so it follows the register from now on.
+
 *14 Sep 2026 (evening):* the Overview and Licences pages now show **this same
 1.1.4 figure** as their "Licences issued" headline (`licencesIssuedRow` in
 `lib/rules/workPlan.ts`, read through the same saved baseline and plan as the
@@ -109,6 +118,15 @@ it is now 253 carried (40 / 102 / 111) plus the 42 the register dates for itself
 rather than 295 carried and nothing recorded. 1.2.11 is untouched at **193**: the register
 has no enforcement column. See
 [the register import](./inspection-register-2026-import.md).
+
+*22 Oct 2026:* 1.2.4 now reads **every visit the inspection register holds**,
+its 255 undated 2026 rows included — **354** on the day, the Inspectorate tab's
+*Total Inspections Conducted* for 2026 — instead of 253 carried + the dated
+visits (352). The register held two rows the section's 295 did not; the
+balance's latest quarter takes them (40 / 123 / 161 / 30 with the dated work).
+Dating an undated row now moves the inspection into its quarter without
+changing the total, so the manual "take one off the balance" step is gone.
+1.2.11 is unchanged.
 
 *28 Sep 2026:* the division's enforcement list was laid on the register — 116
 actions, recorded as Written Notices. The section confirmed the list is inside

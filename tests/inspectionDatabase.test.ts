@@ -138,7 +138,7 @@ describe("inspection cards", () => {
     ).toMatchObject({ type: "Enforcement Action" });
     expect(
       suggestedFollowUp({ cardStatus: "Expired", enforcement: "Suspension of Practice" }).hint,
-    ).toContain("Suspension of Practice");
+    ).toContain("Sealed");
   });
 });
 
@@ -340,7 +340,7 @@ describe("summariseInspectionDatabase", () => {
   it("bands Management's six enforcement actions and no engagements", () => {
     expect(ENFORCEMENT_COLUMNS.map((c) => c.label)).toEqual([
       "Written Notice",
-      "Suspension of Practice",
+      "Sealed",
       "Seizure of Device",
       "Enforcement Notice",
       "Suspension of License",

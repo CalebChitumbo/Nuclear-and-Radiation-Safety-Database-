@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 
+import { JumpLinks } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
@@ -415,6 +416,18 @@ export default function SourceInventoryPage() {
           banner over live data rather than a blocked page. */}
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
+      <JumpLinks
+        links={[
+          { id: "by-practice", label: "By practice" },
+          { id: "by-nuclide", label: "By nuclide" },
+          { id: "located", label: "Where located" },
+          { id: "facilities", label: "Facilities" },
+          { id: "gaps", label: "Register gaps" },
+          { id: "removed", label: "Removed" },
+          { id: "items", label: "Search & list" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <div className="stat">
           <div className="stat-label">Registered items</div>
@@ -464,6 +477,7 @@ export default function SourceInventoryPage() {
       </Panel>
 
       <Panel
+          id="by-practice"
           title={
             kind === "Radiation Generator"
               ? "Radiation generators by practice and type"
@@ -516,6 +530,7 @@ export default function SourceInventoryPage() {
       {showSources ? (
         <>
           <Panel
+            id="by-nuclide"
             title="Sealed sources by nuclide"
             note="Tap a nuclide to filter the list below."
           >
@@ -538,6 +553,7 @@ export default function SourceInventoryPage() {
       ) : null}
 
       <Panel
+        id="located"
         title="Where they are located"
         note={`The facility each item is registered under, from the RAIS location export of ${HOLDER_META.exportedOn}. Tap a province or a facility to filter the list below.`}
       >
@@ -575,6 +591,7 @@ export default function SourceInventoryPage() {
       </Panel>
 
       <Panel
+        id="facilities"
         title={`Facilities on the register — ${holders.facilities}`}
         note="Every facility RAIS locates an item at, most first."
       >
@@ -629,6 +646,7 @@ export default function SourceInventoryPage() {
       </Panel>
 
       <Panel
+        id="gaps"
         title="Register gaps"
         note="Fields RAIS carries but has never been given a value for — the difference between an item being registered and it being described."
       >
@@ -685,6 +703,7 @@ export default function SourceInventoryPage() {
 
       {merged.removed.length > 0 ? (
         <Panel
+          id="removed"
           title={`Removed from the register (${merged.removed.length})`}
           note="Out of the counts and the list above, but kept — an accession register should not lose the fact that a record was withdrawn."
         >
@@ -723,7 +742,7 @@ export default function SourceInventoryPage() {
         </Panel>
       ) : null}
 
-      <Panel>
+      <Panel id="items">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="rais-search" className="field-label">

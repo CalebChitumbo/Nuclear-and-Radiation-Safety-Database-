@@ -506,15 +506,27 @@ facilities hold a current use licence **for a chosen year** versus those whose
 renewal is still in the pipeline (and at which stage). `lib/rules/licenceStats.ts`
 computes it; the Overview surfaces a summary.
 
-The **Licences issued headline** on both pages is not the register's count — it
-is work plan output **1.1.4**'s figure, derived by `licencesIssuedRow`
-(`lib/rules/workPlan.ts`) through the same saved baseline and plan as the
-weekly report, so the dashboard and the report always read the same number
-(392 at the 14 Sep 2026 hand-over). The register's own authorisation count sits
-in the caption with why it differs: it carries licences from before the plan
-year, and the section's total holds licences that land on no facility. A
-facility the register holds twice inflates it — `npm run fix:duplicate-facilities`
-finds and collapses those.
+The **Licences issued headline** on both pages is work plan output **1.1.4**'s
+figure, derived by `licencesIssuedRow` (`lib/rules/workPlan.ts`) through the
+same saved baseline and plan as the weekly report. Since Oct 2026 that figure
+**is the register's authorisation count** — the Overview's *Authorisations on
+record* (431 on 22 Oct 2026). Management asked that the dashboard and the
+sectional update move together and named the dashboard's figure the right one,
+so 1.1.4's opening balance takes up the difference in its latest quarter
+(`registerTarget` / `shiftOpeningBalance`) and the dated licences stay in their
+own quarters. A facility the register holds twice inflates it —
+`npm run fix:duplicate-facilities` finds and collapses those.
+
+Output **1.2.4** works the same way against the inspection register: it reads
+every visit the register holds, the 2026 register's undated rows included —
+the Inspectorate tab's *Total Inspections Conducted* for 2026 (354 on 22 Oct
+2026). Dating an undated row no longer needs a re-baseline; it only moves the
+inspection into its quarter.
+
+The **Overview's licensing figures are out of the functional facilities** (Oct
+2026): the headline strip, the coverage gauge, public/private, provinces, the
+unlicensed pipeline and *Use licence held*. The whole register — functional and
+not — has its own *All facilities* panel lower down.
 
 ---
 
@@ -674,7 +686,7 @@ top — the inspections, then Management's six enforcement actions:
 
 | | INSPECTIONS | | | | | ENFORCEMENT ACTIONS | | | | | | |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Province** | Pre-Auth | Planned | Follow-Up | Investigative | **Total** | Written Notice | Suspension of Practice | Seizure of Device | Enforcement Notice | Suspension of License | Cancellation of License | **Total** |
+| **Province** | Pre-Auth | Planned | Follow-Up | Investigative | **Total** | Written Notice | Sealed | Seizure of Device | Enforcement Notice | Suspension of License | Cancellation of License | **Total** |
 
 with a **Total** row and, underneath, *Total Inspections Conducted* and *Total
 Enforcements*. Tapping a province opens its sheet. The three engagement actions
@@ -712,8 +724,19 @@ The enforcement vocabulary is stored with the workbook's own spelling
 elsewhere in this codebase, so an exported database pastes straight back into
 the workbook's validated column. The stored "Written Warning" is *shown* as
 **Written Notice** everywhere — chips, dropdowns, the summary — the way
-Management's format names it (`enforcementLabel`); the stored value is never
+Management's format names it (`enforcementLabel`), and the stored "Suspension
+of Practice" is shown as **Sealed** (Oct 2026); the stored values are never
 renamed, so existing records keep counting.
+
+**Outcomes** are *Compliant* or *Non-compliant* (Oct 2026). Inspections logged
+earlier with *Minor findings* or *Major findings* keep their stored value and
+read as Non-compliant (`inspectionOutcome`); the register's imported rows carry
+"N/A" — no outcome — and are counted apart on the Outcomes panel.
+
+**On this page.** Long pages carry a sticky row of jump links under the top bar
+(`components/JumpLinks.tsx`): give a `Panel` an `id`, or wrap anything else in
+`JumpTarget`, and list it. A link whose section is not rendered for the account
+is dropped.
 
 **Exports.** *Export summary* and *Export database* write the two sheets in the
 workbook's own layouts — the Summary with its banded head and footer figures,

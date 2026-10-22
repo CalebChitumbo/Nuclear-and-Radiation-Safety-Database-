@@ -19,6 +19,7 @@ import {
   outputMetricKey,
   percentAchieved,
   quarterOfISO,
+  shiftOpeningBalance,
   workPlanBrief,
   workPlanRows,
   type SubprogrammeReport,
@@ -199,6 +200,68 @@ describe("quarters", () => {
     expect(index.get(week("W15"))).toBe(2);
     expect(index.get(week("W40"))).toBe(3); // 28 Sep → 2 Oct
     expect(index.get(week("W53"))).toBe(4); // 28 Dec → 1 Jan 2027
+  });
+});
+
+describe("the rows the dashboard reads off a register", () => {
+  it("moves the latest quarter the balance carries, never below zero", () => {
+    expect(shiftOpeningBalance([152, 125, 100, 0], 8)).toEqual([152, 125, 108, 0]);
+    expect(shiftOpeningBalance([40, 102, 111, 0], -2)).toEqual([40, 102, 109, 0]);
+    expect(shiftOpeningBalance([5, 3, 0, 0], -6)).toEqual([2, 0, 0, 0]);
+    expect(shiftOpeningBalance([1, 1, 0, 0], -9)).toEqual([0, 0, 0, 0]);
+    expect(shiftOpeningBalance([0, 0, 0, 0], 3)).toEqual([3, 0, 0, 0]);
+  });
+
+  it("reports 1.2.4 as every visit on the register, undated rows included", () => {
+    const undated = (i: number): Inspection => ({
+      ...insp("Routine Inspection", "", "", 100 + i),
+    });
+    const inspections = [
+      insp("Routine Inspection", Q3, "2026-07-21", 1),
+      insp("Follow-up", Q3, "2026-07-22", 2),
+      ...Array.from({ length: 255 }, (_, i) => undated(i)),
+    ];
+    const reports = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q3,
+      events: [],
+      inspections,
+      valuesByWeek: new Map(),
+    });
+    const r = row(reports, "1.2.4");
+    // 255 undated + 2 dated: the balance (253) takes up the 2 it is short,
+    // in its latest quarter; the dated visits sit in Q3 as recorded.
+    expect(r.total).toBe(257);
+    expect(r.registerAdjustment).toBe(2);
+    expect(r.opening).toEqual([40, 102, 113, 0]);
+    expect(r.quarters).toEqual([40, 102, 115, 0]);
+    // Its split by type adds up to the row.
+    expect(r.breakdown.reduce((a, b) => a + b.total, 0)).toBe(257);
+    // Dating an undated row moves no total — it only finds its quarter.
+    const dated = deriveWorkPlan({
+      weeks: WEEKS,
+      week: Q3,
+      events: [],
+      inspections: [...inspections.slice(0, -1), insp("Routine Inspection", Q2, "2026-05-26", 99)],
+      valuesByWeek: new Map(),
+    });
+    expect(row(dated, "1.2.4").total).toBe(257);
+  });
+
+  it("reports 1.1.4 as the register's authorisations when given them", () => {
+    const events = [ev("Importation Licence", Q3, "2026-07-21", 1)];
+    const r = licencesIssuedRow({
+      events,
+      weeks: WEEKS,
+      week: Q3,
+      registerAuthorisations: 431,
+    });
+    expect(r?.total).toBe(431);
+    expect(r?.registerAdjustment).toBe(431 - 378);
+    // The earlier quarters keep the section's figures.
+    expect(r?.quarters.slice(0, 2)).toEqual([152, 125]);
+    // Without the register, it is the balance plus the dated events.
+    expect(licencesIssuedRow({ events, weeks: WEEKS, week: Q3 })?.total).toBe(378);
   });
 });
 

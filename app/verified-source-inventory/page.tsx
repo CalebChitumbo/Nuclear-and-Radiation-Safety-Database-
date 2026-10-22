@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 
+import { JumpLinks } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
@@ -228,6 +229,15 @@ export default function VerifiedSourceInventoryPage() {
           banner over live data rather than a blocked page. */}
       {error ? <LoadErrorBanner error={error} onRetry={reload} /> : null}
 
+      <JumpLinks
+        links={[
+          { id: "by-practice", label: "By practice" },
+          { id: "by-source-type", label: "By source type" },
+          { id: "removed", label: "Removed" },
+          { id: "items", label: "Search & list" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <div className="stat">
           <div className="stat-label">Sources & devices</div>
@@ -254,6 +264,7 @@ export default function VerifiedSourceInventoryPage() {
       </section>
 
       <Panel
+        id="by-practice"
         title="By practice and equipment type"
         note="Grouped by practice, the way the IAEA safety standards divide the field. Tap a group or a type to filter the list below."
       >
@@ -354,6 +365,7 @@ export default function VerifiedSourceInventoryPage() {
 
       {summary.bySourceType.length > 0 ? (
         <Panel
+          id="by-source-type"
           title="Sealed sources by type of source"
           note="The nuclide as the annex records it. Tap one to search the list below."
         >
@@ -394,6 +406,7 @@ export default function VerifiedSourceInventoryPage() {
 
       {merged.removed.length > 0 ? (
         <Panel
+          id="removed"
           title={`Removed from the annex (${merged.removed.length})`}
           note="Out of the counts and the list above, but kept — the record of what the field team found should not lose an entry silently."
         >
@@ -430,7 +443,7 @@ export default function VerifiedSourceInventoryPage() {
         </Panel>
       ) : null}
 
-      <Panel>
+      <Panel id="items">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="source-search" className="field-label">
