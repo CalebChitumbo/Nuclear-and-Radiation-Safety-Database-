@@ -32,12 +32,14 @@ import { parseISO, toISO, todayISO, weekLabelForDate } from "@/lib/rules/week";
 import { enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import {
   applyWorkPlanConfig,
+  countAuthorisations,
   deriveWorkPlan,
   formatPercent,
   planForSections,
   WORK_PLAN_YEAR,
 } from "@/lib/rules/workPlan";
 import {
+  inspectionOutcome,
   type Border,
   type DailyEntry,
   type Section,
@@ -194,6 +196,8 @@ export default function DailyUpdatesPage() {
     valuesByWeek: effectiveValuesByWeek(weekMetricsAll, entries),
     dailyEntries: entries,
     baseline: baseline?.values ?? null,
+    // Only an account that reads the register has it to count.
+    registerAuthorisations: facilities.length ? countAuthorisations(facilities) : null,
   });
 
   // Licensing suggestions: issued Use/Possession certificates whose facility is
@@ -378,7 +382,7 @@ export default function DailyUpdatesPage() {
                         <span className="font-bold">{i.facilityName}</span>
                         <span className="flex items-center gap-1">
                           <span className="chip slate">{i.type}</span>
-                          <span className="chip">{i.outcome}</span>
+                          <span className="chip">{inspectionOutcome(i.outcome) ?? "N/A"}</span>
                           {i.enforcement ? (
                             <span className="chip amber">{enforcementLabel(i.enforcement)}</span>
                           ) : null}

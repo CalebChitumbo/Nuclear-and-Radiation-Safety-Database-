@@ -44,7 +44,11 @@ replaces the previous import rather than adding to it.
    to the workbook's sheets by facility and type); a licence the app holds that
    is on no sheet counts on top. Put the movement in the latest quarter with
    work in it, update the pin in `tests/workPlan.test.ts` and note it in
-   `docs/subprogrammes-2026-cumulative-update.md` under 1.1.4.
+   `docs/subprogrammes-2026-cumulative-update.md` under 1.1.4. Since Oct 2026
+   the constant only sets the quarterly SPLIT: wherever the report has the
+   register's authorisations (`registerAuthorisations`), 1.1.4's total is that
+   count and the balance's latest quarter takes up the difference
+   (`registerTarget`, `shiftOpeningBalance`).
 4. Update the counts in `README.md` (the intro, the seed verification line,
    the `seedBaseline` test entry and the acceptance criteria).
 5. Run the checks, commit on a `claude/...` branch, open a PR. Then re-seed the
@@ -80,9 +84,10 @@ REGISTER TWICE*; collapse it with `npm run fix:duplicate-facilities` (dry run;
 `--apply` to write), which carries the officer's review over and deletes the old
 document. Left alone, its licences count twice on the Overview and Licences
 headlines. Those headlines read output **1.1.4**'s figure — the same one the
-weekly report shows — so the dashboard and the report can never disagree; the
-register's own authorisation count sits in the caption with the reason it
-differs (licences from before the plan year; licences that land on no facility).
+weekly report shows — and since Oct 2026 that figure IS the register's
+authorisation count (Management: the dashboard and the report move together,
+the dashboard's figure is right). The weekly page reads it off the one
+`aggregates/dashboard` document, never the whole facility list.
 
 ## Routine: the Inspectorate hands over a new inspection total
 
@@ -91,6 +96,13 @@ inspections conducted** figure (e.g. 288 → 295 on 4 Sep 2026). That total is
 the **opening balance** of work plan output **1.2.4**, and the inspections the
 section logs afterwards on Daily Updates / the Inspectorate tab add on top of
 it. Nothing is imported — the figure is a constant.
+
+**Since Oct 2026 this routine moves only the quarterly split.** 1.2.4 reports
+the inspection register's own total (see the watch-out below), so a figure the
+Inspectorate gives that the register does not hold has to reach the register —
+a new register hand-over, or the inspections logged — before the report shows
+it. Say so to the section rather than editing the constant and expecting the
+total to move.
 
 1. Open `lib/rules/workPlan.ts` and find `WORK_PLAN_OPENING_BALANCE["1.2.4"]`
    (four quarters, e.g. `[40, 123, 132, 0]`, summing to the total).
@@ -110,13 +122,13 @@ it. Nothing is imported — the figure is a constant.
 figure after deploy, an officer has saved a baseline — correct 1.2.4 on the
 Opening balance panel on `/weekly` instead (or as well).
 
-**Watch out:** 1.2.4 is now part carried, part counted. The 2026 facility
-inspection register (below) gave it 42 dated inspections of its own, and the
-balance was reduced by exactly those. Never back-import the same inspections as
-dated records without taking them off 1.2.4's balance, or they count twice —
-and if an officer dates one of the register's 255 undated rows, take one off the
-balance's latest quarter with work in it, because the balance is still carrying
-that row.
+**Watch out:** since Oct 2026 1.2.4's TOTAL is the inspection register's own —
+every visit, the 2026 register's undated rows included (`registerTarget` in
+`lib/rules/workPlan.ts`), the same figure the Inspectorate tab shows for 2026.
+The constant only sets the quarterly split; the balance's latest quarter takes
+up the difference. So a new Inspectorate total that the register does not hold
+will NOT show — the register has to hold it. Dating an undated row moves no
+total (it only finds its quarter), so that step needs no re-baseline any more.
 
 ## Routine: the Inspectorate hands over its facility inspection register
 
@@ -412,7 +424,8 @@ Notice · Suspension of License · Cancellation of License
   weekly report panel and the 1.2.11 breakdown all read the same array, so a
   column change is made once there.
 - The stored vocabulary (`ENFORCEMENT_ACTIONS`) is the workbook's — "Written
-  Warning" is *stored* and shown as "Written Notice" on the summary; the
+  Warning" is *stored* and shown as "Written Notice", "Suspension of Practice"
+  is stored and shown as "Sealed" (Oct 2026), everywhere; the
   spelling is "License" (workbook), not "Licence". Do not rename stored values;
   existing `inspections.enforcement` records would stop counting.
 - The three **engagement** actions are still recordable and appear on the

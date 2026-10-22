@@ -8,6 +8,7 @@ import { Bars } from "@/components/Bars";
 import { FigureChangesPanel } from "@/components/nsss/FigureChangesPanel";
 import { ScreeningExportPanel } from "@/components/nsss/ScreeningExportPanel";
 import { Kpi } from "@/components/Kpi";
+import { JumpLinks, JumpTarget } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { canEditSection, useAuth } from "@/lib/auth";
@@ -193,6 +194,16 @@ export default function NsssPage() {
         }
       />
 
+      <JumpLinks
+        links={[
+          { id: "metrics", label: "Section metrics" },
+          { id: "border-posts", label: "By border post" },
+          { id: "export", label: "Excel export" },
+          { id: "what-changed", label: "What changed" },
+          { id: "daily-log", label: "Recent daily log" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Vehicles screened — this week"
@@ -221,7 +232,10 @@ export default function NsssPage() {
         />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="metrics"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <Bars title="Vehicle screening — last 8 weeks" rows={trend} />
         <Panel
           title="Section metrics"
@@ -268,7 +282,10 @@ export default function NsssPage() {
         </Panel>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="border-posts"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         {borderRows.length ? (
           <Bars title={`Screening by border post — ${year}`} rows={borderRows} />
         ) : (
@@ -294,15 +311,20 @@ export default function NsssPage() {
 
       {/* The SharePoint hand-over: the same entries the figures above are
           summed from, as a workbook the section uploads. */}
-      <ScreeningExportPanel
-        entries={data?.entries || []}
-        borders={data?.borders || []}
-        generatedBy={user?.displayName || ""}
-      />
+      <JumpTarget id="export">
+        <ScreeningExportPanel
+          entries={data?.entries || []}
+          borders={data?.borders || []}
+          generatedBy={user?.displayName || ""}
+        />
+      </JumpTarget>
 
-      <FigureChangesPanel entries={data?.auditLog || []} />
+      <JumpTarget id="what-changed">
+        <FigureChangesPanel entries={data?.auditLog || []} />
+      </JumpTarget>
 
       <Panel
+        id="daily-log"
         title={`Recent daily log — latest ${sectionEntries.length}`}
         flush
         action={

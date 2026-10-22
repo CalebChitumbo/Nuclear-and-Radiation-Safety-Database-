@@ -19,6 +19,7 @@ import {
   type FacilityEnforcement,
 } from "@/lib/rules/enforcementStatus";
 import { facilitiesToCsv } from "@/lib/rules/exportCsv";
+import { enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import { norm } from "@/lib/rules/matching";
 import {
   CATEGORIES,
@@ -507,7 +508,7 @@ function Flags({
       {enforcement ? (
         <span
           className={size}
-          title={`${enforcement.action}${enforcement.date ? ` on ${enforcement.date}` : ""} — recorded on the Inspectorate tab`}
+          title={`${enforcementLabel(enforcement.action)}${enforcement.date ? ` on ${enforcement.date}` : ""} — recorded on the Inspectorate tab`}
         >
           <EnforcementChip action={enforcement.action} />
         </span>

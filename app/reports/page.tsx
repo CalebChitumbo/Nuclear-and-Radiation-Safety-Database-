@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { JumpLinks } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { PageHeader, Panel } from "@/components/Section";
 import { downloadTextFile } from "@/components/downloadFile";
@@ -205,6 +206,15 @@ export default function ReportsPage() {
         }
       />
 
+      <JumpLinks
+        links={[
+          { id: "status-operating", label: "Status × operating" },
+          { id: "sector-category", label: "Sector & category" },
+          { id: "by-province", label: "By province" },
+          { id: "pipeline", label: "Pipeline detail" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <StatLink
           label="Functional"
@@ -232,7 +242,7 @@ export default function ReportsPage() {
         />
       </section>
 
-      <Panel title="Current status × operating state" flush>
+      <Panel id="status-operating" title="Current status × operating state" flush>
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -295,7 +305,10 @@ export default function ReportsPage() {
         </p>
       </Panel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div
+        id="sector-category"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <BreakdownPanel
           title="By sector"
           rows={(["Public", "Private"] as const).map((s) => ({
@@ -314,7 +327,7 @@ export default function ReportsPage() {
         />
       </div>
 
-      <Panel title="By province" flush>
+      <Panel id="by-province" title="By province" flush>
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -352,7 +365,7 @@ export default function ReportsPage() {
         </div>
       </Panel>
 
-      <Panel title="Pipeline detail — every stage" flush>
+      <Panel id="pipeline" title="Pipeline detail — every stage" flush>
         <div className="table-wrap">
           <table className="data">
             <thead>

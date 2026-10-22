@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { downloadBinaryFile, downloadTextFile } from "@/components/downloadFile";
 import { Kpi } from "@/components/Kpi";
+import { JumpLinks } from "@/components/JumpLinks";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { DataRow, PageHeader, Panel } from "@/components/Section";
 import { Segmented } from "@/components/Segmented";
@@ -138,6 +139,15 @@ export default function FunctionalFacilitiesPage() {
         }
       />
 
+      <JumpLinks
+        links={[
+          { id: "status", label: "Licensing status" },
+          { id: "no-application", label: "No application" },
+          { id: "how-read", label: "How it's read" },
+          { id: "facility-list", label: "Facility list" },
+        ]}
+      />
+
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi
           label="Functional facilities"
@@ -167,6 +177,7 @@ export default function FunctionalFacilitiesPage() {
       {/* The breakdown Management asked for: functional only, public beside
           private, the stages in the meeting's words. */}
       <Panel
+        id="status"
         title="Licensing status — functional facilities, public and private"
         flush
         note="Each stage folds the RAIS statuses named under it. Tap a status to open those facilities in the register."
@@ -200,6 +211,7 @@ export default function FunctionalFacilitiesPage() {
           read against the licensing register. */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel
+          id="no-application"
           title={`No application submitted — ${dash.noApplication.total}`}
           note="What the Authority has done about each one, from the inspection register. A suspended or closed practice is not simply “no application”."
         >
@@ -263,7 +275,7 @@ export default function FunctionalFacilitiesPage() {
           </div>
         </Panel>
 
-        <Panel title="How the figures are read">
+        <Panel id="how-read" title="How the figures are read">
           <ul className="divide-y divide-gunmetal/8">
             <DataRow
               label="Register"
@@ -303,6 +315,7 @@ export default function FunctionalFacilitiesPage() {
 
       {/* The list Management asked for by name. */}
       <Panel
+        id="facility-list"
         title={listTitle}
         flush
         action={

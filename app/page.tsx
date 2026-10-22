@@ -4,12 +4,15 @@ import Link from "next/link";
 
 import { Bars } from "@/components/Bars";
 import { Gauge } from "@/components/Gauge";
+import { JumpLinks } from "@/components/JumpLinks";
 import { Kpi } from "@/components/Kpi";
 import { LoadErrorBanner } from "@/components/LoadError";
 import { DataRow, Panel } from "@/components/Section";
 import { useAuth } from "@/lib/auth";
 import { useWeek } from "@/lib/weekContext";
 import { useStoreData } from "@/lib/storeHooks";
+import { computeAggregate } from "@/lib/rules/aggregate";
+import { isFunctional } from "@/lib/rules/functionalFacilities";
 import { computeLicenceStats } from "@/lib/rules/licenceStats";
 import {
   WORK_PLAN_YEAR,
@@ -24,6 +27,7 @@ import {
   LICENCE_TYPES,
   PROVINCES,
   STAGES,
+  inspectionOutcome,
   isUseP,
   type WorkPlanBaseline,
   type WorkPlanConfig,
@@ -79,19 +83,29 @@ export default function DashboardPage() {
   }
 
   const { agg, events, inspections, facilities, requests } = data;
-  const coverage = agg.total ? (agg.licensed / agg.total) * 100 : 0;
+  // Licensing is read against the FUNCTIONAL facilities — the ones that
+  // operate and so need a licence. The whole register has its own panel.
+  const functionalFacilities = facilities.filter(isFunctional);
+  const fn = computeAggregate(functionalFacilities);
+  const coverage = fn.total ? (fn.licensed / fn.total) * 100 : 0;
+  const registerCoverage = agg.total ? (agg.licensed / agg.total) * 100 : 0;
+  const nonFunctional = agg.total - (agg.functional ?? agg.total);
   const inspectionInbox = deriveInspectionInbox(requests, {
     canEditAS,
     canEditInsp,
   });
   const requestStats = inspectionRequestStats(requests, CURRENT_YEAR);
+  // Licences issued are every authorisation on the register (output 1.1.4);
+  // who holds a current use licence is asked of the functional facilities.
   const licence = computeLicenceStats(facilities, CURRENT_YEAR);
+  const useHeld = computeLicenceStats(functionalFacilities, CURRENT_YEAR);
   const issued = licencesIssuedRow({
     events,
     weeks,
     week: selected.label,
     baseline: data.baseline?.values ?? null,
     config: data.config,
+    registerAuthorisations: agg.auths,
   });
   const issuedNote = issued
     ? licencesIssuedNote(issued.total, licence.totalIssued)
@@ -122,7 +136,7 @@ export default function DashboardPage() {
       id: i.id,
       date: i.date,
       title: `${i.type} — ${i.facilityName}`,
-      subtitle: `${i.outcome}${i.province ? " · " + i.province : ""}`,
+      subtitle: `${inspectionOutcome(i.outcome) ?? "N/A"}${i.province ? " · " + i.province : ""}`,
     })),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -131,64 +145,84 @@ export default function DashboardPage() {
   const sectorRows = [
     {
       label: "Public",
-      total: agg.bySector.Public.total,
-      primary: agg.bySector.Public.licensed,
+      total: fn.bySector.Public.total,
+      primary: fn.bySector.Public.licensed,
     },
     {
       label: "Private",
-      total: agg.bySector.Private.total,
-      primary: agg.bySector.Private.licensed,
+      total: fn.bySector.Private.total,
+      primary: fn.bySector.Private.licensed,
     },
   ];
 
   const provinceRows = PROVINCES.map((p) => ({
     label: p,
-    total: agg.byProvince[p].total,
-    primary: agg.byProvince[p].licensed,
+    total: fn.byProvince[p].total,
+    primary: fn.byProvince[p].licensed,
   })).sort((a, b) => b.total - a.total);
 
-  const stageRows = STAGES.filter((s) => s !== "Licensed")
-    .map((s) => ({ label: s, total: agg.byStage[s] || 0 }))
-    .filter((r) => r.total > 0)
-    .sort((a, b) => b.total - a.total);
+  const pipeline = (byStage: Partial<Record<string, number>>) =>
+    STAGES.filter((s) => s !== "Licensed")
+      .map((s) => ({ label: s, total: byStage[s] || 0 }))
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+  const stageRows = pipeline(fn.byStage);
+  const registerStageRows = pipeline(agg.byStage);
 
   return (
     <div className="space-y-4 staggered">
-      {/* The register at a glance — one strip, divided, not five cards */}
-      <section className="stat-grid bleed grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Total facilities" value={agg.total.toLocaleString()} />
+      <JumpLinks
+        links={[
+          { id: "licensing", label: "Licensing" },
+          { id: "workflow", label: "Inspectorate ↔ Licensing" },
+          { id: "provinces", label: "Provinces & pipeline" },
+          { id: "licences-issued", label: "Licences issued" },
+          { id: "all-facilities", label: "All facilities" },
+          { id: "activity", label: "Recent activity" },
+        ]}
+      />
+
+      {/* Licensing at a glance — out of the functional facilities */}
+      <section
+        id="licensing"
+        className="stat-grid bleed grid-cols-2 lg:grid-cols-4 jump-target"
+      >
+        <Kpi
+          label="Functional facilities"
+          value={fn.total.toLocaleString()}
+          caption={
+            <Link className="link-action" href="/functional-facilities">
+              Licensing breakdown →
+            </Link>
+          }
+        />
         <Kpi
           label="Licensed"
-          value={agg.licensed.toLocaleString()}
+          value={fn.licensed.toLocaleString()}
           accent="green"
-          caption={`${coverage.toFixed(1)}% of register`}
+          caption={`${coverage.toFixed(1)}% of functional facilities`}
         />
         <Kpi
           label="Unlicensed"
-          value={agg.unlicensed.toLocaleString()}
+          value={fn.unlicensed.toLocaleString()}
           accent="red"
-        />
-        <Kpi
-          label="Functional"
-          value={(agg.functional ?? agg.total).toLocaleString()}
-          accent="green"
-          caption={
-            <Link className="link-action" href="/functional-facilities">
-              {`${(agg.total - (agg.functional ?? agg.total)).toLocaleString()} non-functional · licensing breakdown →`}
-            </Link>
-          }
+          caption={`${(100 - coverage).toFixed(1)}% of functional facilities`}
         />
         <Kpi
           label="Authorisations on record"
           value={agg.auths.toLocaleString()}
           accent="slate"
-          caption="Every licence on the register, incl. before 2026 — not the issued figure"
+          caption="Every licence on the register — output 1.1.4"
         />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Gauge value={coverage} />
-        <Bars title="Public vs Private" rows={sectorRows} showCounts />
+        <Gauge value={coverage} label="Licensing coverage — functional facilities" />
+        <Bars
+          title="Public vs Private (licensed / functional)"
+          rows={sectorRows}
+          showCounts
+        />
         <Panel
           title={`This week — ${selected.label}`}
           action={
@@ -215,6 +249,7 @@ export default function DashboardPage() {
 
       {/* Licensing ↔ Inspectorate handoff */}
       <Panel
+        id="workflow"
         title="Inspectorate ↔ Licensing workflow"
         action={
           <Link className="link-action" href="/inspection-requests">
@@ -260,22 +295,26 @@ export default function DashboardPage() {
         </div>
       </Panel>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="provinces"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <Bars
-          title="Facilities by province (licensed / total)"
+          title="Functional facilities by province (licensed / functional)"
           rows={provinceRows}
         />
         <Panel
-          title="Unlicensed pipeline — whole register"
+          title="Unlicensed pipeline — functional facilities"
           action={
             <Link className="link-action" href="/functional-facilities">
-              Functional only →
+              Breakdown →
             </Link>
           }
         >
           {stageRows.length === 0 ? (
             <p className="text-sm text-gunmetal/60">
-              Every facility is licensed. (You won&apos;t see this often.)
+              Every functional facility is licensed. (You won&apos;t see this
+              often.)
             </p>
           ) : (
             <ul className="divide-y divide-gunmetal/8">
@@ -288,7 +327,10 @@ export default function DashboardPage() {
       </section>
 
       {/* Licences issued (all types) + who holds a current use licence */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section
+        id="licences-issued"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 jump-target"
+      >
         <Panel
           title={
             issued
@@ -345,7 +387,7 @@ export default function DashboardPage() {
         </Panel>
 
         <Panel
-          title={`Use licence held — ${CURRENT_YEAR}`}
+          title={`Use licence held — functional, ${CURRENT_YEAR}`}
           action={
             <Link className="link-action" href="/licences">
               Breakdown →
@@ -355,16 +397,16 @@ export default function DashboardPage() {
           <ul className="divide-y divide-gunmetal/8">
             <DataRow
               label={`Licensed for ${CURRENT_YEAR}`}
-              value={licence.licensedThisYear}
+              value={useHeld.licensedThisYear}
               accent="green"
             />
             <DataRow
               label="Renewal not yet confirmed"
-              value={licence.licensedYearUnconfirmed}
+              value={useHeld.licensedYearUnconfirmed}
             />
             <DataRow
               label="Not licensed"
-              value={licence.notLicensed}
+              value={useHeld.notLicensed}
               accent="red"
             />
           </ul>
@@ -375,7 +417,51 @@ export default function DashboardPage() {
         </Panel>
       </section>
 
-      <Panel title="Recent activity" flush>
+      {/* Every facility on the register, functional or not */}
+      <Panel
+        id="all-facilities"
+        title="All facilities — whole register"
+        note="Functional and non-functional together. The figures above are out of the functional facilities only."
+        action={
+          <Link className="link-action" href="/facilities">
+            Facility register →
+          </Link>
+        }
+      >
+        <div className="stat-grid grid-cols-2 md:grid-cols-4">
+          <Kpi label="Total facilities" value={agg.total.toLocaleString()} />
+          <Kpi
+            label="Licensed"
+            value={agg.licensed.toLocaleString()}
+            accent="green"
+            caption={`${registerCoverage.toFixed(1)}% of the register`}
+          />
+          <Kpi
+            label="Unlicensed"
+            value={agg.unlicensed.toLocaleString()}
+            accent="red"
+          />
+          <Kpi
+            label="Non-functional"
+            value={nonFunctional.toLocaleString()}
+            accent="slate"
+          />
+        </div>
+        {registerStageRows.length ? (
+          <details className="mt-3 group">
+            <summary className="link-action cursor-pointer text-sm">
+              Unlicensed pipeline — whole register
+            </summary>
+            <ul className="divide-y divide-gunmetal/8 mt-2">
+              {registerStageRows.map((r) => (
+                <DataRow key={r.label} label={r.label} value={r.total} />
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </Panel>
+
+      <Panel id="activity" title="Recent activity" flush>
         {feed.length === 0 ? (
           <p className="text-sm text-gunmetal/60 px-4 sm:px-5">
             No events or inspections yet. Try the{" "}

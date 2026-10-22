@@ -31,6 +31,7 @@ import {
   type LicenceType,
   type LicenceWorkflow,
   INSPECTION_PRIORITIES,
+  inspectionOutcome,
   LICENCE_TYPES,
   isUseP,
 } from "@/lib/rules/types";
@@ -375,7 +376,7 @@ export function FacilityDetail({
           label="Enforcement standing"
           value={
             enforcement
-              ? `${enforcement.action}${enforcement.date ? ` · ${enforcement.date}` : ""}${
+              ? `${enforcementLabel(enforcement.action)}${enforcement.date ? ` · ${enforcement.date}` : ""}${
                   enforcement.history.length > 1
                     ? ` · ${enforcement.history.length} actions on record`
                     : ""
@@ -660,7 +661,7 @@ export function FacilityDetail({
                 >
                   <div className="min-w-0">
                     <div className="font-bold break-words">{i.type}</div>
-                    <div className="text-xs text-gunmetal/60">{i.outcome}</div>
+                    <div className="text-xs text-gunmetal/60">{inspectionOutcome(i.outcome) ?? "N/A"}</div>
                     {i.enforcement ? (
                       <div className="mt-1">
                         <span className="chip red">{enforcementLabel(i.enforcement)}</span>

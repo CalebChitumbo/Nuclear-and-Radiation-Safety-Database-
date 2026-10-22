@@ -88,14 +88,37 @@ export const INSPECTION_TYPES = [
 ] as const;
 export type InspectionType = (typeof INSPECTION_TYPES)[number];
 
-export const INSPECTION_OUTCOMES = [
-  "Compliant",
-  "Minor findings",
-  "Major findings",
-  "Non-compliant",
-  "N/A",
-] as const;
+/**
+ * The two outcomes an inspection is recorded with (Oct 2026 — the findings
+ * grades were dropped: a finding is a non-compliance).
+ */
+export const INSPECTION_OUTCOMES = ["Compliant", "Non-compliant"] as const;
 export type InspectionOutcome = (typeof INSPECTION_OUTCOMES)[number];
+
+/**
+ * What an inspection document can hold: one of the two outcomes, "N/A" for a
+ * register row imported with no outcome, or one of the two findings grades
+ * inspections were logged with before Oct 2026. Stored values are never
+ * rewritten — `inspectionOutcome` reads them as the two outcomes.
+ */
+export type StoredInspectionOutcome =
+  | InspectionOutcome
+  | "N/A"
+  | "Minor findings"
+  | "Major findings";
+
+/** The outcome a stored value reads as; null when none was recorded. */
+export function inspectionOutcome(stored: string | undefined): InspectionOutcome | null {
+  if (stored === "Compliant") return "Compliant";
+  if (
+    stored === "Non-compliant" ||
+    stored === "Minor findings" ||
+    stored === "Major findings"
+  ) {
+    return "Non-compliant";
+  }
+  return null;
+}
 
 export const SECTIONS = [
   "Authorisation & Standards",
@@ -224,7 +247,7 @@ export interface Inspection {
   facilityId: string | null;
   facilityName: string;
   type: InspectionType;
-  outcome: InspectionOutcome;
+  outcome: StoredInspectionOutcome;
   province: Province | "";
   sector: Sector | "";
   notes: string;
@@ -393,7 +416,7 @@ export interface InspectionRequest {
   /** Completion / report. */
   completedAt?: string;
   completedDate?: string;
-  outcome?: InspectionOutcome;
+  outcome?: StoredInspectionOutcome;
   /** Where the signed inspection report lives (a link, a RAIS ref, a location). */
   reportRef?: string;
   findings?: string;

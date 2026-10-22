@@ -11,6 +11,7 @@
  * and unit-tested. Side effects (persisting, and recording the dated Inspection
  * on completion) live in the store; this module only computes the next value.
  */
+import { enforcementLabel } from "./inspectionDatabase";
 import type {
   Inspection,
   InspectionOutcome,
@@ -289,7 +290,7 @@ export function applyInspectionRequestAction(
       event.status = next.status;
       event.text = withNote(
         `Inspection completed — ${action.outcome}${
-          action.enforcement ? `. ${action.enforcement}` : ""
+          action.enforcement ? `. ${enforcementLabel(action.enforcement)}` : ""
         }${reportRef ? `. Report: ${reportRef}` : ""}`,
         action.findings,
       );

@@ -149,11 +149,13 @@ describe("§18 — seeded 2026 inspection register", () => {
     expect(summary.total.enforcementTotal).toBe(0);
   });
 
-  it("does not report the register's dated rows twice under output 1.2.4", () => {
+  it("reports 1.2.4 as the register's total, counting no row twice", () => {
     // The 42 dated rows are counted off the register, so 1.2.4's opening
     // balance sheds exactly them, quarter for quarter as the report attributes
-    // them. Carried + counted must come back to the 295 the section reported on
-    // 4 Sep 2026, split the way the section's own workbook split it.
+    // them: carried + counted is the 295 the section reported on 4 Sep 2026.
+    // Since Oct 2026 the row reads the register's own total, as the
+    // Inspectorate tab does — the register holds 297, so the balance's latest
+    // quarter takes the 2 the section's figure did not carry.
     const quarterByWeek = buildQuarterIndex(WEEKS, 2026);
     const quarters = [0, 0, 0, 0];
     for (const i of inspections) {
@@ -179,8 +181,10 @@ describe("§18 — seeded 2026 inspection register", () => {
     const row = reports
       .flatMap((r) => [...r.rows, ...r.supporting])
       .find((r) => r.output.id === "1.2.4");
-    expect(row?.total).toBe(295);
-    expect(row?.quarters).toEqual([40, 123, 132, 0]);
+    expect(row?.total).toBe(IMPORTED);
+    expect(IMPORTED).toBe(297);
+    expect(row?.registerAdjustment).toBe(2);
+    expect(row?.quarters).toEqual([40, 123, 134, 0]);
   });
 
   it("treats an inspection typed before the hand-over as the register's", () => {
