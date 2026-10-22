@@ -517,7 +517,8 @@ export function raisInventoryToCsv(
       r.type,
       groupOf(practice.category),
       practice.category,
-      source ? practice.basis : "",
+      // "location" on the sheet: the source was placed by where it is located.
+      source ? (practice.basis === "holder" ? "location" : practice.basis) : "",
       r.manufacturer,
       r.model,
       r.serialNumber,
