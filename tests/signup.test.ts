@@ -13,6 +13,7 @@ import {
   postedOffice,
   requiresInlandOffice,
   settledAccounts,
+  validatePasswordChange,
   validateSignup,
   type SignupInput,
 } from "../lib/rules/signup";
@@ -367,5 +368,34 @@ describe("officeOptions", () => {
     const options = officeOptions(["Kasumbalesa", "nakonde"]);
     expect(options).toContain("Kasumbalesa");
     expect(options.filter((o) => o === "Nakonde")).toHaveLength(1);
+  });
+});
+
+describe("validatePasswordChange", () => {
+  it("accepts a different, long-enough, matching new password", () => {
+    expect(
+      validatePasswordChange({ current: "temp-pass-1", next: "a better one", confirm: "a better one" }),
+    ).toEqual([]);
+  });
+
+  it("asks for the current password", () => {
+    expect(
+      validatePasswordChange({ current: "", next: "a better one", confirm: "a better one" }),
+    ).toEqual(["Enter your current password."]);
+  });
+
+  it("holds the new password to the sign-up floor", () => {
+    expect(
+      validatePasswordChange({ current: "temp-pass-1", next: "short", confirm: "short" }),
+    ).toEqual(["Choose a new password of at least 8 characters."]);
+  });
+
+  it("refuses an unchanged password and a mismatch", () => {
+    expect(
+      validatePasswordChange({ current: "temp-pass-1", next: "temp-pass-1", confirm: "temp-pass-1" }),
+    ).toEqual(["Choose a new password different from the current one."]);
+    expect(
+      validatePasswordChange({ current: "temp-pass-1", next: "a better one", confirm: "another" }),
+    ).toEqual(["The two new passwords do not match."]);
   });
 });
