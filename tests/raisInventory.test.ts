@@ -12,6 +12,7 @@ import {
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
+  nuclidesOf,
   parseActivity,
   raisInventoryToCsv,
   sealedCategoryLabel,
@@ -234,11 +235,16 @@ describe("summary figures reconcile to the detail rows", () => {
     );
   });
 
-  it("puts every source under one nuclide, totalling 789", () => {
-    expect(SUMMARY.byNuclide.reduce((a, n) => a + n.count, 0)).toBe(789);
-    expect(SUMMARY.distinctNuclides).toBe(19);
+  it("splits paired sources, counting each nuclide once — 789 sources, 810 entries", () => {
+    // 21 sources are pairs (11 Am-241/Cs-137, 8 Cs-137/Ba-137m, Sr-90/Y-90,
+    // Am-241/Be-10), so the split counts sum to 789 + 21.
+    expect(SUMMARY.byNuclide.reduce((a, n) => a + n.count, 0)).toBe(810);
+    expect(SUMMARY.distinctNuclides).toBe(18);
+    expect(SUMMARY.byNuclide.some((n) => /[,/]/.test(n.nuclide))).toBe(false);
     // Caesium-137 dominates the register; the gap bucket always sorts last.
-    expect(SUMMARY.byNuclide[0]).toEqual({ nuclide: "Cs-137", count: 618 });
+    expect(SUMMARY.byNuclide[0]).toEqual({ nuclide: "Cs-137", count: 637 });
+    expect(SUMMARY.byNuclide.find((n) => n.nuclide === "Am-241")?.count).toBe(35);
+    expect(SUMMARY.byNuclide.find((n) => n.nuclide === "Be-10")?.count).toBe(1);
     expect(SUMMARY.byNuclide[SUMMARY.byNuclide.length - 1]).toEqual({
       nuclide: NUCLIDE_NOT_RECORDED,
       count: 69,
@@ -482,6 +488,19 @@ describe("nuclideLabel", () => {
     expect(nuclideLabel(source({ nuclide: "Am-241, Cs-137" }))).toBe(
       "Am-241, Cs-137",
     );
+  });
+
+  it("splits a paired source into its nuclides", () => {
+    expect(nuclidesOf(source({ nuclide: "Am-241, Be-10" }))).toEqual([
+      "Am-241",
+      "Be-10",
+    ]);
+    expect(nuclidesOf(source({ nuclide: "Cs-137/Ba-137m" }))).toEqual([
+      "Cs-137",
+      "Ba-137m",
+    ]);
+    expect(nuclidesOf(source({ nuclide: "Co-60" }))).toEqual(["Co-60"]);
+    expect(nuclidesOf(source())).toEqual([NUCLIDE_NOT_RECORDED]);
   });
 
   it("labels a blank nuclide as a gap", () => {

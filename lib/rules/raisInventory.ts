@@ -217,6 +217,20 @@ export function nuclideLabel(record: RaisRecord): string {
   return (record.nuclide || "").trim() || NUCLIDE_NOT_RECORDED;
 }
 
+/**
+ * The nuclides a source record names, one entry each. RAIS writes a paired
+ * source on one row — "Am-241, Be-10", "Cs-137/Ba-137m" — and the inventory
+ * reports each nuclide on its own (Management, Oct 2026), so a pair counts once
+ * under each of its nuclides. The record's own text is untouched.
+ */
+export function nuclidesOf(record: RaisRecord): string[] {
+  const parts = nuclideLabel(record)
+    .split(/\s*(?:[,/+&;]|\band\b)\s*/i)
+    .map((n) => n.trim())
+    .filter(Boolean);
+  return parts.length ? [...new Set(parts)] : [NUCLIDE_NOT_RECORDED];
+}
+
 const ACTIVITY_UNITS: Record<string, number> = {
   bq: 1,
   kbq: 1e3,
@@ -313,6 +327,10 @@ export interface RaisSummary {
   sourcePracticeBasis: Record<PracticeBasis, number>;
   /** Per use, how many of its sources were placed by the holder rule. */
   placedByHolder: { category: SourceCategory; count: number }[];
+  /**
+   * Per nuclide, paired sources split — a pair counts under each of its
+   * nuclides, so the counts add up to more than `sealedSources`.
+   */
   byNuclide: { nuclide: string; count: number }[];
   byCategory: { category: SealedCategoryLabel; count: number }[];
   dataQuality: RaisDataQuality;
@@ -385,9 +403,10 @@ export function summarizeRaisInventory(
       );
     }
     if (practice.basis === "undetermined") quality.sourceUseUndetermined += 1;
-    const nuclide = nuclideLabel(r);
-    nuclideCounts.set(nuclide, (nuclideCounts.get(nuclide) || 0) + 1);
-    if (nuclide === NUCLIDE_NOT_RECORDED) quality.missingNuclide += 1;
+    for (const nuclide of nuclidesOf(r)) {
+      nuclideCounts.set(nuclide, (nuclideCounts.get(nuclide) || 0) + 1);
+    }
+    if (nuclideLabel(r) === NUCLIDE_NOT_RECORDED) quality.missingNuclide += 1;
     if (!parseActivity(r.activity)) quality.missingActivity += 1;
 
     const category = sealedCategoryLabel(r);

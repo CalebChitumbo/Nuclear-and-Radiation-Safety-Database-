@@ -21,6 +21,7 @@ import {
   UNRECOGNISED_TYPE,
   groupCounts,
   groupOf,
+  sectorOf,
   type SourceCategory,
 } from "@/lib/rules/sourceCategories";
 import { mergeRaisInventory } from "@/lib/rules/inventoryEdits";
@@ -32,6 +33,7 @@ import {
   isSerialRecorded,
   loadRaisInventory,
   nuclideLabel,
+  nuclidesOf,
   raisInventoryToCsv,
   summarizeRaisInventory,
   type RaisInventorySeed,
@@ -83,7 +85,7 @@ const FACILITY_PREVIEW = 12;
 
 const KIND_FILTERS: { value: "all" | RaisKind; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "Radiation Generator", label: "Generators" },
+  { value: "Radiation Generator", label: "Devices" },
   { value: "Sealed Source", label: "Sources" },
 ];
 
@@ -246,7 +248,8 @@ export default function SourceInventoryPage() {
         return {
           r,
           family: practiceOf(r, HOLDERS).category,
-          nuclide: r.kind === "Sealed Source" ? nuclideLabel(r) : null,
+          nuclides: r.kind === "Sealed Source" ? nuclidesOf(r) : [],
+          unclassified: sectorOf(practiceOf(r, HOLDERS).category) === "Not classified",
           holder,
           hay: [
             r.ran,
@@ -288,10 +291,25 @@ export default function SourceInventoryPage() {
   );
   // A group with nothing in it is still one the inventory reports against, so
   // it is named under the breakdown rather than dropped from it.
-  const groupsInUse = familyGroups.filter((g) => g.total > 0);
+  // Management asked (Oct 2026) for the items not yet classified to be kept
+  // out of view until they are: they leave the breakdown and the list, and
+  // wait in their own collapsed panel near the foot of the page.
+  const groupsInUse = familyGroups.filter(
+    (g) => g.total > 0 && g.sector !== "Not classified",
+  );
+  const unclassifiedGroup = familyGroups.find(
+    (g) => g.sector === "Not classified",
+  );
   const emptyGroups = familyGroups
     .filter((g) => g.total === 0 && g.sector !== "Not classified")
     .map((g) => g.group);
+
+  const pickedUnclassified =
+    (grouping.startsWith("family:") &&
+      sectorOf(grouping.slice("family:".length) as SourceCategory) ===
+        "Not classified") ||
+    (unclassifiedGroup !== undefined &&
+      grouping === `group:${unclassifiedGroup.group}`);
 
   const filtered = useMemo(() => {
     const q = norm(search);
@@ -304,8 +322,13 @@ export default function SourceInventoryPage() {
         } else if (grouping.startsWith("family:")) {
           if (row.family !== grouping.slice("family:".length)) return false;
         } else if (grouping.startsWith("nuclide:")) {
-          if (row.nuclide !== grouping.slice("nuclide:".length)) return false;
+          if (!row.nuclides.includes(grouping.slice("nuclide:".length))) {
+            return false;
+          }
         }
+        // Items not yet classified are kept out of the list unless one of
+        // their own buckets is picked from the "Not yet classified" panel.
+        if (row.unclassified && !pickedUnclassified) return false;
         if (holding.startsWith("province:")) {
           const want = holding.slice("province:".length);
           if ((row.holder?.province || "") !== want) return false;
@@ -319,7 +342,7 @@ export default function SourceInventoryPage() {
         return !q || row.hay.includes(q);
       })
       .map(({ r }) => r);
-  }, [indexed, search, kind, grouping, holding]);
+  }, [indexed, search, kind, grouping, holding, pickedUnclassified]);
 
   const exportCsv = useCallback(() => {
     downloadTextFile(
@@ -387,7 +410,7 @@ export default function SourceInventoryPage() {
       <PageHeader
         eyebrow={META.system}
         title="Source Inventory"
-        subtitle={`${summary.total} radiation generators and sealed sources on the national register${
+        subtitle={`${summary.total} radiation devices and sealed sources on the national register${
           META.exportedOn ? ` — RAIS export of ${META.exportedOn}` : ""
         }.`}
         actions={
@@ -423,6 +446,7 @@ export default function SourceInventoryPage() {
           { id: "located", label: "Where located" },
           { id: "facilities", label: "Facilities" },
           { id: "gaps", label: "Register gaps" },
+          { id: "unclassified", label: "Not yet classified" },
           { id: "removed", label: "Removed" },
           { id: "items", label: "Search & list" },
         ]}
@@ -432,10 +456,10 @@ export default function SourceInventoryPage() {
         <div className="stat">
           <div className="stat-label">Registered items</div>
           <div className="stat-value">{summary.total}</div>
-          <div className="stat-caption">generators &amp; sealed sources</div>
+          <div className="stat-caption">devices &amp; sealed sources</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Radiation generators</div>
+          <div className="stat-label">Radiation devices</div>
           <div className="stat-value">{summary.generators}</div>
           <div className="stat-caption">
             {gaps.missingType} with no type recorded
@@ -480,7 +504,7 @@ export default function SourceInventoryPage() {
           id="by-practice"
           title={
             kind === "Radiation Generator"
-              ? "Radiation generators by practice and type"
+              ? "Radiation devices by practice and type"
               : kind === "Sealed Source"
                 ? "Sealed sources by practice and type"
                 : "By practice and type"
@@ -532,7 +556,7 @@ export default function SourceInventoryPage() {
           <Panel
             id="by-nuclide"
             title="Sealed sources by nuclide"
-            note="Tap a nuclide to filter the list below."
+            note="A paired source (Am-241 with Be-10, Cs-137 with Ba-137m …) is split and counted once under each of its nuclides. Tap a nuclide to filter the list below."
           >
             <ul className="mt-1 space-y-1.5">
               {summary.byNuclide.map(({ nuclide, count }) => (
@@ -657,7 +681,7 @@ export default function SourceInventoryPage() {
             of={summary.total}
           />
           <GapRow
-            label="Generator type not recorded"
+            label="Device type not recorded"
             count={gaps.missingType}
             of={summary.generators}
           />
@@ -700,6 +724,40 @@ export default function SourceInventoryPage() {
           breakdown returns once the activities have been re-verified.
         </p>
       </Panel>
+
+      {unclassifiedGroup && unclassifiedGroup.total > 0 ? (
+        <Panel id="unclassified">
+          <details open={pickedUnclassified || undefined}>
+            <summary className="cursor-pointer select-none flex items-baseline justify-between gap-3">
+              <span className="font-black">Not yet classified</span>
+              <span className="tabular font-black">
+                {unclassifiedGroup.total}
+              </span>
+            </summary>
+            <p className="mt-2 text-[11px] leading-relaxed text-gunmetal/55">
+              Kept out of the breakdown and the list above until they are
+              classified. They are still on the register and in its totals.
+              Tap a row to list them.
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {unclassifiedGroup.rows
+                .filter((r) => r.count > 0)
+                .map(({ family, count }) => (
+                  <BreakdownRow
+                    key={family}
+                    label={family}
+                    count={count}
+                    max={maxFamily}
+                    detail={familyDetail(family)}
+                    active={grouping === `family:${family}`}
+                    muted
+                    onClick={() => pickFamily(family)}
+                  />
+                ))}
+            </ul>
+          </details>
+        </Panel>
+      ) : null}
 
       {merged.removed.length > 0 ? (
         <Panel
@@ -789,7 +847,9 @@ export default function SourceInventoryPage() {
                 }}
               >
                 <option value="">All types &amp; nuclides</option>
-                {SOURCE_GROUPS.map((g) => {
+                {SOURCE_GROUPS.filter(
+                  (g) => g.sector !== "Not classified" || pickedUnclassified,
+                ).map((g) => {
                       const families = g.categories as readonly SourceCategory[];
                       return (
                         <optgroup key={g.group} label={g.group}>
@@ -954,7 +1014,7 @@ export default function SourceInventoryPage() {
           keyField={{
             label: "RAN (accession number)",
             placeholder: "RG/1024",
-            hint: "RG/nnnn for a radiation generator, SS/nnnn for a sealed source.",
+            hint: "RG/nnnn for a radiation device, SS/nnnn for a sealed source.",
           }}
           takenKeys={takenKeys}
           onSave={save}
@@ -1151,10 +1211,10 @@ function HolderCell({ holder }: { holder: ResolvedHolder | null }) {
   );
 }
 
-/** The nuclide (sources) or the type and its family (generators). */
+/** The nuclide (sources) or the type and its family (devices). */
 function ItemCell({ r }: { r: RaisRecord }) {
   if (r.kind === "Sealed Source") {
-    const nuclide = nuclideLabel(r);
+    const nuclide = nuclidesOf(r).join(" · ");
     const recorded = r.nuclide?.trim();
     return (
       <>
@@ -1268,7 +1328,7 @@ const RaisCard = memo(function RaisCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-bold leading-tight break-words">
-            {source ? nuclideLabel(r) : r.type || "Type not recorded"}
+            {source ? nuclidesOf(r).join(" · ") : r.type || "Type not recorded"}
           </div>
           <div className="text-xs text-gunmetal/60 mt-0.5">
             {r.manufacturer || "Manufacturer not recorded"}
