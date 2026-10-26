@@ -1446,6 +1446,15 @@ breakdowns show each group with its total, the types beneath it, and name the
 empty groups underneath. Tapping a group filters the list to the whole group,
 and the CSV exports carry a *Practice Group* column beside the type.
 
+On the Source Inventory tab (Management, Oct 2026) the *Not Classified* group
+is kept out of view until it is classified: it leaves the breakdown and the
+list and waits in a collapsed **Not yet classified** panel, whose rows list
+those items when tapped. The headline totals still count them. The tab also
+calls the generator register **Devices** (the stored kind stays
+`Radiation Generator`), and the nuclide breakdown splits a paired source —
+`Am-241, Be-10`, `Cs-137/Ba-137m` — counting it once under each nuclide
+(`nuclidesOf`), so those counts sum to 810 for 789 sources.
+
 **The XRF split** cannot come from the type column: RAIS types all 64 analysers
 as the bare word `XRF`. It comes from the instrument — the model the register
 names, read against that manufacturer's product line (an `X – MET 7000` is
