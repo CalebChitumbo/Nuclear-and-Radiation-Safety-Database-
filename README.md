@@ -1483,9 +1483,9 @@ and `X-ray Tube`) — it is a gap for an officer to resolve, not a family.
 Sealed sources sit in the same groups. Neither export records what a source is
 used for, so `lib/rules/sourcePractice.ts` reads it from the record's maker or
 model first (a Troxler is a portable gauge, an Endress+Hauser a fixed one), then
-from who holds it — construction and roads → portable gauges, mines and plants
+from where it is located — construction and roads → portable gauges, mines and plants
 → fixed gauges — and says which it was. Of RAIS' 789: 477 from the record, 290
-from the holder (mostly ZCCM's store of disused mine sources), 22 not
+from its location (mostly ZCCM's store of disused mine sources), 22 not
 determined. The breakdown follows the Register toggle, so *Nuclear Gauges*
 counts the X-ray thickness gauges and the gauge sources together. The nuclide
 split is still shown.

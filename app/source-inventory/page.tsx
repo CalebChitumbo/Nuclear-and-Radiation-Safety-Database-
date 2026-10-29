@@ -219,12 +219,12 @@ export default function SourceInventoryPage() {
     const byHolder = showSources ? placedByHolder.get(family) || 0 : 0;
     if (byHolder) {
       notes.push(
-        `${byHolder} sealed source${byHolder === 1 ? "" : "s"} placed by who holds ${byHolder === 1 ? "it" : "them"} — the record names no maker or model`,
+        `${byHolder} sealed source${byHolder === 1 ? "" : "s"} placed by where ${byHolder === 1 ? "it is" : "they are"} located — the record names no maker or model`,
       );
     }
     if (family === SEALED_SOURCES) {
       notes.push(
-        "neither the record nor the facility holding it says what the source is used for",
+        "neither the record nor the facility it is located at says what the source is used for",
       );
     }
     return notes.length ? notes.join(" · ") : undefined;
@@ -511,7 +511,7 @@ export default function SourceInventoryPage() {
           }
           note={`Grouped by practice, the way the IAEA safety standards divide the field.${
             showSources
-              ? ` RAIS does not record what a sealed source is used for: ${summary.sourcePracticeBasis.record} are placed from their maker or model, ${summary.sourcePracticeBasis.holder} from the facility holding them (construction and roads → portable gauges, mines and plants → fixed gauges), ${summary.sourcePracticeBasis.undetermined} not determined.`
+              ? ` RAIS does not record what a sealed source is used for: ${summary.sourcePracticeBasis.record} are placed from their maker or model, ${summary.sourcePracticeBasis.holder} from the facility they are located at (construction and roads → portable gauges, mines and plants → fixed gauges), ${summary.sourcePracticeBasis.undetermined} not determined.`
               : ""
           } Tap a group or a type to filter the list below.`}
         >
