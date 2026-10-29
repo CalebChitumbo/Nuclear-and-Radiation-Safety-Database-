@@ -14,6 +14,7 @@ import { Kpi } from "@/components/Kpi";
 import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { AddFacilityDialog } from "@/components/AddFacilityDialog";
+import { FunctionalFollowUp } from "@/components/FunctionalQuestion";
 import {
   addWorkflowsToRanMap,
   buildReport,
@@ -177,6 +178,17 @@ export default function LicenceStatusPage() {
   // The application whose notes & history drawer is open.
   const [viewing, setViewing] = useState<LicenceWorkflow | null>(null);
 
+  // Non-functional facilities a save just gave an authorisation to, waiting
+  // for the officer to say whether they operate (FunctionalFollowUp).
+  const [askFunctional, setAskFunctional] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const queueFunctional = (more: Array<{ id: string; name: string }>) =>
+    setAskFunctional((cur) => [
+      ...cur,
+      ...more.filter((m) => !cur.some((c) => c.id === m.id)),
+    ]);
+
   // Who is acting — stamped onto comments and automatic history entries so the
   // trail answers "which officer was working on this".
   const actor = user
@@ -272,6 +284,7 @@ export default function LicenceStatusPage() {
     try {
       const s = await store();
       const res = await s.saveLicenceWorkflows([rec], user.uid, actor);
+      queueFunctional(res.nonFunctional);
       toast.push(
         facilityId
           ? `Applied — ${res.facilitiesUpdated} facility stage updated.`
@@ -304,6 +317,9 @@ export default function LicenceStatusPage() {
         [{ facilityId: row.facilityId, number: row.ran, type, date }],
         user.uid,
       );
+      if (facById.get(row.facilityId)?.functional === false) {
+        queueFunctional([{ id: row.facilityId, name: row.facilityName }]);
+      }
       toast.push(
         res.summary.newLicensed > 0
           ? `${row.facilityName} is now Licensed.`
@@ -368,6 +384,7 @@ export default function LicenceStatusPage() {
     try {
       const s = await store();
       const res = await s.saveLicenceWorkflows(recs, user.uid, actor);
+      queueFunctional(res.nonFunctional);
       toast.push(
         `Applied ${recs.length} update(s) — ${res.facilitiesUpdated} facility status(es) updated.`,
         "success",
@@ -395,6 +412,7 @@ export default function LicenceStatusPage() {
     try {
       const s = await store();
       const res = await s.saveLicenceWorkflows(rows, user.uid, actor);
+      queueFunctional(res.nonFunctional);
       toast.push(
         `Saved ${res.saved} applications · ${res.facilitiesUpdated} facility stages updated.`,
         "success",
@@ -452,6 +470,14 @@ export default function LicenceStatusPage() {
         isSaved={!!(viewing && savedFor(viewing))}
         onClose={() => setViewing(null)}
         onChanged={reload}
+      />
+
+      <FunctionalFollowUp
+        items={askFunctional}
+        onAnswered={(id, marked) => {
+          setAskFunctional((cur) => cur.filter((f) => f.id !== id));
+          if (marked) reloadFacs();
+        }}
       />
 
       <JumpLinks

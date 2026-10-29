@@ -819,6 +819,17 @@ marking a facility non-functional on its record takes it off the tab at once.
   "no application" facilities the Authority has already acted against, and the
   list says which. The same standing shows as a chip on the register's rows,
   as a field on the facility record, and as two columns on the register's CSV.
+- **An authorisation never makes a facility functional on its own.** Wherever
+  a licence lands on a facility the tab does not already count — one being
+  created from the licence, or one marked non-functional — the officer is
+  asked *"is it operating?"* (`components/FunctionalQuestion.tsx`): per row on
+  Bulk Approval and in *Record an authorisation* on the facility record (the
+  commit waits for the answer), on *Add facility*, and on Licence Status
+  straight after a save that recorded authorisations by itself
+  (`saveLicenceWorkflows` returns them as `nonFunctional`). Unanswered, a new
+  facility is functional only when its licence is Use/Possession
+  (`recordLicence`). Oct 2026: four import-only holders created by a bulk
+  commit had lifted the count 398 → 402.
 
 Full detail in [docs/management-updates-2026-09.md](docs/management-updates-2026-09.md).
 

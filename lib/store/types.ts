@@ -67,6 +67,14 @@ export interface ReadFreshness {
   maxAgeMs: number;
 }
 
+/** What saving parsed RAIS workflows did to the register. */
+export interface SaveLicenceWorkflowsResult {
+  saved: number;
+  facilitiesUpdated: number;
+  /** Given an authorisation by this save while marked non-functional. */
+  nonFunctional: Array<{ id: string; name: string }>;
+}
+
 export interface DataStore {
   ready(): Promise<void>;
   listFacilities(): Promise<Facility[]>;
@@ -274,6 +282,8 @@ export interface DataStore {
       type: string;
       date: string;
       newFacilityDraft?: Partial<Facility>;
+      /** True: the officer says this non-functional facility is operating. */
+      markFunctional?: boolean;
     }>,
     uid: string,
   ): Promise<{
@@ -363,12 +373,16 @@ export interface DataStore {
    * status changed also gets an automatic history entry appended to its notes
    * trail (workflowHistoryOnSave); pass `actor` so those entries carry the
    * officer's name, not just the uid.
+   *
+   * `nonFunctional` names the facilities this save recorded an authorisation
+   * for while the register has them as non-functional — the authorisation
+   * leaves the flag alone, so the page asks the officer whether they operate.
    */
   saveLicenceWorkflows(
     items: LicenceWorkflow[],
     uid: string,
     actor?: RequestActor,
-  ): Promise<{ saved: number; facilitiesUpdated: number }>;
+  ): Promise<SaveLicenceWorkflowsResult>;
   updateFacility(id: string, patch: Partial<Facility>, uid: string): Promise<void>;
   addFacility(f: Omit<Facility, "id">, uid: string): Promise<Facility>;
   provisionUser(input: {

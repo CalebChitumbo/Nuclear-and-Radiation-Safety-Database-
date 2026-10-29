@@ -92,7 +92,12 @@ import {
   type SeedInspection,
   type SeedScreening,
 } from "./seeding";
-import type { DataStore, ReadFreshness, ScanWatch } from "./types";
+import type {
+  DataStore,
+  ReadFreshness,
+  SaveLicenceWorkflowsResult,
+  ScanWatch,
+} from "./types";
 
 // v6: the 2026 enforcement list laid on the inspection register.
 // v5: the Inspectorate's 2026 facility inspection register, so the demo opens
@@ -945,6 +950,8 @@ class MockStore implements DataStore {
       type: string;
       date: string;
       newFacilityDraft?: Partial<Facility>;
+      /** True: the officer says this non-functional facility is operating. */
+      markFunctional?: boolean;
     }>,
     uid: string,
   ): ReturnType<DataStore["recordLicences"]> {
@@ -978,6 +985,7 @@ class MockStore implements DataStore {
       const result = recordLicence({
         facility: fac,
         newFacilityDraft: inp.newFacilityDraft,
+        markFunctional: inp.markFunctional,
         number: inp.number,
         type: detected,
         defaultType: detected,
@@ -1192,7 +1200,7 @@ class MockStore implements DataStore {
     items: LicenceWorkflow[],
     uid: string,
     actor?: RequestActor,
-  ): Promise<{ saved: number; facilitiesUpdated: number }> {
+  ): Promise<SaveLicenceWorkflowsResult> {
     const s = ensure();
     const now = new Date().toISOString();
     const weeks = weeksSeed as WeekDef[];
@@ -1225,6 +1233,7 @@ class MockStore implements DataStore {
     );
     const facMap = new Map(s.facilities.map((f) => [f.id, f]));
     const dirty = new Set<string>();
+    const nonFunctional = new Map<string, string>();
 
     // 1. Issued applications → recorded on the facility through the R1–R6 rules.
     //    recordLicence does the right thing per family: a confirmed
@@ -1262,6 +1271,7 @@ class MockStore implements DataStore {
       s.licenceEvents.push(result.event);
       facMap.set(fac.id, result.facilityWrite);
       dirty.add(fac.id);
+      if (fac.functional === false) nonFunctional.set(fac.id, fac.name);
     }
 
     // 2. Use/Possession pipeline stage (pre-issuance). The issued case is handled
@@ -1313,7 +1323,11 @@ class MockStore implements DataStore {
 
     save(s);
     dispatchChange();
-    return { saved: items.length, facilitiesUpdated: dirty.size };
+    return {
+      saved: items.length,
+      facilitiesUpdated: dirty.size,
+      nonFunctional: [...nonFunctional].map(([id, name]) => ({ id, name })),
+    };
   }
 
   async updateFacility(

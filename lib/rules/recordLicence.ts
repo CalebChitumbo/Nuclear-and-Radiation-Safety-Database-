@@ -24,6 +24,12 @@ export interface RecordLicenceInput {
   uid: string;
   newFacilityId?: string;               // pre-generated id for the new facility
   newEventId?: string;                  // pre-generated id for the event
+  /**
+   * The officer's answer to "is it operating?" for an existing facility the
+   * register has as non-functional. True marks it functional; anything else
+   * leaves the flag as it is — an authorisation alone never changes it.
+   */
+  markFunctional?: boolean;
 }
 
 export interface RecordLicenceMutation {
@@ -68,6 +74,7 @@ export function recordLicence(input: RecordLicenceInput): RecordLicenceMutation 
       updatedAt: now,
       updatedBy: input.uid,
     };
+    if (input.markFunctional === true) facilityWrite.functional = true;
 
     let effect: RecordLicenceMutation["effect"] = "authorisation-only";
     if (isUseP(type)) {
@@ -131,8 +138,11 @@ export function recordLicence(input: RecordLicenceInput): RecordLicenceMutation 
     province,
     practice,
     sector,
-    // A facility being licensed right now is operating unless stated otherwise.
-    functional: d.functional ?? true,
+    // The officer is asked whether it is operating. Unanswered, only a
+    // Use/Possession licence says so — an import or other standalone
+    // authorisation is not evidence the facility is working (Oct 2026: four
+    // import-only holders had lifted the functional count 398 → 402).
+    functional: d.functional ?? isUseP(type),
     category: d.category || categoriseFacility(practice, baseName),
     licensed,
     stage,

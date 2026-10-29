@@ -3,6 +3,7 @@
 import { cloneElement, useId, useState } from "react";
 
 import { Drawer } from "./Drawer";
+import { FunctionalQuestion } from "./FunctionalQuestion";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { useToast } from "./Toast";
@@ -44,7 +45,8 @@ export function AddFacilityDialog({
   const [province, setProvince] = useState<Province>("Lusaka");
   const [practice, setPractice] = useState("");
   const [sector, setSector] = useState<Sector>("Private");
-  const [functional, setFunctional] = useState(true);
+  // Asked, never assumed: undefined until the officer answers.
+  const [functional, setFunctional] = useState<boolean | undefined>(undefined);
   // "" = derive from the practice/name at submit time.
   const [category, setCategory] = useState<"" | FacilityCategory>("");
   const [licensed, setLicensed] = useState(false);
@@ -55,7 +57,7 @@ export function AddFacilityDialog({
   if (!open) return null;
 
   const submit = async () => {
-    if (!user || !name.trim()) return;
+    if (!user || !name.trim() || functional === undefined) return;
     setBusy(true);
     try {
       const s = await store();
@@ -86,6 +88,7 @@ export function AddFacilityDialog({
       setPractice("");
       setFacCode("");
       setLicensed(false);
+      setFunctional(undefined);
       setStage("No Application Submitted");
     } catch (err) {
       // Without this the rejection was unhandled: the dialog silently stayed
@@ -107,7 +110,7 @@ export function AddFacilityDialog({
       footer={
         <div className="flex gap-2">
           <button
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || functional === undefined}
             className="btn btn-primary flex-1 sm:flex-none"
             onClick={submit}
           >
@@ -194,16 +197,12 @@ export function AddFacilityDialog({
             </select>
           </FormField>
         </div>
+        <FunctionalQuestion
+          isNew
+          value={functional}
+          onChange={setFunctional}
+        />
         <div className="flex items-center gap-5 flex-wrap">
-          <label className="flex items-center gap-2 text-sm font-bold py-1">
-            <input
-              type="checkbox"
-              className="w-4 h-4"
-              checked={functional}
-              onChange={(e) => setFunctional(e.target.checked)}
-            />
-            Functional
-          </label>
           <label className="flex items-center gap-2 text-sm font-bold py-1">
             <input
               type="checkbox"
