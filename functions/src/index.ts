@@ -207,9 +207,17 @@ export const setUserClaims = onCall(async (request) => {
     });
   }
 
+  // This call doubles as the password reset for an existing account, and it
+  // does not carry the account's further sections - so keep the ones the
+  // account document already holds. Re-minted from the document alone, an
+  // unchanged write would not fire onUserDocWrite and the `extra` claim would
+  // be lost until the account was next saved.
+  const existing = await db.doc(`users/${userRecord.uid}`).get();
+  const extra = cleanExtraSections(section, existing.data()?.extraSections);
   await auth.setCustomUserClaims(userRecord.uid, {
     role,
     section,
+    ...(extra.length ? { extra } : {}),
     ...(office ? { border: office } : {}),
   });
   await db.doc(`users/${userRecord.uid}`).set(
