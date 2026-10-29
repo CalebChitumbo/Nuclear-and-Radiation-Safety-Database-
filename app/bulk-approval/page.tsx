@@ -7,6 +7,7 @@ import { isMockMode } from "@/lib/firebase";
 import { store } from "@/lib/store";
 import { useStoreData } from "@/lib/storeHooks";
 import { FacilitySelect } from "@/components/FacilitySelect";
+import { FunctionalQuestion } from "@/components/FunctionalQuestion";
 import { Kpi } from "@/components/Kpi";
 import { Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
@@ -37,12 +38,26 @@ interface ReviewRow {
   type: LicenceType;
   detected: LicenceType;
   decision: RowDecision;
+  /**
+   * The officer's answer to "is it operating?", asked of a facility being
+   * created and of a matched one the register has as non-functional.
+   * Undefined until answered; the commit waits for it.
+   */
+  functional?: boolean;
   createDraft?: {
     sector: Sector;
     province: Province;
     practice: string;
     district: string;
   };
+}
+
+/** Whether this row's commit waits on the "is it operating?" answer. */
+function asksFunctional(row: ReviewRow, facilities: Facility[]): boolean {
+  if (row.decision === "create") return true;
+  if (row.decision !== "include" || !row.matchId) return false;
+  const fac = facilities.find((f) => f.id === row.matchId);
+  return fac?.functional === false;
 }
 
 export default function BulkApprovalPage() {
@@ -136,10 +151,15 @@ export default function BulkApprovalPage() {
           number: r.number,
           type: r.type,
           date,
+          markFunctional:
+            r.decision === "include" && r.functional === true
+              ? true
+              : undefined,
           newFacilityDraft:
             r.decision === "create"
               ? {
                   name: r.name,
+                  functional: r.functional,
                   sector: r.createDraft?.sector,
                   province: r.createDraft?.province,
                   practice: r.createDraft?.practice,
@@ -180,6 +200,9 @@ export default function BulkApprovalPage() {
   }
 
   const toCommit = rows.filter((r) => r.decision !== "skip").length;
+  const unanswered = rows.filter(
+    (r) => asksFunctional(r, facilities || []) && r.functional === undefined,
+  ).length;
 
   return (
     <div className="space-y-4 staggered">
@@ -252,7 +275,9 @@ export default function BulkApprovalPage() {
             rows.filter((r) => r.decision === "create").length
           } new facilities · ${
             rows.filter((r) => r.decision === "skip").length
-          } skipped`}
+          } skipped${
+            unanswered ? ` · ${unanswered} to answer: functional?` : ""
+          }`}
           flush
         >
           {/* Desktop: the full review grid */}
@@ -297,11 +322,21 @@ export default function BulkApprovalPage() {
           <div className="px-4 sm:px-5 pt-4 flex flex-wrap items-center gap-2 border-t border-gunmetal/8 mt-4">
             <button
               className="btn btn-primary flex-1 sm:flex-none"
-              disabled={committing || rows.every((r) => r.decision === "skip")}
+              disabled={
+                committing ||
+                unanswered > 0 ||
+                rows.every((r) => r.decision === "skip")
+              }
               onClick={commit}
             >
               {committing ? "Committing…" : `Commit ${toCommit} licences`}
             </button>
+            {unanswered > 0 ? (
+              <span className="text-xs text-gunmetal/65">
+                Answer &ldquo;functional?&rdquo; on {unanswered}{" "}
+                {unanswered === 1 ? "row" : "rows"} first.
+              </span>
+            ) : null}
             <button className="btn btn-ghost" onClick={() => setRows([])}>
               Clear
             </button>
@@ -434,6 +469,7 @@ function useRowParts({ index, row, facilities, onChangeRow }: EditorProps) {
               matchId: id,
               matchName: m ? m.name : "",
               score: 1,
+              functional: undefined,
               // An include-row stripped of its match must not stay
               // committable — it would create a blank facility.
               decision:
@@ -477,6 +513,15 @@ function useRowParts({ index, row, facilities, onChangeRow }: EditorProps) {
 
   const effect = <span className={`chip ${eff.variant}`}>{eff.label}</span>;
 
+  const functionalQuestion = asksFunctional(row, facilities) ? (
+    <FunctionalQuestion
+      compact
+      isNew={row.decision === "create"}
+      value={row.functional}
+      onChange={(functional) => onChange({ functional })}
+    />
+  ) : null;
+
   const decision = (
     <div className="seg">
       {(["include", "create", "skip"] as RowDecision[]).map((d) => (
@@ -488,6 +533,7 @@ function useRowParts({ index, row, facilities, onChangeRow }: EditorProps) {
           onClick={() =>
             onChange({
               decision: d,
+              functional: d === row.decision ? row.functional : undefined,
               createDraft:
                 d === "create"
                   ? row.createDraft || {
@@ -506,12 +552,13 @@ function useRowParts({ index, row, facilities, onChangeRow }: EditorProps) {
     </div>
   );
 
-  return { match, typePicker, effect, decision };
+  return { match, typePicker, effect, decision, functionalQuestion };
 }
 
 const ReviewRowEditor = memo(function ReviewRowEditor(props: EditorProps) {
   const { row } = props;
-  const { match, typePicker, effect, decision } = useRowParts(props);
+  const { match, typePicker, effect, decision, functionalQuestion } =
+    useRowParts(props);
   return (
     <tr>
       <td>
@@ -520,7 +567,12 @@ const ReviewRowEditor = memo(function ReviewRowEditor(props: EditorProps) {
           {row.number || "no number"}
         </div>
       </td>
-      <td style={{ minWidth: 220 }}>{match}</td>
+      <td style={{ minWidth: 220 }}>
+        {match}
+        {functionalQuestion ? (
+          <div className="mt-2">{functionalQuestion}</div>
+        ) : null}
+      </td>
       <td style={{ minWidth: 180 }}>{typePicker}</td>
       <td>{effect}</td>
       <td>{decision}</td>
@@ -530,7 +582,8 @@ const ReviewRowEditor = memo(function ReviewRowEditor(props: EditorProps) {
 
 const ReviewCardEditor = memo(function ReviewCardEditor(props: EditorProps) {
   const { row } = props;
-  const { match, typePicker, effect, decision } = useRowParts(props);
+  const { match, typePicker, effect, decision, functionalQuestion } =
+    useRowParts(props);
   return (
     <li className="px-4 sm:px-5 py-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
@@ -548,6 +601,7 @@ const ReviewCardEditor = memo(function ReviewCardEditor(props: EditorProps) {
         <div className="field-label">Matched facility</div>
         {match}
       </div>
+      {functionalQuestion}
       <div>
         <div className="field-label">Licence type</div>
         {typePicker}

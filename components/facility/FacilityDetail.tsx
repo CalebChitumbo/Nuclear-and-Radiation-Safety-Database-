@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
+import { FunctionalQuestion } from "@/components/FunctionalQuestion";
 import { StatusPill } from "@/components/StatusPill";
 import { WorkflowNotesPanel } from "@/components/WorkflowNotesPanel";
 import { Field, Panel } from "@/components/Section";
@@ -70,6 +71,8 @@ export function FacilityDetail({
   const [type, setType] = useState<LicenceType>("New Use/Possession Licence");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [autoType, setAutoType] = useState(true);
+  // Asked only when the register has this facility as non-functional.
+  const [operating, setOperating] = useState<boolean | undefined>(undefined);
 
   // Held in a ref so a caller passing an inline callback can't re-run the load.
   const onLoadedRef = useRef(onLoaded);
@@ -231,11 +234,25 @@ export function FacilityDetail({
     try {
       const s = await store();
       await s.recordLicences(
-        [{ facilityId: facility.id, number, type, date }],
+        [
+          {
+            facilityId: facility.id,
+            number,
+            type,
+            date,
+            markFunctional: operating === true ? true : undefined,
+          },
+        ],
         user.uid,
       );
-      toast.push(`Authorisation recorded for ${facility.name}.`, "success");
+      toast.push(
+        operating === true
+          ? `Authorisation recorded for ${facility.name} — marked functional.`
+          : `Authorisation recorded for ${facility.name}.`,
+        "success",
+      );
       setNumber("");
+      setOperating(undefined);
       setAdding(false);
       setAutoType(true);
       onChanged?.();
@@ -511,10 +528,19 @@ export function FacilityDetail({
             </select>
           </div>
           <div className="text-xs text-gunmetal/65">{effectNote}</div>
+          {facility.functional === false ? (
+            <FunctionalQuestion
+              isNew={false}
+              value={operating}
+              onChange={setOperating}
+            />
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <button
               className="btn btn-primary"
-              disabled={busy}
+              disabled={
+                busy || (facility.functional === false && operating === undefined)
+              }
               onClick={submit}
             >
               {busy ? "Recording…" : "Record"}
@@ -524,6 +550,7 @@ export function FacilityDetail({
               onClick={() => {
                 setAdding(false);
                 setNumber("");
+                setOperating(undefined);
               }}
             >
               Cancel

@@ -102,7 +102,12 @@ import {
 import { borderId } from "../rules/daily";
 import { weekLabelForDate } from "../rules/week";
 import { WORK_PLAN_YEAR } from "../rules/workPlan";
-import type { DataStore, ReadFreshness, ScanWatch } from "./types";
+import type {
+  DataStore,
+  ReadFreshness,
+  SaveLicenceWorkflowsResult,
+  ScanWatch,
+} from "./types";
 import weeksSeed from "../../seed/weeks-2026.seed.json";
 
 function requireDb(): Firestore {
@@ -915,6 +920,8 @@ class FirebaseStore implements DataStore {
       type: string;
       date: string;
       newFacilityDraft?: Partial<Facility>;
+      /** True: the officer says this non-functional facility is operating. */
+      markFunctional?: boolean;
     }>,
     uid: string,
   ): ReturnType<DataStore["recordLicences"]> {
@@ -950,6 +957,7 @@ class FirebaseStore implements DataStore {
       const result = recordLicence({
         facility: fac,
         newFacilityDraft: inp.newFacilityDraft,
+        markFunctional: inp.markFunctional,
         number: inp.number,
         type: detected,
         defaultType: detected,
@@ -1191,7 +1199,7 @@ class FirebaseStore implements DataStore {
     items: LicenceWorkflow[],
     uid: string,
     actor?: RequestActor,
-  ): Promise<{ saved: number; facilitiesUpdated: number }> {
+  ): Promise<SaveLicenceWorkflowsResult> {
     const db = requireDb();
     const batch = writeBatch(db);
     const now = new Date().toISOString();
@@ -1233,6 +1241,7 @@ class FirebaseStore implements DataStore {
     );
 
     let facilitiesUpdated = 0;
+    const nonFunctional = new Map<string, string>();
     if (matched.length) {
       const facilities = await this.listFacilities();
       // Working copies so an auth append and a stage roll-up on the same facility
@@ -1275,6 +1284,7 @@ class FirebaseStore implements DataStore {
         batch.set(eventRef, { ...result.event, id: eventRef.id });
         facMap.set(fac.id, result.facilityWrite);
         dirty.add(fac.id);
+        if (fac.functional === false) nonFunctional.set(fac.id, fac.name);
       }
 
       // 2. Use/Possession pipeline stage (pre-issuance). The issued case is
@@ -1331,7 +1341,11 @@ class FirebaseStore implements DataStore {
     }
 
     await batch.commit();
-    return { saved: items.length, facilitiesUpdated };
+    return {
+      saved: items.length,
+      facilitiesUpdated,
+      nonFunctional: [...nonFunctional].map(([id, name]) => ({ id, name })),
+    };
   }
 
   async updateFacility(

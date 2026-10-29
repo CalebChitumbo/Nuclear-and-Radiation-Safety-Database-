@@ -172,6 +172,78 @@ describe("R5 — new facility creation from non-UseP licences", () => {
   });
 });
 
+describe("functional — an authorisation alone never says a facility operates", () => {
+  const create = (type: LicenceType, functional?: boolean) =>
+    recordLicence({
+      facility: null,
+      newFacilityDraft: {
+        name: "Westate Zambia Ltd",
+        province: "Lusaka",
+        sector: "Private",
+        ...(functional === undefined ? {} : { functional }),
+      },
+      number: "",
+      defaultType: type,
+      date: "2026-05-27",
+      weeks,
+      uid: "u",
+      newFacilityId: "new-f",
+      newEventId: "e",
+    });
+
+  it("an unanswered import-only facility is created non-functional", () => {
+    // Oct 2026: four import-only holders lifted the count 398 → 402.
+    expect(create("Importation Licence").facilityWrite.functional).toBe(false);
+    expect(
+      create("Variation of Terms and Conditions").facilityWrite.functional,
+    ).toBe(false);
+  });
+
+  it("an unanswered Use/Possession facility is created functional", () => {
+    expect(create("New Use/Possession Licence").facilityWrite.functional).toBe(
+      true,
+    );
+  });
+
+  it("the officer's answer wins either way", () => {
+    expect(create("Importation Licence", true).facilityWrite.functional).toBe(
+      true,
+    );
+    expect(
+      create("New Use/Possession Licence", false).facilityWrite.functional,
+    ).toBe(false);
+  });
+
+  it("an authorisation leaves a non-functional facility non-functional…", () => {
+    const r = recordLicence({
+      facility: newFac({ functional: false }),
+      number: "AUTH/USE.NEW/0300",
+      defaultType: "New Use/Possession Licence",
+      date: "2026-05-27",
+      weeks,
+      uid: "u",
+      newEventId: "e",
+    });
+    expect(r.facilityWrite.functional).toBe(false);
+    expect(r.facilityWrite.licensed).toBe(true);
+  });
+
+  it("…unless the officer marks it functional", () => {
+    const r = recordLicence({
+      facility: newFac({ functional: false }),
+      number: "AUTH/IMP/0301",
+      defaultType: "Importation Licence",
+      date: "2026-05-27",
+      weeks,
+      uid: "u",
+      newEventId: "e",
+      markFunctional: true,
+    });
+    expect(r.facilityWrite.functional).toBe(true);
+    expect(r.facilityWrite.auths).toHaveLength(1);
+  });
+});
+
 describe("R6 — manual status toggle does not create events", () => {
   it("applyStatusOverride only changes status fields", () => {
     const f = newFac({ licensed: false, stage: "No Application Submitted" });

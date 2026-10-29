@@ -348,4 +348,46 @@ describe("saveLicenceWorkflows — licence family drives where an update lands",
     expect(after.stage).toBe(before.stage); // stays "Licensed", not downgraded
     expect((after.auths || []).length).toBe(before.auths); // renewal stays manual
   });
+
+  it("names a non-functional facility it recorded an authorisation for, and leaves the flag alone", async () => {
+    const fac = (await mockStore.listFacilities()).find((f) => !f.licensed)!;
+    await mockStore.updateFacility(fac.id, { functional: false }, "u");
+
+    const res = await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "AUTH/IMP/0777",
+          ranType: "Import",
+          facilityId: fac.id,
+          facilityName: fac.name,
+          facilityStage: "Licence / Certificate Issued",
+        }),
+      ],
+      "u",
+    );
+
+    expect(res.nonFunctional).toEqual([{ id: fac.id, name: fac.name }]);
+    const after = (await mockStore.listFacilities()).find((f) => f.id === fac.id)!;
+    expect(after.functional).toBe(false);
+    expect((after.auths || []).some((a) => a.number === "AUTH/IMP/0777")).toBe(true);
+  });
+
+  it("names nothing when the facility is already functional", async () => {
+    const fac = (await mockStore.listFacilities()).find(
+      (f) => !f.licensed && f.functional !== false,
+    )!;
+    const res = await mockStore.saveLicenceWorkflows(
+      [
+        wf({
+          ran: "AUTH/IMP/0778",
+          ranType: "Import",
+          facilityId: fac.id,
+          facilityName: fac.name,
+          facilityStage: "Licence / Certificate Issued",
+        }),
+      ],
+      "u",
+    );
+    expect(res.nonFunctional).toEqual([]);
+  });
 });
