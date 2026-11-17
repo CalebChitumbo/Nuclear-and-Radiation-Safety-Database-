@@ -436,6 +436,24 @@ Notice · Suspension of License · Cancellation of License
   `tests/inspectionDatabase.test.ts` (columns + band), `tests/workPlan.test.ts`
   (1.2.11 split labels) and the README's Summary-sheet table.
 
+## Routine: which source was sealed
+
+An enforcement's *Sealed* / *Seized* says which facility; the item is recorded
+on its own in `sealedSources` (`lib/rules/sealedSources.ts`, panel
+`components/inspectorate/SealedSourcesPanel.tsx`), keyed by the inventory's own
+key — RAN or annex row. The two inventory tabs read that collection
+(`components/inventory/SealedSources.tsx`) and chip the row Sealed until
+`liftedOn` is set.
+
+- Nothing is stored on the inventory and nothing moves 1.2.11 — no re-seed, no
+  re-baseline. A RAIS re-export keeps every seal because the key is the RAN.
+- The inventory seeds (~900 KB) are loaded by the form only when it opens, by
+  dynamic `import()`. Keep them out of the Inspectorate route's chunk.
+- The National Source Inventory cannot read `inspections`; that is why the
+  record is a collection of its own. Do not move it onto the inspection.
+- A new sealing action goes in `SEALING_ACTIONS` and in the `validSealedSource`
+  rule's `action in [...]` together.
+
 ## Routine: Management asks for the SharePoint workbook, or a new stage split
 
 - The **Excel export for SharePoint** is the panel on `/nsss` and `/border`.

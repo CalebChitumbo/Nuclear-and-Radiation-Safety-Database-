@@ -25,6 +25,11 @@ import {
 } from "../rules/licenceFamily";
 import { recordLicence } from "../rules/recordLicence";
 import {
+  validateSealedSource,
+  type NewSealedSource,
+  type SealedSource,
+} from "../rules/sealedSources";
+import {
   accessPatch,
   approvalPatch,
   normaliseOfficeName,
@@ -132,6 +137,7 @@ interface State {
   borders: Border[];
   truckScans: TruckScan[];
   inventoryEdits: InventoryEdit[];
+  sealedSources: SealedSource[];
   users: UserDoc[];
   tasks: Task[];
 }
@@ -243,6 +249,7 @@ function freshState(): State {
     borders: mapSeedBorders(screeningSeed as SeedScreening),
     truckScans: [],
     inventoryEdits: [],
+    sealedSources: [],
     users: DEMO_USERS.map((u) => ({ ...u })),
     tasks: [],
   };
@@ -280,6 +287,8 @@ function load(): State {
     if (!parsed.truckScans) parsed.truckScans = [];
     // Back-compat: stores saved before the inventories became editable.
     if (!parsed.inventoryEdits) parsed.inventoryEdits = [];
+    // Back-compat: stores saved before sealed sources were recorded by item.
+    if (!parsed.sealedSources) parsed.sealedSources = [];
     // Back-compat: stores saved before the Tasks desk existed.
     if (!parsed.tasks) parsed.tasks = [];
     // Back-compat: the demo department, placed on its reporting line. Accounts
@@ -1130,6 +1139,58 @@ class MockStore implements DataStore {
     dispatchChange();
   }
 
+  async listSealedSources(): Promise<SealedSource[]> {
+    return [...ensure().sealedSources];
+  }
+
+  async addSealedSource(r: NewSealedSource, actor?: string): Promise<SealedSource> {
+    const problem = validateSealedSource(r);
+    if (problem) throw new Error(problem);
+    const s = ensure();
+    const created: SealedSource = {
+      ...r,
+      id: newId("seal"),
+      createdAt: new Date().toISOString(),
+      ...(actor ? { updatedBy: actor } : {}),
+    };
+    s.sealedSources.push(created);
+    save(s);
+    dispatchChange();
+    return created;
+  }
+
+  async updateSealedSource(
+    id: string,
+    patch: Partial<NewSealedSource>,
+    actor?: string,
+  ): Promise<SealedSource> {
+    const s = ensure();
+    const before = s.sealedSources.find((r) => r.id === id);
+    if (!before) throw new Error("That sealed-source record is no longer on file.");
+    const next: SealedSource = { ...before, ...patch, id };
+    // An explicit undefined clears the field, as the Firebase store's whole write does.
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete (next as unknown as Record<string, unknown>)[k];
+    }
+    const { id: _id, ...data } = next;
+    void _id;
+    const problem = validateSealedSource(data);
+    if (problem) throw new Error(problem);
+    next.updatedAt = new Date().toISOString();
+    if (actor) next.updatedBy = actor;
+    s.sealedSources = s.sealedSources.map((r) => (r.id === id ? next : r));
+    save(s);
+    dispatchChange();
+    return next;
+  }
+
+  async deleteSealedSource(id: string): Promise<void> {
+    const s = ensure();
+    s.sealedSources = s.sealedSources.filter((r) => r.id !== id);
+    save(s);
+    dispatchChange();
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     return [...ensure().inspectionRequests].sort((a, b) =>
       (b.requestedAt || "").localeCompare(a.requestedAt || ""),
@@ -1490,6 +1551,7 @@ class MockStore implements DataStore {
       workPlanConfig: s.workPlanConfig[String(WORK_PLAN_YEAR)] || null,
       dailyEntries: s.dailyEntries,
       inventoryEdits: s.inventoryEdits,
+      sealedSources: s.sealedSources,
       truckScans: s.truckScans,
       borders: s.borders,
     };

@@ -28,6 +28,7 @@ import {
   enforcementLabel,
   type EnforcementAction,
 } from "@/lib/rules/inspectionDatabase";
+import { isSealingAction } from "@/lib/rules/sealedSources";
 import { norm } from "@/lib/rules/matching";
 import type { Subprogramme } from "@/lib/rules/workPlan";
 import {
@@ -327,7 +328,11 @@ function InspectionFlow({
     return (
       <SuccessScreen
         message={`Inspection logged — ${facilityName}`}
-        sub="It's in the register, today's log and this week's report."
+        sub={
+          isSealingAction(enforcement)
+            ? "It's in the register, today's log and this week's report. Now record WHICH source or device was sealed: Inspectorate tab → Sealed sources, so the inventory shows it as sealed."
+            : "It's in the register, today's log and this week's report."
+        }
         onAgain={reset}
       />
     );

@@ -52,6 +52,11 @@ import {
 } from "../rules/inventoryEdits";
 import { recordLicence } from "../rules/recordLicence";
 import {
+  validateSealedSource,
+  type NewSealedSource,
+  type SealedSource,
+} from "../rules/sealedSources";
+import {
   accessPatch,
   approvalPatch,
   normaliseOfficeName,
@@ -1113,6 +1118,54 @@ class FirebaseStore implements DataStore {
     await deleteDoc(doc(db, "inspectionCards", id));
   }
 
+  async listSealedSources(): Promise<SealedSource[]> {
+    const db = requireDb();
+    // A handful of documents — one per item ever put under seal — so the
+    // inventory tabs read these, never the inspection log.
+    const snap = await getDocs(collection(db, "sealedSources"));
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SealedSource, "id">) }));
+  }
+
+  async addSealedSource(r: NewSealedSource, actor?: string): Promise<SealedSource> {
+    const problem = validateSealedSource(r);
+    if (problem) throw new Error(problem);
+    const db = requireDb();
+    const data: NewSealedSource = {
+      ...r,
+      createdAt: new Date().toISOString(),
+      ...(actor ? { updatedBy: actor } : {}),
+    };
+    const ref = await addDoc(collection(db, "sealedSources"), stripUndefined(data));
+    return { ...data, id: ref.id };
+  }
+
+  async updateSealedSource(
+    id: string,
+    patch: Partial<NewSealedSource>,
+    actor?: string,
+  ): Promise<SealedSource> {
+    const db = requireDb();
+    const ref = doc(db, "sealedSources", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("That sealed-source record is no longer on file.");
+    const before = { id, ...(snap.data() as Omit<SealedSource, "id">) };
+    const next: SealedSource = { ...before, ...patch, id };
+    const { id: _id, ...data } = next;
+    void _id;
+    const problem = validateSealedSource(data);
+    if (problem) throw new Error(problem);
+    data.updatedAt = new Date().toISOString();
+    if (actor) data.updatedBy = actor;
+    // Written whole, so un-lifting a seal (liftedOn: undefined) drops the field.
+    await setDoc(ref, stripUndefined(data));
+    return { ...data, id };
+  }
+
+  async deleteSealedSource(id: string): Promise<void> {
+    const db = requireDb();
+    await deleteDoc(doc(db, "sealedSources", id));
+  }
+
   async listInspectionRequests(): Promise<InspectionRequest[]> {
     const db = requireDb();
     const snap = await getDocs(collection(db, "inspectionRequests"));
@@ -1558,6 +1611,7 @@ class FirebaseStore implements DataStore {
       workPlanBaseline,
       workPlanConfig,
       inventoryEdits,
+      sealedSources,
     ] = await Promise.all([
       this.listFacilities(),
       this.listLicenceEvents(),
@@ -1575,6 +1629,7 @@ class FirebaseStore implements DataStore {
       this.getWorkPlanBaseline(WORK_PLAN_YEAR).catch(() => null),
       this.getWorkPlanConfig(WORK_PLAN_YEAR).catch(() => null),
       this.listInventoryEdits().catch(() => [] as InventoryEdit[]),
+      this.listSealedSources().catch(() => [] as SealedSource[]),
     ]);
     const db = requireDb();
     const snap = await getDocs(collection(db, "weekMetrics"));
@@ -1598,6 +1653,7 @@ class FirebaseStore implements DataStore {
       borders,
       truckScans,
       inventoryEdits,
+      sealedSources,
     };
   }
 }
