@@ -25,6 +25,16 @@ import {
   InspectionCardRegisterPanel,
   RecordInspectionCardPanel,
 } from "@/components/inspectorate/InspectionCardRegister";
+import {
+  SealedSourcesPanel,
+  type SealPrefill,
+} from "@/components/inspectorate/SealedSourcesPanel";
+import {
+  isSealingAction,
+  isUnderSeal,
+  sealLabel,
+  type SealedSource,
+} from "@/lib/rules/sealedSources";
 import { useWeek } from "@/lib/weekContext";
 import { norm } from "@/lib/rules/matching";
 import { toCsv } from "@/lib/rules/exportCsv";
@@ -105,7 +115,7 @@ export default function InspectoratePage() {
   const { selected, weeks } = useWeek();
   const toast = useToast();
   const { data, error, reload } = useStoreData(async (s) => {
-    const [facilities, inspections, requests, cards] = await Promise.all([
+    const [facilities, inspections, requests, cards, seals] = await Promise.all([
       s.listFacilities(),
       s.listInspections(),
       // Secondary: the schedule must not break the dashboard if the
@@ -113,8 +123,10 @@ export default function InspectoratePage() {
       s.listInspectionRequests().catch(() => []),
       // Likewise the cards recorded on their own.
       s.listInspectionCards().catch(() => []),
+      // And the items sealed or seized, until the sealedSources rules are out.
+      s.listSealedSources().catch(() => [] as SealedSource[]),
     ]);
-    return { facilities, inspections, requests, cards };
+    return { facilities, inspections, requests, cards, seals };
   });
 
   const [period, setPeriod] = useState<InspectionPeriod>("year");
@@ -135,6 +147,22 @@ export default function InspectoratePage() {
   const inspections = useMemo(() => data?.inspections || [], [data]);
   const requests = useMemo(() => data?.requests || [], [data]);
   const cards = useMemo(() => data?.cards || [], [data]);
+  const seals = useMemo(() => data?.seals || [], [data]);
+  // "Record sealed source" on an inspection opens the Sealed sources form
+  // with its facility, day and action filled in.
+  const [sealPrefill, setSealPrefill] = useState<SealPrefill | null>(null);
+  const recordSeal = (inspection: Inspection) =>
+    setSealPrefill({ inspection, nonce: Date.now() });
+  const rowSeals: RowSeals = useMemo(() => {
+    const byInspection = new Map<string, SealedSource[]>();
+    for (const r of seals) {
+      if (!r.inspectionId) continue;
+      const list = byInspection.get(r.inspectionId) || [];
+      list.push(r);
+      byInspection.set(r.inspectionId, list);
+    }
+    return { byInspection };
+  }, [seals]);
 
   const today = todayISO();
   const ctx: PeriodContext = useMemo(
@@ -299,6 +327,9 @@ export default function InspectoratePage() {
         }
       : undefined;
 
+  const sealsForRows: RowSeals =
+    canEditInsp && user ? { ...rowSeals, onRecord: recordSeal } : rowSeals;
+
   // What is on screen is what is exported: the consolidated database, or the
   // picked round's whole sheet (zeros included, as the workbook keeps it).
   const exportDatabase = () => {
@@ -342,6 +373,7 @@ export default function InspectoratePage() {
           { id: "cards-due", label: "Cards due" },
           { id: "cards", label: "Card register" },
           { id: "enforcement", label: "Enforcement" },
+          { id: "sealed", label: "Sealed sources" },
           { id: "outcomes", label: "Outcomes" },
           { id: "schedule", label: "Schedule" },
           { id: "log-inspection", label: "Log inspection" },
@@ -589,11 +621,30 @@ export default function InspectoratePage() {
             {[...enforced]
               .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
               .map((i) => (
-                <InspectionRow key={i.id} inspection={i} showType editing={rowEditing} />
+                <InspectionRow
+                  key={i.id}
+                  inspection={i}
+                  showType
+                  editing={rowEditing}
+                  seals={sealsForRows}
+                />
               ))}
           </ul>
         )}
       </Panel>
+
+      {/* Which source or device each seal or seizure reached — the item the
+          inventory tabs show as Sealed. */}
+      <SealedSourcesPanel
+        records={seals}
+        facilities={facilities}
+        inspections={inspections}
+        canEdit={canEditInsp && !!user}
+        actorUid={user?.uid ?? null}
+        prefill={sealPrefill}
+        onChanged={reload}
+        toastPush={toast.push}
+      />
 
       <section
         id="outcomes"
@@ -755,7 +806,10 @@ export default function InspectoratePage() {
           facilities={facilities}
           knownPhases={knownPhases}
           prefill={prefill}
-          onLogged={reload}
+          onLogged={(created) => {
+            reload();
+            if (created && isSealingAction(created.enforcement)) recordSeal(created);
+          }}
           toastPush={toast.push}
         />
       ) : null}
@@ -766,10 +820,17 @@ export default function InspectoratePage() {
           period={period}
           ctx={ctx}
           editing={rowEditing}
+          seals={sealsForRows}
         />
       </JumpTarget>
     </div>
   );
+}
+
+/** The items sealed at each inspection, and (for editors) recording more. */
+interface RowSeals {
+  byInspection: Map<string, SealedSource[]>;
+  onRecord?: (i: Inspection) => void;
 }
 
 /** Opening one inspection of a list for correction, in place. */
@@ -783,13 +844,17 @@ function InspectionRow({
   inspection: i,
   showType,
   editing,
+  seals,
 }: {
   inspection: Inspection;
   showType?: boolean;
   /** Absent for a reader who cannot correct the register. */
   editing?: RowEditing;
+  seals?: RowSeals;
 }) {
   const open = editing?.openId === i.id;
+  const sealed = seals?.byInspection.get(i.id) || [];
+  const sealing = isSealingAction(i.enforcement);
   return (
     <li className="px-4 sm:px-5 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -806,6 +871,29 @@ function InspectionRow({
             <div className="text-xs text-gunmetal/65 mt-1 whitespace-pre-line">
               {i.notes}
             </div>
+          ) : null}
+          {sealed.length ? (
+            <ul className="text-xs mt-1 space-y-0.5">
+              {sealed.map((r) => (
+                <li key={r.id}>
+                  <span className={isUnderSeal(r) ? "text-[var(--status-stalled)] font-bold" : "text-gunmetal/55"}>
+                    {isUnderSeal(r) ? sealLabel(r.action) : "Seal lifted"}:
+                  </span>{" "}
+                  {r.description}
+                  {r.inventory === "rais" ? ` (${r.key})` : ""}
+                  {r.serialNumber ? ` · serial ${r.serialNumber}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : sealing ? (
+            <div className="text-xs text-[#7a5b07] mt-1">
+              Which source or device was {sealLabel(i.enforcement as string).toLowerCase()} is not recorded.
+            </div>
+          ) : null}
+          {sealing && seals?.onRecord ? (
+            <button className="link-action mt-1 text-xs" onClick={() => seals.onRecord?.(i)}>
+              {sealed.length ? "+ Record another sealed source" : "Record the sealed source"}
+            </button>
           ) : null}
         </div>
         <div className="text-xs tabular text-gunmetal/55 text-right shrink-0">
@@ -852,7 +940,8 @@ function LogInspectionPanel({
   facilities: Facility[];
   knownPhases: string[];
   prefill?: LogPrefill | null;
-  onLogged: () => void;
+  /** Handed the new inspection, so a seal can go straight to "which source". */
+  onLogged: (created?: Inspection) => void;
   toastPush: (msg: string, kind?: "success" | "error") => void;
 }) {
   const { weeks } = useWeek();
@@ -916,7 +1005,7 @@ function LogInspectionPanel({
     try {
       const s = await store();
       const week = weekLabelForDate(date, weeks, "");
-      await s.addInspection({
+      const created = await s.addInspection({
         date,
         week,
         facilityId: selected ? selected.id : null,
@@ -941,7 +1030,7 @@ function LogInspectionPanel({
       setPractice("");
       setEnforcement("");
       setCardIssued(false);
-      onLogged();
+      onLogged(created);
     } catch (err) {
       toastPush(
         `Logging the inspection failed: ${err instanceof Error ? err.message : err}`,
@@ -1171,11 +1260,13 @@ function RegisterPanel({
   period,
   ctx,
   editing,
+  seals,
 }: {
   inspections: Inspection[];
   period: InspectionPeriod;
   ctx: PeriodContext;
   editing?: RowEditing;
+  seals?: RowSeals;
 }) {
   const [filter, setFilter] = useState<InspectionType | "">("");
   // Finding one past visit among hundreds — to put its card on it, say.
@@ -1226,7 +1317,7 @@ function RegisterPanel({
       </div>
       <ul className="divide-y divide-gunmetal/8 mt-3">
         {filtered.slice(0, limit).map((i) => (
-          <InspectionRow key={i.id} inspection={i} showType editing={editing} />
+          <InspectionRow key={i.id} inspection={i} showType editing={editing} seals={seals} />
         ))}
         {filtered.length === 0 ? (
           <li className="px-4 sm:px-5 py-6 text-sm text-gunmetal/55">

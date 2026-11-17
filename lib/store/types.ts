@@ -9,6 +9,7 @@ import type {
   InventoryEditInput,
   InventoryKind,
 } from "../rules/inventoryEdits";
+import type { NewSealedSource, SealedSource } from "../rules/sealedSources";
 import type {
   NewTaskInput,
   TaskAction,
@@ -344,6 +345,22 @@ export interface DataStore {
    * unlike an inspection: a card counts toward no figure.
    */
   deleteInspectionCard(id: string): Promise<void>;
+  /**
+   * Every source or device recorded as sealed or seized by an enforcement —
+   * under seal and lifted alike (lib/rules/sealedSources.ts). Read by the
+   * Inspectorate tab and by both inventory tabs, which show the item as Sealed.
+   */
+  listSealedSources(): Promise<SealedSource[]>;
+  /** Record one item sealed or seized. Moves no reported figure. */
+  addSealedSource(r: NewSealedSource, actor?: string): Promise<SealedSource>;
+  /** Correct a record, or lift the seal (`liftedOn`, `liftNote`). */
+  updateSealedSource(
+    id: string,
+    patch: Partial<NewSealedSource>,
+    actor?: string,
+  ): Promise<SealedSource>;
+  /** Take a record entered in error off the register. */
+  deleteSealedSource(id: string): Promise<void>;
   /** Every cross-section inspection request, newest first. */
   listInspectionRequests(): Promise<InspectionRequest[]>;
   /** Inspection requests for one facility, newest first (indexed in Firebase). */
@@ -504,5 +521,6 @@ export interface DataStore {
     borders: Border[];
     truckScans: TruckScan[];
     inventoryEdits: InventoryEdit[];
+    sealedSources: SealedSource[];
   }>;
 }

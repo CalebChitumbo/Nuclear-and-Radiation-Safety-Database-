@@ -355,6 +355,58 @@ describe("the facilities register and what hangs off it", () => {
   });
 });
 
+describe("sources sealed or seized, item by item", () => {
+  const seal = {
+    inventory: "rais",
+    key: "SS/0639",
+    description: "Cs-137 · Sealed source · Troxler 3440",
+    serialNumber: "36211",
+    facilityId: "f1",
+    facilityName: "Kitwe Central Hospital",
+    action: "Suspension of Practice",
+    sealedOn: "2026-11-10",
+    notes: "",
+  };
+
+  it("are the Inspectorate's to write, and the source inventory's to read", async () => {
+    await assertSucceeds(setDoc(doc(insp(), "sealedSources/s1"), seal));
+    await assertSucceeds(
+      setDoc(doc(insp(), "sealedSources/s1"), { ...seal, liftedOn: "2026-11-15", liftNote: "Licence renewed" }),
+    );
+    await assertSucceeds(getDoc(doc(nsi(), "sealedSources/s1")));
+    await assertSucceeds(getDoc(doc(as(), "sealedSources/s1")));
+    await assertFails(getDoc(doc(nsssDesk(), "sealedSources/s1")));
+    await assertFails(getDoc(doc(nakonde(), "sealedSources/s1")));
+
+    await assertFails(setDoc(doc(nsi(), "sealedSources/s2"), seal));
+    await assertFails(setDoc(doc(as(), "sealedSources/s3"), seal));
+    await assertFails(setDoc(doc(pending(), "sealedSources/s4"), seal));
+    await assertFails(deleteDoc(doc(nsi(), "sealedSources/s1")));
+    await assertSucceeds(deleteDoc(doc(insp(), "sealedSources/s1")));
+  });
+
+  it("must name the item, the facility, the action and the day", async () => {
+    await assertFails(setDoc(doc(insp(), "sealedSources/b1"), { ...seal, key: "" }));
+    await assertFails(setDoc(doc(insp(), "sealedSources/b2"), { ...seal, action: "Written Warning" }));
+    await assertFails(setDoc(doc(insp(), "sealedSources/b3"), { ...seal, sealedOn: "10/11/2026" }));
+    await assertFails(setDoc(doc(insp(), "sealedSources/b4"), { ...seal, facilityName: "" }));
+    await assertFails(setDoc(doc(insp(), "sealedSources/b5"), { ...seal, liftedOn: "2026-11-01" }));
+    // An item on neither inventory says what it is instead.
+    await assertFails(
+      setDoc(doc(insp(), "sealedSources/b6"), { ...seal, inventory: "", key: "", description: "" }),
+    );
+    await assertSucceeds(
+      setDoc(doc(insp(), "sealedSources/ok"), {
+        ...seal,
+        inventory: "",
+        key: "",
+        description: "Am-241/Be portable gauge",
+        action: "Seizure of Device",
+      }),
+    );
+  });
+});
+
 describe("inspection cards recorded on their own", () => {
   const past = {
     issued: "2026-03-10",

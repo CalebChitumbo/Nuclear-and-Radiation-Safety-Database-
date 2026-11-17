@@ -417,6 +417,7 @@ automatically (Production for the production branch, Preview for others).
 | `licenceEvents/{id}` | The dated flow log — one document per licence ever recorded |
 | `inspections/{id}` | The dated inspection log — type, outcome, the `enforcement` action it led to, the `phase` of the province round, and the `cardIssued` date of any inspection card. The Inspectorate's whole database (province sheets, summary, card list) is derived from these. `date` is empty only on rows back-imported from the 2026 register, where the section recorded the visit but not the day |
 | `inspectionCards/{id}` | An inspection card recorded on its own — the day it was issued, the facility, the non-compliances written on it — for the cards the section issued before the log carried them, or at a visit never logged here. A record, not an inspection: it counts toward no output. A card issued at a visit logged in the app is `cardIssued` on that inspection instead; the Inspectorate tab reads both as one register (`lib/rules/inspectionCards.ts`) |
+| `sealedSources/{id}` | One source or device an enforcement **sealed or seized** — named by the inventory's own key (`inventory` `rais` + the RAN, or `verified` + the annex row; `""` for an item on neither, with what it is and its serial), the facility, the day, the inspection it was applied at, and `liftedOn` once the seal is lifted. The Inspectorate writes it; the National Source Inventory reads it, and both inventory tabs show the item as *Sealed* until it is lifted (`lib/rules/sealedSources.ts`). Moves no reported figure |
 | `inspectionRequests/{id}` | The Licensing ↔ Inspectorate handoff — one document per pre-authorisation inspection request, with its status, assigned inspector, report reference and full audit trail |
 | `weekMetrics/{week}` | Manual per-week figures, keyed by work plan output (plus the section's supporting figures) |
 | `workPlanNotes/{outputId}` | The Status / Comments / Action Points an officer keeps against one 2026 work plan output — the only typed columns of the sectional update; the figures are always derived |
@@ -787,6 +788,27 @@ register — a facility's latest card is the one that stands, so a card re-issue
 at a follow-up supersedes the past one. Recorded cards can be corrected and
 removed by the Inspectorate (they count toward nothing), and show on the
 facility record under *Inspection cards on record*.
+
+**Which source was sealed.** The enforcement column says a facility was
+*Sealed* (stored "Suspension of Practice") or had a device seized; it cannot say
+which item. The **Sealed & seized sources** panel on the Inspectorate tab
+records that, one row per item. *Record sealed source* takes the facility, the
+day, Sealed or Seized and the inspection it was applied at, then offers the
+items the inventories place at that facility — RAIS items by the facility's FAC
+code through the holdings export, annex rows by establishment name — with a
+search across both registers (RAN, serial, nuclide, type, holder) for an item
+filed elsewhere, and a free-text line for one on neither inventory (common at an
+unlicensed facility). Several items can be picked at once. Logging an inspection
+with Sealed or Seized opens the form prefilled, and every such inspection in the
+lists carries *Record the sealed source* until one is recorded. A seal is lifted
+on the same panel (day, and on whose authority); nothing is deleted, so the
+history of a source stays on file. The Source Inventory and Verified Source
+Inventory tabs read these records (`sealedSources`, a few documents — never the
+inspection log, which that section does not read) and show **Sealed 2026-11-17**
+on the item's row, an *Under seal* panel listing them, and a *List only these*
+filter; the Source Inventory tab also lists any sealed item that is on neither
+inventory. Output 1.2.11 still counts the action once per inspection, however
+many items it reached.
 
 ---
 
@@ -1570,6 +1592,12 @@ npm test
   survive re-imports
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
+- `sealedSources` — which actions seal an item (Sealed / Seized), what a
+  record needs (an inventory key, or a description for an item on neither;
+  no lift before the seal), the index of items under seal with the latest seal
+  winning and a lifted one dropping out, the seals a tab has no row for, the
+  items offered at a facility (by FAC code and by name) and by search, and the
+  mock store's record / lift / un-lift / remove round trip
 - `inspectionCards` — the card register read off both routes (a card stamped
   on a logged inspection, a past card recorded on its own): standing derived
   from the day issued, a facility's latest card superseding its earlier one,

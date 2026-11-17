@@ -12,6 +12,13 @@ import {
   type EditField,
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
+import {
+  SealChip,
+  UnderSealPanel,
+  sealFor,
+  useSealedSources,
+} from "@/components/inventory/SealedSources";
+import { sealedWithoutRow, type SealedSource } from "@/lib/rules/sealedSources";
 import { norm } from "@/lib/rules/matching";
 import {
   GAP_CATEGORIES,
@@ -92,6 +99,8 @@ export default function VerifiedSourceInventoryPage() {
   const [status, setStatus] = useState<"all" | StatusGroup>("all");
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Only the items an enforcement has under seal. */
+  const [sealedOnly, setSealedOnly] = useState(false);
   /** null = closed; { no: null } = adding a record. */
   const [editing, setEditing] = useState<{ no: string | null } | null>(null);
 
@@ -100,6 +109,25 @@ export default function VerifiedSourceInventoryPage() {
 
   const merged = useMemo(() => mergeVerifiedInventory(BASELINE, edits), [edits]);
   const inventory = merged.records;
+  // The Inspectorate's seals, item by item.
+  const { records: sealRecords, active: activeSeals } = useSealedSources();
+  const sealedRows = useMemo(
+    () =>
+      inventory
+        .map((r) => ({ r, seal: sealFor(activeSeals, "verified", String(r.no)) }))
+        .filter((x): x is { r: VerifiedRecord; seal: SealedSource } => !!x.seal)
+        .map(({ r, seal }) => ({
+          key: String(r.no),
+          label: `#${r.no} · ${r.equipmentType} · ${r.facility}`,
+          seal,
+        })),
+    [inventory, activeSeals],
+  );
+  const sealsWithoutRow = useMemo(
+    () =>
+      sealedWithoutRow(sealRecords, "verified", new Set(inventory.map((r) => String(r.no)))),
+    [sealRecords, inventory],
+  );
   const summary = useMemo(
     () => summarizeVerifiedInventory(inventory),
     [inventory],
@@ -159,10 +187,11 @@ export default function VerifiedSourceInventoryPage() {
           if (groupOf(c) !== category.slice("group:".length)) return false;
         } else if (category && c !== category) return false;
         if (status !== "all" && group !== status) return false;
+        if (sealedOnly && !sealFor(activeSeals, "verified", String(r.no))) return false;
         return !q || hay.includes(q);
       })
       .map(({ r }) => r);
-  }, [indexed, search, category, status]);
+  }, [indexed, search, category, status, sealedOnly, activeSeals]);
 
   const exportCsv = useCallback(() => {
     downloadTextFile(
@@ -174,12 +203,23 @@ export default function VerifiedSourceInventoryPage() {
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
 
   const activeFilters =
-    (category ? 1 : 0) + (status !== "all" ? 1 : 0);
+    (category ? 1 : 0) + (status !== "all" ? 1 : 0) + (sealedOnly ? 1 : 0);
 
   const resetFilters = () => {
     setCategory("");
     setStatus("all");
+    setSealedOnly(false);
     setPage(0);
+  };
+
+  // A tap on an item under seal lists what is sealed at its facility (the
+  // annex has no unique key to search by other than the row).
+  const findItem = (no: string) => {
+    const r = inventory.find((x) => String(x.no) === no);
+    setSearch(r ? r.facility : "");
+    setSealedOnly(true);
+    setPage(0);
+    document.getElementById("items")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const pickCategory = (c: SourceCategory | `group:${string}`) => {
@@ -231,6 +271,7 @@ export default function VerifiedSourceInventoryPage() {
 
       <JumpLinks
         links={[
+          { id: "sealed", label: "Under seal" },
           { id: "by-practice", label: "By practice" },
           { id: "by-source-type", label: "By source type" },
           { id: "removed", label: "Removed" },
@@ -262,6 +303,18 @@ export default function VerifiedSourceInventoryPage() {
           <div className="stat-caption">sealed sources confirmed</div>
         </div>
       </section>
+
+      <UnderSealPanel
+        onRow={sealedRows}
+        withoutRow={sealsWithoutRow}
+        inventoryLabel="the verified inventory"
+        onPick={findItem}
+        filterActive={sealedOnly}
+        onToggleFilter={() => {
+          setSealedOnly((v) => !v);
+          setPage(0);
+        }}
+      />
 
       <Panel
         id="by-practice"
@@ -545,6 +598,7 @@ export default function VerifiedSourceInventoryPage() {
                 <SourceRow
                   key={r.no}
                   r={r}
+                  seal={sealFor(activeSeals, "verified", String(r.no))}
                   edited={merged.editedKeys.has(String(r.no))}
                   added={merged.addedKeys.has(String(r.no))}
                   onEdit={
@@ -572,6 +626,7 @@ export default function VerifiedSourceInventoryPage() {
             <SourceCard
               key={r.no}
               r={r}
+              seal={sealFor(activeSeals, "verified", String(r.no))}
               edited={merged.editedKeys.has(String(r.no))}
               added={merged.addedKeys.has(String(r.no))}
               onEdit={canEdit ? () => setEditing({ no: String(r.no) }) : null}
@@ -645,11 +700,13 @@ function ProvenanceChip({ edited, added }: { edited: boolean; added: boolean }) 
 
 const SourceRow = memo(function SourceRow({
   r,
+  seal,
   edited,
   added,
   onEdit,
 }: {
   r: VerifiedRecord;
+  seal: SealedSource | null;
   edited: boolean;
   added: boolean;
   onEdit: (() => void) | null;
@@ -677,6 +734,11 @@ const SourceRow = memo(function SourceRow({
       </td>
       <td>
         <StatusChip status={r.status} />
+        {seal ? (
+          <div className="mt-1">
+            <SealChip seal={seal} />
+          </div>
+        ) : null}
       </td>
       {onEdit ? (
         <td>
@@ -695,11 +757,13 @@ const SourceRow = memo(function SourceRow({
 
 const SourceCard = memo(function SourceCard({
   r,
+  seal,
   edited,
   added,
   onEdit,
 }: {
   r: VerifiedRecord;
+  seal: SealedSource | null;
   edited: boolean;
   added: boolean;
   onEdit: (() => void) | null;
@@ -718,7 +782,10 @@ const SourceCard = memo(function SourceCard({
             </span>
           </div>
         </div>
-        <StatusChip status={r.status} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <StatusChip status={r.status} />
+          <SealChip seal={seal} />
+        </div>
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <div className="text-xs text-gunmetal/55 tabular min-w-0">

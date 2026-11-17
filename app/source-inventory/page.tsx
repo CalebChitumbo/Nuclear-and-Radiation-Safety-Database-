@@ -12,6 +12,13 @@ import {
   type EditField,
 } from "@/components/inventory/InventoryEditDrawer";
 import { useInventoryEditing } from "@/components/inventory/useInventoryEditing";
+import {
+  SealChip,
+  UnderSealPanel,
+  sealFor,
+  useSealedSources,
+} from "@/components/inventory/SealedSources";
+import { describeRaisItem, sealedWithoutRow, type SealedSource } from "@/lib/rules/sealedSources";
 import { norm } from "@/lib/rules/matching";
 import {
   GAP_CATEGORIES,
@@ -174,6 +181,8 @@ export default function SourceInventoryPage() {
   const [showAllFacilities, setShowAllFacilities] = useState(false);
   const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Only the items an enforcement has under seal. */
+  const [sealedOnly, setSealedOnly] = useState(false);
   /** null = closed; { ran: null } = adding a record. */
   const [editing, setEditing] = useState<{ ran: string | null } | null>(null);
 
@@ -182,6 +191,21 @@ export default function SourceInventoryPage() {
 
   const merged = useMemo(() => mergeRaisInventory(BASELINE, edits), [edits]);
   const inventory = merged.records;
+  // The Inspectorate's seals, item by item — the register shows each item
+  // under seal as Sealed until the seal is lifted.
+  const { records: sealRecords, active: activeSeals } = useSealedSources();
+  const sealedRows = useMemo(
+    () =>
+      inventory
+        .map((r) => ({ r, seal: sealFor(activeSeals, "rais", r.ran) }))
+        .filter((x): x is { r: RaisRecord; seal: SealedSource } => !!x.seal)
+        .map(({ r, seal }) => ({ key: r.ran, label: `${r.ran} · ${describeRaisItem(r)}`, seal })),
+    [inventory, activeSeals],
+  );
+  const sealsWithoutRow = useMemo(
+    () => sealedWithoutRow(sealRecords, "rais", new Set(inventory.map((r) => r.ran))),
+    [sealRecords, inventory],
+  );
   const summary = useMemo(
     () => summarizeRaisInventory(inventory, HOLDERS),
     [inventory],
@@ -326,9 +350,11 @@ export default function SourceInventoryPage() {
             return false;
           }
         }
+        if (sealedOnly && !sealFor(activeSeals, "rais", row.r.ran)) return false;
         // Items not yet classified are kept out of the list unless one of
-        // their own buckets is picked from the "Not yet classified" panel.
-        if (row.unclassified && !pickedUnclassified) return false;
+        // their own buckets is picked from the "Not yet classified" panel —
+        // or the list is showing what is under seal, which hides nothing.
+        if (row.unclassified && !pickedUnclassified && !sealedOnly) return false;
         if (holding.startsWith("province:")) {
           const want = holding.slice("province:".length);
           if ((row.holder?.province || "") !== want) return false;
@@ -342,7 +368,7 @@ export default function SourceInventoryPage() {
         return !q || row.hay.includes(q);
       })
       .map(({ r }) => r);
-  }, [indexed, search, kind, grouping, holding, pickedUnclassified]);
+  }, [indexed, search, kind, grouping, holding, pickedUnclassified, sealedOnly, activeSeals]);
 
   const exportCsv = useCallback(() => {
     downloadTextFile(
@@ -354,13 +380,24 @@ export default function SourceInventoryPage() {
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
 
   const activeFilters =
-    (kind !== "all" ? 1 : 0) + (grouping ? 1 : 0) + (holding ? 1 : 0);
+    (kind !== "all" ? 1 : 0) +
+    (grouping ? 1 : 0) +
+    (holding ? 1 : 0) +
+    (sealedOnly ? 1 : 0);
 
   const resetFilters = () => {
     setKind("all");
     setGrouping("");
     setHolding("");
+    setSealedOnly(false);
     setPage(0);
+  };
+
+  // A tap on an item under seal finds it in the list.
+  const findItem = (ran: string) => {
+    setSearch(ran);
+    setPage(0);
+    document.getElementById("items")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   // A practice group or type spans both registers (a gauge can be an X-ray set
@@ -441,6 +478,7 @@ export default function SourceInventoryPage() {
 
       <JumpLinks
         links={[
+          { id: "sealed", label: "Under seal" },
           { id: "by-practice", label: "By practice" },
           { id: "by-nuclide", label: "By nuclide" },
           { id: "located", label: "Where located" },
@@ -482,6 +520,18 @@ export default function SourceInventoryPage() {
           </div>
         </div>
       </section>
+
+      <UnderSealPanel
+        onRow={sealedRows}
+        withoutRow={sealsWithoutRow}
+        inventoryLabel="the register"
+        onPick={findItem}
+        filterActive={sealedOnly}
+        onToggleFilter={() => {
+          setSealedOnly((v) => !v);
+          setPage(0);
+        }}
+      />
 
       <Panel>
         <span className="field-label">Register</span>
@@ -940,6 +990,7 @@ export default function SourceInventoryPage() {
                 <RaisRow
                   key={r.ran}
                   r={r}
+                  seal={sealFor(activeSeals, "rais", r.ran)}
                   edited={merged.editedKeys.has(r.ran)}
                   added={merged.addedKeys.has(r.ran)}
                   onEdit={canEdit ? () => setEditing({ ran: r.ran }) : null}
@@ -965,6 +1016,7 @@ export default function SourceInventoryPage() {
             <RaisCard
               key={r.ran}
               r={r}
+              seal={sealFor(activeSeals, "rais", r.ran)}
               edited={merged.editedKeys.has(r.ran)}
               added={merged.addedKeys.has(r.ran)}
               onEdit={canEdit ? () => setEditing({ ran: r.ran }) : null}
@@ -1241,11 +1293,13 @@ function ItemCell({ r }: { r: RaisRecord }) {
 
 const RaisRow = memo(function RaisRow({
   r,
+  seal,
   edited,
   added,
   onEdit,
 }: {
   r: RaisRecord;
+  seal: SealedSource | null;
   edited: boolean;
   added: boolean;
   onEdit: (() => void) | null;
@@ -1256,6 +1310,11 @@ const RaisRow = memo(function RaisRow({
     <tr>
       <td className="tabular font-bold whitespace-nowrap">
         {r.ran}
+        {seal ? (
+          <div className="mt-1">
+            <SealChip seal={seal} />
+          </div>
+        ) : null}
         {edited || added ? (
           <div className="mt-1">
             <ProvenanceChip edited={edited} added={added} />
@@ -1310,11 +1369,13 @@ const RaisRow = memo(function RaisRow({
 
 const RaisCard = memo(function RaisCard({
   r,
+  seal,
   edited,
   added,
   onEdit,
 }: {
   r: RaisRecord;
+  seal: SealedSource | null;
   edited: boolean;
   added: boolean;
   onEdit: (() => void) | null;
@@ -1369,6 +1430,7 @@ const RaisCard = memo(function RaisCard({
           {source && r.activity ? <> · {r.activity}</> : null}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <SealChip seal={seal} />
           <ProvenanceChip edited={edited} added={added} />
           {onEdit ? (
             <button

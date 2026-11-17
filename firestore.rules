@@ -155,6 +155,27 @@ service cloud.firestore {
         && (!('reference' in d) || (d.reference is string && d.reference.size() <= 80));
     }
 
+    // One source or device an enforcement sealed or seized, named by the
+    // inventory's own key (lib/rules/sealedSources.ts). The Inspectorate
+    // records it; both inventory tabs read it to show the item as Sealed.
+    function validSealedSource(d) {
+      return d.inventory in ['rais','verified','']
+        && d.key is string && d.key.size() <= 64
+        && (d.inventory == '' || d.key.size() > 0)
+        && d.description is string && d.description.size() <= 200
+        && (d.inventory != '' || d.description.size() > 0)
+        && d.serialNumber is string && d.serialNumber.size() <= 120
+        && d.facilityName is string && d.facilityName.size() > 0
+        && d.action in ['Suspension of Practice','Seizure of Device']
+        && d.sealedOn is string && d.sealedOn.matches('\\d{4}-\\d{2}-\\d{2}')
+        && d.notes is string && d.notes.size() <= 500
+        && (!('inspectionId' in d) || d.inspectionId is string)
+        && (!('liftedOn' in d)
+             || (d.liftedOn is string && d.liftedOn.matches('\\d{4}-\\d{2}-\\d{2}')
+                 && d.liftedOn >= d.sealedOn))
+        && (!('liftNote' in d) || (d.liftNote is string && d.liftNote.size() <= 500));
+    }
+
     function validInspectionRequest(d) {
       return d.facilityName is string && d.facilityName.size() > 0
         && d.type in ['Routine Inspection','Follow-up','Pre-Authorisation','Investigation','Enforcement Action']
@@ -191,6 +212,17 @@ service cloud.firestore {
       allow read:   if seesRegister();
       allow create: if isInsp() && validInspectionCard(request.resource.data);
       allow update: if isInsp() && validInspectionCard(request.resource.data);
+      allow delete: if isInsp();
+    }
+
+    // Sources and devices sealed or seized, item by item. The Inspectorate
+    // writes them (a record moves no reported figure, so it may also take one
+    // entered in error off); the National Source Inventory reads them for its
+    // two tabs, which do not read the inspection register itself.
+    match /sealedSources/{id} {
+      allow read:   if seesRegister() || isNSI();
+      allow create: if isInsp() && validSealedSource(request.resource.data);
+      allow update: if isInsp() && validSealedSource(request.resource.data);
       allow delete: if isInsp();
     }
 
