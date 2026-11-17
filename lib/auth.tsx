@@ -51,6 +51,11 @@ interface AuthState {
   signUp: (input: SignupInput) => Promise<void>;
   signOut: () => Promise<void>;
   /**
+   * Change the signed-in account's own password. The current password is
+   * checked first; rejects with a message fit to show the officer.
+   */
+  changePassword: (current: string, next: string) => Promise<void>;
+  /**
    * Re-read the account's claims from the server. An approval changes the
    * account's claims, not this browser's token, so the pending screen offers
    * this rather than making people wait out the token's hour.
@@ -367,6 +372,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      if (isMockMode) {
+        // Demo accounts accept any password; there is nothing to change.
+        if (!current) throw new Error("Enter your current password.");
+        return;
+      }
+      const auth = getFirebaseAuth();
+      const fbUser = auth?.currentUser;
+      if (!fbUser || !fbUser.email) throw new Error("You are not signed in.");
+      const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } =
+        await import("firebase/auth");
+      try {
+        await reauthenticateWithCredential(
+          fbUser,
+          EmailAuthProvider.credential(fbUser.email, current),
+        );
+        await updatePassword(fbUser, next);
+      } catch (err) {
+        switch ((err as { code?: string }).code) {
+          case "auth/wrong-password":
+          case "auth/invalid-credential":
+          case "auth/invalid-login-credentials":
+            throw new Error("That is not your current password.");
+          case "auth/too-many-requests":
+            throw new Error("Too many attempts. Wait a few minutes and try again.");
+          case "auth/weak-password":
+            throw new Error("Choose a stronger new password.");
+          case "auth/network-request-failed":
+            throw new Error("No connection. Try again when you are online.");
+          default:
+            throw new Error("Could not change the password. Try again.");
+        }
+      }
+    },
+    [],
+  );
+
   const refresh = useCallback(async () => {
     if (isMockMode) {
       const session = loadMockSession();
@@ -406,6 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      changePassword,
       refresh,
       isAdmin: user?.role === "admin",
       canEditAS: canEditSection(user, "Authorisation & Standards"),
@@ -415,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sections: sectionsFor(user),
       postedOnly: isPostedOfficer(user),
     }),
-    [user, pendingAccount, loading, signIn, signUp, signOut, refresh],
+    [user, pendingAccount, loading, signIn, signUp, signOut, changePassword, refresh],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

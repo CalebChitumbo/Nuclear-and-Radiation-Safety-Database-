@@ -140,6 +140,35 @@ export function validateSignup(input: SignupInput): string[] {
   return problems;
 }
 
+/** What the change-password form collects. */
+export interface PasswordChangeInput {
+  current: string;
+  next: string;
+  confirm: string;
+}
+
+/**
+ * What is wrong with a password change, or nothing. The current password is
+ * asked for (and checked by Firebase) so that a stranger at an unlocked
+ * computer cannot take the account over; the new one meets the same floor as
+ * a sign-up and must be different from the old.
+ */
+export function validatePasswordChange(input: PasswordChangeInput): string[] {
+  const problems: string[] = [];
+  if (!input.current) problems.push("Enter your current password.");
+  if (input.next.length < MIN_PASSWORD_LENGTH) {
+    problems.push(
+      `Choose a new password of at least ${MIN_PASSWORD_LENGTH} characters.`,
+    );
+  } else if (input.current && input.next === input.current) {
+    problems.push("Choose a new password different from the current one.");
+  }
+  if (input.next !== input.confirm) {
+    problems.push("The two new passwords do not match.");
+  }
+  return problems;
+}
+
 /**
  * The account document a validated request becomes: an ordinary officer of the
  * one section asked for, held pending, with the inland office attached when the
