@@ -307,6 +307,47 @@ describe("the facilities register and what hangs off it", () => {
     );
   });
 
+  it("takes the service-provider mark and its recognition from Licensing only", async () => {
+    const stamp = {
+      serviceProvider: true,
+      spRecognised: true,
+      spRecognisedOn: "2026-11-20",
+      spRecognitionNote: "Recognised for equipment maintenance.",
+      spRecognitionBy: "C. Officer",
+      spRecognitionAt: "2026-11-24T08:00:00Z",
+      updatedAt: "2026-11-24T08:00:00Z",
+      updatedBy: "u-as",
+    };
+    await assertSucceeds(updateDoc(doc(as(), "facilities/f1"), stamp));
+    await assertFails(updateDoc(doc(insp(), "facilities/f1"), { ...stamp }));
+    // Withdrawn, with the day cleared.
+    await assertSucceeds(
+      updateDoc(doc(as(), "facilities/f1"), { spRecognised: false, spRecognisedOn: "" }),
+    );
+    // A recognised facility must be a service provider.
+    await assertFails(
+      updateDoc(doc(as(), "facilities/f1"), { serviceProvider: false, spRecognised: true }),
+    );
+    await assertFails(
+      updateDoc(doc(as(), "facilities/f1"), { serviceProvider: "yes" }),
+    );
+    await assertFails(
+      updateDoc(doc(as(), "facilities/f1"), { spRecognisedOn: "20 Nov 2026" }),
+    );
+    await assertFails(
+      updateDoc(doc(as(), "facilities/f1"), { spRecognitionNote: "x".repeat(501) }),
+    );
+  });
+
+  it("lets the register read the inspections linked to no facility", async () => {
+    // The facility page matches these to the facility by name.
+    const unlinked = query(collection(as(), "inspections"), where("facilityId", "==", null));
+    await assertSucceeds(getDocs(unlinked));
+    await assertFails(
+      getDocs(query(collection(nsssDesk(), "inspections"), where("facilityId", "==", null))),
+    );
+  });
+
   it("takes an undated inspection, but only from the Inspectorate", async () => {
     // The 2026 register hand-over records the visit but not the day for most of
     // its rows, so an inspection may be stored with no date and no week.

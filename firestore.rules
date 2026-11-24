@@ -103,7 +103,23 @@ service cloud.firestore {
         && (!('functional' in d) || d.functional is bool)
         && (!('category' in d) || d.category in ['Medical','Non-Medical'])
         && (!('stalled' in d) || d.stalled is bool)
-        && (!('needsReview' in d) || d.needsReview is bool);
+        && (!('needsReview' in d) || d.needsReview is bool)
+        && validServiceProvider(d);
+    }
+
+    // The service-provider mark and the Authority's recognition of one
+    // (lib/rules/serviceProviders.ts). All optional; a recognised provider must
+    // be a provider, the day is a day or blank, the note is bounded.
+    function validServiceProvider(d) {
+      return (!('serviceProvider' in d) || d.serviceProvider is bool)
+        && (!('spRecognised' in d) || d.spRecognised is bool)
+        && (!d.get('spRecognised', false) || d.get('serviceProvider', false) == true)
+        && (!('spRecognisedOn' in d) || (d.spRecognisedOn is string
+              && (d.spRecognisedOn == '' || d.spRecognisedOn.matches('\\d{4}-\\d{2}-\\d{2}'))))
+        && (!('spRecognitionNote' in d) || (d.spRecognitionNote is string
+              && d.spRecognitionNote.size() <= 500))
+        && (!('spRecognitionBy' in d) || d.spRecognitionBy is string)
+        && (!('spRecognitionAt' in d) || d.spRecognitionAt is string);
     }
 
     function validEvent(d) {

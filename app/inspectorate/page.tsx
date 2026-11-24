@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/rules/sealedSources";
 import { useWeek } from "@/lib/weekContext";
 import { norm } from "@/lib/rules/matching";
+import { belongsToFacility, recordsOfFacility } from "@/lib/rules/facilityInspections";
 import { toCsv } from "@/lib/rules/exportCsv";
 import { todayISO, weekLabelForDate } from "@/lib/rules/week";
 import {
@@ -111,6 +113,15 @@ const SHEET_PAGE = 100;
  * the weekly report at once.
  */
 export default function InspectoratePage() {
+  // useSearchParams needs a Suspense boundary during static prerender.
+  return (
+    <Suspense fallback={null}>
+      <InspectorateInner />
+    </Suspense>
+  );
+}
+
+function InspectorateInner() {
   const { user, canEditInsp, isAdmin } = useAuth();
   const { selected, weeks } = useWeek();
   const toast = useToast();
@@ -128,6 +139,12 @@ export default function InspectoratePage() {
     ]);
     return { facilities, inspections, requests, cards, seals };
   });
+
+  // ?facility=<id> — opened from a facility's page: that facility's
+  // inspection data, all time, in a panel of its own at the top.
+  const params = useSearchParams();
+  const router = useRouter();
+  const focusId = params.get("facility") || "";
 
   const [period, setPeriod] = useState<InspectionPeriod>("year");
   // "Record follow-up" on a due card fills the logging form with the facility
@@ -165,6 +182,37 @@ export default function InspectoratePage() {
   }, [seals]);
 
   const today = todayISO();
+
+  const focusFacility = useMemo(
+    () => (focusId ? facilities.find((f) => f.id === focusId) || null : null),
+    [focusId, facilities],
+  );
+  const focus = useMemo(() => {
+    if (!focusFacility) return null;
+    const own = recordsOfFacility(inspections, focusFacility).sort((a, b) =>
+      (b.date || "").localeCompare(a.date || ""),
+    );
+    return {
+      inspections: own,
+      recordedCards: recordsOfFacility(cards, focusFacility).length,
+      rows: buildInspectionDatabase(own, facilities, { today }),
+      cards: cardRegister(inspections, cards, facilities, today).filter((c) =>
+        belongsToFacility({ facilityId: c.facilityId, facilityName: c.facility }, focusFacility),
+      ),
+    };
+  }, [focusFacility, inspections, cards, facilities, today]);
+  const clearFocus = () => router.replace("/inspectorate", { scroll: false });
+
+  // The data arrives after the page does, so the browser's own jump to
+  // #facility-inspections finds nothing; scroll once the panel is drawn.
+  const focusRef = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef("");
+  useEffect(() => {
+    if (!focusId || !data || scrolledFor.current === focusId) return;
+    scrolledFor.current = focusId;
+    focusRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusId, data]);
+
   const ctx: PeriodContext = useMemo(
     () => ({ week: selected, today }),
     [selected, today],
@@ -380,6 +428,87 @@ export default function InspectoratePage() {
           { id: "register", label: "Inspection log" },
         ]}
       />
+
+      {focusId && data ? (
+        <div ref={focusRef} id="facility-inspections" className="jump-target">
+          <Panel
+            title={
+              focusFacility
+                ? `Inspection data — ${focusFacility.name}`
+                : "Inspection data — facility not found"
+            }
+            flush
+            note={
+              focus
+                ? `All time, whatever the period above: ${focus.inspections.length} inspection${
+                    focus.inspections.length === 1 ? "" : "s"
+                  }${
+                    focus.recordedCards
+                      ? ` and ${focus.recordedCards} card${focus.recordedCards === 1 ? "" : "s"} recorded on their own`
+                      : ""
+                  }.`
+                : "That facility is not on the register (it may have been removed or merged)."
+            }
+            action={
+              <span className="flex flex-wrap gap-3">
+                {focusFacility ? (
+                  <Link className="link-action" href={`/facilities/${focusFacility.id}`}>
+                    ← Facility record
+                  </Link>
+                ) : null}
+                <button className="link-action" onClick={clearFocus}>
+                  ✕ Show all facilities
+                </button>
+              </span>
+            }
+          >
+            {focus && focus.inspections.length === 0 && focus.cards.length === 0 ? (
+              <p className="px-4 sm:px-5 text-sm text-gunmetal/60">
+                No inspections recorded for this facility.
+              </p>
+            ) : null}
+            {focus && focus.rows.length > 0 ? (
+              <InspectionDatabaseTable rows={focus.rows} showRound />
+            ) : null}
+            {focus && focus.inspections.length > 0 ? (
+              <ul className="divide-y divide-gunmetal/8 mt-3 border-t border-gunmetal/8">
+                {focus.inspections.map((i) => (
+                  <InspectionRow
+                    key={i.id}
+                    inspection={i}
+                    showType
+                    editing={rowEditing}
+                    seals={sealsForRows}
+                  />
+                ))}
+              </ul>
+            ) : null}
+            {focus && focus.cards.length > 0 ? (
+              <div className="px-4 sm:px-5 mt-3">
+                <div className="caps text-[10px] text-gunmetal/50 mb-1.5">
+                  Inspection cards
+                </div>
+                <ul className="divide-y divide-gunmetal/8 text-sm">
+                  {focus.cards.map((c) => (
+                    <li key={c.key} className="flex items-baseline justify-between gap-3 py-2">
+                      <div className="min-w-0 text-xs text-gunmetal/65">
+                        {c.reference ? `Card ${c.reference}` : "Card"}
+                        {c.source === "record" ? " · recorded card" : " · issued at the visit"}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <CardStatusChip status={c.status} />
+                        <div className="text-[11px] text-gunmetal/55 tabular mt-1">
+                          {c.issued} → {c.expiry}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Panel>
+        </div>
+      ) : null}
 
       <section className="stat-grid bleed grid-cols-2 lg:grid-cols-4">
         <Kpi

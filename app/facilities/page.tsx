@@ -20,7 +20,24 @@ import {
 } from "@/lib/rules/enforcementStatus";
 import { facilitiesToCsv } from "@/lib/rules/exportCsv";
 import { enforcementLabel } from "@/lib/rules/inspectionDatabase";
+import {
+  LICENCE_STAGES,
+  LICENCE_STAGE_META,
+  countLicenceStages,
+  importOnlyBasis,
+  licenceStageOf,
+  parseLicenceStage,
+  type LicenceStage,
+} from "@/lib/rules/licenceStage";
 import { norm } from "@/lib/rules/matching";
+import {
+  countServiceProviders,
+  matchesSpFilter,
+  parseSpFilter,
+  serviceProviderSuggestions,
+  type SpFilter,
+} from "@/lib/rules/serviceProviders";
+import { ServiceProviderBadge } from "@/components/facility/ServiceProviderBadge";
 import {
   CATEGORIES,
   PROVINCES,
@@ -62,7 +79,7 @@ function FacilitiesInner() {
   );
   // Deep-linkable filters (the Reports page links into pre-filtered views):
   // /facilities?lic=licensed&func=functional&cat=Medical&sector=Public
-  //            &province=Lusaka&stalled=1&review=1
+  //            &province=Lusaka&stalled=1&review=1&licstage=import-only&sp=recognised
   const params = useSearchParams();
   const [search, setSearch] = useState("");
   const [province, setProvince] = useState<"" | Province>(() => {
@@ -89,6 +106,15 @@ function FacilitiesInner() {
     const v = params.get("func");
     return v === "functional" || v === "non-functional" ? v : "all";
   });
+  // Where each facility stands on the road to Use/Possession — import-only
+  // and the rest (lib/rules/licenceStage.ts).
+  const [licStage, setLicStage] = useState<LicenceStage | "">(() =>
+    parseLicenceStage(params.get("licstage")),
+  );
+  // Service providers, recognised or not (lib/rules/serviceProviders.ts).
+  const [spFilter, setSpFilter] = useState<SpFilter>(() =>
+    parseSpFilter(params.get("sp")),
+  );
   const [onlyStalled, setOnlyStalled] = useState(params.get("stalled") === "1");
   const [onlyReview, setOnlyReview] = useState(params.get("review") === "1");
   // Exact-stage deep link (from the Reports page). No dropdown of its own —
@@ -129,7 +155,9 @@ function FacilitiesInner() {
     [facilities],
   );
 
-  const filtered = useMemo(() => {
+  // Every filter but the two whose options carry counts, so each option can
+  // say how many it would show alongside everything else that is set.
+  const beforeFacets = useMemo(() => {
     const q = norm(search);
     return indexed
       .filter(({ f, hay }) => {
@@ -161,6 +189,37 @@ function FacilitiesInner() {
     stageFilter,
   ]);
 
+  const stageCounts = useMemo(
+    () => countLicenceStages(beforeFacets.filter((f) => matchesSpFilter(f, spFilter))),
+    [beforeFacets, spFilter],
+  );
+  const spCounts = useMemo(
+    () =>
+      countServiceProviders(
+        licStage
+          ? beforeFacets.filter((f) => licenceStageOf(f) === licStage)
+          : beforeFacets,
+      ),
+    [beforeFacets, licStage],
+  );
+
+  const filtered = useMemo(
+    () =>
+      beforeFacets.filter(
+        (f) =>
+          (!licStage || licenceStageOf(f) === licStage) &&
+          matchesSpFilter(f, spFilter),
+      ),
+    [beforeFacets, licStage, spFilter],
+  );
+
+  // Facilities the imported data already calls a service provider, for an
+  // officer to review one by one — shown with the service-provider filter.
+  const spSuggestions = useMemo(
+    () => (canEditAS && spFilter !== "all" ? serviceProviderSuggestions(facilities) : []),
+    [canEditAS, spFilter, facilities],
+  );
+
   const exportCsv = useCallback(() => {
     downloadTextFile(
       `rpa-register-${new Date().toISOString().slice(0, 10)}.csv`,
@@ -177,6 +236,8 @@ function FacilitiesInner() {
     (category ? 1 : 0) +
     (statusFilter !== "all" ? 1 : 0) +
     (funcFilter !== "all" ? 1 : 0) +
+    (licStage ? 1 : 0) +
+    (spFilter !== "all" ? 1 : 0) +
     (onlyStalled ? 1 : 0) +
     (onlyReview ? 1 : 0);
 
@@ -186,6 +247,8 @@ function FacilitiesInner() {
     setCategory("");
     setStatusFilter("all");
     setFuncFilter("all");
+    setLicStage("");
+    setSpFilter("all");
     setOnlyStalled(false);
     setOnlyReview(false);
     setStageFilter("");
@@ -303,6 +366,29 @@ function FacilitiesInner() {
                 ))}
               </select>
             </div>
+            <div className="col-span-2 lg:col-span-1">
+              <label className="field-label" htmlFor="f-licstage">
+                Licence stage
+              </label>
+              <select
+                id="f-licstage"
+                className="input"
+                value={licStage}
+                title={licStage ? LICENCE_STAGE_META[licStage].hint : undefined}
+                onChange={(e) => {
+                  setLicStage(parseLicenceStage(e.target.value));
+                  setPage(0);
+                }}
+              >
+                <option value="">All stages</option>
+                {LICENCE_STAGES.map((st) => (
+                  <option key={st} value={st} title={LICENCE_STAGE_META[st].hint}>
+                    {LICENCE_STAGE_META[st].label}
+                    {initialLoading ? "" : ` (${stageCounts[st]})`}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-end gap-4 col-span-2 lg:col-span-1">
               <label className="flex items-center gap-2 text-xs font-bold py-2">
                 <input
@@ -364,7 +450,59 @@ function FacilitiesInner() {
                 ]}
               />
             </div>
+            <div>
+              <span className="field-label">Service providers</span>
+              <Segmented
+                ariaLabel="Service providers"
+                value={spFilter}
+                onChange={(v) => {
+                  setSpFilter(v);
+                  setPage(0);
+                }}
+                options={[
+                  { value: "all" as SpFilter, label: "All" },
+                  { value: "sp" as SpFilter, label: `Service providers (${spCounts.sp})` },
+                  { value: "recognised" as SpFilter, label: `★ Recognised (${spCounts.recognised})` },
+                  {
+                    value: "unrecognised" as SpFilter,
+                    label: `Not yet recognised (${spCounts.unrecognised})`,
+                  },
+                ]}
+              />
+            </div>
           </div>
+
+          {licStage ? (
+            <p className="mt-2 text-[11px] text-gunmetal/60">
+              {LICENCE_STAGE_META[licStage].hint}.
+              {licStage === "import-only"
+                ? " Facilities the register marks import-only with no import licence recorded are tagged “No import licence on record”."
+                : ""}
+            </p>
+          ) : null}
+
+          {spSuggestions.length > 0 ? (
+            <details className="mt-3 inset p-3 text-sm">
+              <summary className="cursor-pointer select-none text-xs font-bold">
+                {spSuggestions.length} facilities the imported data describes as a
+                service provider — not marked yet
+              </summary>
+              <p className="text-[11px] text-gunmetal/60 mt-2">
+                Nothing is marked automatically. Open each one and use “Mark as
+                service provider” if it is one.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {spSuggestions.map((sug) => (
+                  <li key={sug.id} className="flex flex-wrap gap-x-2">
+                    <Link className="link-action" href={`/facilities/${sug.id}`}>
+                      {sug.name}
+                    </Link>
+                    <span className="text-[11px] text-gunmetal/55">{sug.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
 
           {stageFilter ? (
             <div className="mt-3 flex items-center gap-2 flex-wrap text-sm">
@@ -494,12 +632,33 @@ function Flags({
   enforcement?: FacilityEnforcement;
   small?: boolean;
 }) {
-  if (f.functional !== false && !f.stalled && !f.needsReview && !enforcement) {
+  const importOnly = importOnlyBasis(f);
+  if (
+    f.functional !== false &&
+    !f.stalled &&
+    !f.needsReview &&
+    !enforcement &&
+    !importOnly &&
+    !f.serviceProvider
+  ) {
     return null;
   }
   const size = small ? "text-[10px]" : "";
   return (
     <div className="mt-1 flex flex-wrap gap-1">
+      {f.serviceProvider ? <ServiceProviderBadge f={f} small={small} /> : null}
+      {importOnly ? (
+        <span
+          className={`chip amber ${size}`}
+          title={
+            importOnly === "licence"
+              ? "Holds an import licence and no Use/Possession licence"
+              : "The register marks it import-only; no import licence is recorded against it"
+          }
+        >
+          Import licence only{importOnly === "register" ? " · no import licence on record" : ""}
+        </span>
+      ) : null}
       {f.functional === false ? (
         <span className={`chip red ${size}`}>Non-Functional</span>
       ) : null}

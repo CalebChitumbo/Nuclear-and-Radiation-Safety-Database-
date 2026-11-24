@@ -87,6 +87,14 @@ export interface DataStore {
   listInspections(): Promise<Inspection[]>;
   /** Inspections for one facility, newest first (indexed query in Firebase mode). */
   listInspectionsFor(facilityId: string): Promise<Inspection[]>;
+  /**
+   * Every inspection record of one facility: those linked to it, and those
+   * linked to no facility under its name (lib/rules/facilityInspections.ts).
+   * Newest first, undated last.
+   */
+  listInspectionsOfFacility(
+    facility: Pick<Facility, "id" | "name" | "nameLower">,
+  ): Promise<Inspection[]>;
   listActivities(): Promise<Activity[]>;
   listLicenceWorkflows(): Promise<LicenceWorkflow[]>;
   /** Applications linked to one facility, most recently updated first. */
