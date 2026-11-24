@@ -1,5 +1,7 @@
 import type { FacilityEnforcement } from "./enforcementStatus";
+import { LICENCE_STAGE_META, licenceStageOf } from "./licenceStage";
 import { authWhen } from "./licenceStats";
+import { isRecognisedProvider } from "./serviceProviders";
 import type { Facility } from "./types";
 
 /** RFC-4180 escaping: quote when the value contains a comma, quote or newline. */
@@ -36,12 +38,16 @@ export function facilitiesToCsv(
     "Functional",
     "Licensed",
     "Stage",
+    "Licence Stage",
     "Stalled Application",
     "Needs Review",
     "Review Note",
     "Licence Numbers",
     "Licences Held",
     "Import Detail",
+    "Service Provider",
+    "Recognised by the Authority",
+    "Recognised On",
     "Latest Enforcement Action",
     "Enforcement Date",
   ];
@@ -57,6 +63,7 @@ export function facilitiesToCsv(
     f.functional === false ? "No" : "Yes",
     f.licensed ? "Yes" : "No",
     f.stage,
+    LICENCE_STAGE_META[licenceStageOf(f)].label,
     f.stalled ? "Yes" : "",
     f.needsReview ? "Yes" : "",
     f.reviewNote || "",
@@ -73,6 +80,9 @@ export function facilitiesToCsv(
       })
       .join("; "),
     f.statusDetail || "",
+    f.serviceProvider ? "Yes" : "",
+    f.serviceProvider ? (isRecognisedProvider(f) ? "Yes" : "No") : "",
+    isRecognisedProvider(f) ? f.spRecognisedOn || "" : "",
     enforcement?.get(f.id)?.action || "",
     enforcement?.get(f.id)?.date || "",
   ]);

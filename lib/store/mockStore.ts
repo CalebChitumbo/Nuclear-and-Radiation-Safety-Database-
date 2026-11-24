@@ -23,6 +23,7 @@ import {
   workflowIssueDate,
   workflowLicenceType,
 } from "../rules/licenceFamily";
+import { recordsOfFacility } from "../rules/facilityInspections";
 import { recordLicence } from "../rules/recordLicence";
 import {
   validateSealedSource,
@@ -401,6 +402,14 @@ class MockStore implements DataStore {
     return ensure()
       .inspections.filter((i) => i.facilityId === facilityId)
       .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async listInspectionsOfFacility(
+    facility: Pick<Facility, "id" | "name" | "nameLower">,
+  ): Promise<Inspection[]> {
+    return recordsOfFacility(ensure().inspections, facility).sort((a, b) =>
+      (b.date || "").localeCompare(a.date || ""),
+    );
   }
 
   async listActivities(): Promise<Activity[]> {

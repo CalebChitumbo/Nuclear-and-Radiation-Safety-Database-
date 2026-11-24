@@ -529,6 +529,57 @@ The **Overview's licensing figures are out of the functional facilities** (Oct
 unlicensed pipeline and *Use licence held*. The whole register — functional and
 not — has its own *All facilities* panel lower down.
 
+### Licence stage, service providers and the inspection link (Nov 2026)
+
+**Licence stage filter.** The Facilities register has a *Licence stage*
+dropdown — Use/Possession licence · Import licence only · Other authorisation
+only · Application in progress · No application — each with its count under the
+other filters and the search (`lib/rules/licenceStage.ts`). *Import licence
+only* is read off what a facility **holds**, not off its stage: unlicensed, no
+Use/Possession licence on record, and an import licence on record — or the
+register's own *Import Licence Only* stage where no import licence is recorded.
+In the Sep 2026 seed that is **52** facilities: 41 by their licence (the import
+leaves the stage at wherever the Use/Possession application sits) and 11 by the
+stage alone, which carry the chip *Import licence only · no import licence on
+record*. A facility whose Use/Possession licence has lapsed is not import-only:
+it has been through Use/Possession. Deep link: `/facilities?licstage=import-only`.
+The CSV export gains a *Licence Stage* column.
+
+**Service providers.** A facility can be marked a *service provider* (supply,
+transport, maintenance, dosimetry …) on its page, and a service provider marked
+**recognised** by the Authority, with an optional recognition date and note;
+who changed it and when are kept (`serviceProvider`, `spRecognised`,
+`spRecognisedOn`, `spRecognitionNote`, `spRecognitionBy`, `spRecognitionAt` —
+`lib/rules/serviceProviders.ts`). A recognised provider shows a green ★ stamp on
+the register row and the facility page; one not yet recognised a plain chip.
+The register's *Service providers* filter has All · Service providers ·
+★ Recognised · Not yet recognised (`?sp=sp|recognised|unrecognised`). The mark
+sits **beside** Medical/Non-Medical rather than replacing it, so the category
+counts, the dashboard rollup and the reports do not move. Only Licensing (who
+may edit the record) can set it; `validServiceProvider` in `firestore.rules`
+holds the fields' shapes and that a recognised facility is a provider. Nothing
+is marked by any import: with the filter on, an officer sees the facilities the
+imported data describes as service providers (the Licensing Status workbook's
+"Service provider"/"Transporter", or a Dealer/Supplier, Transportation or
+Dosimetry Services practice — seven in the Sep 2026 seed) to review one by one.
+A register re-import keeps the marks (`mergeSeededFacility` keeps an edited
+facility's own fields).
+
+**Inspection data from the facility page.** The facility page shows *View
+inspection data (N) →*, which opens the Inspectorate tab on that facility
+(`/inspectorate?facility=<id>`): a panel at the top with its database row,
+every inspection (all time, whatever the period) and its cards, and *Show all
+facilities* to go back. With nothing recorded it reads *No inspections
+recorded*; for an account that cannot open the Inspectorate tab (a
+Licensing-only officer) it says how many records there are and points to the
+page's own History. A facility's records are those linked to it **and** the
+unlinked ones under its name (`lib/rules/facilityInspections.ts`, the rule the
+enforcement chip already used) — the 2026 register left five rows unlinked
+whose names are register facilities, Chama District Hospital among them. To
+find those the facility page reads the inspections linked to no facility
+(`listInspectionsOfFacility`, about a hundred documents) beside its indexed
+query.
+
 ---
 
 ## Application notes & history — the officer handover
@@ -1590,6 +1641,15 @@ npm test
 - `workflowNotes` — the application notes & history trail: comment building,
   the automatic history entries a save produces, and that officer comments
   survive re-imports
+- `licenceStage` — the licence stage each facility is in (import-only read
+  off the licences held, or the register's import-only stage), the 52
+  import-only facilities of the 2026 seed and the CSV column
+- `serviceProviders` — the service-provider filter, marking and recognising
+  (who, when, day, note; what the rules refuse), the marks surviving a
+  re-import, the export columns, and the seven facilities the seed suggests
+- `facilityInspections` — a facility's inspection records (linked, or
+  unlinked under its name), the link to the Inspectorate tab, and the mock
+  store's `listInspectionsOfFacility`
 - `inspectionStats` — Inspectorate dashboard period filters (week/month/year),
   per-type and outcome counts, and the schedule ordering
 - `sealedSources` — which actions seal an item (Sealed / Seized), what a

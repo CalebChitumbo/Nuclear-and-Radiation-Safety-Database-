@@ -28,6 +28,7 @@ import { trackWrite } from "./writeQueue";
 import type { DailyEntryScope } from "../rules/access";
 import { computeAggregate } from "../rules/aggregate";
 import { detectType } from "../rules/detectType";
+import { recordsOfFacility } from "../rules/facilityInspections";
 import {
   applyInspectionRequestAction,
   buildInspectionRequest,
@@ -281,6 +282,27 @@ class FirebaseStore implements DataStore {
       ),
     );
     return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Inspection, "id">) }));
+  }
+
+  async listInspectionsOfFacility(
+    facility: Pick<Facility, "id" | "name" | "nameLower">,
+  ): Promise<Inspection[]> {
+    const db = requireDb();
+    // The linked ones by the indexed query; the unlinked ones (a register row
+    // whose province disagreed with ours, a facility typed in by name) are
+    // read as a set — about a hundred documents — and matched by name here,
+    // because Firestore cannot compare names the way norm() does.
+    const [linked, unlinked] = await Promise.all([
+      this.listInspectionsFor(facility.id),
+      getDocs(query(collection(db, "inspections"), where("facilityId", "==", null))),
+    ]);
+    const named = recordsOfFacility(
+      unlinked.docs.map(
+        (d) => ({ id: d.id, ...(d.data() as Omit<Inspection, "id">) }) as Inspection,
+      ),
+      facility,
+    );
+    return [...linked, ...named].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   }
 
   async listActivities(): Promise<Activity[]> {

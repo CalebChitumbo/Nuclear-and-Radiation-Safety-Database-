@@ -6,16 +6,25 @@ import Link from "next/link";
 
 import { FunctionalQuestion } from "@/components/FunctionalQuestion";
 import { StatusPill } from "@/components/StatusPill";
+import { ServiceProviderBadge } from "@/components/facility/ServiceProviderBadge";
+import { ServiceProviderPanel } from "@/components/facility/ServiceProviderPanel";
 import { WorkflowNotesPanel } from "@/components/WorkflowNotesPanel";
 import { Field, Panel } from "@/components/Section";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/store";
 import { CardStatusChip } from "@/components/inspectorate/InspectionDatabaseTable";
+import { canOpen } from "@/lib/rules/access";
 import { detectType } from "@/lib/rules/detectType";
+import { facilityInspectionsHref } from "@/lib/rules/facilityInspections";
 import { enforcementByFacility } from "@/lib/rules/enforcementStatus";
 import { cardExpiry, cardStatus, enforcementLabel } from "@/lib/rules/inspectionDatabase";
 import { REQUEST_STATUS_META } from "@/lib/rules/inspectionRequests";
+import {
+  LICENCE_STAGE_META,
+  importOnlyBasis,
+  licenceStageOf,
+} from "@/lib/rules/licenceStage";
 import { authWhen } from "@/lib/rules/licenceStats";
 import { todayISO } from "@/lib/rules/week";
 import {
@@ -88,10 +97,13 @@ export function FacilityDetail({
   // (indexed queries in Firebase mode) instead of downloading whole collections.
   const loadFacility = useCallback(async (id: string) => {
     const s = await store();
+    const facility = s.getFacility(id);
     return Promise.all([
-      s.getFacility(id),
+      facility,
       s.listLicenceEventsFor(id),
-      s.listInspectionsFor(id),
+      // Linked to it, and the unlinked register rows under its name — the
+      // same records the Inspectorate's view of this facility shows.
+      facility.then((f) => (f ? s.listInspectionsOfFacility(f) : [])),
       // Secondary: a missing rule/index for this new collection must not stop
       // the facility itself from opening. Degrade to an empty list.
       s.listInspectionRequestsFor(id).catch(() => []),
@@ -297,8 +309,11 @@ export function FacilityDetail({
   };
 
   /** Small direct edits to the facility record (functional/category/review). */
-  const patchFacility = async (patch: Partial<Facility>, note: string) => {
-    if (!user || busy) return;
+  const patchFacility = async (
+    patch: Partial<Facility>,
+    note: string,
+  ): Promise<boolean> => {
+    if (!user || busy) return false;
     setBusy(true);
     try {
       const s = await store();
@@ -306,17 +321,25 @@ export function FacilityDetail({
       toast.push(note, "success");
       onChanged?.();
       await refresh(facility.id);
+      return true;
     } catch (err) {
       toast.push(
         `Update failed: ${err instanceof Error ? err.message : err}`,
         "error",
       );
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
   const isPage = variant === "page";
+  const licenceStage = licenceStageOf(facility);
+  const importOnly = importOnlyBasis(facility);
+  // Everything the Inspectorate holds on this facility: its inspections and
+  // the cards recorded on their own.
+  const inspectionCount = inspections.length + cards.length;
+  const mayOpenInspectorate = !!user && canOpen(user, "/inspectorate");
 
   // ---- blocks ------------------------------------------------------------
 
@@ -331,6 +354,16 @@ export function FacilityDetail({
       <span className="chip">
         {facility.category === "Non-Medical" ? "Non-Medical" : "Medical"}
       </span>
+      <ServiceProviderBadge f={facility} />
+      {importOnly ? (
+        <span
+          className="chip amber"
+          title={LICENCE_STAGE_META["import-only"].hint}
+        >
+          Import licence only
+          {importOnly === "register" ? " · no import licence on record" : ""}
+        </span>
+      ) : null}
       <span className="chip slate">{facility.sector}</span>
       <span className="chip">{facility.province}</span>
       {facility.facCode ? (
@@ -390,6 +423,13 @@ export function FacilityDetail({
         <Field label="Sequence #" value={String(facility.no || "—")} />
         <Field label="Stage" value={facility.stage} wide />
         <Field
+          label="Licence stage"
+          value={`${LICENCE_STAGE_META[licenceStage].label}${
+            importOnly === "register" ? " (register marks it import-only; no import licence recorded)" : ""
+          }`}
+          wide
+        />
+        <Field
           label="Enforcement standing"
           value={
             enforcement
@@ -414,6 +454,40 @@ export function FacilityDetail({
         ) : null}
       </dl>
     </Panel>
+  );
+
+  // Straight to this facility's inspection data on the Inspectorate tab — only
+  // when there is some to see, and only for an account that may open that tab.
+  const inspectionLink =
+    inspectionCount === 0 ? (
+      <span className="chip slate" title="No inspection or inspection card is recorded against this facility">
+        No inspections recorded
+      </span>
+    ) : mayOpenInspectorate ? (
+      <Link
+        href={facilityInspectionsHref(facility.id)}
+        className="btn btn-secondary text-xs"
+      >
+        View inspection data ({inspectionCount}) →
+      </Link>
+    ) : (
+      <span
+        className="chip slate"
+        title="The Inspectorate tab is the Inspectorate's; the inspections are listed under History on this page."
+      >
+        {inspectionCount} inspection record{inspectionCount === 1 ? "" : "s"} — see History
+      </span>
+    );
+
+  const spPanel = (
+    <ServiceProviderPanel
+      facility={facility}
+      canEdit={canEditAS}
+      actorName={user?.displayName || "Officer"}
+      busy={busy}
+      onPatch={patchFacility}
+      bleed={!isPage}
+    />
   );
 
   const actionsPanel = canEditAS ? (
@@ -674,8 +748,13 @@ export function FacilityDetail({
           )}
         </div>
         <div>
-          <div className="caps text-[10px] text-gunmetal/50 mb-1.5">
-            Inspections
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="caps text-[10px] text-gunmetal/50">Inspections</div>
+            {inspectionCount > 0 && mayOpenInspectorate ? (
+              <Link href={facilityInspectionsHref(facility.id)} className="link-action text-xs">
+                Open on the Inspectorate tab →
+              </Link>
+            ) : null}
           </div>
           {inspections.length === 0 ? (
             <p className="text-sm text-gunmetal/55">No inspections.</p>
@@ -876,8 +955,10 @@ export function FacilityDetail({
     return (
       <div className="space-y-4">
         {identity}
+        <div>{inspectionLink}</div>
         {reviewCallout}
         {recordPanel}
+        {spPanel}
         {actionsPanel}
         {authorisationsPanel}
         {applicationsPanel}
@@ -904,6 +985,7 @@ export function FacilityDetail({
           </p>
         </div>
         {identity}
+        <div>{inspectionLink}</div>
       </header>
 
       {reviewCallout}
@@ -917,6 +999,7 @@ export function FacilityDetail({
         </div>
         <div className="space-y-4 min-w-0 lg:sticky lg:top-20">
           {recordPanel}
+          {spPanel}
           {actionsPanel}
         </div>
       </div>

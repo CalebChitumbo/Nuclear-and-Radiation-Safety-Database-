@@ -220,6 +220,24 @@ export interface Facility {
   currentStatus?: NewApplicationStatus;
   facCode: string;
   auths: Authorisation[];
+  /**
+   * The facility is a service provider (a dealer, transporter, maintenance or
+   * dosimetry service …) rather than a user of radiation in its own practice.
+   * Set by an officer; nothing in the imports sets it. It sits beside the
+   * Medical/Non-Medical category, which stays what it was, so the register's
+   * category counts and the dashboard rollup do not move.
+   * See lib/rules/serviceProviders.ts.
+   */
+  serviceProvider?: boolean;
+  /** A service provider the Authority has recognised (verified). */
+  spRecognised?: boolean;
+  /** The day the Authority recognised it (YYYY-MM-DD), or "" if not recorded. */
+  spRecognisedOn?: string;
+  /** Free note on the recognition — the letter, the scope, the condition. */
+  spRecognitionNote?: string;
+  /** Who last set or cleared the recognition, and when (ISO timestamp). */
+  spRecognitionBy?: string;
+  spRecognitionAt?: string;
   updatedAt?: string;
   updatedBy?: string;
 }
